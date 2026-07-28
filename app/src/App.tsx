@@ -35,9 +35,9 @@ import { AgentsArea } from './cockpit/pages/AgentsArea'
 import { AufgabenArea } from './cockpit/pages/AufgabenArea'
 import { TermineArea } from './cockpit/pages/TermineArea'
 import { FreigabenArea } from './cockpit/pages/FreigabenArea'
+import { LinkedinArea } from './cockpit/pages/LinkedinArea'
 
 
-function isEditableTarget(target: EventTarget | null): boolean {
 /** CRM → Sales (Juli 2026): alte /crm-Links/Bookmarks/Deep-Links auf /sales umleiten. */
 function CrmRedirect() {
   const location = useLocation()
@@ -46,6 +46,7 @@ function CrmRedirect() {
   return <Navigate to={`/sales${target}${location.search}`} replace />
 }
 
+function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false
   const tag = target.tagName.toLowerCase()
   if (tag === 'input' || tag === 'textarea' || tag === 'select') return true
@@ -217,6 +218,7 @@ function App() {
                 <Route path="/aufgaben" element={<AufgabenArea />} />
                 <Route path="/termine" element={<TermineArea />} />
                 <Route path="/freigaben" element={<FreigabenArea />} />
+                <Route path="/linkedin" element={<LinkedinArea />} />
                 <Route path="/sales/*" element={<SalesArea />} />
                 <Route path="/crm/*" element={<CrmRedirect />} />
                 <Route path="/projekte/*" element={<ProjekteArea />} />

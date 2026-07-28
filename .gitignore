@@ -42,3 +42,6 @@ supabase/.temp/
 
 # Local Netlify folder
 .netlify
+
+# Abgeleiteter Zustand: zuletzt tragende LinkedIn-Blaetter-Query-ID (wird validiert/neu entdeckt)
+runner/linkedin/.paging-queryid.json

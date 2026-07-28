@@ -374,6 +374,31 @@ export interface Contact {
   updated_at: string
 }
 
+export type LinkedinThreadStatus = 'active' | 'waiting_reply' | 'won' | 'lost' | 'archived'
+export type LinkedinLastFrom = 'me' | 'them' | 'unknown'
+
+/** Siehe supabase/migrations/0058_linkedin_threads.sql. */
+export interface LinkedinThread {
+  id: string
+  brand_id: string
+  thread_key: string
+  contact_id: string | null
+  name: string
+  company: string
+  profile_url: string
+  preview: string
+  last_message_at: string | null
+  last_from: LinkedinLastFrom
+  unread: boolean
+  /** LinkedIn-Stern = Lead hat Ja zur Loom-Analyse gesagt. */
+  starred: boolean
+  followup_stage: number
+  snoozed_until: string | null
+  status: LinkedinThreadStatus
+  first_seen_at: string
+  last_synced_at: string
+}
+
 export type SalesFieldType = 'textarea' | 'text' | 'number' | 'toggle'
 
 export interface SalesFieldItem {

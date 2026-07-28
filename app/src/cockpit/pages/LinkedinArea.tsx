@@ -1,0 +1,479 @@
+import { useEffect, useMemo, useState } from 'react'
+import { useContacts } from '../../hooks/useContacts'
+import { useLinkedinThreads } from '../../hooks/useLinkedinThreads'
+import type { LinkedinThread } from '../../types/db'
+import { HeuteTabs } from '../components/HeuteTabs'
+import { useActiveBrand } from '../lib/activeBrand'
+import { buildLinkedinFollowupInput } from '../lib/approvalDrafts'
+import { bucketOf, coverage, FOLLOWUP_THRESHOLDS_DAYS } from '../lib/linkedinFollowups'
+import { RUNNER_BASE_URL, useRunnerStatus } from '../lib/useRunnerStatus'
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+function agoLabel(iso: string | null, now: number): string {
+  if (!iso) return 'noch nie'
+  const ms = now - new Date(iso).getTime()
+  if (!Number.isFinite(ms) || ms < 0) return 'gerade eben'
+  const mins = Math.round(ms / 60000)
+  if (mins < 1) return 'gerade eben'
+  if (mins < 60) return `vor ${mins} Min.`
+  const hours = Math.round(mins / 60)
+  if (hours < 24) return `vor ${hours} Std.`
+  const days = Math.round(hours / 24)
+  return `vor ${days} Tag${days === 1 ? '' : 'en'}`
+}
+
+function daysSince(iso: string | null, now: number): number | null {
+  if (!iso) return null
+  const ms = now - new Date(iso).getTime()
+  return Number.isFinite(ms) ? Math.floor(ms / DAY_MS) : null
+}
+
+/** thread_key ist die einzige persistierte Kennung — Link wird daraus abgeleitet, keine eigene Spalte. */
+function threadUrl(threadKey: string): string {
+  const id = threadKey.replace(/^urn:li:messagingThread:/, '')
+  return id ? `https://www.linkedin.com/messaging/thread/${id}/` : ''
+}
+
+function ThreadCard({
+  thread,
+  now,
+  onSnoozeTomorrow,
+  onMarkDone,
+  onGenerateDraft,
+}: {
+  thread: LinkedinThread
+  now: number
+  onSnoozeTomorrow: (t: LinkedinThread) => void
+  onMarkDone: (t: LinkedinThread) => void
+  onGenerateDraft: (t: LinkedinThread) => void
+}) {
+  const days = daysSince(thread.last_message_at, now)
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '10px 12px', borderBottom: '1px solid var(--ck-border)' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0 }}>
+          {thread.starred ? (
+            <span title="Stern: Ja zur Loom-Analyse" style={{ color: 'var(--ck-accent)', fontSize: 12 }}>
+              ★
+            </span>
+          ) : null}
+          <span
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: 'var(--ck-text-1)',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+            }}
+          >
+            {thread.name || 'Unbekannt'}
+          </span>
+          {thread.company ? (
+            <span
+              style={{
+                fontSize: 11,
+                color: 'var(--ck-text-3)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                minWidth: 0,
+              }}
+            >
+              {thread.company}
+            </span>
+          ) : null}
+        </div>
+        <span className="ck-label" style={{ flexShrink: 0, fontSize: 9 }}>
+          Stufe {thread.followup_stage} · {days == null ? '—' : `vor ${days} Tag${days === 1 ? '' : 'en'}`}
+        </span>
+      </div>
+      {thread.preview ? (
+        <div style={{ fontSize: 12, color: 'var(--ck-text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {thread.preview}
+        </div>
+      ) : null}
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button type="button" className="ck-btn ck-btn--primary" style={{ fontSize: 10 }} onClick={() => onGenerateDraft(thread)}>
+          Entwurf erzeugen
+        </button>
+        <button type="button" className="ck-btn" style={{ fontSize: 10 }} onClick={() => onSnoozeTomorrow(thread)}>
+          → morgen
+        </button>
+        <button type="button" className="ck-btn" style={{ fontSize: 10 }} onClick={() => onMarkDone(thread)}>
+          Erledigt
+        </button>
+        {threadUrl(thread.thread_key) ? (
+          <a
+            href={threadUrl(thread.thread_key)}
+            target="_blank"
+            rel="noreferrer"
+            className="ck-btn"
+            style={{ fontSize: 10, marginLeft: 'auto', textDecoration: 'none' }}
+          >
+            Öffnen ↗
+          </a>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+const SICHTBAR_PRO_ABSCHNITT = 15
+
+/**
+ * Ein Bucket als Abschnitt. Zeigt anfangs nur die ersten Karten — bei über
+ * hundert Threads wäre die Seite sonst eine Wand statt einer Arbeitsliste.
+ * Die Gesamtzahl steht immer in der Überschrift, es wird nichts verschwiegen.
+ */
+function ThreadSection({
+  titel,
+  hinweis,
+  threads,
+  leerText,
+  now,
+  onSnoozeTomorrow,
+  onMarkDone,
+  onGenerateDraft,
+}: {
+  titel: string
+  hinweis?: string
+  threads: LinkedinThread[]
+  leerText?: string
+  now: number
+  onSnoozeTomorrow: (t: LinkedinThread) => void
+  onMarkDone: (t: LinkedinThread) => void
+  onGenerateDraft: (t: LinkedinThread) => void
+}) {
+  const [alleZeigen, setAlleZeigen] = useState(false)
+  if (threads.length === 0 && !leerText) return null
+  const sichtbar = alleZeigen ? threads : threads.slice(0, SICHTBAR_PRO_ABSCHNITT)
+  const rest = threads.length - sichtbar.length
+
+  return (
+    <section className="ck-panel" style={{ overflow: 'hidden' }}>
+      <div className="ck-label" style={{ padding: '10px 12px 8px' }}>
+        {titel} · {threads.length}
+        {hinweis ? <span style={{ color: 'var(--ck-text-3)' }}> · {hinweis}</span> : null}
+      </div>
+      {threads.length === 0 ? (
+        <div style={{ padding: '16px 12px', fontSize: 12, color: 'var(--ck-text-3)' }}>{leerText}</div>
+      ) : (
+        <>
+          {sichtbar.map((t) => (
+            <ThreadCard
+              key={t.id}
+              thread={t}
+              now={now}
+              onSnoozeTomorrow={onSnoozeTomorrow}
+              onMarkDone={onMarkDone}
+              onGenerateDraft={onGenerateDraft}
+            />
+          ))}
+          {rest > 0 ? (
+            <button
+              type="button"
+              onClick={() => setAlleZeigen(true)}
+              className="ck-label"
+              style={{
+                width: '100%',
+                textAlign: 'left',
+                padding: '10px 12px',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'var(--ck-accent)',
+              }}
+            >
+              ▸ {rest} weitere anzeigen
+            </button>
+          ) : null}
+        </>
+      )}
+    </section>
+  )
+}
+
+/** /linkedin — vierter Heute-Tab (Wargame Zug 7, docs/wargames/linkedin-followups.md). */
+export function LinkedinArea() {
+  const { activeBrand } = useActiveBrand()
+  const slug = activeBrand?.slug
+  const threadsQuery = useLinkedinThreads(slug)
+  const contacts = useContacts(slug)
+  const { state: runnerState } = useRunnerStatus()
+  const [syncing, setSyncing] = useState(false)
+  const [syncMessage, setSyncMessage] = useState<string | null>(null)
+  // Überlebt den Reload, damit der Unvollständigkeits-Hinweis nicht nur direkt
+  // nach dem Sync sichtbar ist. Kein DB-Feld nötig — die Aussage gilt pro Gerät.
+  const [lastSyncPartial, setLastSyncPartial] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('linkedin.lastSyncPartial') === '1'
+    } catch {
+      return false
+    }
+  })
+  // Eine Uhr, die im Minutentakt tickt, statt Date.now() bei jedem Render:
+  // sonst wechselt der Wert in jedem Durchlauf und die useMemos darunter
+  // rechnen jedes Mal neu, obwohl sich an den Daten nichts geändert hat.
+  const [nowDate, setNowDate] = useState(() => new Date())
+  useEffect(() => {
+    const id = window.setInterval(() => setNowDate(new Date()), 60_000)
+    return () => window.clearInterval(id)
+  }, [])
+  const now = nowDate.getTime()
+
+  const lastSyncedAt = useMemo(() => {
+    let max: string | null = null
+    for (const t of threadsQuery.items) {
+      if (!max || t.last_synced_at > max) max = t.last_synced_at
+    }
+    return max
+  }, [threadsQuery.items])
+
+  const staleMs = lastSyncedAt ? now - new Date(lastSyncedAt).getTime() : null
+  const isStale = staleMs != null && staleMs > 24 * 60 * 60 * 1000
+  const isOffline = runnerState === 'offline'
+
+  const buckets = useMemo(() => {
+    const faellig: LinkedinThread[] = []
+    const duBistDran: LinkedinThread[] = []
+    const abschluss: LinkedinThread[] = []
+    const verwaist: LinkedinThread[] = []
+    const pruefen: LinkedinThread[] = []
+    for (const t of threadsQuery.items) {
+      const b = bucketOf(t, nowDate)
+      if (b === 'faellig') faellig.push(t)
+      else if (b === 'du_bist_dran') duBistDran.push(t)
+      else if (b === 'abschluss') abschluss.push(t)
+      else if (b === 'verwaist') verwaist.push(t)
+      else if (b === 'pruefen') pruefen.push(t)
+    }
+    // Ältestes zuerst — was am längsten liegt, ist am dringendsten.
+    const byAge = (a: LinkedinThread, b: LinkedinThread) =>
+      (a.last_message_at ?? '').localeCompare(b.last_message_at ?? '')
+    // Sterne (Loom zugesagt) nach vorn, danach nach Alter.
+    const bySternDannAlter = (a: LinkedinThread, b: LinkedinThread) =>
+      Number(b.starred) - Number(a.starred) || byAge(a, b)
+    return {
+      faellig: faellig.sort(byAge),
+      duBistDran: duBistDran.sort(bySternDannAlter),
+      abschluss: abschluss.sort(byAge),
+      verwaist: verwaist.sort(byAge),
+      pruefen,
+    }
+  }, [threadsQuery.items, nowDate])
+
+  const cov = useMemo(
+    () => coverage(threadsQuery.items, contacts.items, nowDate),
+    [threadsQuery.items, contacts.items, nowDate],
+  )
+
+  const runSync = async () => {
+    setSyncing(true)
+    setSyncMessage(null)
+    try {
+      const res = await fetch(`${RUNNER_BASE_URL}/linkedin/sync`, { method: 'POST' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setSyncMessage(data?.error ?? `Sync fehlgeschlagen (HTTP ${res.status})`)
+      } else {
+        const ads = data.skippedAds ? ` · ${data.skippedAds} Anzeige(n) gefiltert` : ''
+        setSyncMessage(
+          `${data.inserted ?? 0} neu · ${data.updated ?? 0} aktualisiert · ${data.unmatched ?? 0} ohne Kontakt${ads}`,
+        )
+        setLastSyncPartial(Boolean(data.partial))
+        try {
+          localStorage.setItem('linkedin.lastSyncPartial', data.partial ? '1' : '0')
+        } catch {
+          /* ohne localStorage gilt der Hinweis nur für diese Session */
+        }
+        await threadsQuery.reload()
+      }
+    } catch {
+      setSyncMessage('Runner nicht erreichbar — läuft Chrome (chrome-sync) und der Runner lokal?')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  const generateDraft = async (thread: LinkedinThread) => {
+    try {
+      await fetch(`${RUNNER_BASE_URL}/run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agent: 'linkedin-followup-entwuerfe',
+          input: buildLinkedinFollowupInput([thread], nowDate),
+        }),
+      })
+      setSyncMessage(`Entwurf für ${thread.name} angefordert — siehe /freigaben.`)
+    } catch {
+      setSyncMessage('Runner nicht erreichbar — Entwurf konnte nicht angefordert werden.')
+    }
+  }
+
+  const snoozeTomorrow = (thread: LinkedinThread) => {
+    void threadsQuery.snooze(thread.id, new Date(now + DAY_MS).toISOString())
+  }
+
+  let badgeColor = 'var(--ck-text-3)'
+  let badgeText = `Zuletzt synchronisiert ${agoLabel(lastSyncedAt, now)}`
+  if (isOffline) {
+    badgeColor = '#ef4444'
+    badgeText = `Chrome/Runner offline — Stand vom ${lastSyncedAt ? new Date(lastSyncedAt).toLocaleString('de-DE') : 'nie'}`
+  } else if (isStale) {
+    badgeColor = 'var(--ck-warn)'
+  }
+
+  return (
+    <div style={{ maxWidth: 780, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <HeuteTabs />
+
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <h1 style={{ fontSize: 18, fontWeight: 600, color: 'var(--ck-text-1)', margin: 0 }}>LinkedIn</h1>
+          <span className="ck-label" style={{ color: badgeColor, fontSize: 10 }}>
+            {badgeText}
+          </span>
+        </div>
+        <button type="button" onClick={() => void runSync()} disabled={syncing} className="ck-btn ck-btn--primary" style={{ fontSize: 10 }}>
+          {syncing ? 'Synchronisiert …' : 'Jetzt synchronisieren'}
+        </button>
+      </div>
+
+      {syncMessage ? (
+        <div style={{ fontSize: 11, color: 'var(--ck-text-3)' }}>{syncMessage}</div>
+      ) : null}
+
+      {threadsQuery.error ? (
+        <div style={{ fontSize: 11, color: 'var(--ck-warn)' }}>{threadsQuery.error}</div>
+      ) : null}
+
+      {threadsQuery.tableMissing ? (
+        <div className="ck-panel" style={{ padding: '28px 14px', textAlign: 'center', fontSize: 13, color: 'var(--ck-text-3)' }}>
+          Noch keine Daten — Migration 0058 muss zuerst gepusht werden (supabase db push).
+        </div>
+      ) : threadsQuery.loading ? (
+        <div style={{ fontSize: 12, color: 'var(--ck-text-3)', padding: 12 }}>Lädt …</div>
+      ) : (
+        <>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <div className="ck-panel" style={{ padding: '10px 14px', flex: 1, minWidth: 140 }}>
+              <div className="ck-label" style={{ fontSize: 9 }}>Du bist dran</div>
+              <div style={{ fontSize: 20, fontWeight: 600, color: buckets.duBistDran.length ? 'var(--ck-warn)' : 'var(--ck-text-1)' }}>
+                {buckets.duBistDran.length}
+              </div>
+            </div>
+            <div className="ck-panel" style={{ padding: '10px 14px', flex: 1, minWidth: 140 }}>
+              <div className="ck-label" style={{ fontSize: 9 }}>Fällig</div>
+              <div style={{ fontSize: 20, fontWeight: 600, color: 'var(--ck-text-1)' }}>{buckets.faellig.length}</div>
+            </div>
+            <div className="ck-panel" style={{ padding: '10px 14px', flex: 1, minWidth: 140 }}>
+              <div className="ck-label" style={{ fontSize: 9 }}>Altlasten</div>
+              <div style={{ fontSize: 20, fontWeight: 600, color: buckets.verwaist.length ? 'var(--ck-warn)' : 'var(--ck-text-1)' }}>
+                {buckets.verwaist.length}
+              </div>
+            </div>
+            <div className="ck-panel" style={{ padding: '10px 14px', flex: 1, minWidth: 140 }}>
+              <div className="ck-label" style={{ fontSize: 9 }}>★ Loom zugesagt</div>
+              <div style={{ fontSize: 20, fontWeight: 600, color: 'var(--ck-accent)' }}>
+                {threadsQuery.items.filter((t) => t.starred).length}
+              </div>
+            </div>
+          </div>
+
+          {/* RECON-1: der letzte Sync hat eine volle Seite (20 Konversationen)
+              geliefert — solange Blättern ungeklärt ist, darf die Seite das nicht
+              als Gesamtzahl ausgeben. Hängt bewusst am Sync-Ergebnis und nicht an
+              der Zeilenzahl, denn gefilterte Anzeigen verfälschen die. */}
+          {lastSyncPartial ? (
+            <div style={{ fontSize: 11, color: 'var(--ck-warn)' }}>
+              Der letzte Sync hat eine volle Seite von LinkedIn geladen — möglicherweise
+              unvollständig, ältere Threads fehlen eventuell.
+            </div>
+          ) : null}
+
+          <ThreadSection
+            titel="Du bist dran"
+            hinweis="Lead hat geantwortet · Sterne zuerst"
+            threads={buckets.duBistDran}
+            now={now}
+            onSnoozeTomorrow={snoozeTomorrow}
+            onMarkDone={(th) => void threadsQuery.markDone(th)}
+            onGenerateDraft={(th) => void generateDraft(th)}
+          />
+
+          <ThreadSection
+            titel="Fällig heute"
+            hinweis="älteste zuerst"
+            threads={buckets.faellig}
+            leerText="Keine fälligen Follow-ups."
+            now={now}
+            onSnoozeTomorrow={snoozeTomorrow}
+            onMarkDone={(th) => void threadsQuery.markDone(th)}
+            onGenerateDraft={(th) => void generateDraft(th)}
+          />
+
+          <ThreadSection
+            titel="Abschluss fällig"
+            hinweis="letzte Nachricht, danach wird archiviert"
+            threads={buckets.abschluss}
+            now={now}
+            onSnoozeTomorrow={snoozeTomorrow}
+            onMarkDone={(th) => void threadsQuery.markDone(th)}
+            onGenerateDraft={(th) => void generateDraft(th)}
+          />
+
+          <ThreadSection
+            titel="Altlasten"
+            hinweis="über 30 Tage liegen geblieben, nie nachgefasst — wiederbeleben oder schließen"
+            threads={buckets.verwaist}
+            now={now}
+            onSnoozeTomorrow={snoozeTomorrow}
+            onMarkDone={(th) => void threadsQuery.markDone(th)}
+            onGenerateDraft={(th) => void generateDraft(th)}
+          />
+
+          <section className="ck-panel" style={{ padding: 12 }}>
+            <div className="ck-label" style={{ marginBottom: 8 }}>Abdeckung</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8, fontSize: 12 }}>
+              <div>Fällig: {cov.faellig}</div>
+              <div>Du bist dran: {cov.du_bist_dran}</div>
+              <div>Wartet: {cov.wartet}</div>
+              <div>Prüfen: {cov.pruefen}</div>
+              <div>Abschluss: {cov.abschluss}</div>
+              <div>Ruht: {cov.ruht}</div>
+              <div style={{ color: cov.nie_angeschrieben > 0 ? 'var(--ck-warn)' : undefined }}>
+                Nie angeschrieben: {cov.nie_angeschrieben}
+              </div>
+              <div>Ohne Kontakt: {cov.ohne_kontakt}</div>
+              <div style={{ color: cov.verwaist > 0 ? 'var(--ck-warn)' : undefined }}>Verwaist: {cov.verwaist}</div>
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--ck-text-3)', marginTop: 8 }}>
+              Follow-up-Schwellen: {FOLLOWUP_THRESHOLDS_DAYS.join(' / ')} Tage (Stufe 0/1/2)
+            </div>
+          </section>
+
+          {buckets.pruefen.length > 0 ? (
+            <section className="ck-panel" style={{ overflow: 'hidden' }}>
+              <div className="ck-label" style={{ padding: '10px 12px 8px' }}>Prüfen · {buckets.pruefen.length}</div>
+              {buckets.pruefen.map((t) => (
+                <div
+                  key={t.id}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderBottom: '1px solid var(--ck-border)' }}
+                >
+                  <span style={{ flex: 1, fontSize: 13, color: 'var(--ck-text-1)' }}>{t.name || 'Unbekannt'}</span>
+                  {threadUrl(t.thread_key) ? (
+                    <a href={threadUrl(t.thread_key)} target="_blank" rel="noreferrer" className="ck-btn" style={{ fontSize: 10, textDecoration: 'none' }}>
+                      Im Postfach öffnen ↗
+                    </a>
+                  ) : null}
+                </div>
+              ))}
+            </section>
+          ) : null}
+        </>
+      )}
+    </div>
+  )
+}

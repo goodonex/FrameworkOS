@@ -13,6 +13,8 @@ import { mkdir, readdir, readFile, realpath, stat, writeFile } from 'node:fs/pro
 import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
+import { syncThreads } from './linkedin/sync.mjs'
+import { upsertThreads } from './linkedin/upsert.mjs'
 
 // ---------- Lokale .env (nur für Secrets wie den Supabase-Key; gitignored) ----------
 // Minimaler Parser (zero-dependency). Prozess-Env hat Vorrang vor der Datei.
@@ -52,9 +54,9 @@ const TIMEOUT_MS = 10 * 60 * 1000 // 10 Minuten (Plan §6)
 const SUPABASE_URL = (process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? '').replace(/\/$/, '')
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? ''
 const SNAPSHOT_PUSH_MS = Number(process.env.SNAPSHOT_PUSH_MS ?? 60_000)
+const HEARTBEAT_PUSH_MS = Number(process.env.HEARTBEAT_PUSH_MS ?? 15_000)
 const SNAPSHOT_ENABLED = Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY)
 
-const HEARTBEAT_PUSH_MS = Number(process.env.HEARTBEAT_PUSH_MS ?? 15_000)
 // Kunden-Ads (Cockpit /ads): Ad-Creatives + Manifeste liegen in den Kundenordnern.
 const KUNDEN_ROOT = resolve(process.env.KUNDEN_ROOT ?? join(homedir(), 'Kevin OS', '02 Projekte', 'Kunden'))
 const KUNDEN_CONFIG = join(KUNDEN_ROOT, 'cockpit-kunden.json')
@@ -68,8 +70,6 @@ const SOCIAL_ROOT = resolve(
 )
 const SOCIAL_WEEKLY = join(SOCIAL_ROOT, 'content-engine', 'weekly')
 
-// Content-Manifest pro Brand (Cockpit /content, Post-Ebene). Feste Allowlist —
-// der Brand-Slug wird NIE in einen Pfad interpoliert (kein Traversal). MVP: nur
 // Sales-Bibliothek (Cockpit /sales): Skripte-Ordner der Akquise. Env-überschreibbar.
 const SALES_ROOT = resolve(
   process.env.SALES_ROOT ??
@@ -77,6 +77,8 @@ const SALES_ROOT = resolve(
 )
 const SALES_VAULT_DIR = join(VAULT, '03 Bereiche', 'Vertrieb & Outreach')
 
+// Content-Manifest pro Brand (Cockpit /content, Post-Ebene). Feste Allowlist —
+// der Brand-Slug wird NIE in einen Pfad interpoliert (kein Traversal). MVP: nur
 // HERRMANN; weitere Brands (CoLective …) bekommen in Phase 3 einen eigenen Ordner.
 const CONTENT_MANIFESTS = {
   herrmann: join(SOCIAL_ROOT, 'content-engine', 'content.json'),
@@ -130,6 +132,12 @@ const AGENT_CATALOG = [
     kind: 'readonly',
   },
   {
+    id: 'linkedin-followup-entwuerfe',
+    label: 'LinkedIn-Follow-up-Entwürfe',
+    description: 'Entwirft Follow-up-DMs für fällige LinkedIn-Threads (Wargame linkedin-followups).',
+    kind: 'readonly',
+  },
+  {
     id: 'lead-research',
     label: 'Lead-Research',
     description: 'Recherchiert einen Lead/Kandidaten und fasst Kernpunkte zusammen.',
@@ -141,14 +149,6 @@ const AGENT_CATALOG = [
     description: 'Tägliche Kurzanalyse der eigenen Skill-Nutzung + 1–2 Verbesserungsideen.',
     kind: 'readonly',
   },
-]
-
-const AGENT_BY_ID = new Map(AGENT_CATALOG.map((a) => [a.id, a]))
-
-/** Ausführungs-Konfig je Agent: cwd, Prompt-Builder, zusätzliche CLI-Flags. */
-function agentConfig(agent) {
-  const a = AGENT_BY_ID.get(agent)
-  if (!a) return null
   {
     id: 'loom-skript',
     label: 'Loom-Skript (Lead)',
@@ -190,6 +190,14 @@ function agentConfig(agent) {
       '--print-to-pdf="Follow-up-Analyse <Name>.pdf" "Follow-up-Analyse <Name>.html"`; 3 Seiten via ' +
       '.page.mt-Umbrüche. Keine Preise nennen, CTA nur Quali-Call.',
   },
+]
+
+const AGENT_BY_ID = new Map(AGENT_CATALOG.map((a) => [a.id, a]))
+
+/** Ausführungs-Konfig je Agent: cwd, Prompt-Builder, zusätzliche CLI-Flags. */
+function agentConfig(agent) {
+  const a = AGENT_BY_ID.get(agent)
+  if (!a) return null
   if (a.kind === 'write') {
     return {
       cwd: a.cwd,
@@ -206,6 +214,7 @@ function agentConfig(agent) {
 // ---------- Zustand ----------
 /** @type {Map<string, {id:string, agent:string, startedAt:string, proc:import('node:child_process').ChildProcess}>} */
 const running = new Map()
+let linkedinSyncRunning = false
 
 // ---------- Helpers ----------
 function nowStamp() {
@@ -577,15 +586,6 @@ async function pushSnapshot() {
   }
 }
 
-/** Erlaubte Roots einmalig realpath-auflösen (Symlink-sicher). */
-let osFileRootsPromise = null
-function osFileRoots() {
-  osFileRootsPromise ??= Promise.all(
-    [VAULT, GLOBAL_SKILLS_DIR].map(async (root) => {
-      try {
-        return await realpath(root)
-      } catch {
-        return null // Root existiert nicht → fällt aus der Allowlist
 /**
  * Heartbeat: schreibt alle paar Sekunden last_seen + laufende/wartende Jobs in
  * `runner_heartbeat`. Damit sieht die HTTPS-Live-Domain (die den lokalen Port
@@ -622,6 +622,15 @@ async function pushHeartbeat() {
   }
 }
 
+/** Erlaubte Roots einmalig realpath-auflösen (Symlink-sicher). */
+let osFileRootsPromise = null
+function osFileRoots() {
+  osFileRootsPromise ??= Promise.all(
+    [VAULT, GLOBAL_SKILLS_DIR].map(async (root) => {
+      try {
+        return await realpath(root)
+      } catch {
+        return null // Root existiert nicht → fällt aus der Allowlist
       }
     }),
   ).then((roots) => roots.filter(Boolean))
@@ -660,6 +669,7 @@ const KUNDEN_MIME = {
   '.woff': 'font/woff',
   '.mp4': 'video/mp4',
   '.webm': 'video/webm',
+  '.pdf': 'application/pdf',
 }
 
 /** Kunden-Root einmalig realpath-auflösen (Symlink-sicher, analog osFileRoots). */
@@ -669,7 +679,6 @@ function kundenRootReal() {
   return kundenRootRealPromise
 }
 
-  '.pdf': 'application/pdf',
 /** Social-Root einmalig realpath-auflösen (Symlink-sicher, analog kundenRootReal). */
 let socialRootRealPromise = null
 function socialRootReal() {
@@ -677,15 +686,6 @@ function socialRootReal() {
   return socialRootRealPromise
 }
 
-/**
- * Wochen-Batches: content-engine/weekly/<YYYY-Www>/woche-*.html — neueste zuerst.
- * Titel aus dem <title> der HTML (nur Kopf lesen), Post-Anzahl aus posts/.
- */
-async function socialWeeks() {
-  let dirs
-  try {
-    dirs = await readdir(SOCIAL_WEEKLY, { withFileTypes: true })
-  } catch {
 /** Sales-Root einmalig realpath-auflösen (Symlink-sicher, analog socialRootReal). */
 let salesRootRealPromise = null
 function salesRootReal() {
@@ -739,6 +739,15 @@ async function salesLibrary() {
   }
 }
 
+/**
+ * Wochen-Batches: content-engine/weekly/<YYYY-Www>/woche-*.html — neueste zuerst.
+ * Titel aus dem <title> der HTML (nur Kopf lesen), Post-Anzahl aus posts/.
+ */
+async function socialWeeks() {
+  let dirs
+  try {
+    dirs = await readdir(SOCIAL_WEEKLY, { withFileTypes: true })
+  } catch {
     return [] // Ordner (noch) nicht da → leer, kein Fehler
   }
   const weeks = []
@@ -953,6 +962,31 @@ const server = createServer(async (req, res) => {
       }
     }
 
+    // ---------- LinkedIn-Follow-ups (Wargame Zug 9, docs/wargames/linkedin-followups.md) ----------
+    // Rein lesend gegen die Voyager-API des Sync-Chrome-Profils (~/.uriel-chrome).
+    // Kein Klick, kein Senden. Ein Lauf zur Zeit.
+    if (req.method === 'POST' && url.pathname === '/linkedin/sync') {
+      if (linkedinSyncRunning) return json(res, 409, { error: 'LinkedIn-Sync läuft bereits' })
+      linkedinSyncRunning = true
+      try {
+        const synced = await syncThreads({})
+        const result = await upsertThreads(synced.threads, {})
+        return json(res, 200, {
+          ...result,
+          partial: synced.partial,
+          skippedGroups: synced.skippedGroups,
+          skippedNonInbox: synced.skippedNonInbox,
+          skippedAds: synced.skippedAds,
+          elapsedMs: synced.elapsedMs,
+        })
+      } catch (e) {
+        console.error('[runner] LinkedIn-Sync fehlgeschlagen:', e?.message ?? e)
+        return json(res, 502, { error: e?.message ?? 'LinkedIn-Sync fehlgeschlagen' })
+      } finally {
+        linkedinSyncRunning = false
+      }
+    }
+
     if (req.method === 'GET' && url.pathname === '/os/file') {
       const p = url.searchParams.get('path')
       if (!p) return json(res, 400, { error: 'path fehlt' })
@@ -1011,6 +1045,32 @@ const server = createServer(async (req, res) => {
       return json(res, 200, { weeks: await socialWeeks() })
     }
 
+    // ---------- Sales-Bibliothek: statische Dateien (Vorlagen/PDFs/HTML für /sales) ----------
+    if (req.method === 'GET' && url.pathname.startsWith('/files/sales/')) {
+      const rel = decodeURIComponent(url.pathname.slice('/files/sales/'.length))
+      const dot = rel.lastIndexOf('.')
+      const mime = dot >= 0 ? KUNDEN_MIME[rel.slice(dot).toLowerCase()] : undefined
+      if (!mime) return json(res, 403, { error: 'Dateityp nicht erlaubt' })
+      const root = await salesRootReal()
+      if (!root) return json(res, 404, { error: 'Sales-Root existiert nicht' })
+      const real = await realpath(resolve(join(SALES_ROOT, rel)))
+      if (real !== root && !real.startsWith(root + sep)) {
+        return json(res, 403, { error: 'Pfad außerhalb Sales-Root' })
+      }
+      const buf = await readFile(real)
+      res.writeHead(200, {
+        'Content-Type': mime,
+        'Cache-Control': 'no-cache',
+        'Access-Control-Allow-Origin': '*',
+      })
+      return res.end(buf)
+    }
+
+    // ---------- Sales-Bibliothek: Liste (Vault-Erstnachrichten + Vorlagen/PDFs) ----------
+    if (req.method === 'GET' && url.pathname === '/sales/library') {
+      return json(res, 200, await salesLibrary())
+    }
+
     // ---------- Kunden-Ads: Register + Manifest ----------
     if (req.method === 'GET' && url.pathname === '/ads/customers') {
       return json(res, 200, { kunden: await kundenRegistry() })
@@ -1044,32 +1104,6 @@ const server = createServer(async (req, res) => {
       } catch (e) {
         if (e?.code !== 'ENOENT') throw e // kaputtes JSON soll auffallen, nicht leer wirken
       }
-
-    // ---------- Sales-Bibliothek: statische Dateien (Vorlagen/PDFs/HTML für /sales) ----------
-    if (req.method === 'GET' && url.pathname.startsWith('/files/sales/')) {
-      const rel = decodeURIComponent(url.pathname.slice('/files/sales/'.length))
-      const dot = rel.lastIndexOf('.')
-      const mime = dot >= 0 ? KUNDEN_MIME[rel.slice(dot).toLowerCase()] : undefined
-      if (!mime) return json(res, 403, { error: 'Dateityp nicht erlaubt' })
-      const root = await salesRootReal()
-      if (!root) return json(res, 404, { error: 'Sales-Root existiert nicht' })
-      const real = await realpath(resolve(join(SALES_ROOT, rel)))
-      if (real !== root && !real.startsWith(root + sep)) {
-        return json(res, 403, { error: 'Pfad außerhalb Sales-Root' })
-      }
-      const buf = await readFile(real)
-      res.writeHead(200, {
-        'Content-Type': mime,
-        'Cache-Control': 'no-cache',
-        'Access-Control-Allow-Origin': '*',
-      })
-      return res.end(buf)
-    }
-
-    // ---------- Sales-Bibliothek: Liste (Vault-Erstnachrichten + Vorlagen/PDFs) ----------
-    if (req.method === 'GET' && url.pathname === '/sales/library') {
-      return json(res, 200, await salesLibrary())
-    }
 
       if (req.method === 'GET') {
         return json(res, 200, onDisk ?? emptyManifest(slug))
@@ -1189,13 +1223,13 @@ server.listen(PORT, '127.0.0.1', () => {
     setTimeout(() => void pushSnapshot(), 3000)
     const t = setInterval(() => void pushSnapshot(), SNAPSHOT_PUSH_MS)
     t.unref?.()
-  } else {
-    console.log('[runner] Snapshot-Push + Heartbeat AUS (kein SUPABASE_SERVICE_ROLE_KEY in runner/.env) — Live-Graph bleibt leer, Runner erscheint auf der Live-Domain offline')
-  }
-})
 
     // Heartbeat für den Runner-Status-Punkt auf der Live-Domain (alle 15s).
     console.log(`[runner] Heartbeat aktiv → Supabase alle ${Math.round(HEARTBEAT_PUSH_MS / 1000)}s`)
     setTimeout(() => void pushHeartbeat(), 1500)
     const hb = setInterval(() => void pushHeartbeat(), HEARTBEAT_PUSH_MS)
     hb.unref?.()
+  } else {
+    console.log('[runner] Snapshot-Push + Heartbeat AUS (kein SUPABASE_SERVICE_ROLE_KEY in runner/.env) — Live-Graph bleibt leer, Runner erscheint auf der Live-Domain offline')
+  }
+})

@@ -4,9 +4,10 @@ const TABS = [
   { to: '/aufgaben', label: 'Aufgaben' },
   { to: '/termine', label: 'Termine' },
   { to: '/freigaben', label: 'Freigaben' },
+  { to: '/linkedin', label: 'LinkedIn' },
 ]
 
-/** Sub-Nav für die zusammengefassten „Heute"-Bereiche (Aufgaben · Termine · Freigaben). */
+/** Sub-Nav für die zusammengefassten „Heute"-Bereiche (Aufgaben · Termine · Freigaben · LinkedIn). */
 export function HeuteTabs() {
   return (
     <div

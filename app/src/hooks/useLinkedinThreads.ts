@@ -1,0 +1,94 @@
+import { useCallback, useEffect, useState } from 'react'
+import { isMissingSupabaseTableError } from '../lib/supabaseErrors'
+import { supabase } from '../lib/supabase'
+import type { LinkedinThread } from '../types/db'
+import { useBrandId } from './useBrandId'
+
+interface UseLinkedinThreadsResult {
+  items: LinkedinThread[]
+  loading: boolean
+  /** Tabelle existiert noch nicht (Migration 0058 nicht gepusht) → Leerzustand, kein Fehler. */
+  tableMissing: boolean
+  error: string | null
+  reload: () => Promise<void>
+  snooze: (id: string, untilIso: string) => Promise<void>
+  /** Stufe 0-2 → nächste Stufe. Stufe 3 (Break-up war fällig) → archiviert. */
+  markDone: (thread: LinkedinThread) => Promise<void>
+}
+
+/** Liest linkedin_threads für die aktive Brand (Wargame Zug 7, docs/wargames/linkedin-followups.md). */
+export function useLinkedinThreads(brandSlug: string | undefined): UseLinkedinThreadsResult {
+  const brandId = useBrandId(brandSlug)
+  const [items, setItems] = useState<LinkedinThread[]>([])
+  const [loading, setLoading] = useState(true)
+  const [tableMissing, setTableMissing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const reload = useCallback(async () => {
+    if (!supabase || !brandId) {
+      setItems([])
+      setLoading(false)
+      return
+    }
+    setLoading(true)
+    const { data, error: err } = await supabase
+      .from('linkedin_threads')
+      .select('*')
+      .eq('brand_id', brandId)
+      .order('last_message_at', { ascending: true })
+
+    if (err) {
+      if (isMissingSupabaseTableError(err.message)) {
+        setTableMissing(true)
+        setItems([])
+        setError(null)
+      } else {
+        setError(err.message)
+      }
+      setLoading(false)
+      return
+    }
+    setTableMissing(false)
+    setError(null)
+    setItems((data ?? []) as LinkedinThread[])
+    setLoading(false)
+  }, [brandId])
+
+  useEffect(() => {
+    void reload()
+  }, [reload])
+
+  // Schreibfehler (z. B. RLS) dürfen nicht still verpuffen — sonst klickt Kevin
+  // „Erledigt", nichts passiert, und die Stufe bleibt unbemerkt stehen.
+  const applyPatch = useCallback(
+    async (id: string, patch: Record<string, unknown>) => {
+      if (!supabase) return
+      const { error: err } = await supabase.from('linkedin_threads').update(patch).eq('id', id)
+      if (err) {
+        setError(err.message)
+        return
+      }
+      setError(null)
+      await reload()
+    },
+    [reload],
+  )
+
+  const snooze = useCallback(
+    (id: string, untilIso: string) => applyPatch(id, { snoozed_until: untilIso }),
+    [applyPatch],
+  )
+
+  const markDone = useCallback(
+    (thread: LinkedinThread) =>
+      applyPatch(
+        thread.id,
+        thread.followup_stage >= 3
+          ? { status: 'archived' }
+          : { followup_stage: thread.followup_stage + 1 },
+      ),
+    [applyPatch],
+  )
+
+  return { items, loading, tableMissing, error, reload, snooze, markDone }
+}

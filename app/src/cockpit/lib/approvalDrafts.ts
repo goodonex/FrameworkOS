@@ -1,4 +1,4 @@
-import type { Contact } from '../../types/db'
+import type { Contact, LinkedinThread } from '../../types/db'
 
 /**
  * Approval-Queue (IDEAS-2026 A1, v1 migrationsfrei): der followup-entwuerfe-Agent
@@ -16,6 +16,11 @@ export interface FollowupDraft {
   /** Nur bei E-Mail relevant. */
   subject?: string
   message: string
+  /**
+   * Anzeigename, wenn kein CRM-Kontakt dahinterhängt (LinkedIn-Threads ohne
+   * `contact_id`) — sonst stünde auf der Freigabe-Karte nur „Unbekannter Kontakt".
+   */
+  name?: string
 }
 
 function coerceChannel(x: unknown): DraftChannel {
@@ -42,14 +47,17 @@ export function parseDrafts(content: string): FollowupDraft[] {
     for (const d of arr) {
       if (!d || typeof d !== 'object') continue
       const rec = d as Record<string, unknown>
+      // contact_id kann fehlen (z. B. LinkedIn-Thread ohne zugeordneten CRM-Kontakt) —
+      // das ist der Normalfall dort, kein Grund den Entwurf zu verwerfen.
       const contactId = typeof rec.contact_id === 'string' ? rec.contact_id : ''
       const message = typeof rec.message === 'string' ? rec.message : ''
-      if (!contactId || !message) continue
+      if (!message) continue
       out.push({
         contact_id: contactId,
         channel: coerceChannel(rec.channel),
         subject: typeof rec.subject === 'string' ? rec.subject : undefined,
         message,
+        name: typeof rec.name === 'string' && rec.name.trim() ? rec.name.trim() : undefined,
       })
     }
     return out
@@ -87,6 +95,32 @@ export function buildFollowupInput(contacts: Contact[]): { contacts: Array<Recor
       lastContact: c.stage_changed_at ?? null,
       nextFollowUp: c.next_follow_up_at,
       notes: c.entscheider_name ? `Entscheider: ${c.entscheider_name}` : null,
+    })),
+  }
+}
+
+/**
+ * Baut den Agenten-Input für linkedin-followup-entwuerfe (Wargame Zug 8,
+ * docs/wargames/linkedin-followups.md). `contact_id` bleibt `null`, wenn der
+ * Thread keinem CRM-Kontakt zugeordnet ist — parseDrafts lässt das zu.
+ */
+export function buildLinkedinFollowupInput(
+  threads: LinkedinThread[],
+  now: Date = new Date(),
+): { threads: Array<Record<string, unknown>> } {
+  return {
+    threads: threads.map((t) => ({
+      thread_key: t.thread_key,
+      contact_id: t.contact_id,
+      name: t.name,
+      company: t.company,
+      profile_url: t.profile_url,
+      preview: t.preview,
+      tage_seit_kontakt:
+        t.last_message_at != null
+          ? Math.floor((now.getTime() - new Date(t.last_message_at).getTime()) / (24 * 60 * 60 * 1000))
+          : null,
+      followup_stage: t.followup_stage,
     })),
   }
 }

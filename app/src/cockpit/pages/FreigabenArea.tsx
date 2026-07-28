@@ -24,6 +24,9 @@ interface Card extends FollowupDraft {
   confirming: boolean
 }
 
+/** Agenten, deren Runs Freigabe-Karten liefern (parseDrafts-JSON-Block). */
+const DRAFT_AGENTS = new Set(['followup-entwuerfe', 'linkedin-followup-entwuerfe'])
+
 const CHANNEL_LABEL: Record<DraftChannel, string> = {
   email: 'E-Mail',
   linkedin: 'LinkedIn',
@@ -62,13 +65,11 @@ export function FreigabenArea() {
 
   const latestRun = useMemo(() => {
     return runs
-      .filter((r) => r.agent === 'followup-entwuerfe' && r.status === 'done')
+      .filter((r) => DRAFT_AGENTS.has(r.agent) && r.status === 'done')
       .sort((a, b) => String(b.started).localeCompare(String(a.started)))[0]
   }, [runs])
 
-  const runningFollowup = runs.some(
-    (r) => r.agent === 'followup-entwuerfe' && r.status === 'running',
-  )
+  const runningFollowup = runs.some((r) => DRAFT_AGENTS.has(r.agent) && r.status === 'running')
 
   useEffect(() => {
     if (!latestRun || latestRun.id === loadedRunId) return
@@ -199,7 +200,7 @@ export function FreigabenArea() {
       ) : (
         cards.map((card) => {
           const contact = contactMap.get(card.contact_id)
-          const name = contactLabel(contact, 'Unbekannter Kontakt')
+          const name = contactLabel(contact, card.name || 'Unbekannter Kontakt')
           const toEmail = contact?.email?.trim() || null
           const isEmail = card.channel === 'email'
           const canSend = isEmail && Boolean(toEmail) && Boolean(brandId)
