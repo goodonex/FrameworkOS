@@ -24,6 +24,14 @@ const CDP = 'http://127.0.0.1:9222'
 const MESSAGING = 'https://www.linkedin.com/messaging/'
 const HARD_TIMEOUT_MS = 90_000
 
+// Wie weit zurück geblättert wird. 30 Tage im Alltag: der einmalige Tiefenscan
+// ist gelaufen, ältere Threads liegen bereits in der DB und werden nie gelöscht.
+// Weil LinkedIn absteigend nach letzter Aktivität sortiert, rutscht ein alter
+// Thread, in dem wieder etwas passiert, automatisch auf Seite 1 — ein kurzes
+// Fenster übersieht also keine neue Aktivität, es spart nur Seitenaufrufe.
+// Für einen erneuten Tiefenscan: LINKEDIN_SCAN_TAGE=365 node runner/linkedin/sync.mjs --dry-run
+const SCAN_TAGE = Number(process.env.LINKEDIN_SCAN_TAGE ?? 30)
+
 async function findOrOpenMessaging() {
   const get = async () => (await fetch(`${CDP}/json`)).json()
   let list
@@ -93,8 +101,9 @@ function evaluate(wsUrl, expression) {
 // IMMER erst validiert (ein Aufruf, Wurzelname + Cursor prüfen) und nur benutzt,
 // wenn sie noch trägt — sonst wird neu entdeckt. Damit steht kein Release-Hash
 // im Quelltext und der Sync heilt sich selbst, wenn LinkedIn ihn rotiert.
-const buildSyncExpr = (cachedQid) => `(async () => {
+const buildSyncExpr = (cachedQid, scanTage) => `(async () => {
   const CACHED_QID = ${JSON.stringify(cachedQid || null)};
+  const SCAN_TAGE = ${Number(scanTage)};
   if (document.querySelector('input[type=password]') || location.href.includes('/uas/login')) {
     return { loginWall: true };
   }
@@ -207,8 +216,7 @@ const buildSyncExpr = (cachedQid) => `(async () => {
 
   // ---- Seiten einsammeln ----
   const MAX_SEITEN = 25;
-  const MAX_ALTER_TAGE = 180;
-  const alterGrenze = Date.now() - MAX_ALTER_TAGE * 24 * 60 * 60 * 1000;
+  const alterGrenze = Date.now() - SCAN_TAGE * 24 * 60 * 60 * 1000;
 
   const rohSeiten = [];
   let seitenGeholt = 0;
@@ -370,7 +378,7 @@ export async function syncThreads({ dryRun = false } = {}) {
   const startedAt = Date.now()
   const page = await findOrOpenMessaging()
   const cachedQid = leseQidCache()
-  const result = await evaluate(page.webSocketDebuggerUrl, buildSyncExpr(cachedQid))
+  const result = await evaluate(page.webSocketDebuggerUrl, buildSyncExpr(cachedQid, SCAN_TAGE))
 
   if (result.queryId && result.queryId !== cachedQid) schreibeQidCache(result.queryId)
 

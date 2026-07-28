@@ -220,9 +220,30 @@ Statt 4 Stern-Leads wurden 15 sichtbar.
    (ein Aufruf, Wurzelname + Cursor prüfen). Kein Hash im Quelltext, und bei
    Rotation heilt sich der Sync über die Neuentdeckung selbst.
 3. **Grenzen statt Endlosschleife.** Maximal 25 Seiten, Abbruch sobald eine Seite
-   älter als 180 Tage wird, 450 ms Pause zwischen den Seiten. `partial` ist jetzt
+   älter als das Scan-Fenster wird, 450 ms Pause zwischen den Seiten. `partial` ist jetzt
    nur noch wahr, wenn *wir* gedeckelt haben oder gar nicht blättern konnten —
    nicht mehr bei jeder vollen Seite. Der Abbruchgrund wird mitgeliefert.
+
+### Scan-Fenster: einmal tief, danach 30 Tage
+
+Der Tiefenscan ist eine einmalige Sache und am 28.07.2026 gelaufen (159 Threads,
+zurück bis Januar). Im Alltag steht das Fenster auf **30 Tagen** — der Sync
+brauchte damit 4 statt 8 Seiten und 7 statt 16 Sekunden, und die 159 Zeilen samt
+aller 15 Sterne blieben unverändert erhalten.
+
+Das ist nicht nur schneller, sondern verliert auch nichts: der Sync löscht nie,
+und weil LinkedIn absteigend nach letzter Aktivität sortiert, rutscht ein alter
+Thread, in dem wieder etwas passiert, automatisch auf Seite 1. Ein kurzes Fenster
+übersieht also keine neue Aktivität — es spart nur Seitenaufrufe.
+
+Erneuter Tiefenscan, falls je nötig:
+
+```bash
+LINKEDIN_SCAN_TAGE=365 node runner/linkedin/sync.mjs --dry-run
+```
+
+Für den schreibenden Lauf dieselbe Variable in `runner/.env` setzen und den
+Runner neu starten.
 
 **Folge für die Buckets:** Mit 159 statt 19 Threads wären 121 Threads gleichzeitig
 „fällig" gewesen — als Tagesliste unbrauchbar. Deshalb ist `verwaist` jetzt ein
