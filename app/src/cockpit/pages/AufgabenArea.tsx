@@ -277,7 +277,7 @@ export function AufgabenArea() {
                 contactName={t.contact_id ? contactMap.get(t.contact_id) : undefined}
                 onToggle={tasks.toggle}
                 onRemove={tasks.remove}
-                onOpenContact={(id) => navigate(`/crm/${id}`)}
+                onOpenContact={(id) => navigate(`/sales/${id}`)}
               />
             ))}
           </section>
@@ -313,7 +313,7 @@ export function AufgabenArea() {
                     contactName={t.contact_id ? contactMap.get(t.contact_id) : undefined}
                     onToggle={tasks.toggle}
                     onRemove={tasks.remove}
-                    onOpenContact={(id) => navigate(`/crm/${id}`)}
+                    onOpenContact={(id) => navigate(`/sales/${id}`)}
                   />
                 ))
             : null}

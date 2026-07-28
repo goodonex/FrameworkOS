@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { supabase } from '../../lib/supabase'
 
 export const RUNNER_BASE_URL = 'http://127.0.0.1:4711'
 
@@ -10,9 +11,23 @@ interface RunnerStatusPayload {
   queued: Array<{ id: string; agent: string }>
 }
 
+/** Läuft das Cockpit lokal? Dann ist der Runner-Port direkt erreichbar. */
+function isLocalOrigin(): boolean {
+  if (typeof window === 'undefined') return false
+  const h = window.location.hostname
+  return h === 'localhost' || h === '127.0.0.1' || h === '[::1]'
+}
+
+/** Heartbeat gilt als „frisch" (= Runner online), wenn er höchstens so alt ist. */
+const HEARTBEAT_FRESH_MS = 45_000
+
 /**
- * Pollt den lokalen Runner (Phase 5). Solange der Runner nicht existiert,
- * meldet der Hook ehrlich "offline" — die Statusleiste zeigt das als grauen Punkt.
+ * Pollt den Runner-Status.
+ * - Lokal: direkter Fetch auf http://127.0.0.1:4711 (schnell, exakt).
+ * - Auf der HTTPS-Live-Domain: der lokale Port ist per Mixed Content geblockt
+ *   (der Runner erschien deshalb IMMER offline). Stattdessen liest der Hook den
+ *   `runner_heartbeat`, den der Runner alle ~15s nach Supabase schreibt
+ *   (Migration 0057). Online = Herzschlag jünger als HEARTBEAT_FRESH_MS.
  */
 export function useRunnerStatus(pollMs = 15000): {
   state: RunnerState
@@ -23,8 +38,9 @@ export function useRunnerStatus(pollMs = 15000): {
 
   useEffect(() => {
     let cancelled = false
+    const local = isLocalOrigin()
 
-    const check = async () => {
+    const checkLocal = async () => {
       const controller = new AbortController()
       const timeout = window.setTimeout(() => controller.abort(), 2500)
       try {
@@ -44,6 +60,40 @@ export function useRunnerStatus(pollMs = 15000): {
         window.clearTimeout(timeout)
       }
     }
+
+    const checkRemote = async () => {
+      if (!supabase) {
+        if (!cancelled) {
+          setState('offline')
+          setRunningCount(0)
+        }
+        return
+      }
+      try {
+        const { data, error } = await supabase
+          .from('runner_heartbeat')
+          .select('last_seen, running')
+          .eq('id', 'global')
+          .maybeSingle()
+        if (cancelled) return
+        if (error || !data?.last_seen) {
+          setState('offline')
+          setRunningCount(0)
+          return
+        }
+        const age = Date.now() - new Date(data.last_seen as string).getTime()
+        const fresh = age >= 0 && age <= HEARTBEAT_FRESH_MS
+        setState(fresh ? 'online' : 'offline')
+        setRunningCount(fresh ? (Array.isArray(data.running) ? data.running.length : 0) : 0)
+      } catch {
+        if (!cancelled) {
+          setState('offline')
+          setRunningCount(0)
+        }
+      }
+    }
+
+    const check = local ? checkLocal : checkRemote
 
     void check()
     const interval = window.setInterval(() => void check(), pollMs)

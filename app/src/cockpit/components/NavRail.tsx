@@ -6,7 +6,7 @@ const ITEMS: Array<{ to: string; label: string; icon: string; paths?: string[] }
   // „Heute" fasst die täglichen Operativ-Bereiche zusammen (Sub-Tabs: HeuteTabs) —
   // hält die Nav (v.a. mobile Bottom-Bar) schlank.
   { to: '/aufgaben', label: 'Heute', icon: '☑', paths: ['/aufgaben', '/termine', '/freigaben'] },
-  { to: '/crm', label: 'CRM', icon: '▤' },
+  { to: '/sales', label: 'Sales', icon: '▤' },
   { to: '/projekte', label: 'Projekte', icon: '◈' },
   { to: '/ads', label: 'Ads', icon: '◨' },
   { to: '/content', label: 'Content', icon: '◐' },

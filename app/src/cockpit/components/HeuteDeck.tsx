@@ -200,7 +200,7 @@ export function HeuteDeck({
                     />
                     <button
                       type="button"
-                      onClick={() => navigate(`/crm/${d.contact.id}`)}
+                      onClick={() => navigate(`/sales/${d.contact.id}`)}
                       style={{
                         flex: 1,
                         minWidth: 0,

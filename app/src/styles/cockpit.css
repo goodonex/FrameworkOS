@@ -338,6 +338,8 @@
   .ck-home-grid { grid-template-columns: 1fr; }
   .ck-heute-grid { grid-template-columns: 1fr; }
   .ck-col-divider { display: none; }
+  .ck-sales-dashboard-grid { grid-template-columns: 1fr; }
+  .ck-sales-bibliothek-grid { grid-template-columns: 1fr; }
 }
 
 .ck-tracking-grid {

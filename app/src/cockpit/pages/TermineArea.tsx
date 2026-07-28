@@ -130,7 +130,7 @@ export function TermineArea() {
         kind: 'booking',
         title: b.name || 'Termin',
         sub: b.status === 'cancelled' ? 'abgesagt' : b.status === 'no_show' ? 'No-Show' : undefined,
-        href: b.contact_id ? `/crm/${b.contact_id}` : undefined,
+        href: b.contact_id ? `/sales/${b.contact_id}` : undefined,
         muted,
       })
     }
@@ -145,7 +145,7 @@ export function TermineArea() {
         kind: 'followup',
         title: contactLabel(c),
         sub: typeof typ === 'string' && typ ? typ : 'Follow-up',
-        href: `/crm/${c.id}`,
+        href: `/sales/${c.id}`,
       })
     }
 

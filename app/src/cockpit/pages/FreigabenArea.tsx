@@ -214,7 +214,7 @@ export function FreigabenArea() {
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10, marginBottom: 8 }}>
                 <button
                   type="button"
-                  onClick={() => contact && navigate(`/crm/${contact.id}`)}
+                  onClick={() => contact && navigate(`/sales/${contact.id}`)}
                   style={{ background: 'none', border: 'none', padding: 0, cursor: contact ? 'pointer' : 'default', textAlign: 'left' }}
                 >
                   <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--ck-text-1)' }}>{name}</span>

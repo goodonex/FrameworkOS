@@ -55,13 +55,13 @@ export const URIEL_TOOLS: UrielTool[] = [
   {
     name: 'navigate',
     description:
-      'Navigiert zu einem Cockpit-Bereich. cockpit=Startseite/Graph, crm=Kontakte/Pipeline, projekte=Kundenprojekte, ads=Ad-Review, content=Social/Content, agenten=Agenten-Hub, email=E-Mail, tracking=KPI-Tracking.',
+      'Navigiert zu einem Cockpit-Bereich. cockpit=Startseite/Graph, sales=Kontakte/Pipeline/Bibliothek (crm=Alias, gleiches Ziel), projekte=Kundenprojekte, ads=Ad-Review, content=Social/Content, agenten=Agenten-Hub, email=E-Mail, tracking=KPI-Tracking.',
     input_schema: {
       type: 'object',
       properties: {
         area: {
           type: 'string',
-          enum: ['cockpit', 'crm', 'projekte', 'ads', 'content', 'agenten', 'email', 'tracking'],
+          enum: ['cockpit', 'sales', 'crm', 'projekte', 'ads', 'content', 'agenten', 'email', 'tracking'],
         },
       },
       required: ['area'],

@@ -85,7 +85,7 @@ export interface NebulaNode {
   source?: string
   status?: string
   area?: string
-  /** Nur auf Contact-Nodes gesetzt (Leads-Ansicht): Klickziel /crm/:id. */
+  /** Nur auf Contact-Nodes gesetzt (Leads-Ansicht): Klickziel /sales/:id. */
   href?: string
   dim?: boolean
 }
@@ -716,7 +716,7 @@ export function buildLeads(
     speed,
     size: 3.2 + Math.min((c.lead_value ?? 0) / 3000, 1) * 2.6,
     shape: 'dot',
-    href: `/crm/${c.id}`,
+    href: `/sales/${c.id}`,
     dim: c.pipeline_stage === 'paused',
   })
 

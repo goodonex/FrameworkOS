@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Brand } from '../types/db'
 import { BRAND_FOUNDATION_SEEDS } from '../data/brandFoundationSeeds'
-import { isMissingSupabaseTableError } from '../lib/supabaseErrors'
+import {
+  isMissingSupabaseTableError,
+  isTransientAuthLockError,
+  withAuthLockRetry,
+} from '../lib/supabaseErrors'
 import { isLocalFallbackBrandId } from '../lib/brandResolve'
 import {
   seedFoundationLocalStorage,
@@ -249,11 +253,14 @@ export function useBrands(): UseBrandsResult {
       return
     }
     setLoading(true)
-    const { data, error: err } = await supabase
-      .from('brands')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: true })
+    const sb = supabase
+    const { data, error: err } = await withAuthLockRetry(() =>
+      sb
+        .from('brands')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: true }),
+    )
     if (err) {
       if (isMissingSupabaseTableError(err.message)) {
         console.warn(
@@ -262,6 +269,14 @@ export function useBrands(): UseBrandsResult {
         )
         setError(null)
         setBrands(sortBrandsForDisplay(FALLBACK_BRANDS))
+      } else if (isTransientAuthLockError(err.message)) {
+        // Auch nach mehreren Retries noch ein Web-Locks-Fehler (viele Tabs):
+        // NICHT als fatal behandeln — Banner unterdrücken, vorhandene Brands
+        // behalten, der nächste reload() (z. B. auf onAuthStateChange) heilt.
+        console.warn('[useBrands] Transienter Auth-Lock-Fehler — behalte Stand, kein Banner:', err.message)
+        setError(null)
+        setLoading(false)
+        return
       } else {
         setError(err.message)
         setBrands([])
@@ -276,11 +291,13 @@ export function useBrands(): UseBrandsResult {
       }
       const migrated = await syncPromise
       if (migrated) {
-        const { data: again, error: err2 } = await supabase
-          .from('brands')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: true })
+        const { data: again, error: err2 } = await withAuthLockRetry(() =>
+          sb
+            .from('brands')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: true }),
+        )
         if (!err2 && again) {
           rawRows = again
         }

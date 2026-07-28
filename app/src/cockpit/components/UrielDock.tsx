@@ -38,7 +38,8 @@ import type { ViewMode } from '../graph/nebulaLayout'
 
 const AREA_PATH: Record<string, string> = {
   cockpit: '/cockpit',
-  crm: '/crm',
+  sales: '/sales',
+  crm: '/sales', // Alias — alte Sprachbefehle "öffne CRM" bleiben gültig
   projekte: '/projekte',
   ads: '/ads',
   content: '/content',
@@ -203,7 +204,7 @@ export function UrielDock() {
         case 'open_contact': {
           const id = String(input.contact_id ?? '')
           if (!id) return { ok: false, summary: 'Keine contact_id', data: { error: 'missing_id' } }
-          navigate(`/crm/${id}`)
+          navigate(`/sales/${id}`)
           return { ok: true, summary: 'Kontakt geöffnet', data: { done: true } }
         }
         case 'get_today_kpis': {

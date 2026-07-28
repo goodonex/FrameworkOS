@@ -25,7 +25,7 @@ import { LegacySalesRedirect } from './cockpit/lib/LegacySalesRedirect'
 import { OnboardingPublicPage } from './pages/onboarding/OnboardingPublicPage'
 import { CockpitShell } from './cockpit/CockpitShell'
 import { CockpitHome } from './cockpit/pages/CockpitHome'
-import { CrmArea } from './cockpit/pages/CrmArea'
+import { SalesArea } from './cockpit/pages/SalesArea'
 import { ProjekteArea } from './cockpit/pages/ProjekteArea'
 import { EmailArea } from './cockpit/pages/EmailArea'
 import { TrackingArea } from './cockpit/pages/TrackingArea'
@@ -38,6 +38,14 @@ import { FreigabenArea } from './cockpit/pages/FreigabenArea'
 
 
 function isEditableTarget(target: EventTarget | null): boolean {
+/** CRM → Sales (Juli 2026): alte /crm-Links/Bookmarks/Deep-Links auf /sales umleiten. */
+function CrmRedirect() {
+  const location = useLocation()
+  const rest = location.pathname.replace(/^\/crm/, '')
+  const target = rest === '' || rest === '/' ? '/pipeline' : rest
+  return <Navigate to={`/sales${target}${location.search}`} replace />
+}
+
   if (!(target instanceof HTMLElement)) return false
   const tag = target.tagName.toLowerCase()
   if (tag === 'input' || tag === 'textarea' || tag === 'select') return true
@@ -98,7 +106,7 @@ function OwnerWorkspaceShell() {
         // Denk-Modi abgerissen (Phase 6): g-Shortcuts zeigen auf die Cockpit-Welt
         const map: Record<string, string> = {
           c: '/cockpit',
-          s: '/crm',
+          s: '/sales',
           e: '/email',
           t: '/tracking',
         }
@@ -209,7 +217,8 @@ function App() {
                 <Route path="/aufgaben" element={<AufgabenArea />} />
                 <Route path="/termine" element={<TermineArea />} />
                 <Route path="/freigaben" element={<FreigabenArea />} />
-                <Route path="/crm/*" element={<CrmArea />} />
+                <Route path="/sales/*" element={<SalesArea />} />
+                <Route path="/crm/*" element={<CrmRedirect />} />
                 <Route path="/projekte/*" element={<ProjekteArea />} />
                 <Route path="/ads/*" element={<AdsArea />} />
               <Route path="/content/*" element={<SocialArea />} />

@@ -149,7 +149,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
     // Phase 6: Universe abgerissen — Cockpit-Bereiche sind die neue Welt
     for (const item of [
       { id: 'nav-cockpit', title: 'Cockpit', path: '/cockpit', keywords: ['home', 'start', 'übersicht', 'graph'] },
-      { id: 'nav-crm', title: 'CRM', path: '/crm', keywords: ['pipeline', 'kontakte', 'leads', 'sales', 'call'] },
+      { id: 'nav-sales', title: 'Sales', path: '/sales', keywords: ['crm', 'pipeline', 'kontakte', 'leads', 'call', 'bibliothek'] },
       { id: 'nav-email', title: 'E-Mail', path: '/email', keywords: ['mail', 'sequenzen', 'flows', 'versand'] },
       { id: 'nav-tracking', title: 'Tracking', path: '/tracking', keywords: ['kpi', 'looms', 'anfragen', 'umsatz', 'ziele'] },
     ]) {

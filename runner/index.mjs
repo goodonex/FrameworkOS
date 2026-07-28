@@ -54,6 +54,7 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? ''
 const SNAPSHOT_PUSH_MS = Number(process.env.SNAPSHOT_PUSH_MS ?? 60_000)
 const SNAPSHOT_ENABLED = Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY)
 
+const HEARTBEAT_PUSH_MS = Number(process.env.HEARTBEAT_PUSH_MS ?? 15_000)
 // Kunden-Ads (Cockpit /ads): Ad-Creatives + Manifeste liegen in den Kundenordnern.
 const KUNDEN_ROOT = resolve(process.env.KUNDEN_ROOT ?? join(homedir(), 'Kevin OS', '02 Projekte', 'Kunden'))
 const KUNDEN_CONFIG = join(KUNDEN_ROOT, 'cockpit-kunden.json')
@@ -69,6 +70,13 @@ const SOCIAL_WEEKLY = join(SOCIAL_ROOT, 'content-engine', 'weekly')
 
 // Content-Manifest pro Brand (Cockpit /content, Post-Ebene). Feste Allowlist —
 // der Brand-Slug wird NIE in einen Pfad interpoliert (kein Traversal). MVP: nur
+// Sales-Bibliothek (Cockpit /sales): Skripte-Ordner der Akquise. Env-überschreibbar.
+const SALES_ROOT = resolve(
+  process.env.SALES_ROOT ??
+    join(homedir(), 'Kevin OS', '02 Projekte', 'Herrmann & Co', "2. SOP's & Skripte", 'Sales Skripte'),
+)
+const SALES_VAULT_DIR = join(VAULT, '03 Bereiche', 'Vertrieb & Outreach')
+
 // HERRMANN; weitere Brands (CoLective …) bekommen in Phase 3 einen eigenen Ordner.
 const CONTENT_MANIFESTS = {
   herrmann: join(SOCIAL_ROOT, 'content-engine', 'content.json'),
@@ -141,6 +149,47 @@ const AGENT_BY_ID = new Map(AGENT_CATALOG.map((a) => [a.id, a]))
 function agentConfig(agent) {
   const a = AGENT_BY_ID.get(agent)
   if (!a) return null
+  {
+    id: 'loom-skript',
+    label: 'Loom-Skript (Lead)',
+    description: 'Individualisiertes Loom-Skript für einen Lead (Akt 2 + Spickzettel + Begleit-DM).',
+    kind: 'write',
+    cwd: SALES_ROOT,
+    prompt:
+      'Baue für den Lead aus den Eingabedaten (name, website) ein individualisiertes Loom-Skript. ' +
+      'Standard-Akte 1/3/4/5 aus der Sprechfassung im Vault ' +
+      '(lies per Read: ' + JSON.stringify(join(SALES_VAULT_DIR, 'Loom-Skript (vollständige Sprechfassung).md')) + ') ' +
+      'übernehmen — NUR Akt 2 (IST-Analyse: erst Positiv, dann 3 Optimierungspunkte), Spickzettel und ' +
+      'Begleit-DM individualisieren. Website per WebFetch analysieren (Eigentümer-Seite? Bewertungstool? ' +
+      'käufer- vs. eigentümerlastig? modern/veraltet?). Ausgabe: EINE selbst-enthaltene HTML-Datei ' +
+      '"Loom-Skript <YYYY-MM-DD> (<Name>).html" im Stil von "Loom-Batch 2026-07-23 (6 Leads).html" ' +
+      '(liegt in DIESEM Ordner, als Vorbild lesen) in DIESEM Ordner. Regeln: Fehler zeigen = Mehrwert, ' +
+      'WAS+WARUM nie WIE, kein Sales-Angebot im CTA, keine Emojis. JS-Strings: deutsche Anführungszeichen ' +
+      'NIE als „…" mit ASCII-Schließquote (bricht den JS-String) — nutze einen Helper wie ' +
+      "const G=s=>'„'+s+'“' oder durchgängig curly-Anführungszeichen. Vor Abschluss den <script>-Teil " +
+      'mit `node --check` validieren.',
+  },
+  {
+    id: 'followup-pdf',
+    label: 'Follow-up-PDF (Lead)',
+    description: 'Individuelle Follow-up-Analyse (V2-Template + Screenshots + Score) für einen Lead.',
+    kind: 'write',
+    cwd: SALES_ROOT,
+    prompt:
+      'Baue für den Lead aus den Eingabedaten (name, website) die individuelle Follow-up-Analyse: ' +
+      '"follow-up-analyse-template-v2.html" (liegt in DIESEM Ordner) kopieren nach ' +
+      '"Follow-up-Analyse <Name>.html", anhand "follow-up-analyse-rubrik.md" (liegt in DIESEM Ordner) ' +
+      'und einer WebFetch-Analyse der Website befüllen (Eigentümer-Score /100, 6 Kriterien je /10, ' +
+      'Mini-Technik-Check SEO/Ladezeit/DSGVO). Screenshots: 3 Aufnahmen (Startseite, Bewertungs-/' +
+      'Formularseite, Kontakt) via ' +
+      '`"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless --disable-gpu ' +
+      '--screenshot=<datei>.png --window-size=1280,800 <url>`; schlägt ein Screenshot fehl → graues ' +
+      'Platzhalter-Panel mit Seitentitel einsetzen und im Abschlussbericht WARN melden, NICHT abbrechen. ' +
+      'Danach PDF erzeugen: ' +
+      '`"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless --disable-gpu ' +
+      '--print-to-pdf="Follow-up-Analyse <Name>.pdf" "Follow-up-Analyse <Name>.html"`; 3 Seiten via ' +
+      '.page.mt-Umbrüche. Keine Preise nennen, CTA nur Quali-Call.',
+  },
   if (a.kind === 'write') {
     return {
       cwd: a.cwd,
@@ -537,6 +586,42 @@ function osFileRoots() {
         return await realpath(root)
       } catch {
         return null // Root existiert nicht → fällt aus der Allowlist
+/**
+ * Heartbeat: schreibt alle paar Sekunden last_seen + laufende/wartende Jobs in
+ * `runner_heartbeat`. Damit sieht die HTTPS-Live-Domain (die den lokalen Port
+ * 4711 nicht erreichen darf, Mixed Content) den Runner als online. Läuft
+ * UNBEDINGT bei jedem Tick (kein Signatur-Vergleich wie beim Snapshot), sonst
+ * altert last_seen. Siehe Migration 0057.
+ */
+async function pushHeartbeat() {
+  if (!SNAPSHOT_ENABLED) return
+  const now = new Date().toISOString()
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/runner_heartbeat`, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates,return=minimal',
+      },
+      body: JSON.stringify({
+        id: 'global',
+        last_seen: now,
+        running: [...running.values()].map(({ id, agent, startedAt }) => ({ id, agent, startedAt })),
+        queued: [],
+        updated_at: now,
+      }),
+    })
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '')
+      console.error(`[runner] Heartbeat HTTP ${res.status}: ${txt.slice(0, 160)}`)
+    }
+  } catch (e) {
+    console.error('[runner] Heartbeat fehlgeschlagen:', e?.message ?? e)
+  }
+}
+
       }
     }),
   ).then((roots) => roots.filter(Boolean))
@@ -584,6 +669,7 @@ function kundenRootReal() {
   return kundenRootRealPromise
 }
 
+  '.pdf': 'application/pdf',
 /** Social-Root einmalig realpath-auflösen (Symlink-sicher, analog kundenRootReal). */
 let socialRootRealPromise = null
 function socialRootReal() {
@@ -600,6 +686,59 @@ async function socialWeeks() {
   try {
     dirs = await readdir(SOCIAL_WEEKLY, { withFileTypes: true })
   } catch {
+/** Sales-Root einmalig realpath-auflösen (Symlink-sicher, analog socialRootReal). */
+let salesRootRealPromise = null
+function salesRootReal() {
+  salesRootRealPromise ??= realpath(SALES_ROOT).catch(() => null)
+  return salesRootRealPromise
+}
+
+/**
+ * Sales-Bibliothek (Cockpit /sales/bibliothek): zwei Gruppen — Vault-Markdown
+ * (Erstnachrichten/Loom-Sprechfassung/Outbound-Skripte) + Vorlagen/PDFs/HTML
+ * im Sales-Skripte-Ordner. Nur Top-Level-Dateien, mtime absteigend sortiert.
+ */
+async function salesLibrary() {
+  async function listDir(dir, exts) {
+    let entries
+    try {
+      entries = await readdir(dir, { withFileTypes: true })
+    } catch {
+      return []
+    }
+    const out = []
+    for (const e of entries) {
+      if (!e.isFile()) continue
+      const dot = e.name.lastIndexOf('.')
+      const ext = dot >= 0 ? e.name.slice(dot).toLowerCase() : ''
+      if (!exts.has(ext)) continue
+      const full = join(dir, e.name)
+      const st = await stat(full)
+      out.push({ name: e.name, ext, mtime: st.mtime.toISOString() })
+    }
+    out.sort((a, b) => (a.mtime < b.mtime ? 1 : -1))
+    return out
+  }
+
+  const vaultFiles = await listDir(SALES_VAULT_DIR, new Set(['.md']))
+  const skripteFiles = await listDir(SALES_ROOT, new Set(['.md', '.html', '.pdf']))
+
+  return {
+    vault: vaultFiles.map((f) => ({
+      name: f.name.replace(/\.md$/, ''),
+      path: join('03 Bereiche', 'Vertrieb & Outreach', f.name),
+      kind: 'md',
+      mtime: f.mtime,
+    })),
+    skripte: skripteFiles.map((f) => ({
+      name: f.name.replace(/\.(html|pdf|md)$/, ''),
+      rel: f.name,
+      kind: f.ext.slice(1),
+      mtime: f.mtime,
+    })),
+  }
+}
+
     return [] // Ordner (noch) nicht da → leer, kein Fehler
   }
   const weeks = []
@@ -906,6 +1045,32 @@ const server = createServer(async (req, res) => {
         if (e?.code !== 'ENOENT') throw e // kaputtes JSON soll auffallen, nicht leer wirken
       }
 
+    // ---------- Sales-Bibliothek: statische Dateien (Vorlagen/PDFs/HTML für /sales) ----------
+    if (req.method === 'GET' && url.pathname.startsWith('/files/sales/')) {
+      const rel = decodeURIComponent(url.pathname.slice('/files/sales/'.length))
+      const dot = rel.lastIndexOf('.')
+      const mime = dot >= 0 ? KUNDEN_MIME[rel.slice(dot).toLowerCase()] : undefined
+      if (!mime) return json(res, 403, { error: 'Dateityp nicht erlaubt' })
+      const root = await salesRootReal()
+      if (!root) return json(res, 404, { error: 'Sales-Root existiert nicht' })
+      const real = await realpath(resolve(join(SALES_ROOT, rel)))
+      if (real !== root && !real.startsWith(root + sep)) {
+        return json(res, 403, { error: 'Pfad außerhalb Sales-Root' })
+      }
+      const buf = await readFile(real)
+      res.writeHead(200, {
+        'Content-Type': mime,
+        'Cache-Control': 'no-cache',
+        'Access-Control-Allow-Origin': '*',
+      })
+      return res.end(buf)
+    }
+
+    // ---------- Sales-Bibliothek: Liste (Vault-Erstnachrichten + Vorlagen/PDFs) ----------
+    if (req.method === 'GET' && url.pathname === '/sales/library') {
+      return json(res, 200, await salesLibrary())
+    }
+
       if (req.method === 'GET') {
         return json(res, 200, onDisk ?? emptyManifest(slug))
       }
@@ -1025,6 +1190,12 @@ server.listen(PORT, '127.0.0.1', () => {
     const t = setInterval(() => void pushSnapshot(), SNAPSHOT_PUSH_MS)
     t.unref?.()
   } else {
-    console.log('[runner] Snapshot-Push AUS (kein SUPABASE_SERVICE_ROLE_KEY in runner/.env) — Live-Graph bleibt leer')
+    console.log('[runner] Snapshot-Push + Heartbeat AUS (kein SUPABASE_SERVICE_ROLE_KEY in runner/.env) — Live-Graph bleibt leer, Runner erscheint auf der Live-Domain offline')
   }
 })
+
+    // Heartbeat für den Runner-Status-Punkt auf der Live-Domain (alle 15s).
+    console.log(`[runner] Heartbeat aktiv → Supabase alle ${Math.round(HEARTBEAT_PUSH_MS / 1000)}s`)
+    setTimeout(() => void pushHeartbeat(), 1500)
+    const hb = setInterval(() => void pushHeartbeat(), HEARTBEAT_PUSH_MS)
+    hb.unref?.()
