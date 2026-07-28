@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useToast } from '../../components/Toast'
 import { useActiveBrand } from '../lib/activeBrand'
+import { RunnerHinweis } from '../components/RunnerHinweis'
 import { getSeenWeeks, markWeekSeen, syncSocialBatchesFromRunner } from '../lib/socialApi'
 import { loadSocialBatchHtml, loadSocialBatchList, type SocialBatchMeta } from '../lib/socialBatchStore'
 import { postRun } from '../lib/runnerApi'
@@ -295,12 +296,11 @@ function ContentPostsView() {
           </p>
         </div>
       ) : error ? (
-        <div className="ck-panel" style={{ padding: '10px 14px', border: '1px solid var(--ck-warn)', color: 'var(--ck-warn)', fontSize: 12.5 }}>
-          Runner nicht erreichbar: {error}
-          <div className="ck-label" style={{ marginTop: 4, color: 'var(--ck-text-3)' }}>
-            Die Post-Ebene läuft lokal-first — starte das Cockpit mit <code>npm run cockpit:full</code>. Die Wochen-Ansicht bleibt live.
-          </div>
-        </div>
+        <RunnerHinweis
+          error={error}
+          was="Die Post-Ebene"
+          hinweis="Die Wochen-Ansicht bleibt überall verfügbar."
+        />
       ) : loading || !manifest ? (
         <p className="ck-label">Lade…</p>
       ) : manifest.posts.length === 0 ? (

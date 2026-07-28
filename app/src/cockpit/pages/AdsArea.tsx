@@ -2,6 +2,7 @@ import { type CSSProperties, useEffect, useMemo, useState } from 'react'
 import { Route, Routes, useNavigate, useParams } from 'react-router-dom'
 import { AdCard } from '../components/ads/AdCard'
 import { AdDetailPanel } from '../components/ads/AdDetailPanel'
+import { RunnerHinweis } from '../components/RunnerHinweis'
 import type { AdsOverviewEntry, DerivedMetrics, Kunde } from '../lib/adsApi'
 import {
   ACTIVE_STATUSES,
@@ -95,11 +96,7 @@ function AdsDashboard() {
   const totals = useMemo(() => sumMetrics(rows.map((r) => r.metrics)), [rows])
 
   if (error) {
-    return (
-      <div className="ck-panel" style={{ padding: '10px 14px', border: '1px solid var(--ck-warn)', color: 'var(--ck-warn)', fontSize: 12.5, maxWidth: 820 }}>
-        Runner nicht erreichbar: {error}
-      </div>
-    )
+    return <RunnerHinweis error={error} was="Die Ads-Auswertung" />
   }
   if (!entries) return <p className="ck-label">Lade…</p>
 

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { RunnerHinweis } from '../components/RunnerHinweis'
 import {
   fetchAgents,
   fetchRun,
@@ -90,15 +91,7 @@ export function AgentsArea() {
     return (
       <div style={{ maxWidth: 820 }}>
         <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>Agenten</div>
-        <div
-          className="ck-panel"
-          style={{ padding: '12px 14px', border: '1px solid var(--ck-warn)', color: 'var(--ck-warn)', fontSize: 12.5 }}
-        >
-          Runner nicht erreichbar: {error}
-          <div className="ck-label" style={{ marginTop: 6, color: 'var(--ck-text-3)' }}>
-            Die Agenten laufen über den lokalen Runner — starte <code>npm run cockpit:full</code>.
-          </div>
-        </div>
+        <RunnerHinweis error={error} was="Die Agenten" />
       </div>
     )
   }
