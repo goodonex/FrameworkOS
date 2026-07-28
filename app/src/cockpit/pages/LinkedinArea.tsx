@@ -6,7 +6,7 @@ import { HeuteTabs } from '../components/HeuteTabs'
 import { useActiveBrand } from '../lib/activeBrand'
 import { buildLinkedinFollowupInput } from '../lib/approvalDrafts'
 import { bucketOf, coverage, FOLLOWUP_THRESHOLDS_DAYS } from '../lib/linkedinFollowups'
-import { RUNNER_BASE_URL, useRunnerStatus } from '../lib/useRunnerStatus'
+import { isLocalOrigin, RUNNER_BASE_URL, useRunnerStatus } from '../lib/useRunnerStatus'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -38,12 +38,14 @@ function threadUrl(threadKey: string): string {
 function ThreadCard({
   thread,
   now,
+  entwurfMoeglich,
   onSnoozeTomorrow,
   onMarkDone,
   onGenerateDraft,
 }: {
   thread: LinkedinThread
   now: number
+  entwurfMoeglich: boolean
   onSnoozeTomorrow: (t: LinkedinThread) => void
   onMarkDone: (t: LinkedinThread) => void
   onGenerateDraft: (t: LinkedinThread) => void
@@ -94,7 +96,14 @@ function ThreadCard({
         </div>
       ) : null}
       <div style={{ display: 'flex', gap: 6 }}>
-        <button type="button" className="ck-btn ck-btn--primary" style={{ fontSize: 10 }} onClick={() => onGenerateDraft(thread)}>
+        <button
+          type="button"
+          className="ck-btn ck-btn--primary"
+          style={{ fontSize: 10, opacity: entwurfMoeglich ? 1 : 0.45 }}
+          disabled={!entwurfMoeglich}
+          title={entwurfMoeglich ? undefined : 'Nur lokal möglich — braucht den Runner'}
+          onClick={() => onGenerateDraft(thread)}
+        >
           Entwurf erzeugen
         </button>
         <button type="button" className="ck-btn" style={{ fontSize: 10 }} onClick={() => onSnoozeTomorrow(thread)}>
@@ -132,6 +141,7 @@ function ThreadSection({
   threads,
   leerText,
   now,
+  entwurfMoeglich,
   onSnoozeTomorrow,
   onMarkDone,
   onGenerateDraft,
@@ -141,6 +151,7 @@ function ThreadSection({
   threads: LinkedinThread[]
   leerText?: string
   now: number
+  entwurfMoeglich: boolean
   onSnoozeTomorrow: (t: LinkedinThread) => void
   onMarkDone: (t: LinkedinThread) => void
   onGenerateDraft: (t: LinkedinThread) => void
@@ -165,6 +176,7 @@ function ThreadSection({
               key={t.id}
               thread={t}
               now={now}
+              entwurfMoeglich={entwurfMoeglich}
               onSnoozeTomorrow={onSnoozeTomorrow}
               onMarkDone={onMarkDone}
               onGenerateDraft={onGenerateDraft}
@@ -201,6 +213,10 @@ export function LinkedinArea() {
   const threadsQuery = useLinkedinThreads(slug)
   const contacts = useContacts(slug)
   const { state: runnerState } = useRunnerStatus()
+  // Sync und Entwürfe brauchen den lokalen Runner-Port. Auf der Live-Domain
+  // blockt der Browser den (Mixed Content) — dann Knöpfe sperren statt sie ins
+  // Leere laufen zu lassen. Lesen aus Supabase funktioniert überall.
+  const runnerBedienbar = isLocalOrigin()
   const [syncing, setSyncing] = useState(false)
   const [syncMessage, setSyncMessage] = useState<string | null>(null)
   // Überlebt den Reload, damit der Unvollständigkeits-Hinweis nicht nur direkt
@@ -336,10 +352,30 @@ export function LinkedinArea() {
             {badgeText}
           </span>
         </div>
-        <button type="button" onClick={() => void runSync()} disabled={syncing} className="ck-btn ck-btn--primary" style={{ fontSize: 10 }}>
+        <button
+          type="button"
+          onClick={() => void runSync()}
+          disabled={syncing || !runnerBedienbar}
+          className="ck-btn ck-btn--primary"
+          style={{ fontSize: 10, opacity: runnerBedienbar ? 1 : 0.45 }}
+          title={
+            runnerBedienbar
+              ? 'Postfach neu einlesen'
+              : 'Nur lokal: der Browser blockt den Runner-Port von der Live-Domain aus'
+          }
+        >
           {syncing ? 'Synchronisiert …' : 'Jetzt synchronisieren'}
         </button>
       </div>
+
+      {!runnerBedienbar ? (
+        <div className="ck-panel" style={{ padding: '10px 14px', fontSize: 12, color: 'var(--ck-text-2)' }}>
+          Nur-Lesen-Ansicht. Synchronisieren und Entwürfe brauchen den lokalen Runner — der
+          Browser lässt von dieser Domain aus keine Verbindung dorthin zu. Beides läuft unter{' '}
+          <code style={{ color: 'var(--ck-accent)' }}>localhost:5173</code>, wo auch dein
+          LinkedIn-Chrome offen ist.
+        </div>
+      ) : null}
 
       {syncMessage ? (
         <div style={{ fontSize: 11, color: 'var(--ck-text-3)' }}>{syncMessage}</div>
@@ -396,6 +432,7 @@ export function LinkedinArea() {
           <ThreadSection
             titel="Du bist dran"
             hinweis="Lead hat geantwortet · Sterne zuerst"
+            entwurfMoeglich={runnerBedienbar}
             threads={buckets.duBistDran}
             now={now}
             onSnoozeTomorrow={snoozeTomorrow}
@@ -406,6 +443,7 @@ export function LinkedinArea() {
           <ThreadSection
             titel="Fällig heute"
             hinweis="älteste zuerst"
+            entwurfMoeglich={runnerBedienbar}
             threads={buckets.faellig}
             leerText="Keine fälligen Follow-ups."
             now={now}
@@ -417,6 +455,7 @@ export function LinkedinArea() {
           <ThreadSection
             titel="Abschluss fällig"
             hinweis="letzte Nachricht, danach wird archiviert"
+            entwurfMoeglich={runnerBedienbar}
             threads={buckets.abschluss}
             now={now}
             onSnoozeTomorrow={snoozeTomorrow}
@@ -427,6 +466,7 @@ export function LinkedinArea() {
           <ThreadSection
             titel="Altlasten"
             hinweis="über 30 Tage liegen geblieben, nie nachgefasst — wiederbeleben oder schließen"
+            entwurfMoeglich={runnerBedienbar}
             threads={buckets.verwaist}
             now={now}
             onSnoozeTomorrow={snoozeTomorrow}

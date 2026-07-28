@@ -11,8 +11,16 @@ interface RunnerStatusPayload {
   queued: Array<{ id: string; agent: string }>
 }
 
-/** Läuft das Cockpit lokal? Dann ist der Runner-Port direkt erreichbar. */
-function isLocalOrigin(): boolean {
+/**
+ * Läuft das Cockpit lokal? Dann ist der Runner-Port direkt erreichbar.
+ *
+ * Auf der HTTPS-Live-Domain blockt der Browser jeden Aufruf an
+ * http://127.0.0.1:4711 als Mixed Content. Der Status-Punkt kommt dort über den
+ * Supabase-Heartbeat (Migration 0057) und steht auf grün — schreibende Aktionen
+ * am Runner scheitern trotzdem. Bereiche mit solchen Aktionen fragen deshalb
+ * hier nach, statt den Nutzer in eine Fehlermeldung laufen zu lassen.
+ */
+export function isLocalOrigin(): boolean {
   if (typeof window === 'undefined') return false
   const h = window.location.hostname
   return h === 'localhost' || h === '127.0.0.1' || h === '[::1]'
