@@ -1,4 +1,5 @@
 import { RUNNER_BASE_URL } from './useRunnerStatus'
+import { leseSpiegel, runnerDirekt } from './runnerBridge'
 
 /**
  * Kunden-Ads (Cockpit /ads): Typen + Fetcher für das Dateisystem-Manifest.
@@ -147,6 +148,12 @@ export interface AdsOverviewEntry {
 }
 
 export async function fetchAdsOverview(): Promise<AdsOverviewEntry[]> {
+  // Ohne direkten Draht zum Runner (HTTPS-Domain) den Spiegel lesen — Migration 0059.
+  if (!runnerDirekt()) {
+    const spiegel = await leseSpiegel<{ entries: AdsOverviewEntry[] }>('ads_overview')
+    if (!spiegel) throw new Error('Noch kein Spiegel vorhanden — Runner einmal laufen lassen.')
+    return spiegel.data.entries
+  }
   const { entries } = await req<{ entries: AdsOverviewEntry[] }>('/ads/overview')
   return entries
 }

@@ -6,7 +6,8 @@ import { HeuteTabs } from '../components/HeuteTabs'
 import { useActiveBrand } from '../lib/activeBrand'
 import { buildLinkedinFollowupInput } from '../lib/approvalDrafts'
 import { bucketOf, coverage, FOLLOWUP_THRESHOLDS_DAYS } from '../lib/linkedinFollowups'
-import { isLocalOrigin, RUNNER_BASE_URL, useRunnerStatus } from '../lib/useRunnerStatus'
+import { RUNNER_BASE_URL, useRunnerStatus } from '../lib/useRunnerStatus'
+import { beauftrageRunner, runnerDirekt } from '../lib/runnerBridge'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -213,10 +214,9 @@ export function LinkedinArea() {
   const threadsQuery = useLinkedinThreads(slug)
   const contacts = useContacts(slug)
   const { state: runnerState } = useRunnerStatus()
-  // Sync und Entwürfe brauchen den lokalen Runner-Port. Auf der Live-Domain
-  // blockt der Browser den (Mixed Content) — dann Knöpfe sperren statt sie ins
-  // Leere laufen zu lassen. Lesen aus Supabase funktioniert überall.
-  const runnerBedienbar = isLocalOrigin()
+  // Beide Wege sind bedienbar: lokal direkt, sonst als Auftrag über Supabase
+  // (Migration 0059). Der Knopf muss also nicht mehr gesperrt werden.
+  const direkt = runnerDirekt()
   const [syncing, setSyncing] = useState(false)
   const [syncMessage, setSyncMessage] = useState<string | null>(null)
   // Überlebt den Reload, damit der Unvollständigkeits-Hinweis nicht nur direkt
@@ -288,10 +288,19 @@ export function LinkedinArea() {
     setSyncing(true)
     setSyncMessage(null)
     try {
-      const res = await fetch(`${RUNNER_BASE_URL}/linkedin/sync`, { method: 'POST' })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setSyncMessage(data?.error ?? `Sync fehlgeschlagen (HTTP ${res.status})`)
+      let data: Record<string, unknown> = {}
+      let fehler: string | null = null
+      if (direkt) {
+        const res = await fetch(`${RUNNER_BASE_URL}/linkedin/sync`, { method: 'POST' })
+        data = await res.json().catch(() => ({}))
+        if (!res.ok) fehler = (data?.error as string) ?? `Sync fehlgeschlagen (HTTP ${res.status})`
+      } else {
+        const r = await beauftrageRunner<Record<string, unknown>>('linkedin_sync', {}, activeBrand?.id)
+        if (r.status === 'error') fehler = r.error ?? 'Sync fehlgeschlagen'
+        else data = r.result ?? {}
+      }
+      if (fehler) {
+        setSyncMessage(fehler)
       } else {
         const ads = data.skippedAds ? ` · ${data.skippedAds} Anzeige(n) gefiltert` : ''
         setSyncMessage(
@@ -314,14 +323,18 @@ export function LinkedinArea() {
 
   const generateDraft = async (thread: LinkedinThread) => {
     try {
-      await fetch(`${RUNNER_BASE_URL}/run`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          agent: 'linkedin-followup-entwuerfe',
-          input: buildLinkedinFollowupInput([thread], nowDate),
-        }),
-      })
+      const eingabe = buildLinkedinFollowupInput([thread], nowDate)
+      if (direkt) {
+        await fetch(`${RUNNER_BASE_URL}/run`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ agent: 'linkedin-followup-entwuerfe', input: eingabe }),
+        })
+      } else {
+        setSyncMessage(`Entwurf für ${thread.name} beauftragt — der Runner holt ihn gleich ab …`)
+        const r = await beauftrageRunner('agent_run', { agent: 'linkedin-followup-entwuerfe', input: eingabe }, activeBrand?.id)
+        if (r.status === 'error') { setSyncMessage(r.error ?? 'Entwurf fehlgeschlagen'); return }
+      }
       setSyncMessage(`Entwurf für ${thread.name} angefordert — siehe /freigaben.`)
     } catch {
       setSyncMessage('Runner nicht erreichbar — Entwurf konnte nicht angefordert werden.')
@@ -355,27 +368,14 @@ export function LinkedinArea() {
         <button
           type="button"
           onClick={() => void runSync()}
-          disabled={syncing || !runnerBedienbar}
+          disabled={syncing}
           className="ck-btn ck-btn--primary"
-          style={{ fontSize: 10, opacity: runnerBedienbar ? 1 : 0.45 }}
-          title={
-            runnerBedienbar
-              ? 'Postfach neu einlesen'
-              : 'Nur lokal: der Browser blockt den Runner-Port von der Live-Domain aus'
-          }
+          style={{ fontSize: 10 }}
+          title={direkt ? 'Postfach neu einlesen' : 'Läuft als Auftrag über deinen Runner — dauert ein paar Sekunden länger'}
         >
           {syncing ? 'Synchronisiert …' : 'Jetzt synchronisieren'}
         </button>
       </div>
-
-      {!runnerBedienbar ? (
-        <div className="ck-panel" style={{ padding: '10px 14px', fontSize: 12, color: 'var(--ck-text-2)' }}>
-          Nur-Lesen-Ansicht. Synchronisieren und Entwürfe brauchen den lokalen Runner — der
-          Browser lässt von dieser Domain aus keine Verbindung dorthin zu. Beides läuft unter{' '}
-          <code style={{ color: 'var(--ck-accent)' }}>localhost:5173</code>, wo auch dein
-          LinkedIn-Chrome offen ist.
-        </div>
-      ) : null}
 
       {syncMessage ? (
         <div style={{ fontSize: 11, color: 'var(--ck-text-3)' }}>{syncMessage}</div>
@@ -432,7 +432,7 @@ export function LinkedinArea() {
           <ThreadSection
             titel="Du bist dran"
             hinweis="Lead hat geantwortet · Sterne zuerst"
-            entwurfMoeglich={runnerBedienbar}
+            entwurfMoeglich={true}
             threads={buckets.duBistDran}
             now={now}
             onSnoozeTomorrow={snoozeTomorrow}
@@ -443,7 +443,7 @@ export function LinkedinArea() {
           <ThreadSection
             titel="Fällig heute"
             hinweis="älteste zuerst"
-            entwurfMoeglich={runnerBedienbar}
+            entwurfMoeglich={true}
             threads={buckets.faellig}
             leerText="Keine fälligen Follow-ups."
             now={now}
@@ -455,7 +455,7 @@ export function LinkedinArea() {
           <ThreadSection
             titel="Abschluss fällig"
             hinweis="letzte Nachricht, danach wird archiviert"
-            entwurfMoeglich={runnerBedienbar}
+            entwurfMoeglich={true}
             threads={buckets.abschluss}
             now={now}
             onSnoozeTomorrow={snoozeTomorrow}
@@ -466,7 +466,7 @@ export function LinkedinArea() {
           <ThreadSection
             titel="Altlasten"
             hinweis="über 30 Tage liegen geblieben, nie nachgefasst — wiederbeleben oder schließen"
-            entwurfMoeglich={runnerBedienbar}
+            entwurfMoeglich={true}
             threads={buckets.verwaist}
             now={now}
             onSnoozeTomorrow={snoozeTomorrow}

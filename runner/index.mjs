@@ -593,6 +593,144 @@ async function pushSnapshot() {
  * UNBEDINGT bei jedem Tick (kein Signatur-Vergleich wie beim Snapshot), sonst
  * altert last_seen. Siehe Migration 0057.
  */
+// ---------- Runner-Brücke (Migration 0059) ----------
+// Der Browser darf von der HTTPS-Domain aus nicht auf 127.0.0.1 zugreifen. Statt
+// den Runner von außen erreichbar zu machen (Tunnel, offener Port), dreht die
+// Brücke die Richtung um: das Cockpit legt einen Auftrag in Supabase ab, der
+// Runner holt ihn sich hier ab. Nach außen offen ist damit weiterhin nichts.
+
+const JOB_POLL_MS = Number(process.env.JOB_POLL_MS ?? 4_000)
+const SNAPSHOT_MIRROR_MS = Number(process.env.SNAPSHOT_MIRROR_MS ?? 60_000)
+let jobLaeuft = false
+
+function supabaseHeaders(extra = {}) {
+  return {
+    apikey: SUPABASE_SERVICE_ROLE_KEY,
+    Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+    'Content-Type': 'application/json',
+    ...extra,
+  }
+}
+
+/** Spiegelt Daten, die sonst nur über den lokalen Port lesbar wären. */
+async function pushSnapshotKey(key, ladeDaten) {
+  try {
+    const data = await ladeDaten()
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/runner_snapshots`, {
+      method: 'POST',
+      headers: supabaseHeaders({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify({ key, data, updated_at: new Date().toISOString() }),
+    })
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '')
+      console.error(`[runner] Spiegel "${key}" HTTP ${res.status}: ${txt.slice(0, 160)}`)
+    }
+  } catch (e) {
+    console.error(`[runner] Spiegel "${key}" fehlgeschlagen:`, e?.message ?? e)
+  }
+}
+
+async function mirrorAll() {
+  if (!SNAPSHOT_ENABLED) return
+  await pushSnapshotKey('ads_overview', async () => {
+    const kunden = await kundenRegistry()
+    const entries = []
+    for (const k of kunden) {
+      const file = join(KUNDEN_ROOT, k.folder, k.adsDir ?? '05_leadgen', 'ads.json')
+      let manifest = emptyManifest(k.slug)
+      try {
+        manifest = JSON.parse(await readFile(file, 'utf8'))
+      } catch (e) {
+        if (e?.code !== 'ENOENT') throw e
+      }
+      entries.push({ kunde: k, manifest })
+    }
+    return { entries }
+  })
+  await pushSnapshotKey('social_weeks', async () => ({ weeks: await socialWeeks() }))
+  await pushSnapshotKey('agents', async () => {
+    const runningIds = new Set([...running.values()].map((r) => r.agent))
+    return {
+      agents: AGENT_CATALOG.map((a) => ({
+        id: a.id,
+        label: a.label,
+        description: a.description,
+        kind: a.kind,
+        running: runningIds.has(a.id),
+      })),
+    }
+  })
+}
+
+/** Führt genau einen Auftrag aus. Rückgabe landet als `result` am Auftrag. */
+async function fuehreJobAus(job) {
+  if (job.kind === 'linkedin_sync') {
+    const synced = await syncThreads({})
+    const result = await upsertThreads(synced.threads, {})
+    return {
+      ...result,
+      partial: synced.partial,
+      skippedAds: synced.skippedAds,
+      skippedGroups: synced.skippedGroups,
+      skippedNonInbox: synced.skippedNonInbox,
+      elapsedMs: synced.elapsedMs,
+    }
+  }
+  if (job.kind === 'agent_run') {
+    const agent = String(job.payload?.agent ?? '')
+    if (!AGENT_BY_ID.has(agent)) throw new Error(`Unbekannter Agent: ${agent}`)
+    if ([...running.values()].some((r) => r.agent === agent)) throw new Error(`${agent} läuft bereits`)
+    return await startRun(agent, job.payload?.input ?? {})
+  }
+  throw new Error(`Unbekannte Auftragsart: ${job.kind}`)
+}
+
+async function pollJobs() {
+  if (!SNAPSHOT_ENABLED || jobLaeuft) return
+  jobLaeuft = true
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/runner_jobs?status=eq.pending&order=created_at.asc&limit=1`,
+      { headers: supabaseHeaders() },
+    )
+    if (!res.ok) return
+    const [job] = await res.json()
+    if (!job) return
+
+    // Beanspruchen: der Filter status=eq.pending sorgt dafür, dass ein zweiter
+    // Runner denselben Auftrag nicht ein zweites Mal greift.
+    const claim = await fetch(
+      `${SUPABASE_URL}/rest/v1/runner_jobs?id=eq.${job.id}&status=eq.pending`,
+      {
+        method: 'PATCH',
+        headers: supabaseHeaders({ Prefer: 'return=representation' }),
+        body: JSON.stringify({ status: 'running', started_at: new Date().toISOString() }),
+      },
+    )
+    const beansprucht = claim.ok ? await claim.json() : []
+    if (!beansprucht.length) return
+
+    console.log(`[runner] Auftrag ${job.kind} (${job.id.slice(0, 8)}) gestartet`)
+    let patch
+    try {
+      patch = { status: 'done', result: await fuehreJobAus(job), error: null }
+      console.log(`[runner] Auftrag ${job.kind} fertig`)
+    } catch (e) {
+      patch = { status: 'error', error: String(e?.message ?? e).slice(0, 800) }
+      console.error(`[runner] Auftrag ${job.kind} fehlgeschlagen:`, e?.message ?? e)
+    }
+    await fetch(`${SUPABASE_URL}/rest/v1/runner_jobs?id=eq.${job.id}`, {
+      method: 'PATCH',
+      headers: supabaseHeaders({ Prefer: 'return=minimal' }),
+      body: JSON.stringify({ ...patch, finished_at: new Date().toISOString() }),
+    })
+  } catch (e) {
+    console.error('[runner] Auftrags-Abfrage fehlgeschlagen:', e?.message ?? e)
+  } finally {
+    jobLaeuft = false
+  }
+}
+
 async function pushHeartbeat() {
   if (!SNAPSHOT_ENABLED) return
   const now = new Date().toISOString()
@@ -1229,6 +1367,15 @@ server.listen(PORT, '127.0.0.1', () => {
     setTimeout(() => void pushHeartbeat(), 1500)
     const hb = setInterval(() => void pushHeartbeat(), HEARTBEAT_PUSH_MS)
     hb.unref?.()
+
+    // Brücke (0059): Aufträge abholen + Ansichten spiegeln, damit das Cockpit
+    // auch auf der HTTPS-Domain vollständig bedienbar ist.
+    console.log(`[runner] Auftrags-Abfrage aktiv → alle ${Math.round(JOB_POLL_MS / 1000)}s`)
+    const jp = setInterval(() => void pollJobs(), JOB_POLL_MS)
+    jp.unref?.()
+    setTimeout(() => void mirrorAll(), 4000)
+    const mi = setInterval(() => void mirrorAll(), SNAPSHOT_MIRROR_MS)
+    mi.unref?.()
   } else {
     console.log('[runner] Snapshot-Push + Heartbeat AUS (kein SUPABASE_SERVICE_ROLE_KEY in runner/.env) — Live-Graph bleibt leer, Runner erscheint auf der Live-Domain offline')
   }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { RUNNER_BASE_URL } from './useRunnerStatus'
+import { leseSpiegel, runnerDirekt } from './runnerBridge'
 import { useActiveBrandOptional } from './activeBrand'
 import { loadSocialBatchList, saveSocialBatch } from './socialBatchStore'
 
@@ -24,6 +25,11 @@ async function req<T>(path: string): Promise<T> {
 }
 
 export async function fetchSocialWeeks(): Promise<SocialWeek[]> {
+  if (!runnerDirekt()) {
+    const spiegel = await leseSpiegel<{ weeks: SocialWeek[] }>('social_weeks')
+    if (!spiegel) throw new Error('Noch kein Spiegel vorhanden — Runner einmal laufen lassen.')
+    return spiegel.data.weeks
+  }
   const { weeks } = await req<{ weeks: SocialWeek[] }>('/social/weeks')
   return weeks
 }

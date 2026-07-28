@@ -1,4 +1,5 @@
 import { RUNNER_BASE_URL } from './useRunnerStatus'
+import { beauftrageRunner, leseSpiegel, runnerDirekt } from './runnerBridge'
 
 export interface RunSummary {
   id: string
@@ -36,11 +37,25 @@ export interface AgentInfo {
 
 /** Agenten-Katalog fürs Cockpit (/agenten). */
 export async function fetchAgents(): Promise<AgentInfo[]> {
+  if (!runnerDirekt()) {
+    const spiegel = await leseSpiegel<{ agents: AgentInfo[] }>('agents')
+    if (!spiegel) throw new Error('Noch kein Spiegel vorhanden — Runner einmal laufen lassen.')
+    return spiegel.data.agents
+  }
   const { agents } = await req<{ agents: AgentInfo[] }>('/agents')
   return agents
 }
 
-export function postRun(agent: string, input?: Record<string, unknown>) {
+export async function postRun(agent: string, input?: Record<string, unknown>) {
+  // Ohne direkten Draht als Auftrag über Supabase — der Runner holt ihn ab.
+  if (!runnerDirekt()) {
+    const r = await beauftrageRunner<{ id: string; agent: string; startedAt: string }>('agent_run', {
+      agent,
+      input: input ?? {},
+    })
+    if (r.status === 'error') throw new Error(r.error ?? 'Agent-Start fehlgeschlagen')
+    return r.result as { id: string; agent: string; startedAt: string }
+  }
   return req<{ id: string; agent: string; startedAt: string }>('/run', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
