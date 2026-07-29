@@ -9,169 +9,148 @@
 
 Kevins Cockpit zeigt Zustand, nimmt ihm aber keine Entscheidung ab. Seine Worte:
 *„Es fühlt sich eher wie ein Nachschlagewerk an, nicht wie ein Tool, in dem ich
-arbeite."* Und: *„Das Programm sagt mir nicht, was jetzt das Wichtigste ist."*
+arbeite."*
 
-**Ziel:** Drei Dinge, die aus Anzeige Arbeit machen.
+**Was das System können muss — in Kevins Worten (29.07.):**
 
-1. **Tagespensum** statt Lagerbestand — das System entscheidet die Portion.
-2. **Arbeitsmodus** im Vollbild — ein Kontakt, ein Text, drei fette Knöpfe.
-3. **Abhaken = Tracking** — was er wegklickt, zählt sich selbst.
+> „Die müssen nur von oben bis unten abgearbeitet werden." · „Ich kann morgen den
+> kompletten Tag zwölf Stunden Sales machen." · „Das Wichtigste ist Kundenarbeit,
+> dass die so schnell wie möglich fertig ist und beim Reviewen oder abgegeben ist.
+> Und dann kommt Sales." · „Das Programm muss nur auf eine Weise laufen."
 
-Dazu das **Sales-Dashboard als Kacheln**: jede Kachel eine Kennzahl **plus eine
-empfohlene Handlung**, Klick vergrößert sie zum Arbeitsfenster, Schließen ordnet
-sie zurück ins Raster.
+**Daraus die vier Gesetze dieses Plans:**
 
-**Nicht im Scope (v1):** Kalender-gestützte Verteilung über die Woche. Graph-
-Darstellung der LinkedIn-Leads. Offene Vernetzungsanfragen als Arbeitsliste
-(Datenlage ungeklärt, siehe RECON-2). Content-Kachel.
+1. **Reihenfolge statt Portion.** Das System sagt, *was als Nächstes dran ist* —
+   nicht, wie viel Kevin heute darf. Fertig ist fertig; hat er zwölf Stunden,
+   arbeitet er alles ab.
+2. **Kundenarbeit vor Sales.** Erst raus, was Kunden schulden. Danach Akquise.
+3. **Limits nur, wo sie echt sind.** Siehe Recon: das ist fast nirgends.
+4. **Eine Betriebsart.** Kein Sondermodus für den aktuellen Rückstau. Heute große
+   Zahlen, in vier Wochen kleine — dieselbe Maschine. Überlauf über ein paar Tage
+   ist ausdrücklich in Ordnung und wird **nicht** weggeplant.
+
+**Nicht im Scope (v1):** Verteilung von Aufgaben über mehrere Tage. Kapazitäts-
+oder Minutenrechnung. Kalender-gestützte Tagesplanung. Graph-Darstellung der
+LinkedIn-Leads. Offene Vernetzungsanfragen als Arbeitsliste (siehe RECON-2).
 
 **Leitplanken:**
-- Keine neuen Metrik-Felder erfinden. `METRIC_FIELDS` ist gesetzt (siehe Recon).
-- Der Vollbild-Modus muss **einhändig am Handy** bedienbar sein: Knöpfe ≥ 48 px,
-  kein Lesen nötig, kein Zielen.
-- Bestehende Seiten (Pipeline, Listen, Call-Mode) bleiben unangetastet.
+- Keine neuen Metrik-Felder erfinden. `METRIC_FIELDS` ist gesetzt.
+- Vollbild-Modus **einhändig am Handy** bedienbar: Knöpfe ≥ 48 px, kein Zielen.
+- Bestehende Seiten (Pipeline, Listen, Call-Mode, Bibliothek) bleiben unangetastet.
+- **Nichts über Zeit rationieren.** Wenn der Executor anfängt, Minuten zu rechnen,
+  ist er falsch abgebogen.
 
 ---
 
-## Recon-Befunde (verifiziert am 29.07.2026, nicht raten)
+## Recon-Befunde (verifiziert 29.07.2026, nicht raten)
 
 | Frage | Befund | Konsequenz |
 |---|---|---|
-| Wo liegen die Trichter-Quoten? | `app/src/cockpit/lib/goals.ts` → `CONVERSION_TARGETS`: `nachrichtLoom.min 0.1`, `loomQuali.min 0.1`, `qualiKunde.min 0.25` | Tagespensum rechnet **aus diesen Werten**, nicht aus neuen Konstanten. |
-| Wo liegt das Monatsziel? | `goals.ts` → `MONTH_TARGETS['2026-07'].total = 30000`, Wochenkurve `JULY_2026_CURVE`, Helfer `currentSoll(curve, today)`; Überschreibung via `monthTotalOverride(monthKey)` | Ziel **nie hartkodieren** — immer über `monthTargetFor()` / `monthTotalOverride()`. |
-| Wert je Kunde? | `LIFE_TARGET.cashProKunde = 5500` | Kunden = Monatsziel ÷ 5500. |
-| Wo wird getrackt? | Tabelle `daily_metrics`, Hook `useDailyMetrics()` (`app/src/cockpit/lib/useDailyMetrics.ts`), Feldliste `METRIC_FIELDS` (23 Felder), Upsert bereits vorhanden | Abhaken schreibt **über diesen Hook**, kein eigener Schreibpfad. |
-| Relevante Felder | `li_nachrichten`, `li_followups`, `looms`, `antworten_li`, `quali_termine`, `abschluesse` | Zuordnung siehe Zug 4. |
-| Datenquellen der Listen | `linkedin_threads` (159 Zeilen, Buckets über `bucketOf`), `linkedin_erstnachrichten` (91 Zeilen, Status `offen`) | Beide live und befüllt. |
-| Loom-Status | **Existiert nicht.** Stern (`starred`) sagt nur „hat zugesagt" | Neue Spalte nötig → Zug 2. |
-| Kachel-Vorbild im Repo | `app/src/cockpit/pages/SalesDashboard.tsx` (aktuell Formulare + leere Panels) | Wird ersetzt, nicht ergänzt. |
-| Runner-Brücke | `runnerBridge.ts` (`runnerDirekt`, `leseSpiegel`, `beauftrageRunner`) | Für alles, was den Runner braucht — nie direkt `fetch` auf 127.0.0.1. |
+| Trichter-Quoten | `app/src/cockpit/lib/goals.ts` → `CONVERSION_TARGETS` (`nachrichtLoom` 0,10–0,20 · `loomQuali` 0,10–0,30 · `qualiKunde` 0,25–0,50) | Quoten-Anzeige rechnet aus diesen Werten. |
+| Monatsziel | `MONTH_TARGETS['2026-07'].total = 30000`, Kurve `JULY_2026_CURVE`, Helfer `currentSoll()`, Überschreibung `monthTotalOverride()` | Nie hartkodieren — immer `monthTargetFor()`. |
+| Wert je Kunde | `LIFE_TARGET.cashProKunde = 5500` | |
+| Tracking | Tabelle `daily_metrics`, Hook `useDailyMetrics()`, 23 Felder in `METRIC_FIELDS`, Upsert vorhanden | Abhaken schreibt **über diesen Hook**. |
+| Listen-Quellen | `linkedin_threads` (159 Zeilen, Buckets via `bucketOf`), `linkedin_erstnachrichten` (91 Zeilen) | Beide live befüllt. |
+| Loom-Status | **Existiert nicht.** `starred` heißt nur „hat zugesagt" | Neue Spalte → Zug 2. |
+| Kundenprojekte | `foundation_tasks` (mit `project_id`), `deliver_projects`, `contacts.stage_changed_at` | Quellen für Zug 6. |
+| Dashboard heute | `app/src/cockpit/pages/SalesDashboard.tsx` — Formulare + leere Panels | Wird ersetzt. |
+| Runner-Zugriff | `runnerBridge.ts` (`runnerDirekt`, `leseSpiegel`, `beauftrageRunner`) | Nie direkt auf 127.0.0.1. |
 
-### Die Rechnung, die alles prägt (nachgerechnet, nicht geschätzt)
+### Die einzigen echten Limits (Kevin, 29.07.)
 
-30.000 € ÷ 5.500 € = **5,5 Kunden** → ÷ 0,25 = **22 Quali-Calls** → ÷ 0,10 =
-**219 Looms** → ÷ 0,10 = **2.182 Erstnachrichten** im Monat.
+| Spur | Limit | Art |
+|---|---|---|
+| Vernetzungsanfragen | **30 / Tag** | Kevins eigenes Tagespensum, sein Ritual |
+| InMails | **150 Credits** | **Vorrat**, kein Tagesrhythmus — verbraucht sich |
+| InMails an offene Profile | **unbegrenzt** | kostet keinen Credit |
+| Erstnachrichten, Follow-ups, Antworten | **kein Limit** | gehen an bestehende Kontakte |
 
-Bei 21 Arbeitstagen: **104 Erstnachrichten + 10,4 Looms pro Tag.**
+**Konsequenz:** Es gibt im ganzen System genau **eine** Rationierungsentscheidung —
+wofür die 150 Credits ausgegeben werden. Alles andere wird abgearbeitet, bis es
+leer ist. Jede Zeit- oder Kapazitätsrechnung im Plan wäre erfunden.
 
-**Kevins Tagesrahmen (4-4-4, bestätigt 29.07.):** 4 h Promo/Sales (inkl. Termine),
-4 h Kundenarbeit, 4 h dritter Block — der fällt zuerst weg, wenn es eng wird.
-Die Akquise-Kapazität ist also **240 Minuten**, aber **Termine liegen innerhalb
-dieses Blocks** und wandern im Kalender.
+**RECON-1 (offen, blockiert nicht):** Kevin ist unsicher, ob die 150 Credits ein
+Gesamtstand oder ein Monatskontingent sind. Der Executor **rät nicht** — die
+Zahl wird als Bestand geführt und die Kachel beschriftet sie neutral („150
+Credits übrig"). Klärung: Kevin liest den Stand in LinkedIn nach.
 
-**Dauern (von Kevin, nicht geschätzt):** Antwort **20 s** (Text ist vorgeschrieben,
-nur kopieren), Erstnachricht 30 s, Follow-up 30 s, Vernetzungsanfrage ~10 s,
-Loom **15 min**. Fixe Tagesgröße: **30 Vernetzungsanfragen**.
+### Die Rechnung — als Anzeige, nicht als Steuerung
 
-Damit geht die Rechnung bei 240 Minuten **punktgenau auf**:
+30.000 € ÷ 5.500 € = 5,5 Kunden. Rückwärts durch den Trichter, an beiden Enden
+von Kevins eigener Zielspanne:
 
-```
-30 Anfragen    5 min
-38 Antworten  13 min
-11 Looms     165 min
-10 Follow-ups  5 min
-104 Erstnachrichten 52 min
-              = 240 min
-```
+| | Erstnachrichten/Monat | Looms/Monat | nötige Anfragen/Tag |
+|---|---|---|---|
+| Untergrenze (0,10 / 0,10 / 0,25) | 2.182 | 219 | **347** |
+| Zielwert (0,20 / 0,30 / 0,50) | 182 | 37 | **29** |
 
-**Korrektur 29.07. (Kevin): Das oben ist der RÜCKSTAU, nicht das Tagesgeschäft.**
-Die 91 Erstnachrichten, 63 Follow-ups, 38 Antworten und 15 Looms haben sich
-einmalig angesammelt. Ist der Berg abgetragen, ist der tägliche Zulauf klein.
+Kevin schickt **30 Anfragen/Tag**. Das trifft die Zielwert-Zeile punktgenau und
+verfehlt die Untergrenze um Faktor 12.
 
-**Dauerzustand, gerechnet aus Kevins eigenen Zielspannen (`CONVERSION_TARGETS`):**
-
-| | Erstnachrichten/Tag | Looms/Tag | Zeit/Tag | nötige Anfragen/Tag |
-|---|---|---|---|---|
-| Untergrenze (0,10 / 0,10 / 0,25) | 104 | 10,4 | 213 min | **347** |
-| Zielwert `great` (0,20 / 0,30 / 0,50) | 8,7 | 1,7 | **35 min** | **29** |
-
-Kevin schickt **30 Vernetzungsanfragen/Tag**. Das trifft die Zielwert-Zeile auf
-die Eins — und verfehlt die Untergrenze um Faktor 12. **Zwischen beiden Zeilen
-liegt, ob sein Monatsziel erreichbar ist.**
-
-**Die drei Erkenntnisse, die das Design bestimmen:**
-
-1. **Bestand ≠ Fluss.** Das Dashboard muss **Zulauf heute** (klein, ~35 min) und
-   **Rückstau** (einmalig, groß) getrennt zeigen. Wer beides vermischt, macht aus
-   jedem Tag einen Notfall — und Kevin ignoriert das Pensum nach drei Tagen.
-   Der Rückstau bekommt eine **Portion aus der Restkapazität**, nie den ganzen Berg.
-2. **Looms sind der Flaschenhals, nicht die Nachrichten.** Selbst im Dauerzustand
-   sind 1,7 Looms = 26 min gegenüber 4 min für alle Nachrichten zusammen. Im
-   Rückstau-Modus (11 Looms = 165 min) frisst eine Stunde Termin sofort ~90
-   Erstnachrichten. Regel: **Looms bekommen ihren Platz zuerst**; passen sie nicht,
-   sagt die Oberfläche das, statt sie stillschweigend fallen zu lassen.
-3. **Die wichtigste Kennzahl ist die erreichte Quote, nicht der Zähler.** Sie
-   entscheidet, ob der Tag 35 Minuten oder unmöglich ist. Sie gehört als eigene
-   Kachel nach vorn (Zug 5, Kachel 6) — mit Ist gegen Zielspanne, nicht nur Ist.
+**Das ist die wichtigste Kennzahl im ganzen Cockpit** — sie entscheidet, ob das
+Monatsziel erreichbar ist. Sie wird **angezeigt** (Zug 5, Kachel „Quoten"), aber
+sie steuert **nichts**. Sie teilt Kevin keinen Tag zu.
 
 ---
 
-## Zug 1 — Tagespensum als reine Funktionen (`app/src/cockpit/lib/tagespensum.ts`)
+## Zug 1 — Prioritätenliste (`app/src/cockpit/lib/prioritaet.ts`)
 
-**Aktion:** Neues Modul, keine Netzwerkaufrufe, per `tsx` prüfbar.
+**Aktion:** Reine Funktionen, keine Netzwerkaufrufe, per `tsx` prüfbar. Das Modul
+beantwortet **eine** Frage: *In welcher Reihenfolge?*
 
 ```
-DAUER_MINUTEN = { anfrage: 10/60, antwort: 20/60, erstnachricht: 0.5, followup: 0.5, loom: 15 }
-AKQUISE_BLOCK_MINUTEN = 240   // 4-4-4: erster Block
-ANFRAGEN_PRO_TAG = 30         // feste Tagesgröße
+export type Spur =
+  | 'kundenaufgabe' | 'kunde_liegt' | 'antwort' | 'loom'
+  | 'erstnachricht' | 'followup' | 'anfrage' | 'inmail'
 ```
 
-Exporte:
+`ordnePosten(quellen, heute)` → `Posten[]`, absteigend nach Dringlichkeit.
+Die Reihenfolge ist **fest verdrahtet**, kein Ermessen für den Executor:
 
-- `berechneBedarf(monatsziel, quoten, cashProKunde)` → `{ kunden, quali, looms, nachrichten }`.
-- `proArbeitstag(bedarf, arbeitstageRest)` → dieselben Felder als Tagesbedarf.
-- `berechnePensum({ bedarf, zulauf, rueckstau, kapazitaetMinuten })` → Portion je Spur,
-  **getrennt nach `zulauf` und `rueckstau`**.
+| Rang | Spur | Begründung |
+|---|---|---|
+| 1 | `kundenaufgabe` | Kevins Gesetz: erst raus, was Kunden schulden |
+| 2 | `kunde_liegt` | Projekt > 14 Tage ohne Bewegung → Follow-up |
+| 3 | `antwort` | Jemand wartet auf Kevin. Kühlt am schnellsten ab |
+| 4 | `loom` | Lead hat zugesagt — verbindlichster nächster Schritt |
+| 5 | `erstnachricht` | Frisch angenommen, solange warm |
+| 6 | `followup` | Kühlende Leads |
+| 7 | `anfrage` | Tagesritual, füttert den Trichter (30) |
+| 8 | `inmail` | Reaktivierung, credit-begrenzt |
 
-**Zulauf** = was heute neu angefallen ist (neue Antworten, neu angenommene
-Anfragen). **Rückstau** = alles Ältere. Die Trennung läuft über das Alter des
-Eintrags; Schwelle: seit dem letzten abgeschlossenen Arbeitsdurchgang.
+**Innerhalb einer Spur:** ältestes zuerst; bei LinkedIn-Threads Sterne vor
+Nicht-Sternen (bestehende Sortierung aus `LinkedinArea` übernehmen).
 
-**Reihenfolge der Zuteilung ist festgelegt** (kein Ermessen):
-1. `anfragen` — feste 30, ~5 min. Nicht verhandelbar, füttert den ganzen Trichter.
-2. `antworten` (Zulauf **und** Rückstau) — **alle**, ungedeckelt. Wer geantwortet
-   hat, wartet nicht.
-3. `looms` — Tagesbedarf zuerst, dann Rückstau, solange Zeit bleibt.
-4. `followups` — Zulauf, dann Rückstau.
-5. `erstnachrichten` — Zulauf zuerst, dann füllt der Rückstau die **restliche**
-   Kapazität auf.
+Zusätzlich `tagesstand(metrikZeile)` → `{ anfragenHeute, anfragenLimit: 30,
+inmailCredits }` — nur zum **Anzeigen** der Zähler, nicht zum Abschneiden von
+Listen.
 
-Rückgabe zusätzlich: `{ minutenGeplant, minutenKapazitaet, minutenTermine,
-bedarfNachrichtenProTag, luecke, rueckstauGesamt, rueckstauHeute }`.
+**Erwartete Beobachtung bei Erfolg:** `npx tsx scripts/verify-prioritaet.ts` gibt
+„N/N Fälle korrekt". Fixture prüft mindestens: eine Kundenaufgabe steht über
+jeder Antwort; eine Antwort steht über jedem Loom; innerhalb der Antworten steht
+die älteste oben; ein Stern-Thread steht über einem gleich alten ohne Stern.
+**Bei Fehlschlag:** Reihenfolge weicht ab.
 
-**Termine gehen von der Kapazität ab.** `kapazitaetMinuten = AKQUISE_BLOCK_MINUTEN
-− minutenTermine`. Die Termine kommen aus dem bestehenden Kalender-Proxy
-(`fetchCalendar`, Runner-Endpoint `/calendar`) — nur die des heutigen Tages, nur
-die, die in den Akquise-Block fallen. Ist der Kalender nicht erreichbar, gilt
-`minutenTermine = 0` und die UI sagt „ohne Termine gerechnet".
+**Wahrscheinlichster Fehler:** Der Executor baut eine Gewichtung oder ein
+Punktesystem, weil das „intelligenter" wirkt. **Gegenzug:** Die Rangfolge ist eine
+feste Liste. Ein Punktesystem macht die Reihenfolge unerklärbar und ist explizit
+nicht gewünscht.
 
-**Erwartete Beobachtung bei Erfolg:** `npx tsx scripts/verify-tagespensum.ts` gibt
-„N/N Fälle korrekt". Fixture mit Monatsziel 30000, Vorrat (91 Erstnachrichten,
-63 Follow-ups, 38 Antworten, 15 Looms), Kapazität 90 → Summe der Minuten ≤ 90,
-`antworten` = 38 (ungedeckelt), `luecke > 0`.
-**Bei Fehlschlag:** Minutensumme > Kapazität, oder `antworten` gedeckelt.
+**Zweiter Fehler:** Listen werden auf ein Tagespensum gekürzt. **Gegenzug:** Es
+gibt kein Tagespensum. `ordnePosten` gibt **alles** zurück; die Oberfläche zeigt
+zunächst die ersten N mit „weitere anzeigen".
 
-**Wahrscheinlichster Fehler:** Der Executor deckelt die Antworten mit, weil sie
-zeitlich am teuersten sind (38 × 3 min = 114 min > Kapazität). **Gegenzug:**
-Antworten stehen **vor** der Kapazitätsrechnung. Übersteigen sie die Kapazität
-allein, ist das Pensum = nur Antworten, alles andere 0, und `minutenGeplant`
-liegt über `minutenKapazitaet`. Das ist gewollt und muss die UI zeigen dürfen.
+**Trigger:** Fehlt eine Quelle (Tabelle nicht migriert), fehlt nur **deren** Spur.
+Nie die ganze Liste abbrechen.
 
-**Zweiter Fehler:** Division durch null, wenn eine Quote 0 ist oder der Monat
-kein Ziel hat. **Gegenzug:** Quote ≤ 0 → Bedarf `Infinity` vermeiden, stattdessen
-`null` zurückgeben und die UI zeigt „Ziel/Quoten unvollständig".
-
-**Trigger:** Liefert `monthTargetFor(monatsKey)` `null` → kein Pensum berechnen,
-Kachel zeigt „Monatsziel fehlt" mit Link auf `/tracking`. Kein Ersatzwert erfinden.
-
-**Abbruchbedingung:** Keine neuen Zielwerte in dieses Modul schreiben. Alles kommt
-aus `goals.ts`.
+**Abbruchbedingung:** Keine Minuten, keine Kapazität, keine Verteilung auf Tage.
+Taucht so etwas im Code auf, ist der Zug falsch umgesetzt.
 
 ---
 
 ## Zug 2 — Migration `0061_loom_status.sql`
 
-**Aktion:** Loom-Spur auf `linkedin_threads` ergänzen (die Sterne sind dort):
+**Aktion:**
 
 ```sql
 alter table linkedin_threads
@@ -183,15 +162,14 @@ create index if not exists linkedin_threads_loom_idx
   on linkedin_threads (brand_id, loom_status) where starred;
 ```
 
-**Erwartete Beobachtung bei Erfolg:** `select count(*) from linkedin_threads where
-loom_status = 'offen' and starred` gibt **15**.
-**Bei Fehlschlag:** Spalte fehlt → PGRST-Fehler in der App.
+**Erwartete Beobachtung bei Erfolg:** `select count(*) from linkedin_threads
+where loom_status = 'offen' and starred` gibt **15**.
+**Bei Fehlschlag:** PGRST-Fehler „column does not exist".
 
-**Wahrscheinlichster Fehler:** Der Executor pusht selbst. **Verboten** — Kevins
-Migrations-Historie desynchronisiert. **Gegenzug:** Migration nur schreiben, dann
-stoppen und Kevin den SQL-Block zum Einfügen in den Supabase-SQL-Editor geben
-(so lief es bei 0058/0059/0060). Bis dahin muss die App einen sauberen
-Leerzustand zeigen — `isMissingSupabaseTableError`-Muster analog nutzen.
+**Wahrscheinlichster Fehler:** Der Executor pusht selbst. **Verboten** — das
+desynchronisiert Kevins Migrations-Historie. **Gegenzug:** Migration nur
+schreiben, dann stoppen und Kevin den SQL-Block zum Einfügen in den
+Supabase-SQL-Editor geben (so lief es bei 0058/0059/0060).
 
 **Trigger:** Fehlt die Spalte zur Laufzeit → Loom-Kachel zeigt „Migration 0061
 ausstehend", alle anderen Kacheln arbeiten normal weiter.
@@ -200,38 +178,40 @@ ausstehend", alle anderen Kacheln arbeiten normal weiter.
 
 ## Zug 3 — Arbeitsmodus (`app/src/cockpit/components/Arbeitsmodus.tsx`)
 
-**Aktion:** Vollbild-Overlay, **ein** Eintrag gleichzeitig.
+**Aktion:** Vollbild-Overlay, **ein** Posten gleichzeitig, arbeitet die Liste aus
+Zug 1 von oben nach unten ab — spurübergreifend, wenn Kevin „alles" startet.
 
 Aufbau von oben:
-1. Fortschritt „3 / 12" + dünner Balken. Kein weiterer Text.
-2. **Name** (groß). Dahinter **grau** die Firma. Darunter **grün** die Website als Link.
-3. Der Text (Nachricht bzw. Loom-Skript) in einem ruhigen Block, `white-space: pre-wrap`.
-4. Drei Knöpfe, jeder **≥ 48 px hoch**, volle Breite auf Handy:
+1. Fortschritt „3 / 47" + dünner Balken. Sonst kein Text.
+2. **Name** groß · dahinter **grau** die Firma · darunter **grün** die Website als Link.
+3. Der Text (Nachricht, Loom-Skript oder Aufgabenbeschreibung), `white-space: pre-wrap`.
+4. Drei Knöpfe, **≥ 48 px**, auf Handy volle Breite:
    `Kopieren` (primär) · `Erledigt` · `Überspringen`.
-5. `Esc` / „Schließen" bricht ab — Fortschritt bleibt erhalten.
+5. `Esc` / „Schließen" bricht ab, Fortschritt bleibt erhalten.
 
-Nach `Erledigt` **automatisch zum nächsten Eintrag**. Nach dem letzten: Abschluss-
-Bild — „12 raus." plus die aktualisierten Tageszahlen.
+Nach `Erledigt` automatisch zum nächsten. Nach dem letzten ein Abschlussbild:
+was geschafft wurde, plus die aktualisierten Tageszähler.
 
 **Erwartete Beobachtung bei Erfolg:** Screenshot bei 390×664 zeigt Name, Text und
-drei Knöpfe **ohne Scrollen**; `document.documentElement.scrollWidth === clientWidth`.
-**Bei Fehlschlag:** Knöpfe unterhalb der Falz, horizontaler Überlauf.
+alle drei Knöpfe **ohne Scrollen**; `document.documentElement.scrollWidth ===
+clientWidth`.
+**Bei Fehlschlag:** Knöpfe unter der Falz oder horizontaler Überlauf.
 
-**Wahrscheinlichster Fehler:** Die bekannte Falle aus `App.tsx` — `#app-ui-overlay`
-setzt global `pointer-events: none`. Ein Vollbild außerhalb der CockpitShell ist
-dann tot. **Gegenzug:** Overlay explizit mit `pointerEvents: 'auto'` rendern und
-**innerhalb** der Shell montieren. Signal: Knöpfe reagieren nicht auf Klicks.
+**Wahrscheinlichster Fehler:** Bekannte Falle aus `App.tsx` — `#app-ui-overlay`
+setzt global `pointer-events: none`; ein Vollbild außerhalb der CockpitShell ist
+dann tot. **Signal:** Knöpfe reagieren nicht. **Gegenzug:** Overlay mit
+`pointerEvents: 'auto'` rendern und **innerhalb** der Shell montieren.
 
-**Zweiter Fehler:** `navigator.clipboard` wirft in unsicherem Kontext oder ohne
-Nutzergeste. **Gegenzug:** `try/catch`; scheitert es, den Text markierbar lassen
-und „Text markieren und kopieren" einblenden — nie stumm scheitern.
+**Zweiter Fehler:** `navigator.clipboard` wirft ohne sicheren Kontext oder ohne
+Nutzergeste. **Gegenzug:** `try/catch`; scheitert es, Text markierbar lassen und
+„Text markieren und kopieren" einblenden — nie stumm scheitern.
 
-**Dritter Fehler:** Die `h-svh`-Falle aus der Memory — auf echtem Handy klemmt der
-Inhalt hinter der Nav. **Gegenzug:** Bei 390×664 prüfen, nicht nur im Desktop-
-Schmalfenster.
+**Dritter Fehler:** `h-svh`-Falle aus der Memory — auf echtem Handy klemmt der
+Inhalt hinter der Nav. **Gegenzug:** bei 390×664 prüfen, nicht nur im schmalen
+Desktop-Fenster.
 
-**Trigger:** Ist die Liste beim Start leer → Arbeitsmodus gar nicht öffnen,
-stattdessen „nichts offen" an der Kachel.
+**Trigger:** Ist die Liste beim Start leer → Modus gar nicht öffnen, stattdessen
+„nichts offen" an der Kachel.
 
 ---
 
@@ -239,131 +219,118 @@ stattdessen „nichts offen" an der Kachel.
 
 **Aktion:** Jedes `Erledigt` erhöht **genau ein** Feld über `useDailyMetrics()`:
 
-| Spur | Feld | Begründung |
-|---|---|---|
-| Erstnachricht | `li_nachrichten` | +1 je verschickter Erstnachricht |
-| Follow-up | `li_followups` | +1 je Follow-up |
-| Loom | `looms` | +1, zusätzlich `loom_status = 'verschickt'` |
-| **Antwort** | **keins** | `antworten_li` zählt **erhaltene** Antworten (Trichter-Eingang). Eine eigene Antwort ist keine neue Antwort. |
+| Spur | Feld |
+|---|---|
+| `erstnachricht` | `li_nachrichten` |
+| `followup` | `li_followups` |
+| `loom` | `looms` (zusätzlich `loom_status = 'verschickt'`) |
+| `anfrage` | `li_anfragen` |
+| `inmail` | `inmails` |
+| **`antwort`** | **keins** |
+| `kundenaufgabe`, `kunde_liegt` | keins (kein passendes Feld) |
 
-**Das ist die gefährlichste Stelle des ganzen Plans.** Ein falsch gezähltes Feld
+**Das ist die gefährlichste Stelle des Plans.** Ein falsch gezähltes Feld
 verfälscht Kevins Trichter dauerhaft und fällt erst Wochen später auf.
 
-**Erwartete Beobachtung bei Erfolg:** Vor/Nach-Vergleich der Zeile in
-`daily_metrics` für das heutige Datum: genau das erwartete Feld +1, alle anderen
-unverändert.
-**Bei Fehlschlag:** zwei Felder verändert, oder `antworten_li` hochgezählt.
+**`antworten_li` zählt die Antworten, die Kevin BEKOMMT** (Trichter-Eingang).
+Eine Antwort, die er selbst schreibt, ist keine neue Antwort. Diese Begründung
+gehört als Kommentar in den Code, damit sie nicht später „repariert" wird.
 
-**Wahrscheinlichster Fehler:** Der Executor hält `antworten_li` für „Antworten,
-die ich schreibe" und zählt hoch. **Gegenzug:** Die Antwort-Spur erhöht
-**nichts**. Steht so im Code-Kommentar, damit es nicht später „repariert" wird.
+**Erwartete Beobachtung bei Erfolg:** Zeile aus `daily_metrics` für heute vor und
+nach einem `Erledigt` — genau das erwartete Feld +1, alle anderen unverändert.
+**Bei Fehlschlag:** zwei Felder verändert oder `antworten_li` hochgezählt.
 
 **Zweiter Fehler:** Doppelzählung bei Doppelklick oder erneutem Öffnen.
-**Gegenzug:** Der Status-Wechsel ist die Quelle der Wahrheit — nur erhöhen, wenn
-der Eintrag **von** `offen` **auf** erledigt wechselt. Ist er schon erledigt,
-passiert nichts.
+**Gegenzug:** Nur zählen beim Übergang **von** `offen` **auf** erledigt. Ist der
+Posten schon erledigt, passiert nichts.
 
-**Abbruchbedingung:** Kein neues Feld zu `METRIC_FIELDS` hinzufügen. Passt eine
-Spur auf kein Feld, zählt sie nicht — und das wird in der UI gesagt.
+**Abbruchbedingung:** Kein neues Feld in `METRIC_FIELDS`. Passt eine Spur auf kein
+Feld, zählt sie nicht — und die UI sagt das.
 
 ---
 
 ## Zug 5 — Sales-Dashboard als Kacheln (`SalesDashboard.tsx` ersetzen)
 
-**Aktion:** Raster aus Kacheln (`repeat(auto-fit, minmax(260px, 1fr))`). Jede
-Kachel: **Titel · eine Kennzahl · eine empfohlene Handlung**. Klick vergrößert sie
-zum Arbeitsfenster (Overlay), Schließen ordnet sie zurück.
+**Aktion:** Raster (`repeat(auto-fit, minmax(260px, 1fr))`). Jede Kachel:
+**Titel · eine Kennzahl · eine empfohlene Handlung.** Klick vergrößert sie zum
+Arbeitsfenster (Overlay), Schließen ordnet sie zurück ins Raster.
 
-Kacheln in dieser Reihenfolge — die Reihenfolge ist die Priorität:
+**Kacheln — die Reihenfolge ist die Priorität aus Zug 1:**
 
 | # | Kachel | Kennzahl | Handlung |
 |---|---|---|---|
-| 1 | **Heute** | „0 von 14 · 38 Min. · 1 Termin abgezogen" | „Arbeitsmodus starten" (alle Spuren nacheinander) |
-| 2 | **Vernetzungsanfragen** | **0 von 30** | Arbeitsmodus (Spur `anfrage`) — Kevins Tagesritual, füttert den Trichter |
-| 3 | **Antworten** | 38 warten · 12 mit Stern | Arbeitsmodus (Spur `antwort`) |
-| 4 | **Looms** | 0 von 2 heute · 15 im Rückstau | Arbeitsmodus (Spur `loom`) |
-| 5 | **Erstnachrichten** | 9 heute · 91 im Rückstau | Arbeitsmodus (Spur `erstnachricht`) |
-| 6 | **Quoten** | Ist gegen Zielspanne, je Stufe | Link `/tracking` |
-| 7 | **Follow-ups** | 63 fällig · 58 Altlasten | Arbeitsmodus (Spur `followup`) |
-| 8 | **Ziel** | Ist/Soll + Lücke | Link `/tracking` |
+| 1 | **Jetzt dran** | „47 offen · zuerst: Kundenaufgabe CoLective" | „Arbeitsmodus starten" (alle Spuren, von oben) |
+| 2 | **Kundenarbeit** | offene Aufgaben je Projekt | Link ins Projekt |
+| 3 | **Liegt zu lange** | Projekte > 14 Tage ohne Bewegung | „Follow-up entwerfen" |
+| 4 | **Antworten** | 38 warten · 12 mit Stern | Arbeitsmodus (`antwort`) |
+| 5 | **Looms** | 0 von 15 | Arbeitsmodus (`loom`) |
+| 6 | **Erstnachrichten** | 91 offen | Arbeitsmodus (`erstnachricht`) |
+| 7 | **Follow-ups** | 63 fällig · 58 Altlasten | Arbeitsmodus (`followup`) |
+| 8 | **Vernetzungsanfragen** | **0 von 30** | Arbeitsmodus (`anfrage`) |
+| 9 | **Quoten** | Ist gegen Zielspanne je Stufe | Link `/tracking` |
+| 10 | **InMails** | 150 Credits · 867 offene Anfragen | Hinweis auf Skill `linkedin-inmail` (RECON-2) |
 
-**Kachel 6 ist die wichtigste und darf nicht nach hinten rutschen.** Sie zeigt je
-Trichterstufe Ist gegen die Spanne aus `CONVERSION_TARGETS` — denn zwischen
-Untergrenze und Zielwert liegt Faktor 12 im Tagesaufwand. Farbe: unterhalb `min`
+**Kachel 9 darf beim Bauen nicht nach hinten rutschen** — zwischen Unter- und
+Obergrenze der Quoten liegt Faktor 12 in der nötigen Menge. Farbe: unter `min`
 warnend, zwischen `min` und `great` neutral, ab `great` positiv.
 
-**Jede Kachel mit Rückstau zeigt beides getrennt** („9 heute · 91 im Rückstau").
-Nie die Summe — sonst sieht jeder Tag nach Notstand aus.
+**Zähler-Regel:** Wo es ein echtes Tageslimit gibt, zeigt die Kachel „X von Y"
+(nur Vernetzungsanfragen: 0 von 30). Überall sonst nur die offene Menge — **kein
+erfundenes Tagesziel.**
 
-**Der Tagesrahmen 4-4-4 ist die Klammer:** Das Dashboard zeigt oben, in welchem
-Block Kevin gerade ist (Akquise / Kundenarbeit / dritter Block) und wie viel Zeit
-darin noch übrig ist. Der zweite Block bekommt seine eigene Kachelgruppe (Zug 7).
+**Erwartete Beobachtung bei Erfolg:** `npx tsc -b` und `npm run build` grün;
+Kacheln bei 1280×800 mehrspaltig, bei 390×664 einspaltig ohne horizontalen
+Überlauf; **jede** Kachel hat eine Zahl **und** einen Knopf.
+**Bei Fehlschlag:** eine Kachel ohne Handlung — dann ist es wieder ein
+Nachschlagewerk.
 
-**Erwartete Beobachtung bei Erfolg:** `npx tsc -b` grün, `npm run build` grün,
-Kacheln bei 1280×800 dreispaltig, bei 390×664 einspaltig ohne horizontalen
-Überlauf. Jede Kachel zeigt eine Zahl **und** einen Knopf.
-**Bei Fehlschlag:** Kachel ohne Handlung (dann ist es wieder ein Nachschlagewerk).
-
-**Wahrscheinlichster Fehler:** Der Executor baut Reiter statt Kacheln, weil das
-im Repo häufiger vorkommt. **Gegenzug:** Kevin hat Kacheln ausdrücklich verlangt
+**Wahrscheinlichster Fehler:** Der Executor baut Reiter statt Kacheln, weil das im
+Repo häufiger vorkommt. **Gegenzug:** Kevin hat Kacheln ausdrücklich verlangt
 („keine Tabs, sondern Kartenfenster, das größer wird"). Reiter sind hier falsch.
 
 **Zweiter Fehler:** Die Vergrößerung wird als Route gebaut → Zurück-Taste und
-Zustand brechen. **Gegenzug:** Lokaler State im Dashboard, kein Routing.
+Zustand brechen. **Gegenzug:** lokaler State im Dashboard, kein Routing.
 
-**Trigger:** Fehlt eine Datenquelle (Tabelle noch nicht migriert), zeigt **nur
-diese** Kachel ihren Leerzustand. Nie die ganze Seite abbrechen.
+**Trigger:** Fehlt eine Datenquelle, zeigt **nur diese** Kachel ihren Leerzustand.
 
 ---
 
-## Zug 7 — Kundenarbeit als zweiter Block (Kachelgruppe „Liefern")
+## Zug 6 — Kundenarbeit als Quelle (`app/src/cockpit/lib/kundenarbeit.ts`)
 
-**Aktion:** Zweite Kachelgruppe unter der Akquise, für Kevins zweiten 4-h-Block.
-Sie beantwortet: *„Was schulde ich Kunden, und was liegt zu lange?"*
+**Aktion:** Liefert die Posten für Rang 1 und 2 der Prioritätenliste.
 
-Quellen (alle vorhanden, nichts Neues erfinden):
-- `foundation_tasks` — offene Aufgaben mit `project_id`.
-- `deliver_projects` / `contacts.deliver_project_id` — laufende Kundenprojekte.
-- `contacts.stage_changed_at` — wie lange der Zustand schon steht.
+Quellen (alle vorhanden, **nichts Neues modellieren**):
+- `foundation_tasks` — offene Aufgaben mit `project_id`
+- `deliver_projects` / `contacts.deliver_project_id` — laufende Projekte
+- `contacts.stage_changed_at` — wie lange der Zustand steht
 
-Kacheln:
+**Regel „liegt zu lange"** (Kevins Formulierung: *„die ist seit zwei Wochen im
+Review, mach da mal ein Follow-up"*): Projekt ohne Änderung an
+`stage_changed_at` **und** ohne erledigte Aufgabe seit **> 14 Tagen**.
 
-| Kachel | Kennzahl | Handlung |
-|---|---|---|
-| **Offene Kundenaufgaben** | Anzahl je Projekt | Link ins Projekt |
-| **Liegt zu lange** | Projekte ohne Bewegung seit > 14 Tagen | „Follow-up entwerfen" |
+**Erwartete Beobachtung bei Erfolg:** Mindestens ein Projekt erscheint mit Alter
+in Tagen (CoLective oder Reichentrog).
+**Bei Fehlschlag:** leere Liste trotz laufender Projekte → falsche Quelle.
 
-**Die „liegt zu lange"-Regel ist Kevins ausdrücklicher Wunsch** (*„die ist seit
-zwei Wochen im Review, mach da mal ein Follow-up"*). Schwelle: **14 Tage ohne
-Änderung an `stage_changed_at` bzw. ohne erledigte Aufgabe im Projekt.**
-
-**Erwartete Beobachtung bei Erfolg:** Kachelgruppe rendert; bei Kevins aktuellem
-Stand erscheint mindestens ein Projekt (CoLective oder Reichentrog) mit Alter in
-Tagen.
-**Bei Fehlschlag:** leere Gruppe trotz laufender Projekte → falsche Quelle gewählt.
-
-**Wahrscheinlichster Fehler:** Der Executor erfindet eine neue Projekt-Tabelle,
-weil die Zuordnung Kunde↔Projekt verstreut ist. **Gegenzug:** Ausschließlich die
-drei Quellen oben. Reicht das nicht, ist das ein **RECON-3**-Fall — melden, nicht
+**Wahrscheinlichster Fehler:** Der Executor legt eine neue Projekt-Tabelle an,
+weil die Zuordnung Kunde↔Projekt verstreut ist. **Gegenzug:** ausschließlich die
+drei Quellen oben. Reicht das nicht, ist es **RECON-3** — melden, nicht
 modellieren.
 
-**Abbruchbedingung:** Keine Migration für diesen Zug. Findet sich die nötige
-Information nicht in den drei Quellen, bleibt die Kachel mit ehrlichem Leertext
-stehen.
+**Abbruchbedingung:** Keine Migration für diesen Zug.
 
 ---
 
-## Zug 6 — Verifikation
+## Zug 7 — Verifikation
 
-1. `npx tsx scripts/verify-tagespensum.ts` → „N/N Fälle korrekt".
+1. `npx tsx scripts/verify-prioritaet.ts` → „N/N Fälle korrekt".
 2. `npx tsc -b` und `npm run build --prefix app` → grün.
-3. Screenshots **1280×800 und 390×664** von: Dashboard-Raster, geöffneter Kachel,
+3. Screenshots bei **1280×800 und 390×664**: Kachelraster, geöffnete Kachel,
    Arbeitsmodus, Abschlussbild.
-4. Metrik-Beweis: Zeile aus `daily_metrics` für heute **vor** und **nach** einem
-   `Erledigt` ausgeben — genau ein Feld +1.
-5. Konsole auf Fehler prüfen. **Hinweis:** Hooks-Order-Warnungen nach einem Edit
-   sind HMR-Artefakte; erst nach vollem Reload bewerten (das kostete am 28.07.
-   unnötig Zeit).
+4. Metrik-Beweis: `daily_metrics`-Zeile für heute vor und nach einem `Erledigt`
+   ausgeben — genau ein Feld +1.
+5. Konsole prüfen. **Hinweis:** Hooks-Order-Warnungen direkt nach einem Edit sind
+   HMR-Artefakte; erst nach vollem Reload bewerten (kostete am 28.07. Zeit).
 
 ---
 
@@ -371,27 +338,28 @@ stehen.
 
 | Angriff | Ergebnis | Patch |
 |---|---|---|
-| „Das Tagespensum ist 104 Nachrichten — Kevin ignoriert es ab Tag 3." | **Traf.** | Das waren Rückstauzahlen. Zulauf und Rückstau werden getrennt gezeigt; der Rückstau bekommt nur eine Portion aus der Restzeit. |
-| „Jeder Tag sieht nach Notstand aus, weil Bestand und Fluss addiert werden." | **Traf.** | Keine Kachel zeigt je die Summe — immer „X heute · Y im Rückstau". |
-| „Termine wandern, das Pensum rechnet trotzdem mit 240 Minuten." | **Traf.** | Kapazität = 240 − Termine des Tages im Akquise-Block, aus dem Kalender-Proxy. Kalender weg → „ohne Termine gerechnet". |
-| „Die Quoten-Kachel rutscht beim Bauen nach unten, weil sie 'nur' eine Zahl ist." | **Traf.** | Ausdrücklich als wichtigste Kachel markiert: zwischen Untergrenze und Zielwert liegt Faktor 12 im Tagesaufwand. |
-| „Antwort-Spur zählt `antworten_li` hoch und verfälscht den Trichter." | **Traf.** | Zug 4: Antwort-Spur zählt nichts, mit Begründung im Code. |
-| „Abhaken zählt doppelt bei Doppelklick." | **Traf.** | Nur beim Übergang `offen` → erledigt zählen. |
-| „Vollbild reagiert nicht auf Klicks." | **Abgewehrt.** | `pointerEvents: 'auto'` + Montage in der Shell, Falle aus `App.tsx` bekannt. |
-| „Executor baut Reiter statt Kacheln." | **Traf.** | Ausdrücklicher Hinweis in Zug 5 samt Kevins Formulierung. |
-| „Ziel fehlt für den Monat → Division durch null, weiße Seite." | **Abgewehrt.** | `monthTargetFor()` null → Kachel meldet „Monatsziel fehlt". |
-| „Loom-Kachel bricht die Seite, weil 0061 noch nicht gepusht ist." | **Traf.** | Leerzustand pro Kachel, nie global. |
+| „Der Executor baut wieder eine Minuten-/Kapazitätsrechnung, weil das klug wirkt." | **Traf.** | Ausdrückliches Verbot in Leitplanken und Zug 1, plus Abbruchbedingung. |
+| „Listen werden auf ein Tagespensum gekürzt, Kevin kann nicht durcharbeiten." | **Traf.** | `ordnePosten` gibt alles zurück; UI zeigt N mit „weitere anzeigen". |
+| „Antwort-Spur zählt `antworten_li` hoch und verfälscht den Trichter." | **Traf.** | Zug 4: Antwort zählt nichts, Begründung im Code. |
+| „Doppelklick zählt doppelt." | **Traf.** | Nur beim Übergang `offen` → erledigt zählen. |
+| „Executor baut Reiter statt Kacheln." | **Traf.** | Kevins Formulierung wörtlich im Plan. |
+| „Punktesystem statt fester Rangfolge — Reihenfolge wird unerklärbar." | **Traf.** | Rangfolge ist eine feste Liste, kein Scoring. |
+| „Vollbild reagiert nicht auf Klicks." | **Abgewehrt.** | `pointerEvents: 'auto'`, Falle aus `App.tsx` bekannt. |
+| „Loom-Kachel bricht die Seite, weil 0061 fehlt." | **Abgewehrt.** | Leerzustand pro Kachel, nie global. |
+| „150 InMail-Credits werden als Tageslimit interpretiert." | **Traf.** | Als Bestand geführt, neutral beschriftet, RECON-1 offen. |
 
 ---
 
 ## Abbruchbedingungen (stoppen und melden, nicht improvisieren)
 
-1. Ein Metrik-Feld passt auf keine Spur → nicht zählen, nicht erfinden.
-2. `db push` durch den Executor — verboten. SQL an Kevin geben.
-3. Bestehende Seiten (Pipeline, Listen, Call-Mode, Bibliothek) müssten geändert
-   werden → stoppen, das ist nicht im Auftrag.
-4. Der Arbeitsmodus bräuchte einen Schreibpfad am `useDailyMetrics`-Hook vorbei.
-5. Mehr als eine Kachel zeigt gleichzeitig einen Leerzustand → Datenlage prüfen
+1. Der Plan verlangt irgendwo eine Zeit-, Minuten- oder Kapazitätsrechnung →
+   falsch abgebogen, stoppen.
+2. Ein Metrik-Feld passt auf keine Spur → nicht zählen, nicht erfinden.
+3. `db push` durch den Executor — verboten. SQL an Kevin geben.
+4. Bestehende Seiten (Pipeline, Listen, Call-Mode, Bibliothek) müssten geändert
+   werden → nicht im Auftrag.
+5. Der Arbeitsmodus bräuchte einen Schreibpfad am `useDailyMetrics`-Hook vorbei.
+6. Mehr als eine Kachel zeigt gleichzeitig einen Leerzustand → Datenlage prüfen
    lassen, nicht weiterbauen.
 
 ---
@@ -401,14 +369,9 @@ stehen.
 | # | Blocker | Was gebraucht wird | Blockiert |
 |---|---|---|---|
 | **L-1** | Migration 0061 | SQL-Block aus Zug 2 im Supabase-SQL-Editor ausführen | Loom-Kachel |
-| **L-2** | ~~Kapazität~~ **geklärt 29.07.** | 4-4-4: 240 Min. Akquise-Block, minus Termine des Tages | — |
-| **L-3** | ~~Dauer Antwort~~ **geklärt 29.07.** | 20 s (Text ist vorgeschrieben) | — |
-| **L-4** | `{{annahmequote}}` | Wie viel Prozent der 30 Vernetzungsanfragen werden angenommen? Für die Zulauf-Prognose. Ohne Antwort rechnet der Plan mit dem **Ist aus `daily_metrics`** statt mit einer Annahme | Zug 1 (nur die Vorschau „morgen kommen ~N dazu") |
-| **R-2** | Offene Vernetzungsanfragen als Liste | Kein Kevin-Input nötig. Recon 28.07.: Seite ist serverseitig gerendert, Klassennamen verwürfelt, virtualisierte Liste — 10 von 867 lesbar. ICP-Einstufung existiert nirgends. **Bis geklärt: nur Zahl + Hinweis auf `linkedin-inmail`** | Kachel 7 |
-
-L-4 blockiert nichts — ohne Antwort wird die Annahmequote aus den echten Zahlen in
-`daily_metrics` abgeleitet statt geschätzt. Alle Konstanten stehen benannt oben in
-`tagespensum.ts`, damit Kevin sie an einer Stelle ändern kann.
+| **RECON-1** | InMail-Credits | Sind die 150 ein Gesamtstand oder monatlich? Kevin liest den Stand in LinkedIn nach. Bis dahin neutral als Bestand anzeigen | nur die Beschriftung von Kachel 10 |
+| **RECON-2** | Offene Vernetzungsanfragen als Liste | Kein Input nötig. Recon 28.07.: Seite serverseitig gerendert, Klassennamen verwürfelt, virtualisiert — 10 von 867 lesbar; ICP-Einstufung existiert nirgends. **Bis geklärt: nur Zahl + Verweis auf `linkedin-inmail`** | Kachel 10 |
+| **RECON-3** | Kunde↔Projekt-Zuordnung | Nur falls die drei Quellen in Zug 6 nicht reichen — dann melden statt modellieren | Zug 6 |
 
 ---
 
@@ -416,13 +379,14 @@ L-4 blockiert nichts — ohne Antwort wird die Annahmequote aus den echten Zahle
 
 1. ✅ Jeder Zug nennt die erwartete Beobachtung bei Erfolg **und** Fehlschlag.
 2. ✅ Jeder Zug trägt wahrscheinlichsten Fehler, Signal und Gegenzug.
-3. ✅ Weggabelungen haben Trigger — Zug 1 (Ziel fehlt), 2 (Spalte fehlt), 3 (leere
-   Liste), 5 (fehlende Datenquelle).
-4. ✅ Ungeklärtes markiert: R-2 im Ledger, `{{kapazitaet_minuten}}`, `{{dauer_antwort}}`.
-5. ✅ Abbruchbedingungen als eigener Abschnitt, fünf Stück.
+3. ✅ Weggabelungen haben Trigger — Zug 1 (fehlende Quelle), 2 (Spalte fehlt),
+   3 (leere Liste), 5 (fehlende Datenquelle).
+4. ✅ Ungeklärtes markiert: RECON-1, RECON-2, RECON-3.
+5. ✅ Abbruchbedingungen als eigener Abschnitt, sechs Stück — die erste schützt
+   ausdrücklich vor der Rückkehr der Kapazitätsrechnung.
 6. ✅ Verifikation ausbuchstabiert: Fixtures, `tsc`/Build, Screenshots bei zwei
    Größen, Vorher/Nachher-Beweis an `daily_metrics`.
-7. ✅ Red-Team gelaufen: fünf Angriffe trafen, alle gepatcht.
+7. ✅ Red-Team gelaufen: sieben Angriffe trafen, alle gepatcht.
 8. ✅ Blind ausführbar bis auf L-1 (Kevins Hand am SQL-Editor).
 
 ---
@@ -430,9 +394,9 @@ L-4 blockiert nichts — ohne Antwort wird die Annahmequote aus den echten Zahle
 ## Reihenfolge für den Executor
 
 ```
-Zug 1 (Pensum + Test) → Zug 2 (Migration schreiben) → L-1 (Kevin) →
-Zug 3 (Arbeitsmodus) → Zug 4 (Tracking) → Zug 5 (Kacheln Akquise) →
-Zug 7 (Kacheln Liefern) → Zug 6 (Verifikation)
+Zug 1 (Prioritätenliste + Test) → Zug 6 (Kundenarbeit als Quelle) →
+Zug 2 (Migration schreiben) → L-1 (Kevin) → Zug 3 (Arbeitsmodus) →
+Zug 4 (Tracking) → Zug 5 (Kacheln) → Zug 7 (Verifikation)
 ```
 
 Züge 1 und 3 sind unabhängig und können parallel gebaut werden. Kein Commit ohne
