@@ -52,13 +52,57 @@ Darstellung der LinkedIn-Leads. Offene Vernetzungsanfragen als Arbeitsliste
 30.000 € ÷ 5.500 € = **5,5 Kunden** → ÷ 0,25 = **22 Quali-Calls** → ÷ 0,10 =
 **219 Looms** → ÷ 0,10 = **2.182 Erstnachrichten** im Monat.
 
-Bei 21 Arbeitstagen: **104 Nachrichten + 10 Looms pro Tag ≈ 3,5 Stunden reine
-Akquise.**
+Bei 21 Arbeitstagen: **104 Erstnachrichten + 10,4 Looms pro Tag.**
 
-**Das ist die ehrliche Zahl und sie ist unbequem.** Der Executor darf sie weder
-schönrechnen noch ungefiltert als Tagespensum ausgeben — ein Pensum, das nie
-erreichbar ist, wird nach zwei Tagen ignoriert. Auflösung in Zug 1: **Bedarf und
-Kapazität getrennt ausweisen**, Pensum = das Kleinere, Lücke sichtbar.
+**Kevins Tagesrahmen (4-4-4, bestätigt 29.07.):** 4 h Promo/Sales (inkl. Termine),
+4 h Kundenarbeit, 4 h dritter Block — der fällt zuerst weg, wenn es eng wird.
+Die Akquise-Kapazität ist also **240 Minuten**, aber **Termine liegen innerhalb
+dieses Blocks** und wandern im Kalender.
+
+**Dauern (von Kevin, nicht geschätzt):** Antwort **20 s** (Text ist vorgeschrieben,
+nur kopieren), Erstnachricht 30 s, Follow-up 30 s, Vernetzungsanfrage ~10 s,
+Loom **15 min**. Fixe Tagesgröße: **30 Vernetzungsanfragen**.
+
+Damit geht die Rechnung bei 240 Minuten **punktgenau auf**:
+
+```
+30 Anfragen    5 min
+38 Antworten  13 min
+11 Looms     165 min
+10 Follow-ups  5 min
+104 Erstnachrichten 52 min
+              = 240 min
+```
+
+**Korrektur 29.07. (Kevin): Das oben ist der RÜCKSTAU, nicht das Tagesgeschäft.**
+Die 91 Erstnachrichten, 63 Follow-ups, 38 Antworten und 15 Looms haben sich
+einmalig angesammelt. Ist der Berg abgetragen, ist der tägliche Zulauf klein.
+
+**Dauerzustand, gerechnet aus Kevins eigenen Zielspannen (`CONVERSION_TARGETS`):**
+
+| | Erstnachrichten/Tag | Looms/Tag | Zeit/Tag | nötige Anfragen/Tag |
+|---|---|---|---|---|
+| Untergrenze (0,10 / 0,10 / 0,25) | 104 | 10,4 | 213 min | **347** |
+| Zielwert `great` (0,20 / 0,30 / 0,50) | 8,7 | 1,7 | **35 min** | **29** |
+
+Kevin schickt **30 Vernetzungsanfragen/Tag**. Das trifft die Zielwert-Zeile auf
+die Eins — und verfehlt die Untergrenze um Faktor 12. **Zwischen beiden Zeilen
+liegt, ob sein Monatsziel erreichbar ist.**
+
+**Die drei Erkenntnisse, die das Design bestimmen:**
+
+1. **Bestand ≠ Fluss.** Das Dashboard muss **Zulauf heute** (klein, ~35 min) und
+   **Rückstau** (einmalig, groß) getrennt zeigen. Wer beides vermischt, macht aus
+   jedem Tag einen Notfall — und Kevin ignoriert das Pensum nach drei Tagen.
+   Der Rückstau bekommt eine **Portion aus der Restkapazität**, nie den ganzen Berg.
+2. **Looms sind der Flaschenhals, nicht die Nachrichten.** Selbst im Dauerzustand
+   sind 1,7 Looms = 26 min gegenüber 4 min für alle Nachrichten zusammen. Im
+   Rückstau-Modus (11 Looms = 165 min) frisst eine Stunde Termin sofort ~90
+   Erstnachrichten. Regel: **Looms bekommen ihren Platz zuerst**; passen sie nicht,
+   sagt die Oberfläche das, statt sie stillschweigend fallen zu lassen.
+3. **Die wichtigste Kennzahl ist die erreichte Quote, nicht der Zähler.** Sie
+   entscheidet, ob der Tag 35 Minuten oder unmöglich ist. Sie gehört als eigene
+   Kachel nach vorn (Zug 5, Kachel 6) — mit Ist gegen Zielspanne, nicht nur Ist.
 
 ---
 
@@ -67,25 +111,39 @@ Kapazität getrennt ausweisen**, Pensum = das Kleinere, Lücke sichtbar.
 **Aktion:** Neues Modul, keine Netzwerkaufrufe, per `tsx` prüfbar.
 
 ```
-DAUER_MINUTEN = { erstnachricht: 0.5, followup: 1, antwort: 3, loom: 15 }
-KAPAZITAET_MINUTEN_STANDARD = 90
+DAUER_MINUTEN = { anfrage: 10/60, antwort: 20/60, erstnachricht: 0.5, followup: 0.5, loom: 15 }
+AKQUISE_BLOCK_MINUTEN = 240   // 4-4-4: erster Block
+ANFRAGEN_PRO_TAG = 30         // feste Tagesgröße
 ```
 
 Exporte:
 
-- `berechneBedarf(monatsziel, quoten, cashProKunde)` → `{ kunden, quali, looms, nachrichten }`
-  (Monatswerte, ungerundet).
+- `berechneBedarf(monatsziel, quoten, cashProKunde)` → `{ kunden, quali, looms, nachrichten }`.
 - `proArbeitstag(bedarf, arbeitstageRest)` → dieselben Felder als Tagesbedarf.
-- `berechnePensum({ bedarf, vorrat, kapazitaetMinuten })` → Portion je Spur.
+- `berechnePensum({ bedarf, zulauf, rueckstau, kapazitaetMinuten })` → Portion je Spur,
+  **getrennt nach `zulauf` und `rueckstau`**.
+
+**Zulauf** = was heute neu angefallen ist (neue Antworten, neu angenommene
+Anfragen). **Rückstau** = alles Ältere. Die Trennung läuft über das Alter des
+Eintrags; Schwelle: seit dem letzten abgeschlossenen Arbeitsdurchgang.
 
 **Reihenfolge der Zuteilung ist festgelegt** (kein Ermessen):
-1. `antworten` — **alle** offenen, ungedeckelt. Wer geantwortet hat, wartet nicht.
-2. `looms` — bis Tagesbedarf, begrenzt durch Vorrat.
-3. `followups` — bis Tagesbedarf.
-4. `erstnachrichten` — füllt die **restliche** Kapazität auf.
+1. `anfragen` — feste 30, ~5 min. Nicht verhandelbar, füttert den ganzen Trichter.
+2. `antworten` (Zulauf **und** Rückstau) — **alle**, ungedeckelt. Wer geantwortet
+   hat, wartet nicht.
+3. `looms` — Tagesbedarf zuerst, dann Rückstau, solange Zeit bleibt.
+4. `followups` — Zulauf, dann Rückstau.
+5. `erstnachrichten` — Zulauf zuerst, dann füllt der Rückstau die **restliche**
+   Kapazität auf.
 
-Rückgabe zusätzlich: `{ minutenGeplant, minutenKapazitaet, bedarfNachrichtenProTag,
-luecke }` — `luecke = max(0, bedarfNachrichtenProTag − zugeteilteNachrichten)`.
+Rückgabe zusätzlich: `{ minutenGeplant, minutenKapazitaet, minutenTermine,
+bedarfNachrichtenProTag, luecke, rueckstauGesamt, rueckstauHeute }`.
+
+**Termine gehen von der Kapazität ab.** `kapazitaetMinuten = AKQUISE_BLOCK_MINUTEN
+− minutenTermine`. Die Termine kommen aus dem bestehenden Kalender-Proxy
+(`fetchCalendar`, Runner-Endpoint `/calendar`) — nur die des heutigen Tages, nur
+die, die in den Akquise-Block fallen. Ist der Kalender nicht erreichbar, gilt
+`minutenTermine = 0` und die UI sagt „ohne Termine gerechnet".
 
 **Erwartete Beobachtung bei Erfolg:** `npx tsx scripts/verify-tagespensum.ts` gibt
 „N/N Fälle korrekt". Fixture mit Monatsziel 30000, Vorrat (91 Erstnachrichten,
@@ -220,13 +278,26 @@ Kacheln in dieser Reihenfolge — die Reihenfolge ist die Priorität:
 
 | # | Kachel | Kennzahl | Handlung |
 |---|---|---|---|
-| 1 | **Heute** | „12 von 15 offen · 34 Min." | „Arbeitsmodus starten" (startet alle Spuren nacheinander) |
-| 2 | **Antworten** | 38 warten · 12 mit Stern | Arbeitsmodus (Spur `antwort`) |
-| 3 | **Erstnachrichten** | 91 offen | Arbeitsmodus (Spur `erstnachricht`) |
-| 4 | **Follow-ups** | 63 fällig · 58 Altlasten | Arbeitsmodus (Spur `followup`) |
-| 5 | **Looms** | 0 von 15 | Arbeitsmodus (Spur `loom`) |
-| 6 | **Ziel** | Ist/Soll + Lücke aus Zug 1 | Link `/tracking` |
-| 7 | **Vernetzungsanfragen** | „867 offen" | **nur Zahl**, Hinweis auf Skill `linkedin-inmail` (siehe RECON-2) |
+| 1 | **Heute** | „0 von 14 · 38 Min. · 1 Termin abgezogen" | „Arbeitsmodus starten" (alle Spuren nacheinander) |
+| 2 | **Vernetzungsanfragen** | **0 von 30** | Arbeitsmodus (Spur `anfrage`) — Kevins Tagesritual, füttert den Trichter |
+| 3 | **Antworten** | 38 warten · 12 mit Stern | Arbeitsmodus (Spur `antwort`) |
+| 4 | **Looms** | 0 von 2 heute · 15 im Rückstau | Arbeitsmodus (Spur `loom`) |
+| 5 | **Erstnachrichten** | 9 heute · 91 im Rückstau | Arbeitsmodus (Spur `erstnachricht`) |
+| 6 | **Quoten** | Ist gegen Zielspanne, je Stufe | Link `/tracking` |
+| 7 | **Follow-ups** | 63 fällig · 58 Altlasten | Arbeitsmodus (Spur `followup`) |
+| 8 | **Ziel** | Ist/Soll + Lücke | Link `/tracking` |
+
+**Kachel 6 ist die wichtigste und darf nicht nach hinten rutschen.** Sie zeigt je
+Trichterstufe Ist gegen die Spanne aus `CONVERSION_TARGETS` — denn zwischen
+Untergrenze und Zielwert liegt Faktor 12 im Tagesaufwand. Farbe: unterhalb `min`
+warnend, zwischen `min` und `great` neutral, ab `great` positiv.
+
+**Jede Kachel mit Rückstau zeigt beides getrennt** („9 heute · 91 im Rückstau").
+Nie die Summe — sonst sieht jeder Tag nach Notstand aus.
+
+**Der Tagesrahmen 4-4-4 ist die Klammer:** Das Dashboard zeigt oben, in welchem
+Block Kevin gerade ist (Akquise / Kundenarbeit / dritter Block) und wie viel Zeit
+darin noch übrig ist. Der zweite Block bekommt seine eigene Kachelgruppe (Zug 7).
 
 **Erwartete Beobachtung bei Erfolg:** `npx tsc -b` grün, `npm run build` grün,
 Kacheln bei 1280×800 dreispaltig, bei 390×664 einspaltig ohne horizontalen
@@ -242,6 +313,43 @@ Zustand brechen. **Gegenzug:** Lokaler State im Dashboard, kein Routing.
 
 **Trigger:** Fehlt eine Datenquelle (Tabelle noch nicht migriert), zeigt **nur
 diese** Kachel ihren Leerzustand. Nie die ganze Seite abbrechen.
+
+---
+
+## Zug 7 — Kundenarbeit als zweiter Block (Kachelgruppe „Liefern")
+
+**Aktion:** Zweite Kachelgruppe unter der Akquise, für Kevins zweiten 4-h-Block.
+Sie beantwortet: *„Was schulde ich Kunden, und was liegt zu lange?"*
+
+Quellen (alle vorhanden, nichts Neues erfinden):
+- `foundation_tasks` — offene Aufgaben mit `project_id`.
+- `deliver_projects` / `contacts.deliver_project_id` — laufende Kundenprojekte.
+- `contacts.stage_changed_at` — wie lange der Zustand schon steht.
+
+Kacheln:
+
+| Kachel | Kennzahl | Handlung |
+|---|---|---|
+| **Offene Kundenaufgaben** | Anzahl je Projekt | Link ins Projekt |
+| **Liegt zu lange** | Projekte ohne Bewegung seit > 14 Tagen | „Follow-up entwerfen" |
+
+**Die „liegt zu lange"-Regel ist Kevins ausdrücklicher Wunsch** (*„die ist seit
+zwei Wochen im Review, mach da mal ein Follow-up"*). Schwelle: **14 Tage ohne
+Änderung an `stage_changed_at` bzw. ohne erledigte Aufgabe im Projekt.**
+
+**Erwartete Beobachtung bei Erfolg:** Kachelgruppe rendert; bei Kevins aktuellem
+Stand erscheint mindestens ein Projekt (CoLective oder Reichentrog) mit Alter in
+Tagen.
+**Bei Fehlschlag:** leere Gruppe trotz laufender Projekte → falsche Quelle gewählt.
+
+**Wahrscheinlichster Fehler:** Der Executor erfindet eine neue Projekt-Tabelle,
+weil die Zuordnung Kunde↔Projekt verstreut ist. **Gegenzug:** Ausschließlich die
+drei Quellen oben. Reicht das nicht, ist das ein **RECON-3**-Fall — melden, nicht
+modellieren.
+
+**Abbruchbedingung:** Keine Migration für diesen Zug. Findet sich die nötige
+Information nicht in den drei Quellen, bleibt die Kachel mit ehrlichem Leertext
+stehen.
 
 ---
 
@@ -263,7 +371,10 @@ diese** Kachel ihren Leerzustand. Nie die ganze Seite abbrechen.
 
 | Angriff | Ergebnis | Patch |
 |---|---|---|
-| „Das Tagespensum ist 104 Nachrichten — Kevin ignoriert es ab Tag 3." | **Traf.** | Pensum = kapazitätsbegrenzt, Bedarf und Lücke daneben. Er sieht die Wahrheit, bekommt aber eine machbare Portion. |
+| „Das Tagespensum ist 104 Nachrichten — Kevin ignoriert es ab Tag 3." | **Traf.** | Das waren Rückstauzahlen. Zulauf und Rückstau werden getrennt gezeigt; der Rückstau bekommt nur eine Portion aus der Restzeit. |
+| „Jeder Tag sieht nach Notstand aus, weil Bestand und Fluss addiert werden." | **Traf.** | Keine Kachel zeigt je die Summe — immer „X heute · Y im Rückstau". |
+| „Termine wandern, das Pensum rechnet trotzdem mit 240 Minuten." | **Traf.** | Kapazität = 240 − Termine des Tages im Akquise-Block, aus dem Kalender-Proxy. Kalender weg → „ohne Termine gerechnet". |
+| „Die Quoten-Kachel rutscht beim Bauen nach unten, weil sie 'nur' eine Zahl ist." | **Traf.** | Ausdrücklich als wichtigste Kachel markiert: zwischen Untergrenze und Zielwert liegt Faktor 12 im Tagesaufwand. |
 | „Antwort-Spur zählt `antworten_li` hoch und verfälscht den Trichter." | **Traf.** | Zug 4: Antwort-Spur zählt nichts, mit Begründung im Code. |
 | „Abhaken zählt doppelt bei Doppelklick." | **Traf.** | Nur beim Übergang `offen` → erledigt zählen. |
 | „Vollbild reagiert nicht auf Klicks." | **Abgewehrt.** | `pointerEvents: 'auto'` + Montage in der Shell, Falle aus `App.tsx` bekannt. |
@@ -290,12 +401,14 @@ diese** Kachel ihren Leerzustand. Nie die ganze Seite abbrechen.
 | # | Blocker | Was gebraucht wird | Blockiert |
 |---|---|---|---|
 | **L-1** | Migration 0061 | SQL-Block aus Zug 2 im Supabase-SQL-Editor ausführen | Loom-Kachel |
-| **L-2** | `{{kapazitaet_minuten}}` | Wie viele Minuten Akquise pro Tag realistisch? Vorschlag **90**. Bestätigen oder korrigieren | Zug 1 (nur der Wert) |
-| **L-3** | `{{dauer_antwort}}` | Wie lange braucht eine Antwort im Schnitt? Vorschlag **3 Min.** | Zug 1 (nur die Rechnung) |
+| **L-2** | ~~Kapazität~~ **geklärt 29.07.** | 4-4-4: 240 Min. Akquise-Block, minus Termine des Tages | — |
+| **L-3** | ~~Dauer Antwort~~ **geklärt 29.07.** | 20 s (Text ist vorgeschrieben) | — |
+| **L-4** | `{{annahmequote}}` | Wie viel Prozent der 30 Vernetzungsanfragen werden angenommen? Für die Zulauf-Prognose. Ohne Antwort rechnet der Plan mit dem **Ist aus `daily_metrics`** statt mit einer Annahme | Zug 1 (nur die Vorschau „morgen kommen ~N dazu") |
 | **R-2** | Offene Vernetzungsanfragen als Liste | Kein Kevin-Input nötig. Recon 28.07.: Seite ist serverseitig gerendert, Klassennamen verwürfelt, virtualisierte Liste — 10 von 867 lesbar. ICP-Einstufung existiert nirgends. **Bis geklärt: nur Zahl + Hinweis auf `linkedin-inmail`** | Kachel 7 |
 
-L-2 und L-3 blockieren nichts — bei fehlender Antwort gelten die Vorschlagswerte,
-sie stehen als benannte Konstanten oben in `tagespensum.ts`.
+L-4 blockiert nichts — ohne Antwort wird die Annahmequote aus den echten Zahlen in
+`daily_metrics` abgeleitet statt geschätzt. Alle Konstanten stehen benannt oben in
+`tagespensum.ts`, damit Kevin sie an einer Stelle ändern kann.
 
 ---
 
@@ -318,7 +431,8 @@ sie stehen als benannte Konstanten oben in `tagespensum.ts`.
 
 ```
 Zug 1 (Pensum + Test) → Zug 2 (Migration schreiben) → L-1 (Kevin) →
-Zug 3 (Arbeitsmodus) → Zug 4 (Tracking) → Zug 5 (Kacheln) → Zug 6 (Verifikation)
+Zug 3 (Arbeitsmodus) → Zug 4 (Tracking) → Zug 5 (Kacheln Akquise) →
+Zug 7 (Kacheln Liefern) → Zug 6 (Verifikation)
 ```
 
 Züge 1 und 3 sind unabhängig und können parallel gebaut werden. Kein Commit ohne
