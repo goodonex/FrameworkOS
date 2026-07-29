@@ -160,6 +160,28 @@ alter table linkedin_threads
 
 create index if not exists linkedin_threads_loom_idx
   on linkedin_threads (brand_id, loom_status) where starred;
+
+-- Gemessene Dauern je erledigtem Posten. Einzige Vorleistung fuer das Zielbild
+-- (Kalenderplanung): ohne echte Zeiten muesste spaeter geschaetzt werden, und
+-- nachtraeglich sind sie nicht rekonstruierbar.
+create table if not exists arbeits_dauern (
+  id uuid primary key default gen_random_uuid(),
+  brand_id uuid not null references brands(id) on delete cascade,
+  spur text not null,
+  posten_id text not null,
+  sekunden int not null,
+  erledigt_at timestamptz not null default now()
+);
+
+create index if not exists arbeits_dauern_spur_idx on arbeits_dauern (brand_id, spur, erledigt_at);
+
+alter table arbeits_dauern enable row level security;
+
+drop policy if exists "arbeits_dauern_via_brand" on arbeits_dauern;
+create policy "arbeits_dauern_via_brand" on arbeits_dauern
+  for all
+  using (exists (select 1 from brands b where b.id = arbeits_dauern.brand_id and b.user_id = auth.uid()))
+  with check (exists (select 1 from brands b where b.id = arbeits_dauern.brand_id and b.user_id = auth.uid()));
 ```
 
 **Erwartete Beobachtung bei Erfolg:** `select count(*) from linkedin_threads
@@ -218,6 +240,16 @@ Desktop-Fenster.
 ## Zug 4 — Abhaken schreibt `daily_metrics`
 
 **Aktion:** Jedes `Erledigt` erhöht **genau ein** Feld über `useDailyMetrics()`:
+
+**Zusätzlich misst jeder Posten seine Dauer** — `angezeigt_at` beim Einblenden,
+`erledigt_at` beim Abhaken, Differenz in Sekunden. Das ist der **einzige Teil des
+Zielbilds, der jetzt schon passieren muss**: Ohne echte Dauern kann die spätere
+Tages- und Kalenderplanung nur schätzen, und nachträglich sind die Zeiten nicht
+rekonstruierbar. Kosten jetzt: zwei Zeitstempel. Ablage siehe Zug 2 (Migration).
+
+Ausreißer werden **nicht** bereinigt (Kevin legt das Handy weg, die Uhr läuft
+weiter) — die Auswertung nimmt später den **Median**, nicht den Mittelwert. Das
+gehört als Kommentar an die Stelle, damit niemand „aufräumt".
 
 | Spur | Feld |
 |---|---|
@@ -331,6 +363,28 @@ modellieren.
    ausgeben — genau ein Feld +1.
 5. Konsole prüfen. **Hinweis:** Hooks-Order-Warnungen direkt nach einem Edit sind
    HMR-Artefakte; erst nach vollem Reload bewerten (kostete am 28.07. Zeit).
+
+---
+
+## Zielbild — was spaeter darauf aufbaut (NICHT in v1 bauen)
+
+Festgehalten, damit die Richtung nicht verloren geht. Kevin am 29.07.: *„Ich hab
+nicht das Gefuehl, dass ich grade die Zeit dafuer habe."* Deshalb jetzt nur
+abarbeiten — die Intelligenz kommt, wenn der Berg weg ist, und dann mit echten
+Zahlen statt Annahmen.
+
+| Stufe | Was es kann | Woraus es entsteht |
+|---|---|---|
+| **1. Tagesansage** | „Website raus (15 min), dann Review abwarten, dann Sales: erst Antworten, dann 2 Looms, dann 13 Follow-ups — um 13:25 bist du durch." | Prioritaetenliste aus Zug 1 **+ gemessene Dauern** aus Zug 4 |
+| **2. Kalender-Abgleich** | Sieht drei Sales-Calls am Mittwoch und sagt: „heute schaffst du nur das und das." | Stufe 1 + Kalender-Proxy (`/calendar`, existiert) |
+| **3. Monatsvorschau** | Verteilt Content (mittwochs), Akquise und Kundenarbeit ueber den Monat | Stufe 2 + wiederkehrende Termine |
+| **4. Quoten-Diagnose** | „Nachricht → Loom liegt bei 6 %, Ziel 20 % — es hakt an der Erstnachricht, nicht am Volumen." | `daily_metrics` (laeuft bereits) + `CONVERSION_TARGETS` |
+| **5. Empfehlung** | Ist alles abgearbeitet: „Deine schwaechste Stufe ist X — setz dich an den Leadmagneten." | Stufe 4 + Zustand „nichts mehr offen" |
+
+**Wichtig fuer den Executor:** Nichts davon in v1 bauen. Die einzige Vorleistung
+ist die Dauer-Messung in Zug 4 — die ist Pflicht, weil sie sich nicht nachholen
+laesst. Alles andere ist eine Auswertungsschicht auf Daten, die dann vorliegen,
+und braucht keinen Umbau am hier Gebauten.
 
 ---
 
