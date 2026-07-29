@@ -15,6 +15,7 @@ import { homedir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 import { syncThreads } from './linkedin/sync.mjs'
 import { upsertThreads } from './linkedin/upsert.mjs'
+import { ladeErstnachrichten } from './linkedin/erstnachrichten.mjs'
 
 // ---------- Lokale .env (nur für Secrets wie den Supabase-Key; gitignored) ----------
 // Minimaler Parser (zero-dependency). Prozess-Env hat Vorrang vor der Datei.
@@ -648,6 +649,7 @@ async function mirrorAll() {
     return { entries }
   })
   await pushSnapshotKey('social_weeks', async () => ({ weeks: await socialWeeks() }))
+  await spiegleErstnachrichten()
   await pushSnapshotKey('agents', async () => {
     const runningIds = new Set([...running.values()].map((r) => r.agent))
     return {
@@ -660,6 +662,61 @@ async function mirrorAll() {
       })),
     }
   })
+}
+
+/**
+ * Spiegelt die versandfertigen Erstnachrichten aus dem Vault in die Tabelle.
+ * Schreibt bewusst NUR Inhaltsspalten — `status` und `sent_at` gehören Kevin
+ * und dürfen von einem Spiegel-Lauf nie zurückgesetzt werden.
+ */
+async function spiegleErstnachrichten() {
+  const brandSlug = process.env.LINKEDIN_BRAND_SLUG ?? 'herrmann'
+  try {
+    const { datei, leads, ohneText } = await ladeErstnachrichten(VAULT)
+    if (!datei || !leads.length) return
+
+    const br = await fetch(
+      `${SUPABASE_URL}/rest/v1/brands?slug=eq.${encodeURIComponent(brandSlug)}&select=id&limit=1`,
+      { headers: supabaseHeaders() },
+    )
+    const [brand] = br.ok ? await br.json() : []
+    if (!brand?.id) return
+
+    const now = new Date().toISOString()
+    const rows = leads.map((l) => ({
+      brand_id: brand.id,
+      gruppe: l.gruppe,
+      name: l.name,
+      firma: l.firma,
+      website: l.website,
+      nachricht: l.nachricht,
+      sort_index: l.sortIndex,
+      quelle_datei: datei,
+      last_synced_at: now,
+    }))
+
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/linkedin_erstnachrichten?on_conflict=brand_id,gruppe,name`,
+      {
+        method: 'POST',
+        headers: supabaseHeaders({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
+        body: JSON.stringify(rows),
+      },
+    )
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '')
+      console.error(`[runner] Erstnachrichten-Spiegel HTTP ${res.status}: ${txt.slice(0, 200)}`)
+      return
+    }
+    await pushSnapshotKey('erstnachrichten_meta', async () => ({
+      datei,
+      versandfertig: leads.length,
+      ohneText: ohneText.anzahl,
+      ohneTextGruppe: ohneText.gruppe,
+    }))
+  } catch (e) {
+    console.error('[runner] Erstnachrichten-Spiegel fehlgeschlagen:', e?.message ?? e)
+  }
 }
 
 /** Führt genau einen Auftrag aus. Rückgabe landet als `result` am Auftrag. */

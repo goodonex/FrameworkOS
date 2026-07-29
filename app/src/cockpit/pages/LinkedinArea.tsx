@@ -3,6 +3,7 @@ import { useContacts } from '../../hooks/useContacts'
 import { useLinkedinThreads } from '../../hooks/useLinkedinThreads'
 import type { LinkedinThread } from '../../types/db'
 import { HeuteTabs } from '../components/HeuteTabs'
+import { ErstnachrichtenListe } from '../components/ErstnachrichtenListe'
 import { useActiveBrand } from '../lib/activeBrand'
 import { buildLinkedinFollowupInput } from '../lib/approvalDrafts'
 import { bucketOf, coverage, FOLLOWUP_THRESHOLDS_DAYS } from '../lib/linkedinFollowups'
@@ -217,6 +218,7 @@ export function LinkedinArea() {
   // Beide Wege sind bedienbar: lokal direkt, sonst als Auftrag über Supabase
   // (Migration 0059). Der Knopf muss also nicht mehr gesperrt werden.
   const direkt = runnerDirekt()
+  const [ansicht, setAnsicht] = useState<'erst' | 'followup'>('erst')
   const [syncing, setSyncing] = useState(false)
   const [syncMessage, setSyncMessage] = useState<string | null>(null)
   // Überlebt den Reload, damit der Unvollständigkeits-Hinweis nicht nur direkt
@@ -358,7 +360,29 @@ export function LinkedinArea() {
     <div style={{ maxWidth: 780, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
       <HeuteTabs />
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 6 }}>
+        {([['erst', 'Erstnachrichten'], ['followup', 'Follow-ups']] as const).map(([wert, label]) => (
+          <button
+            key={wert}
+            type="button"
+            onClick={() => setAnsicht(wert)}
+            className="ck-btn"
+            style={{
+              fontSize: 11,
+              minHeight: 36,
+              paddingInline: 14,
+              borderColor: ansicht === wert ? 'var(--ck-accent)' : undefined,
+              color: ansicht === wert ? 'var(--ck-accent)' : undefined,
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {ansicht === 'erst' ? <ErstnachrichtenListe brandSlug={slug} /> : null}
+
+      <div style={{ display: ansicht === 'followup' ? 'flex' : 'none', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <h1 style={{ fontSize: 18, fontWeight: 600, color: 'var(--ck-text-1)', margin: 0 }}>LinkedIn</h1>
           <span className="ck-label" style={{ color: badgeColor, fontSize: 10 }}>
@@ -377,15 +401,15 @@ export function LinkedinArea() {
         </button>
       </div>
 
-      {syncMessage ? (
+      {ansicht === 'followup' && syncMessage ? (
         <div style={{ fontSize: 11, color: 'var(--ck-text-3)' }}>{syncMessage}</div>
       ) : null}
 
-      {threadsQuery.error ? (
+      {ansicht === 'followup' && threadsQuery.error ? (
         <div style={{ fontSize: 11, color: 'var(--ck-warn)' }}>{threadsQuery.error}</div>
       ) : null}
 
-      {threadsQuery.tableMissing ? (
+      {ansicht !== 'followup' ? null : threadsQuery.tableMissing ? (
         <div className="ck-panel" style={{ padding: '28px 14px', textAlign: 'center', fontSize: 13, color: 'var(--ck-text-3)' }}>
           Noch keine Daten — Migration 0058 muss zuerst gepusht werden (supabase db push).
         </div>
