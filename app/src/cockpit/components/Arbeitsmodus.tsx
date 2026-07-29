@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import type { Posten } from '../lib/prioritaet'
+import type { LoomSkriptAktionen } from './Arbeitsliste'
 
 /** Ergebnis eines abgehakten Postens — Zug 4 schreibt daraus genau ein Metrik-Feld + die Dauer. */
 export interface ArbeitsmodusErgebnis {
@@ -12,6 +13,8 @@ interface ArbeitsmodusProps {
   posten: Posten[]
   onErledigt: (ergebnis: ArbeitsmodusErgebnis) => void
   onClose: () => void
+  /** Skript öffnen/generieren für Loom-Posten — ohne bleibt nur Erledigt/Überspringen */
+  loom?: LoomSkriptAktionen
 }
 
 function websiteHref(website: string): string {
@@ -26,7 +29,7 @@ function websiteHref(website: string): string {
  * Dieses Overlay setzt `pointerEvents: 'auto'` deshalb selbst — unabhängig davon,
  * ob es innerhalb der CockpitShell (die das ebenfalls tut) montiert wird.
  */
-export function Arbeitsmodus({ posten, onErledigt, onClose }: ArbeitsmodusProps) {
+export function Arbeitsmodus({ posten, onErledigt, onClose, loom }: ArbeitsmodusProps) {
   const [index, setIndex] = useState(0)
   const [angezeigtAt, setAngezeigtAt] = useState(() => Date.now())
   const [erledigtCount, setErledigtCount] = useState(0)
@@ -206,17 +209,58 @@ export function Arbeitsmodus({ posten, onErledigt, onClose }: ArbeitsmodusProps)
         ) : null}
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, flexShrink: 0 }}>
+          {/* Kopieren nur, wo `text` eine versandfertige Nachricht ist — eine
+              Aufgabenbeschreibung zu kopieren ist sinnlos. Bei Looms führt der
+              Weg stattdessen zum Skript. */}
+          {aktuell.spur === 'erstnachricht' ? (
+            <button
+              type="button"
+              className="ck-btn ck-btn--primary"
+              style={{ minHeight: 48, flex: '1 1 100%' }}
+              onClick={() => void kopieren()}
+            >
+              {kopiert ? '✓ Kopiert' : 'Nachricht kopieren'}
+            </button>
+          ) : null}
+          {aktuell.spur === 'loom' && loom?.fehler ? (
+            <div style={{ fontSize: 12, color: 'var(--ck-warn)', flex: '1 1 100%' }}>{loom.fehler}</div>
+          ) : null}
+          {aktuell.spur === 'loom' && loom ? (
+            loom.skriptUrl(aktuell) ? (
+              loom.dateiOeffenbar ? (
+                <a
+                  className="ck-btn ck-btn--primary"
+                  style={{ minHeight: 48, flex: '1 1 100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                  href={loom.skriptUrl(aktuell) ?? undefined}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Skript öffnen ↗
+                </a>
+              ) : (
+                <div style={{ fontSize: 13, color: 'var(--ck-accent)', flex: '1 1 100%', textAlign: 'center' }}>
+                  Skript bereit — am Mac öffnen
+                </div>
+              )
+            ) : (
+              <button
+                type="button"
+                className="ck-btn ck-btn--primary"
+                style={{ minHeight: 48, flex: '1 1 100%' }}
+                disabled={!loom.verfuegbar || loom.laeuft}
+                onClick={() => loom.generiere(aktuell)}
+              >
+                {loom.laeuft && loom.angefordert(aktuell)
+                  ? 'Skript wird generiert …'
+                  : loom.verfuegbar
+                    ? 'Skript generieren'
+                    : 'Runner offline'}
+              </button>
+            )
+          ) : null}
           <button
             type="button"
-            className="ck-btn ck-btn--primary"
-            style={{ minHeight: 48, flex: '1 1 100%' }}
-            onClick={() => void kopieren()}
-          >
-            {kopiert ? '✓ Kopiert' : 'Kopieren'}
-          </button>
-          <button
-            type="button"
-            className="ck-btn"
+            className={`ck-btn${aktuell.spur === 'erstnachricht' || aktuell.spur === 'loom' ? '' : ' ck-btn--primary'}`}
             style={{ minHeight: 48, flex: '1 1 auto' }}
             onClick={erledigt}
           >

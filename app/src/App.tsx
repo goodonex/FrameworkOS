@@ -36,6 +36,7 @@ import { AufgabenArea } from './cockpit/pages/AufgabenArea'
 import { TermineArea } from './cockpit/pages/TermineArea'
 import { FreigabenArea } from './cockpit/pages/FreigabenArea'
 import { LinkedinArea } from './cockpit/pages/LinkedinArea'
+import { SalesVorschau } from './dev/SalesVorschau'
 
 
 /** CRM → Sales (Juli 2026): alte /crm-Links/Bookmarks/Deep-Links auf /sales umleiten. */
@@ -211,6 +212,8 @@ function App() {
             <Route path="/portal/:projectId" element={<PortalRoute />} />
             <Route path="/book/:brandSlug/:linkSlug" element={<BookingPublicPage />} />
             <Route path="/leads/:brandSlug" element={<LeadIntakePage />} />
+            {/* Dev-only: Sales-Bausteine mit Fixtures, ohne Login prüfbar */}
+            {import.meta.env.DEV ? <Route path="/dev/sales-vorschau" element={<SalesVorschau />} /> : null}
             <Route element={<OwnerWorkspaceShell />}>
               {/* Neue Cockpit-Shell (REBUILD-PLAN §5) */}
               <Route element={<CockpitShell />}>

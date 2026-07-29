@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion, MotionConfig } from 'framer-motion'
 import { useContacts } from '../../hooks/useContacts'
@@ -6,7 +6,10 @@ import { useDeliverProjects } from '../../hooks/useDeliverProjects'
 import { useErstnachrichten } from '../../hooks/useErstnachrichten'
 import { useLinkedinThreads } from '../../hooks/useLinkedinThreads'
 import { useTasks } from '../../hooks/useTasks'
+import { useIsMobile } from '../../hooks/useViewport'
 import { supabase } from '../../lib/supabase'
+import { AnfragenZaehler } from '../components/AnfragenZaehler'
+import { Arbeitsliste, type LoomSkriptAktionen } from '../components/Arbeitsliste'
 import { Arbeitsmodus, type ArbeitsmodusErgebnis } from '../components/Arbeitsmodus'
 import { ConversionPanel } from '../components/ConversionPanel'
 import { WerkzeugePanel } from '../components/WerkzeugePanel'
@@ -16,22 +19,30 @@ import {
   erstnachrichtPosten,
   followupPosten,
   loomPosten,
+  zeilenId,
 } from '../lib/arbeitsmodusQuellen'
 import { erledigePosten } from '../lib/arbeitsmodusTracking'
 import { kundeLiegtPosten, kundenaufgabenPosten, liegendeProjekte } from '../lib/kundenarbeit'
 import { bucketOf } from '../lib/linkedinFollowups'
 import { funnelKpis, sumField } from '../lib/metricsAggregate'
 import { ordnePosten, tagesstand, type Posten, type PostenQuellen, type Spur } from '../lib/prioritaet'
+import { postRun } from '../lib/runnerApi'
+import { runnerDirekt } from '../lib/runnerBridge'
+import { fetchSalesLibrary, salesFileUrl, type SalesLibrary } from '../lib/salesLibraryApi'
 import { useDailyMetrics } from '../lib/useDailyMetrics'
 import { useRunnerData } from '../lib/useRunnerData'
 
 /**
- * Sales-Dashboard als Kacheln (Wargame docs/wargames/sales-arbeitsmodus.md,
- * Zug 5). Ersetzt das alte Formular-Dashboard komplett: jede Kachel zeigt
- * Titel · eine Kennzahl · eine empfohlene Handlung, in der Reihenfolge aus
- * Zug 1. Klick auf die Kachel vergrößert sie zum Arbeitsfenster (lokaler
- * State, kein Routing); „Arbeitsmodus starten" öffnet den Vollbild-Modus
- * (Zug 3) für die jeweilige Spur.
+ * Sales-Dashboard als Kacheln. Jede Kachel ist komplett klickbar und
+ * vergrößert sich per Layout-Morph zum Arbeitsfenster (framer-motion
+ * layoutId). Im Fenster steht die eigentliche Arbeit: die Namensliste der
+ * Spur (Arbeitsliste) — Name aufklappen → Text/Skript darunter, daneben
+ * Haken, Kopieren (nur bei versandfertigem Text) bzw. Skript
+ * öffnen/generieren bei Looms.
+ *
+ * Vollbild gibt es NUR am Handy: den Ein-Posten-Arbeitsmodus (aus dem
+ * Fenster heraus) und den Ein-Knopf-Anfragen-Zähler. Am Desktop bleibt
+ * alles im Fenster — Vollbild wäre dort verschenkter Platz.
  */
 
 const SPUR_LABEL: Record<Spur, string> = {
@@ -66,60 +77,73 @@ function quotenFarbeUndText(conv: ReturnType<typeof funnelKpis>['conv']): { farb
   return { farbe, text }
 }
 
-interface KachelDef {
+export interface KachelDef {
   id: string
   titel: string
   kennzahl: string
   kennzahlFarbe?: string
-  handlungLabel: string
-  handlungDeaktiviert?: boolean
-  onHandlung: () => void
-  erweitert?: () => React.ReactNode
+  /** zweite, kleinere Zeile auf der Kachel (z. B. „zuerst: …") */
+  unterzeile?: string
+  /** Inhalt des aufgeklappten Fensters */
+  inhalt?: () => React.ReactNode
+  /** optionale Aktion im Fenster-Fuß (z. B. „Arbeitsmodus starten" am Handy) */
+  fensterAktion?: { label: string; onClick: () => void }
 }
 
-function KachelCard({ kachel, onOeffnen }: { kachel: KachelDef; onOeffnen: () => void }) {
+export function KachelCard({ kachel, onOeffnen }: { kachel: KachelDef; onOeffnen: () => void }) {
   return (
-    <motion.div
+    <motion.button
+      type="button"
       layoutId={`kachel-${kachel.id}`}
       transition={{ duration: 0.22, ease: 'easeOut' }}
       onClick={onOeffnen}
       className="ck-panel"
       style={{
-        padding: 16,
+        padding: 14,
         display: 'flex',
         flexDirection: 'column',
-        gap: 10,
+        alignItems: 'stretch',
+        textAlign: 'left',
+        gap: 8,
         cursor: 'pointer',
-        minHeight: 128,
+        minHeight: 96,
+        font: 'inherit',
+        color: 'inherit',
       }}
     >
       <div className="ck-label">{kachel.titel}</div>
-      <div style={{ fontSize: 18, fontWeight: 600, color: kachel.kennzahlFarbe ?? 'var(--ck-text-1)', flex: 1 }}>
+      <div style={{ fontSize: 18, fontWeight: 600, color: kachel.kennzahlFarbe ?? 'var(--ck-text-1)' }}>
         {kachel.kennzahl}
       </div>
-      <button
-        type="button"
-        className="ck-btn ck-btn--primary"
-        disabled={kachel.handlungDeaktiviert}
-        style={{ minHeight: 40 }}
-        onClick={(e) => {
-          e.stopPropagation()
-          kachel.onHandlung()
-        }}
-      >
-        {kachel.handlungLabel}
-      </button>
-    </motion.div>
+      {kachel.unterzeile ? (
+        <div
+          style={{
+            fontSize: 12,
+            color: 'var(--ck-text-3)',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {kachel.unterzeile}
+        </div>
+      ) : null}
+    </motion.button>
   )
 }
 
-function KachelFenster({ kachel, onClose }: { kachel: KachelDef; onClose: () => void }) {
+export function KachelFenster({ kachel, onClose }: { kachel: KachelDef; onClose: () => void }) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      onClick={onClose}
+      // pointerdown + target-Check statt onClick: eine Textselektion, die auf
+      // dem Backdrop endet, feuert ihren click am gemeinsamen Vorfahren und
+      // würde das Fenster mitsamt aufgeklappter Zeile schließen.
+      onPointerDown={(e) => {
+        if (e.target === e.currentTarget) onClose()
+      }}
       style={{
         position: 'fixed',
         inset: 0,
@@ -139,36 +163,41 @@ function KachelFenster({ kachel, onClose }: { kachel: KachelDef; onClose: () => 
         onClick={(e) => e.stopPropagation()}
         className="ck-panel"
         style={{
-          width: 'min(560px, 92vw)',
-          maxHeight: '85vh',
+          width: 'min(720px, 94vw)',
+          // 88vh misst den GROSSEN Viewport — bei eingeblendeter Safari-Leiste
+          // ragt das Panel sonst über den sichtbaren Bereich (svh-Falle).
+          maxHeight: 'min(88svh, 100%)',
           overflowY: 'auto',
-          padding: 22,
+          padding: 20,
           display: 'flex',
           flexDirection: 'column',
-          gap: 14,
+          gap: 12,
           borderColor: 'var(--ck-border-strong)',
           boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
         }}
       >
-        <div className="ck-label">{kachel.titel}</div>
-        <div style={{ fontSize: 26, fontWeight: 600, color: kachel.kennzahlFarbe ?? 'var(--ck-text-1)' }}>
-          {kachel.kennzahl}
-        </div>
-        {kachel.erweitert ? kachel.erweitert() : null}
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            className="ck-btn ck-btn--primary"
-            disabled={kachel.handlungDeaktiviert}
-            style={{ minHeight: 48, flex: '1 1 auto' }}
-            onClick={kachel.onHandlung}
-          >
-            {kachel.handlungLabel}
-          </button>
-          <button type="button" className="ck-btn" style={{ minHeight: 48 }} onClick={onClose}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
+          <div>
+            <div className="ck-label">{kachel.titel}</div>
+            <div style={{ fontSize: 20, fontWeight: 600, color: kachel.kennzahlFarbe ?? 'var(--ck-text-1)', marginTop: 2 }}>
+              {kachel.kennzahl}
+            </div>
+          </div>
+          <button type="button" className="ck-btn" style={{ minHeight: 40, flexShrink: 0 }} onClick={onClose}>
             Schließen
           </button>
         </div>
+        {kachel.inhalt ? kachel.inhalt() : null}
+        {kachel.fensterAktion ? (
+          <button
+            type="button"
+            className="ck-btn ck-btn--primary"
+            style={{ minHeight: 48 }}
+            onClick={kachel.fensterAktion.onClick}
+          >
+            {kachel.fensterAktion.label}
+          </button>
+        ) : null}
       </motion.div>
     </motion.div>
   )
@@ -176,6 +205,7 @@ function KachelFenster({ kachel, onClose }: { kachel: KachelDef; onClose: () => 
 
 export function SalesDashboard() {
   const navigate = useNavigate()
+  const isMobile = useIsMobile()
   const { activeBrand } = useActiveBrand()
   const slug = activeBrand?.slug
   const metrics = useDailyMetrics()
@@ -187,7 +217,11 @@ export function SalesDashboard() {
   const { runner, runs, refresh: refreshRuns } = useRunnerData()
 
   const [offenKachelId, setOffenKachelId] = useState<string | null>(null)
-  const [arbeitsmodusSpur, setArbeitsmodusSpur] = useState<Spur | 'alle' | null>(null)
+  /** Snapshot beim Öffnen — die Live-Listen schrumpfen beim Abhaken (optimistische
+      Updates) und würden sonst unter dem laufenden Index wegrutschen: jeder
+      zweite Posten würde übersprungen und nie angezeigt. */
+  const [arbeitsmodus, setArbeitsmodus] = useState<{ spur: Spur | 'alle'; posten: Posten[] } | null>(null)
+  const [anfragenVollbild, setAnfragenVollbild] = useState(false)
 
   // Minutentakt statt Date.now() bei jedem Render (Muster aus LinkedinArea) —
   // sonst rechnen die useMemos unten bei jedem Tastendruck neu.
@@ -244,19 +278,19 @@ export function SalesDashboard() {
   const funnel = useMemo(() => funnelKpis(metrics.monthRows, monthRevenue), [metrics.monthRows, monthRevenue])
   const tag = useMemo(() => tagesstand(metrics.today), [metrics.today])
 
-  const arbeitsmodusPosten = useMemo<Posten[]>(() => {
-    if (arbeitsmodusSpur === null) return []
-    if (arbeitsmodusSpur === 'alle') return geordnet
-    return geordnet.filter((p) => p.spur === arbeitsmodusSpur)
-  }, [arbeitsmodusSpur, geordnet])
-
+  // Vollbild-Arbeitsmodus ist ein Handy-Werkzeug — am Desktop passiert die
+  // Arbeit in der Liste im Kachel-Fenster.
   const oeffneArbeitsmodus = useCallback((spur: Spur | 'alle', liste: Posten[]) => {
-    if (liste.length === 0) return // Trigger: leere Liste → Modus nicht öffnen
-    setArbeitsmodusSpur(spur)
+    if (liste.length === 0) return
+    setOffenKachelId(null)
+    setArbeitsmodus({ spur, posten: [...liste] })
   }, [])
 
   const schreibeDauer = useCallback(
     async (input: { spur: Spur; postenId: string; sekunden: number }) => {
+      // Nur echte Arbeitszeit messen — 0 Sekunden heißt: direkt weggehakt,
+      // ohne den Posten zu öffnen. Das würde den Median nur verfälschen.
+      if (input.sekunden <= 0) return
       if (!supabase || !activeBrand?.id) return
       const { error } = await supabase.from('arbeits_dauern').insert({
         brand_id: activeBrand.id,
@@ -287,67 +321,175 @@ export function SalesDashboard() {
   )
 
   const aktiveAgenten = useMemo(() => runs.filter((r) => r.status === 'running').map((r) => r.agent), [runs])
+  const loomLaeuft = aktiveAgenten.includes('loom-skript')
 
-  // Rang-1-Aufgabe → welches Projekt braucht Kevins Klick zuerst.
-  const ersteKundenaufgabe = kundenaufgabePosten[0]
-  const ersteKundenaufgabeTask = ersteKundenaufgabe
-    ? tasks.items.find((t) => `task:${t.id}` === ersteKundenaufgabe.id)
-    : undefined
+  // Sales-Bibliothek (generierte Loom-Skripte) — geladen, sobald Looms
+  // sichtbar werden, und neu geladen, wenn ein loom-skript-Lauf fertig ist.
+  const [library, setLibrary] = useState<SalesLibrary | null>(null)
+  const [loomFehler, setLoomFehler] = useState<string | null>(null)
+  const [loomAngefordert, setLoomAngefordert] = useState<Set<string>>(new Set())
+  /** Lokal gemerkter laufender Auftrag: auf der Live-Domain gibt es kein
+      fetchRuns-Signal (kein Spiegel-Pfad) — ohne das hier bliebe der
+      Generieren-Knopf aktiv und „Skript öffnen" erschiene nie von selbst. */
+  const [loomPending, setLoomPending] = useState<{ id: string; name: string; startedAt: number } | null>(null)
+
+  const ladeLibrary = useCallback(async () => {
+    try {
+      setLibrary(await fetchSalesLibrary())
+    } catch {
+      // Runner/Spiegel nicht erreichbar — die Knöpfe zeigen den Zustand.
+    }
+  }, [])
+
+  const loomsSichtbar =
+    offenKachelId === 'looms' ||
+    offenKachelId === 'jetzt-dran' ||
+    arbeitsmodus?.spur === 'loom' ||
+    arbeitsmodus?.spur === 'alle'
+  useEffect(() => {
+    if (loomsSichtbar) void ladeLibrary()
+  }, [loomsSichtbar, ladeLibrary])
+
+  const loomLiefZuvor = useRef(false)
+  useEffect(() => {
+    if (loomLiefZuvor.current && !loomLaeuft) void ladeLibrary()
+    loomLiefZuvor.current = loomLaeuft
+  }, [loomLaeuft, ladeLibrary])
+
+  // Solange ein Auftrag offen ist: Bibliothek pollen, bis das Skript auftaucht —
+  // mit Zeitdeckel, falls der Lauf serverseitig hängen bleibt.
+  useEffect(() => {
+    if (!loomPending) return
+    const id = window.setInterval(() => {
+      void ladeLibrary()
+      if (Date.now() - loomPending.startedAt > 15 * 60_000) {
+        setLoomPending(null)
+        setLoomFehler('Loom-Skript-Lauf dauert ungewöhnlich lange — Status unter Agenten prüfen.')
+      }
+    }, 15_000)
+    return () => window.clearInterval(id)
+  }, [loomPending, ladeLibrary])
+
+  useEffect(() => {
+    if (!loomPending || !library) return
+    const fertig = library.skripte.some(
+      (s) =>
+        s.kind === 'html' &&
+        s.name.startsWith('Loom-Skript') &&
+        s.name.toLowerCase().includes(`(${loomPending.name.toLowerCase()})`),
+    )
+    if (fertig) setLoomPending(null)
+  }, [library, loomPending])
+
+  const loomAktionen: LoomSkriptAktionen = useMemo(
+    () => ({
+      skriptUrl: (p) => {
+        const treffer = (library?.skripte ?? [])
+          .filter(
+            (s) =>
+              s.kind === 'html' &&
+              s.name.startsWith('Loom-Skript') &&
+              s.name.toLowerCase().includes(`(${p.name.toLowerCase()})`),
+          )
+          .sort((a, b) => new Date(b.mtime).getTime() - new Date(a.mtime).getTime())[0]
+        return treffer ? salesFileUrl(treffer.rel) : null
+      },
+      generiere: (p) => {
+        setLoomFehler(null)
+        setLoomAngefordert((prev) => new Set(prev).add(p.id))
+        setLoomPending({ id: p.id, name: p.name, startedAt: Date.now() })
+        // profile_url (LinkedIn) ist keine analysierbare Firmen-Website —
+        // dann recherchiert der Agent selbst.
+        const website = p.website && !p.website.includes('linkedin.com') ? p.website : undefined
+        void postRun('loom-skript', { name: p.name, ...(website ? { website } : {}) })
+          .then(() => refreshRuns())
+          .catch((e) => {
+            setLoomFehler((e as Error).message)
+            setLoomPending(null)
+            // sonst zeigt dieser Posten bei jedem späteren Lauf fälschlich „wird generiert"
+            setLoomAngefordert((prev) => {
+              const next = new Set(prev)
+              next.delete(p.id)
+              return next
+            })
+          })
+      },
+      laeuft: loomLaeuft || loomPending !== null,
+      angefordert: (p) => loomAngefordert.has(p.id),
+      verfuegbar: runner.state === 'online',
+      dateiOeffenbar: runnerDirekt(),
+      fehler: loomFehler,
+    }),
+    [library, loomLaeuft, loomPending, loomAngefordert, loomFehler, runner.state, refreshRuns],
+  )
+
+  const projektLink = useCallback(
+    (p: Posten) => {
+      if (!slug) return null
+      const task = tasks.items.find((t) => t.id === zeilenId(p.id))
+      return task?.project_id ? `/brand/${slug}/deliver/${task.project_id}` : null
+    },
+    [slug, tasks.items],
+  )
+
+  const navigiere = useCallback(
+    (route: string) => {
+      setOffenKachelId(null)
+      navigate(route)
+    },
+    [navigate],
+  )
+
+  const liste = useCallback(
+    (posten: Posten[]) => () => (
+      <Arbeitsliste
+        posten={posten}
+        onErledigt={onArbeitsmodusErledigt}
+        loom={loomAktionen}
+        projektLink={projektLink}
+        onNavigiere={navigiere}
+      />
+    ),
+    [onArbeitsmodusErledigt, loomAktionen, projektLink, navigiere],
+  )
+
+  /** Am Handy: „Arbeitsmodus starten" im Fenster-Fuß — am Desktop bewusst nicht. */
+  const mobilArbeitsmodus = useCallback(
+    (spur: Spur | 'alle', posten: Posten[]) =>
+      isMobile && posten.length > 0
+        ? { label: 'Arbeitsmodus starten', onClick: () => oeffneArbeitsmodus(spur, posten) }
+        : undefined,
+    [isMobile, oeffneArbeitsmodus],
+  )
 
   const kacheln: KachelDef[] = [
     {
       id: 'jetzt-dran',
       titel: 'Jetzt dran',
-      kennzahl: geordnet.length
-        ? `${geordnet.length} offen · zuerst: ${SPUR_LABEL[geordnet[0].spur]} ${geordnet[0].name}`
-        : 'Alles abgearbeitet',
-      handlungLabel: geordnet.length ? 'Arbeitsmodus starten' : 'Nichts offen',
-      handlungDeaktiviert: geordnet.length === 0,
-      onHandlung: () => oeffneArbeitsmodus('alle', geordnet),
+      kennzahl: geordnet.length ? `${geordnet.length} offen` : 'Alles abgearbeitet',
+      unterzeile: geordnet.length
+        ? `zuerst: ${SPUR_LABEL[geordnet[0].spur]} — ${geordnet[0].name}`
+        : undefined,
+      inhalt: liste(geordnet),
+      fensterAktion: mobilArbeitsmodus('alle', geordnet),
     },
     {
       id: 'kundenarbeit',
       titel: 'Kundenarbeit',
       kennzahl: `${kundenaufgabePosten.length} offen`,
-      handlungLabel: ersteKundenaufgabeTask?.project_id ? 'Ins Projekt' : 'Keine offen',
-      handlungDeaktiviert: !ersteKundenaufgabeTask?.project_id,
-      onHandlung: () => {
-        if (ersteKundenaufgabeTask?.project_id && slug) {
-          navigate(`/brand/${slug}/deliver/${ersteKundenaufgabeTask.project_id}`)
-        }
-      },
-      erweitert: () => (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {kundenaufgabePosten.length === 0 ? (
-            <span style={{ fontSize: 13, color: 'var(--ck-text-3)' }}>Keine offenen Kundenaufgaben.</span>
-          ) : (
-            kundenaufgabePosten.slice(0, 8).map((p) => (
-              <div key={p.id} style={{ fontSize: 13, color: 'var(--ck-text-2)' }}>
-                {p.firma ? `${p.firma} — ` : ''}
-                {p.name}
-              </div>
-            ))
-          )}
-        </div>
-      ),
+      unterzeile: kundenaufgabePosten[0]
+        ? `zuerst: ${kundenaufgabePosten[0].firma ? `${kundenaufgabePosten[0].firma} — ` : ''}${kundenaufgabePosten[0].name}`
+        : undefined,
+      inhalt: liste(kundenaufgabePosten),
+      fensterAktion: mobilArbeitsmodus('kundenaufgabe', kundenaufgabePosten),
     },
     {
       id: 'liegt-zu-lange',
       titel: 'Liegt zu lange',
       kennzahl: liegend.length ? `${liegend.length} Projekt${liegend.length === 1 ? '' : 'e'} > 14 Tage` : 'Keins liegt',
       kennzahlFarbe: liegend.length ? 'var(--ck-warn)' : undefined,
-      handlungLabel: liegend.length ? 'Follow-up entwerfen' : 'Nichts offen',
-      handlungDeaktiviert: liegend.length === 0,
-      onHandlung: () => oeffneArbeitsmodus('kunde_liegt', kundeLiegtListe),
-      erweitert: () => (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {liegend.map(({ projekt, tage }) => (
-            <div key={projekt.id} style={{ fontSize: 13, color: 'var(--ck-text-2)' }}>
-              {projekt.name} — seit {tage} Tagen
-            </div>
-          ))}
-        </div>
-      ),
+      inhalt: liste(kundeLiegtListe),
+      fensterAktion: mobilArbeitsmodus('kunde_liegt', kundeLiegtListe),
     },
     {
       id: 'antworten',
@@ -355,27 +497,25 @@ export function SalesDashboard() {
       kennzahl: linkedinThreads.tableMissing
         ? 'Migration 0058 ausstehend'
         : `${antwortListe.length} warten · ${antwortListe.filter((p) => p.starred).length} mit Stern`,
-      handlungLabel: antwortListe.length ? 'Arbeitsmodus starten' : 'Nichts offen',
-      handlungDeaktiviert: antwortListe.length === 0,
-      onHandlung: () => oeffneArbeitsmodus('antwort', antwortListe),
+      inhalt: liste(antwortListe),
+      fensterAktion: mobilArbeitsmodus('antwort', antwortListe),
     },
     {
       id: 'looms',
       titel: 'Looms',
       kennzahl: linkedinThreads.tableMissing
         ? 'Migration 0061 ausstehend'
-        : `${loomVerschicktGesamt} von ${loomStarredGesamt}`,
-      handlungLabel: loomListe.length ? 'Arbeitsmodus starten' : 'Nichts offen',
-      handlungDeaktiviert: loomListe.length === 0,
-      onHandlung: () => oeffneArbeitsmodus('loom', loomListe),
+        : `${loomVerschicktGesamt} von ${loomStarredGesamt} verschickt`,
+      unterzeile: loomListe.length ? `${loomListe.length} offen — Skript generieren & aufnehmen` : undefined,
+      inhalt: liste(loomListe),
+      fensterAktion: mobilArbeitsmodus('loom', loomListe),
     },
     {
       id: 'erstnachrichten',
       titel: 'Erstnachrichten',
       kennzahl: erstnachrichten.tableMissing ? 'Migration 0060 ausstehend' : `${erstnachrichtListe.length} offen`,
-      handlungLabel: erstnachrichtListe.length ? 'Arbeitsmodus starten' : 'Nichts offen',
-      handlungDeaktiviert: erstnachrichtListe.length === 0,
-      onHandlung: () => oeffneArbeitsmodus('erstnachricht', erstnachrichtListe),
+      inhalt: liste(erstnachrichtListe),
+      fensterAktion: mobilArbeitsmodus('erstnachricht', erstnachrichtListe),
     },
     {
       id: 'followups',
@@ -383,21 +523,23 @@ export function SalesDashboard() {
       kennzahl: linkedinThreads.tableMissing
         ? 'Migration 0058 ausstehend'
         : `${followupListe.length} fällig · ${verwaistAnzahl} Altlasten`,
-      handlungLabel: followupListe.length ? 'Arbeitsmodus starten' : 'Nichts offen',
-      handlungDeaktiviert: followupListe.length === 0,
-      onHandlung: () => oeffneArbeitsmodus('followup', followupListe),
+      inhalt: liste(followupListe),
+      fensterAktion: mobilArbeitsmodus('followup', followupListe),
     },
     {
       id: 'vernetzungsanfragen',
       titel: 'Vernetzungsanfragen',
       kennzahl: `${tag.anfragenHeute} von ${tag.anfragenLimit}`,
-      handlungLabel: 'Nichts offen',
-      handlungDeaktiviert: true,
-      onHandlung: () => oeffneArbeitsmodus('anfrage', []),
-      erweitert: () => (
-        <span style={{ fontSize: 13, color: 'var(--ck-text-3)' }}>
-          Kevins Tagesritual direkt auf LinkedIn — kein Auto-Tracking in der App, nur der Zähler oben.
-        </span>
+      unterzeile: 'Zähler — das Ritual läuft direkt auf LinkedIn',
+      inhalt: () => (
+        <AnfragenZaehler
+          heute={tag.anfragenHeute}
+          limit={tag.anfragenLimit}
+          onPlus={() => metrics.bump('li_anfragen', 1)}
+          onMinus={() => {
+            if (tag.anfragenHeute > 0) metrics.bump('li_anfragen', -1)
+          }}
+        />
       ),
     },
     {
@@ -405,17 +547,14 @@ export function SalesDashboard() {
       titel: 'Quoten',
       kennzahl: quotenFarbeUndText(funnel.conv).text,
       kennzahlFarbe: quotenFarbeUndText(funnel.conv).farbe,
-      handlungLabel: 'Zu /tracking',
-      onHandlung: () => navigate('/tracking'),
-      erweitert: () => <ConversionPanel kpis={funnel} />,
+      inhalt: () => <ConversionPanel kpis={funnel} />,
+      fensterAktion: { label: 'Zu /tracking', onClick: () => navigiere('/tracking') },
     },
     {
       id: 'inmails',
       titel: 'InMails',
       kennzahl: `${tag.inmailCredits} Credits übrig`,
-      handlungLabel: 'Details',
-      onHandlung: () => setOffenKachelId('inmails'),
-      erweitert: () => (
+      inhalt: () => (
         <span style={{ fontSize: 13, color: 'var(--ck-text-3)' }}>
           Bestand, kein Tagesrhythmus (RECON-1 offen — Kevin liest den genauen Stand in LinkedIn nach).
           Reaktivierung offener Anfragen läuft über den Skill <code>linkedin-inmail</code>.
@@ -428,9 +567,7 @@ export function SalesDashboard() {
       kennzahl:
         runner.state !== 'online' ? 'Runner offline' : aktiveAgenten.length ? `${aktiveAgenten.length} aktiv` : 'Bereit',
       kennzahlFarbe: runner.state !== 'online' ? 'var(--ck-warn)' : undefined,
-      handlungLabel: 'Öffnen',
-      onHandlung: () => setOffenKachelId('werkzeuge'),
-      erweitert: () => (
+      inhalt: () => (
         <WerkzeugePanel runnerState={runner.state} activeAgents={aktiveAgenten} onRan={() => void refreshRuns()} />
       ),
     },
@@ -438,17 +575,30 @@ export function SalesDashboard() {
 
   const offenKachel = kacheln.find((k) => k.id === offenKachelId) ?? null
 
+  const oeffneKachel = useCallback(
+    (id: string) => {
+      // Der Anfragen-Zähler ist am Handy ein Vollbild mit einem Knopf —
+      // genau dafür war das Vollbild gedacht, nirgendwo sonst.
+      if (id === 'vernetzungsanfragen' && isMobile) {
+        setAnfragenVollbild(true)
+        return
+      }
+      setOffenKachelId(id)
+    },
+    [isMobile],
+  )
+
   return (
     <MotionConfig reducedMotion="user">
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
           gap: 14,
         }}
       >
         {kacheln.map((k) => (
-          <KachelCard key={k.id} kachel={k} onOeffnen={() => setOffenKachelId(k.id)} />
+          <KachelCard key={k.id} kachel={k} onOeffnen={() => oeffneKachel(k.id)} />
         ))}
       </div>
 
@@ -456,11 +606,25 @@ export function SalesDashboard() {
         {offenKachel ? <KachelFenster kachel={offenKachel} onClose={() => setOffenKachelId(null)} /> : null}
       </AnimatePresence>
 
-      {arbeitsmodusSpur ? (
+      {anfragenVollbild ? (
+        <AnfragenZaehler
+          vollbild
+          heute={tag.anfragenHeute}
+          limit={tag.anfragenLimit}
+          onPlus={() => metrics.bump('li_anfragen', 1)}
+          onMinus={() => {
+            if (tag.anfragenHeute > 0) metrics.bump('li_anfragen', -1)
+          }}
+          onClose={() => setAnfragenVollbild(false)}
+        />
+      ) : null}
+
+      {arbeitsmodus ? (
         <Arbeitsmodus
-          posten={arbeitsmodusPosten}
+          posten={arbeitsmodus.posten}
           onErledigt={onArbeitsmodusErledigt}
-          onClose={() => setArbeitsmodusSpur(null)}
+          onClose={() => setArbeitsmodus(null)}
+          loom={loomAktionen}
         />
       ) : null}
     </MotionConfig>

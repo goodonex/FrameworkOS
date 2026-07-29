@@ -18,7 +18,9 @@ function threadZuPosten(t: LinkedinThread, spur: Posten['spur'], praefix: string
     spur,
     name: t.name || 'Unbekannt',
     firma: t.company || undefined,
-    website: undefined,
+    // Bei Threads ist der nützliche Link das LinkedIn-Profil — dort findet
+    // die eigentliche Arbeit (antworten, Loom verschicken) statt.
+    website: t.profile_url || undefined,
     text,
     timestamp: t.last_message_at,
     starred: t.starred,
