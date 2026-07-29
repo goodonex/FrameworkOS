@@ -316,9 +316,29 @@ Kacheln bei 1280×800 mehrspaltig, bei 390×664 einspaltig ohne horizontalen
 **Bei Fehlschlag:** eine Kachel ohne Handlung — dann ist es wieder ein
 Nachschlagewerk.
 
+**Die Vergrößerung ist eine Layout-Animation, kein Ein-/Ausblenden.** Kevins
+Referenz (21st.dev „Morphing Card Stack"): Die Kachel *verwandelt* sich zum
+Fenster und ordnet sich beim Schließen zurück ins Raster. Umsetzung mit
+**`framer-motion` (bereits installiert, ^12.38)** über gemeinsame `layoutId` an
+Kachel und Fenster — ein Attribut, keine neue Abhängigkeit.
+
+**Ausdrücklich NICHT übernehmen** (aus derselben Referenz): cursor-abhängige
+Skalierung, dem Zeiger folgende Farbverläufe, pulsierende Knoten. Das verstößt
+gegen Kevins Regel „Ruhe schlägt Effekt" und ist am Handy ohnehin wirkungslos.
+Ebenso **kein Glasmorphismus** (zweite Referenz) — durchscheinende Flächen
+verschlechtern den Kontrast, und genau der ist Kevins Beschwerdepunkt (Zug 8).
+Keine zweite Animationsbibliothek neben framer-motion.
+
+**Bewegung sparsam:** eine Dauer (~220 ms), `prefers-reduced-motion` respektieren.
+
 **Wahrscheinlichster Fehler:** Der Executor baut Reiter statt Kacheln, weil das im
 Repo häufiger vorkommt. **Gegenzug:** Kevin hat Kacheln ausdrücklich verlangt
 („keine Tabs, sondern Kartenfenster, das größer wird"). Reiter sind hier falsch.
+
+**Zweiter Fehler bei der Animation:** `layoutId` an einem Element, das beim
+Öffnen ausgehängt wird → das Morph springt statt zu gleiten. **Signal:** harter
+Schnitt statt Übergang. **Gegenzug:** Kachel und Fenster müssen im selben
+`AnimatePresence`-Baum liegen.
 
 **Zweiter Fehler:** Die Vergrößerung wird als Route gebaut → Zurück-Taste und
 Zustand brechen. **Gegenzug:** lokaler State im Dashboard, kein Routing.
@@ -353,6 +373,43 @@ modellieren.
 
 ---
 
+## Zug 8 — Kontrast anheben (`app/src/styles/cockpit.css`)
+
+**Aktion:** Kevins Beschwerde (*„alles mit diesem schwarz grün, man sieht einfach
+nicht gut"*) ist messbar, nicht Geschmack. Kontrast gegen den Hintergrund
+`#050708`, gemessen 29.07.:
+
+| Variable | Wert | Kontrast | Urteil |
+|---|---|---|---|
+| `--ck-text-1` | `#f2f4f5` | 18,30:1 | ok |
+| `--ck-text-2` | `#9aa4a8` | 7,93:1 | ok |
+| **`--ck-text-3`** | `#5c676c` | **3,47:1** | **unter AA (4,5:1)** |
+| `--ck-accent` | `#34d399` | 10,50:1 | ok |
+| `--ck-warn` | `#f59e0b` | 9,40:1 | ok |
+
+`--ck-text-3` wird an **108 Stellen** verwendet — dort stehen fast alle
+Beschriftungen. Das ist die Ursache.
+
+**Änderung:** `--ck-text-3` von `#5c676c` auf **`#8a9599`** (6,57:1). Nur diese
+eine Variable im Dark-Theme; der Hell-Modus (`#6b7880`) bleibt unangetastet.
+
+**Erwartete Beobachtung bei Erfolg:** Screenshot bei 1280×800 vorher/nachher —
+Micro-Labels lesbar ohne Anstrengung; die Optik bleibt erkennbar dieselbe.
+**Bei Fehlschlag:** Labels wirken jetzt so stark wie Fließtext (dann wurde zu weit
+angehoben, `#7c878c` nehmen).
+
+**Wahrscheinlichster Fehler:** Der Executor ändert gleich mehrere Farben oder
+führt eine neue Palette ein. **Gegenzug:** **Genau eine Variable.** Alles andere
+liegt messbar über der Schwelle und braucht keine Änderung.
+
+**Zweiter Fehler:** Statt der Variable werden einzelne Stellen überschrieben →
+108 Fundstellen driften auseinander. **Gegenzug:** nur die Variablendefinition.
+
+**Abbruchbedingung:** Keine neuen Farbwerte, kein Glasmorphismus, keine
+Verlaufsflächen hinter Text.
+
+---
+
 ## Zug 7 — Verifikation
 
 1. `npx tsx scripts/verify-prioritaet.ts` → „N/N Fälle korrekt".
@@ -363,6 +420,9 @@ modellieren.
    ausgeben — genau ein Feld +1.
 5. Konsole prüfen. **Hinweis:** Hooks-Order-Warnungen direkt nach einem Edit sind
    HMR-Artefakte; erst nach vollem Reload bewerten (kostete am 28.07. Zeit).
+6. Kontrast nachmessen: `--ck-text-3` gegen `--ck-bg` ≥ 4,5:1.
+7. Kachel-Morph einmal öffnen und schließen — die Kachel muss gleiten, nicht
+   springen; mit aktiviertem „Bewegung reduzieren" darf sie hart schalten.
 
 ---
 
@@ -450,7 +510,7 @@ und braucht keinen Umbau am hier Gebauten.
 ```
 Zug 1 (Prioritätenliste + Test) → Zug 6 (Kundenarbeit als Quelle) →
 Zug 2 (Migration schreiben) → L-1 (Kevin) → Zug 3 (Arbeitsmodus) →
-Zug 4 (Tracking) → Zug 5 (Kacheln) → Zug 7 (Verifikation)
+Zug 4 (Tracking) → Zug 8 (Kontrast) → Zug 5 (Kacheln) → Zug 7 (Verifikation)
 ```
 
 Züge 1 und 3 sind unabhängig und können parallel gebaut werden. Kein Commit ohne
