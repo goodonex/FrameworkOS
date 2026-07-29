@@ -1,4 +1,5 @@
 import { RUNNER_BASE_URL } from './useRunnerStatus'
+import { leseSpiegel, runnerDirekt } from './runnerBridge'
 
 export interface SalesLibraryVaultEntry {
   name: string
@@ -20,6 +21,12 @@ export interface SalesLibrary {
 }
 
 export async function fetchSalesLibrary(): Promise<SalesLibrary> {
+  // Ohne direkten Draht zum Runner den Spiegel lesen (Migration 0059).
+  if (!runnerDirekt()) {
+    const spiegel = await leseSpiegel<SalesLibrary>('sales_library')
+    if (!spiegel) throw new Error('Noch kein Spiegel vorhanden — Runner einmal laufen lassen.')
+    return spiegel.data
+  }
   const res = await fetch(`${RUNNER_BASE_URL}/sales/library`)
   const body = (await res.json()) as SalesLibrary & { error?: string }
   if (!res.ok) throw new Error((body as { error?: string }).error ?? `Runner-Fehler ${res.status}`)

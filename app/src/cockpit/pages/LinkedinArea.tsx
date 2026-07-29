@@ -209,7 +209,7 @@ function ThreadSection({
 }
 
 /** /linkedin — vierter Heute-Tab (Wargame Zug 7, docs/wargames/linkedin-followups.md). */
-export function LinkedinArea() {
+export function LinkedinArea({ eingebettet = false }: { eingebettet?: boolean } = {}) {
   const { activeBrand } = useActiveBrand()
   const slug = activeBrand?.slug
   const threadsQuery = useLinkedinThreads(slug)
@@ -358,7 +358,7 @@ export function LinkedinArea() {
 
   return (
     <div style={{ maxWidth: 780, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <HeuteTabs />
+      {eingebettet ? null : <HeuteTabs />}
 
       <div style={{ display: 'flex', gap: 6 }}>
         {([['erst', 'Erstnachrichten'], ['followup', 'Follow-ups']] as const).map(([wert, label]) => (

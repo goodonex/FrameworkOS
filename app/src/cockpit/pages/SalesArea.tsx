@@ -6,10 +6,13 @@ import { SalesMode } from '../../pages/sales/SalesMode'
 import { SalesNewLeadPage } from '../../pages/sales/SalesNewLeadPage'
 import { SalesBibliothek } from './SalesBibliothek'
 import { SalesDashboard } from './SalesDashboard'
+import { LinkedinArea } from './LinkedinArea'
 
 function SalesSubNav() {
   const items = [
     { to: '/sales', label: 'Dashboard', end: true },
+    // LinkedIn-Akquise ist Vertriebsarbeit — sie gehört hierher, nicht nur unter „Heute".
+    { to: '/sales/linkedin', label: 'LinkedIn', end: false },
     { to: '/sales/pipeline', label: 'Pipeline', end: false },
     { to: '/sales/lists', label: 'Listen', end: false },
     { to: '/sales/call-mode', label: 'Call-Mode', end: false },
@@ -48,6 +51,7 @@ export function SalesArea() {
       <SalesSubNav />
       <Routes>
         <Route index element={<SalesDashboard />} />
+        <Route path="linkedin" element={<LinkedinArea eingebettet />} />
         <Route path="pipeline" element={<SalesMode panel="full" scrollEmbed />} />
         <Route path="lists" element={<ContactListsPage />} />
         <Route path="lists/:listId" element={<ContactListsPage />} />

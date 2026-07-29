@@ -649,6 +649,7 @@ async function mirrorAll() {
     return { entries }
   })
   await pushSnapshotKey('social_weeks', async () => ({ weeks: await socialWeeks() }))
+  await pushSnapshotKey('sales_library', async () => await salesLibrary())
   await spiegleErstnachrichten()
   await pushSnapshotKey('agents', async () => {
     const runningIds = new Set([...running.values()].map((r) => r.agent))
