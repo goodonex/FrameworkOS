@@ -14,6 +14,8 @@ interface UseLinkedinThreadsResult {
   snooze: (id: string, untilIso: string) => Promise<void>
   /** Stufe 0-2 → nächste Stufe. Stufe 3 (Break-up war fällig) → archiviert. */
   markDone: (thread: LinkedinThread) => Promise<void>
+  /** Loom aufgenommen und verschickt (Migration 0061, Wargame-Arbeitsmodus Zug 4). */
+  markLoomVerschickt: (id: string) => Promise<void>
 }
 
 /** Liest linkedin_threads für die aktive Brand (Wargame Zug 7, docs/wargames/linkedin-followups.md). */
@@ -90,5 +92,10 @@ export function useLinkedinThreads(brandSlug: string | undefined): UseLinkedinTh
     [applyPatch],
   )
 
-  return { items, loading, tableMissing, error, reload, snooze, markDone }
+  const markLoomVerschickt = useCallback(
+    (id: string) => applyPatch(id, { loom_status: 'verschickt', loom_erledigt_at: new Date().toISOString() }),
+    [applyPatch],
+  )
+
+  return { items, loading, tableMissing, error, reload, snooze, markDone, markLoomVerschickt }
 }

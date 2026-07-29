@@ -27,6 +27,8 @@ function makeThread(overrides: Partial<LinkedinThread>): LinkedinThread {
     status: 'active',
     first_seen_at: dayAgo(30),
     last_synced_at: dayAgo(0),
+    loom_status: 'offen',
+    loom_erledigt_at: null,
     ...overrides,
   }
 }

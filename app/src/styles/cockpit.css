@@ -13,7 +13,7 @@
   --ck-border-strong: #26313a;
   --ck-text-1: #f2f4f5;
   --ck-text-2: #9aa4a8;
-  --ck-text-3: #5c676c;       /* nur für Micro-Labels ≥ 10px auf --ck-bg */
+  --ck-text-3: #8a9599;       /* nur für Micro-Labels ≥ 10px auf --ck-bg — 6,57:1 gegen #050708 (Wargame Zug 8, war 3,47:1) */
   --ck-accent: #34d399;       /* Phosphor-Grün: running, CTA, positiv */
   --ck-accent-dim: rgba(52, 211, 153, 0.14);
   --ck-idle: #64748b;         /* Blaugrau: idle */

@@ -45,3 +45,6 @@ supabase/.temp/
 
 # Abgeleiteter Zustand: zuletzt tragende LinkedIn-Blaetter-Query-ID (wird validiert/neu entdeckt)
 runner/linkedin/.paging-queryid.json
+
+# Claude-Code-Arbeitsordner (Worktrees, lokale Konfiguration)
+.claude/

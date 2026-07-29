@@ -376,8 +376,9 @@ export interface Contact {
 
 export type LinkedinThreadStatus = 'active' | 'waiting_reply' | 'won' | 'lost' | 'archived'
 export type LinkedinLastFrom = 'me' | 'them' | 'unknown'
+export type LoomStatus = 'offen' | 'aufgenommen' | 'verschickt' | 'entfaellt'
 
-/** Siehe supabase/migrations/0058_linkedin_threads.sql. */
+/** Siehe supabase/migrations/0058_linkedin_threads.sql + 0061_loom_status.sql. */
 export interface LinkedinThread {
   id: string
   brand_id: string
@@ -397,6 +398,9 @@ export interface LinkedinThread {
   status: LinkedinThreadStatus
   first_seen_at: string
   last_synced_at: string
+  /** 0061: Status des zugesagten Looms — nur relevant, wenn `starred`. */
+  loom_status: LoomStatus
+  loom_erledigt_at: string | null
 }
 
 export type SalesFieldType = 'textarea' | 'text' | 'number' | 'toggle'
