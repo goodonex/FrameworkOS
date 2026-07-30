@@ -7,6 +7,33 @@ Jede Idee hängt an realem Code mit Datei-Bezug. Aufwand: S/M/L · Wirkung: hoch
 
 ---
 
+## Leitprinzip: Klick-Ökonomie (Kevin, 30.07.)
+
+Nicht alle Klicks sind gleich. **Arbeits-Klicks** (Haken, Kopieren, Senden) sind
+proportional zur Arbeit und in Ordnung. **Weg-Klicks** (Bereich wechseln, Tab
+öffnen, nachsehen ob etwas da ist) sind Verschwendung und werden eliminiert:
+
+1. **Ein Einstieg:** Uriel öffnen = die priorisierte Liste steht da (Heute-Deck
+   v2 aus der Posten-Engine). Kein Abklappern von Home/Sales/Terminen/Freigaben.
+2. **Aktion am Posten, nicht im Bereich:** Entwürfe, Skripte, Links kleben am
+   Namen im Kachel-Fenster — null Bereichswechsel pro Arbeitseinheit.
+3. **Nachts vorarbeiten:** Was ein Agent vorwegnehmen kann, ist kein Klick mehr
+   (Morgenbrief als Routine, Antwort-Entwürfe für alle „Du bist dran"-Threads
+   vorgenerieren).
+4. **Weiterschalten:** Nach „Erledigt" klappt automatisch der nächste offene
+   Posten auf (Desktop-Arbeitsliste; mobil tut der Arbeitsmodus das schon).
+   Tasten: Enter = Haken, K = Kopieren.
+
+**Tabs:** Warteschlange vorn, Nachschlagewerk hinten — keine *Arbeit* hinter
+Tabs (Sales-/Heute-Subtabs lösen sich in Liste/Deck auf), aber Nachschlagen
+(Bibliothek, Historie, Einstellungen) bleibt zu Recht dahinter. Nicht alles auf
+eine Seite stapeln — das wäre wieder die Kachel-Wand.
+
+Messlatte: von „Uriel öffnen" bis zur ersten erledigten Einheit ≤ 2
+Interaktionen; Antwort-an-Lead-Flow von ~10 auf 3.
+
+---
+
 ## Das große Bild — drei Erkenntnisse
 
 1. **Das Phosphor-Cockpit ist gut. Es ist nur nicht allein.** Neben ~16.100 Zeilen
