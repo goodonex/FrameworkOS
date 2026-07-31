@@ -79,14 +79,6 @@ export function NavRail() {
           </NavLink>
         )
       })}
-
-      <div className="ck-nav-spacer" />
-
-      {/* Zurück zur alten App, solange alt+neu koexistieren (bis Phase 6); auf Mobile ausgeblendet (Platz). */}
-      <NavLink to="/" className="ck-nav-item ck-nav-back">
-        <span aria-hidden className="ck-nav-icon">↩</span>
-        <span className="ck-nav-label">Universe</span>
-      </NavLink>
     </nav>
   )
 }

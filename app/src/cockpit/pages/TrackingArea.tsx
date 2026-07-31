@@ -191,8 +191,8 @@ function RatesTable({ rates }: { rates: ReturnType<typeof channelRates> }) {
 export function TrackingArea() {
   const metrics = useDailyMetrics()
   const vitals = useMemo(
-    () => weekVitals(metrics.weekRows, metrics.monthRows),
-    [metrics.weekRows, metrics.monthRows],
+    () => weekVitals(metrics.weekRows, metrics.windowRows),
+    [metrics.weekRows, metrics.windowRows],
   )
   const rates = useMemo(() => channelRates(metrics.monthRows), [metrics.monthRows])
   const termine = useMemo(() => termineAttribution(metrics.monthRows), [metrics.monthRows])

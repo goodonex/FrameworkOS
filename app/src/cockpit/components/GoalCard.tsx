@@ -1,8 +1,10 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { computeMrrMetrics } from '../../lib/performanceMetrics'
 import type { Contact } from '../../types/db'
-import { LIFE_TARGET, currentSoll, formatEuro, monthTargetFor } from '../lib/goals'
+import { useActiveBrand } from '../lib/activeBrand'
+import { LIFE_TARGET, currentSoll, formatEuro, monthKeyOf, monthTargetFor } from '../lib/goals'
 import type { DailyMetricsRow } from '../lib/useDailyMetrics'
+import { useMonthGoal } from '../lib/useMonthGoal'
 import { MonthCurve } from './MonthCurve'
 
 /**
@@ -21,13 +23,29 @@ export function GoalCard({
   contacts: Contact[]
 }) {
   const now = new Date()
-  const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  const month = monthTargetFor(monthKey)
+  const monthKey = monthKeyOf(now)
+  const { activeBrand } = useActiveBrand()
+  const goal = useMonthGoal(activeBrand?.id, monthKey)
+  const month = monthTargetFor(monthKey, goal.total)
+
+  const [editing, setEditing] = useState(false)
+  const [entwurf, setEntwurf] = useState('')
 
   const soll = month ? currentSoll(month.curve, now) : 0
   const total = month?.total ?? 0
   const onTrack = monthRevenue >= soll
   const pct = total > 0 ? Math.min(1, monthRevenue / total) : 0
+
+  const oeffneEditor = () => {
+    setEntwurf(String(total || ''))
+    setEditing(true)
+  }
+
+  const speichere = () => {
+    const n = Number(entwurf.replace(/[^\d]/g, ''))
+    void goal.save(Number.isFinite(n) && n > 0 ? n : null)
+    setEditing(false)
+  }
 
   const { activeRetainers, currentMrr } = useMemo(
     () => computeMrrMetrics(contacts),
@@ -41,16 +59,87 @@ export function GoalCard({
   return (
     <section className="ck-panel" aria-label="Monatsziel und Nordstern">
       <div style={{ padding: '12px 14px' }}>
-        <div className="ck-label">
-          Monatsziel · {month?.label ?? 'Monat'}
-          {month?.generated ? <span style={{ color: 'var(--ck-text-3)' }}> · Ziel geplant</span> : null}
+        <div className="ck-label" style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+          <span>Monatsziel · {month?.label ?? 'Monat'}</span>
+          {/* „geplant" = für diesen Monat wurde nie ein Ziel gesetzt, es gilt der
+              40.000-€-Default. Vorher stand das kommentarlos da und war nicht
+              änderbar — genau die Falle ab September. */}
+          {month?.generated ? <span style={{ color: 'var(--ck-warn)' }}>· Ziel geplant</span> : null}
+          {!editing ? (
+            <button
+              type="button"
+              onClick={oeffneEditor}
+              className="ck-label"
+              style={{
+                marginLeft: 'auto',
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                cursor: 'pointer',
+                color: 'var(--ck-text-3)',
+                textDecoration: 'underline',
+              }}
+            >
+              Ziel ändern
+            </button>
+          ) : null}
         </div>
+
+        {editing ? (
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', margin: '6px 0 4px', flexWrap: 'wrap' }}>
+            <input
+              className="ck-input"
+              value={entwurf}
+              onChange={(e) => setEntwurf(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') speichere()
+                if (e.key === 'Escape') setEditing(false)
+              }}
+              inputMode="numeric"
+              autoFocus
+              aria-label={`Umsatzziel ${month?.label ?? ''} in Euro`}
+              style={{ width: 110, fontSize: 14 }}
+            />
+            <span style={{ fontSize: 12, color: 'var(--ck-text-3)' }}>€</span>
+            <button type="button" className="ck-btn ck-btn--primary" style={{ fontSize: 10 }} onClick={speichere}>
+              Speichern
+            </button>
+            <button type="button" className="ck-btn" style={{ fontSize: 10 }} onClick={() => setEditing(false)}>
+              Abbrechen
+            </button>
+            {/* Nur wenn wirklich ein eigenes Ziel gesetzt ist — bei den
+                hartverdrahteten Monaten gäbe es sonst nichts zurückzusetzen. */}
+            {goal.total != null ? (
+              <button
+                type="button"
+                className="ck-btn"
+                style={{ fontSize: 10, color: 'var(--ck-text-3)' }}
+                onClick={() => {
+                  void goal.save(null)
+                  setEditing(false)
+                }}
+              >
+                Zurücksetzen
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+
         <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: '0.02em', lineHeight: 1.25 }}>
           {formatEuro(monthRevenue)}
           <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--ck-text-3)' }}>
             {' '}/ {formatEuro(total)}
           </span>
         </div>
+
+        {goal.tableMissing ? (
+          <div style={{ fontSize: 11, color: 'var(--ck-text-3)', marginTop: 2 }}>
+            Ziel nur auf diesem Gerät gespeichert — Migration 0062 noch nicht eingespielt.
+          </div>
+        ) : null}
+        {goal.error ? (
+          <div style={{ fontSize: 11, color: 'var(--ck-warn)', marginTop: 2 }}>{goal.error}</div>
+        ) : null}
         <div style={{ height: 4, background: 'var(--ck-border)', borderRadius: 2, overflow: 'hidden', margin: '8px 0 6px' }}>
           <div style={{ width: `${pct * 100}%`, height: '100%', background: onTrack ? 'var(--ck-accent)' : 'var(--ck-idle)' }} />
         </div>
@@ -66,7 +155,7 @@ export function GoalCard({
       </div>
 
       <div style={{ borderTop: '1px solid var(--ck-border)', padding: '6px 2px 0' }}>
-        <MonthCurve monthRows={monthRows} />
+        <MonthCurve monthRows={monthRows} overrideTotal={goal.total} />
       </div>
 
       {/* Nordstern als eine Zeile — Langfrist-Kontext, kein eigenes Panel mehr. */}

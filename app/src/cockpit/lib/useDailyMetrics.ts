@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { supabase } from '../../lib/supabase'
 import { useActiveBrand } from './activeBrand'
+import { toIsoDate, weekRowsOf } from './metricsDates'
 
 /** Eine Tageszeile aus daily_metrics (Migration 0049). */
 export interface DailyMetricsRow {
@@ -93,27 +94,18 @@ export function emptyRow(datum: string): DailyMetricsRow {
   }
 }
 
-export function toIsoDate(d: Date): string {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
-
-/** Montag der Woche von `d` (de: Woche beginnt Montag). */
-export function mondayOf(d: Date): Date {
-  const copy = new Date(d)
-  const day = (copy.getDay() + 6) % 7
-  copy.setDate(copy.getDate() - day)
-  copy.setHours(0, 0, 0, 0)
-  return copy
-}
+// Datums-/Wochenlogik liegt in metricsDates.ts (Blatt-Modul ohne React), damit
+// scripts/verify-*.ts sie ohne Vite-Umgebung laden kann. Re-Export hält alle
+// bestehenden Import-Pfade gültig.
+export { mondayOf, toIsoDate, weekRowsOf } from './metricsDates'
 
 interface UseDailyMetricsResult {
   /** alle Zeilen des laufenden Monats (aufsteigend nach Datum) */
   monthRows: DailyMetricsRow[]
   /** Zeilen der laufenden Woche (Mo–So) */
   weekRows: DailyMetricsRow[]
+  /** ALLE geladenen Zeilen (~45-Tage-Fenster) — Quelle für Verlaufs-Sparklines */
+  windowRows: DailyMetricsRow[]
   /** heutige Zeile (leer, wenn noch nichts eingetragen) */
   today: DailyMetricsRow
   loading: boolean
@@ -362,10 +354,13 @@ export function useDailyMetrics(): UseDailyMetricsResult {
 
   const today = useMemo(() => rowFor(todayIso), [rowFor, todayIso])
 
-  const weekRows = useMemo(() => {
-    const mondayIso = toIsoDate(mondayOf(new Date()))
-    return monthRows.filter((r) => r.datum >= mondayIso)
-  }, [monthRows])
+  // Aus allRows (45-Tage-Fenster), NICHT aus monthRows — sonst bricht die
+  // laufende Woche an jedem Monatsersten weg (siehe weekRowsOf). `todayIso`
+  // wird bewusst durchgereicht, damit die Woche beim Tageswechsel nachzieht.
+  const weekRows = useMemo(
+    () => weekRowsOf(allRows, new Date(`${todayIso}T12:00:00`)),
+    [allRows, todayIso],
+  )
 
   const bumpOn = useCallback(
     (datum: string, field: MetricField, delta: number) => {
@@ -392,6 +387,7 @@ export function useDailyMetrics(): UseDailyMetricsResult {
   return {
     monthRows,
     weekRows,
+    windowRows: allRows,
     today,
     loading,
     tableMissing,

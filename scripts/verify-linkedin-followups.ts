@@ -2,7 +2,7 @@
  * Verifikation für Wargame Zug 6 (docs/wargames/linkedin-followups.md).
  * Reine Funktionen, keine DB — Start: npx tsx scripts/verify-linkedin-followups.ts
  */
-import { bucketOf, coverage, isDue } from '../app/src/cockpit/lib/linkedinFollowups'
+import { bucketOf, coverage, isDue, markDonePatch } from '../app/src/cockpit/lib/linkedinFollowups'
 import type { Contact, LinkedinThread } from '../app/src/types/db'
 
 const NOW = new Date('2026-07-28T12:00:00Z')
@@ -209,6 +209,60 @@ check('11b knapp über Schwelle', isDue(makeThread({ followup_stage: 0, last_mes
   check('12c coverage.ohne_kontakt', cov.ohne_kontakt, 1)
   check('12d coverage.nie_angeschrieben', cov.nie_angeschrieben, 1)
   check('12e coverage.verwaist', cov.verwaist, 1)
+}
+
+// 13. markDonePatch — die Ratsche darf antwortende Leads nicht archivieren
+//     (docs/IDEEN-2026-07-30-nutzbarkeit.md, Abschnitt „Sofort").
+{
+  // Der dokumentierte Fehlerfall: Lead antwortet NACH drei Follow-ups.
+  const antwortetSpaet = makeThread({
+    last_from: 'them',
+    last_message_at: dayAgo(1),
+    followup_stage: 3,
+    status: 'active',
+  })
+  check('13a Antwort auf Stufe 3 wird NICHT archiviert', markDonePatch(antwortetSpaet, NOW)?.status, 'active')
+  check('13b Leiter faellt auf 0 zurueck', markDonePatch(antwortetSpaet, NOW)?.followup_stage, 0)
+  check('13c Thread liegt im Bucket du_bist_dran', bucketOf(antwortetSpaet, NOW), 'du_bist_dran')
+
+  // Nach dem Patch ist der Thread wieder ein normaler wartender Thread.
+  const danach = { ...antwortetSpaet, ...markDonePatch(antwortetSpaet, NOW) }
+  check('13d nach Erledigt: wartet statt abschluss', bucketOf(danach, NOW), 'wartet')
+  check('13e nach Erledigt nicht sofort wieder faellig', isDue(danach, NOW), false)
+
+  // Antwort verhält sich auf jeder Stufe gleich.
+  for (const stufe of [0, 1, 2, 4]) {
+    const t = makeThread({ last_from: 'them', last_message_at: dayAgo(1), followup_stage: stufe, status: 'active' })
+    check(`13f Stufe ${stufe}: Antwort setzt zurueck`, markDonePatch(t, NOW)?.followup_stage, 0)
+  }
+
+  // Snooze wird beim Beantworten aufgehoben.
+  const geschlummert = makeThread({
+    last_from: 'them',
+    last_message_at: dayAgo(1),
+    followup_stage: 2,
+    snoozed_until: new Date(NOW.getTime() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+    status: 'active',
+  })
+  check('13g Snooze wird aufgehoben', markDonePatch(geschlummert, NOW)?.snoozed_until, null)
+
+  // Unveraendertes Verhalten: eigener Thread auf Stufe 3 wird archiviert.
+  const abschluss = makeThread({ last_from: 'me', last_message_at: dayAgo(20), followup_stage: 3, status: 'active' })
+  check('13h Break-up faellig -> archiviert', markDonePatch(abschluss, NOW), { status: 'archived' })
+
+  // Unveraendertes Verhalten: faelliger eigener Thread geht eine Stufe weiter.
+  const faellig = makeThread({ last_from: 'me', last_message_at: dayAgo(5), followup_stage: 0, status: 'active' })
+  check('13i faellig -> naechste Stufe', markDonePatch(faellig, NOW), { followup_stage: 1 })
+
+  // Altlast (30+ Tage, nie nachgefasst) wird wiederbelebt, nicht archiviert.
+  const verwaist = makeThread({ last_from: 'me', last_message_at: dayAgo(40), followup_stage: 0, status: 'active' })
+  check('13j Altlast -> Stufe 1', markDonePatch(verwaist, NOW), { followup_stage: 1 })
+
+  // Endzustaende ruehrt markDone nicht mehr an.
+  for (const status of ['archived', 'won', 'lost'] as const) {
+    const t = makeThread({ last_from: 'them', last_message_at: dayAgo(1), followup_stage: 3, status })
+    check(`13k ${status} bleibt unberuehrt`, markDonePatch(t, NOW), null)
+  }
 }
 
 console.log(`${pass}/${pass + fail} Fälle korrekt`)

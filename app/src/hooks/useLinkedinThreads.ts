@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { markDonePatch } from '../cockpit/lib/linkedinFollowups'
 import { isMissingSupabaseTableError } from '../lib/supabaseErrors'
 import { supabase } from '../lib/supabase'
 import type { LinkedinThread } from '../types/db'
@@ -12,7 +13,10 @@ interface UseLinkedinThreadsResult {
   error: string | null
   reload: () => Promise<void>
   snooze: (id: string, untilIso: string) => Promise<void>
-  /** Stufe 0-2 → nächste Stufe. Stufe 3 (Break-up war fällig) → archiviert. */
+  /**
+   * „Erledigt" je nach Bucket: Antwort des Leads → Leiter zurück auf 0,
+   * Break-up fällig → archiviert, sonst eine Stufe weiter (markDonePatch).
+   */
   markDone: (thread: LinkedinThread) => Promise<void>
   /** Loom aufgenommen und verschickt (Migration 0061, Wargame-Arbeitsmodus Zug 4). */
   markLoomVerschickt: (id: string) => Promise<void>
@@ -82,13 +86,13 @@ export function useLinkedinThreads(brandSlug: string | undefined): UseLinkedinTh
   )
 
   const markDone = useCallback(
-    (thread: LinkedinThread) =>
-      applyPatch(
-        thread.id,
-        thread.followup_stage >= 3
-          ? { status: 'archived' }
-          : { followup_stage: thread.followup_stage + 1 },
-      ),
+    async (thread: LinkedinThread) => {
+      // Regel liegt in linkedinFollowups.markDonePatch (bucket-bewusst, per
+      // scripts/verify-linkedin-followups.ts geprüft).
+      const patch = markDonePatch(thread)
+      if (!patch) return
+      await applyPatch(thread.id, patch)
+    },
     [applyPatch],
   )
 

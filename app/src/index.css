@@ -127,26 +127,6 @@ a {
   scrollbar-color: color-mix(in srgb, var(--text-tertiary) 40%, transparent) transparent;
 }
 
-.universe-planet-label {
-  font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  padding: 7px 14px;
-  border-radius: 10px;
-  border: 1px solid var(--glass-border-2);
-  background: var(--surface-popover);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
-  user-select: none;
-}
-
-[data-ui-theme='plain-light'] .universe-planet-label {
-  text-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  box-shadow: var(--shadow-sm);
-}
+/* .universe-planet-label entfernt: die Three.js-Welt ist seit Phase 6 abgerissen,
+   die Klasse hatte kein Markup mehr. Der „Universe"-Nav-Link, den die
+   Abriss-Liste noch nennt, existierte in NavRail bereits nicht mehr. */

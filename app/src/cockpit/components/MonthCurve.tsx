@@ -1,4 +1,4 @@
-import { formatEuro, monthTargetFor } from '../lib/goals'
+import { formatEuro, monthKeyOf, monthTargetFor } from '../lib/goals'
 import type { DailyMetricsRow } from '../lib/useDailyMetrics'
 import { cumulativeRevenue } from '../lib/metricsAggregate'
 
@@ -10,10 +10,18 @@ const PAD = { left: 52, right: 16, top: 14, bottom: 26 }
  * Monatsansicht: kumulierte Ist-Umsatz-Kurve gegen die back-loaded Soll-Kurve
  * (REBUILD-PLAN §9). Reines SVG, kein Chart-Paket.
  */
-export function MonthCurve({ monthRows }: { monthRows: DailyMetricsRow[] }) {
+export function MonthCurve({
+  monthRows,
+  overrideTotal,
+}: {
+  monthRows: DailyMetricsRow[]
+  /** Gesetztes Monatsziel (month_goals) — von GoalCard durchgereicht, damit
+   *  Kurve und Zahl darüber nie auseinanderlaufen. */
+  overrideTotal?: number | null
+}) {
   const now = new Date()
-  const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  const month = monthTargetFor(monthKey)
+  const monthKey = monthKeyOf(now)
+  const month = monthTargetFor(monthKey, overrideTotal)
 
   if (!month) {
     return (

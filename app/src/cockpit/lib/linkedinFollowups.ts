@@ -73,6 +73,48 @@ export function bucketOf(thread: LinkedinThread, now: Date): FollowupBucket {
   return 'wartet'
 }
 
+/** Feld-Änderungen, die ein „Erledigt" auf einem Thread auslöst. */
+export type MarkDonePatch = Partial<
+  Pick<LinkedinThread, 'followup_stage' | 'last_from' | 'last_message_at' | 'snoozed_until' | 'status'>
+>
+
+/**
+ * Was „Erledigt" bedeutet, hängt am Bucket — nicht an der Stufe allein.
+ *
+ * Vorher zählte der Klick stur `followup_stage + 1` und archivierte ab Stufe 3.
+ * Damit wurde ein Lead, der NACH drei Follow-ups antwortet, beim Beantworten
+ * still archiviert — der teuerste Fehler im Funnel. `bucketOf` weiß längst, dass
+ * eine Antwort alles andere schlägt; diese Regel zieht nach.
+ *
+ * - Lead hat geantwortet (`du_bist_dran`) → Kevin hat geantwortet: Leiter zurück
+ *   auf 0, der Thread lebt weiter. Nie archivieren.
+ * - Break-up war fällig (`abschluss`) → archivieren.
+ * - Sonst (fällig, Altlast, prüfen) → eine Stufe weiter.
+ *
+ * Gibt `null` zurück, wenn nichts zu tun ist (Thread schon in einem Endzustand).
+ */
+export function markDonePatch(thread: LinkedinThread, now: Date = new Date()): MarkDonePatch | null {
+  if (isTerminal(thread.status)) return null
+
+  if (thread.last_from === 'them') {
+    return {
+      followup_stage: 0,
+      // Kevin hat eben geantwortet — der Sync bestätigt das beim nächsten Lauf,
+      // bis dahin zählt die Leiter ab jetzt statt ab der Nachricht des Leads.
+      last_from: 'me',
+      last_message_at: now.toISOString(),
+      snoozed_until: null,
+      // 'waiting_reply' würde den Thread aus isDue() aussperren (dort ist
+      // 'active' Bedingung) und er käme nie wieder als fällig hoch.
+      status: 'active',
+    }
+  }
+
+  if (thread.followup_stage >= 3) return { status: 'archived' }
+
+  return { followup_stage: thread.followup_stage + 1 }
+}
+
 export interface FollowupCoverage {
   faellig: number
   du_bist_dran: number

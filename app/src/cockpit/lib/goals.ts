@@ -44,12 +44,9 @@ export const MONTH_TARGETS: Record<string, { label: string; total: number; curve
   '2026-08': { label: 'August 2026', total: 50000, curve: AUGUST_2026_CURVE },
 }
 
-/** Benchmark-Antwortraten je Kanal (für Referenzlinien in Phase 3). */
-export const CHANNEL_BENCHMARKS = [
-  { key: 'li_anfragen', label: 'LinkedIn', min: 0.15, max: 0.25 },
-  { key: 'inmails', label: 'InMail', min: 0.1, max: 0.25 },
-  { key: 'ig_anfragen', label: 'Instagram', min: 0.1, max: 0.15 },
-] as const
+// CHANNEL_BENCHMARKS entfernt (ohne Importeur): die Benchmark-Bänder leben
+// bereits in metricsAggregate.channelRates — zwei Quellen für dieselbe Zahl
+// waren eine Drift-Falle.
 
 /**
  * Conversion-Zielquoten des Coachings (Agentur Inkubator / Marcel Steljes,
@@ -77,8 +74,8 @@ export const LIFE_TARGET = {
   retainerKundenZiel: 20, // = mrrMeilenstein / mrrProKunde
 } as const
 
-/** localStorage-Key für den (aktuell manuell gepflegten) Stand aktiver Retainer-Kunden. */
-export const RETAINER_KUNDEN_KEY = 'cockpit.retainerKunden'
+// RETAINER_KUNDEN_KEY entfernt (ohne Importeur): die Retainer-Zahl kommt aus
+// dem CRM (computeMrrMetrics), nicht mehr aus einem localStorage-Handstand.
 
 /** Aktuelles Soll für "heute" aus einer Kurve interpolieren (Wochenende = voller Wert). */
 export function currentSoll(curve: WeekTarget[], today = new Date()): number {
@@ -159,7 +156,13 @@ function backLoadedCurve(mondays: Date[], total: number): WeekTarget[] {
   }))
 }
 
-/** Optionales, vom Nutzer gesetztes Monats-Total (localStorage). */
+/**
+ * Optionales, vom Nutzer gesetztes Monats-Total (localStorage).
+ *
+ * Nur noch Rückfallebene: die führende Quelle ist die Tabelle `month_goals`
+ * (Migration 0062, Hook useMonthGoal) — localStorage divergierte zwischen Mac
+ * und Handy. Greift, solange die Migration nicht eingespielt ist.
+ */
 export function monthTotalOverride(monthKey: string): number | null {
   try {
     const raw = localStorage.getItem(`cockpit.monthTarget.${monthKey}`)
@@ -186,21 +189,45 @@ export function setMonthTotalOverride(monthKey: string, total: number | null): v
 /**
  * Monatsziel für einen Schlüssel `YYYY-MM` — hartverdrahtet (Juli/Aug 2026)
  * oder generiert. Gibt null nur bei kaputtem Schlüssel zurück.
+ *
+ * `overrideTotal` kommt aus `month_goals` (useMonthGoal) und schlägt alles
+ * andere — auch die hartverdrahteten Monate, deren Kurve dann proportional
+ * mitskaliert. `undefined` heißt „nichts gesetzt", nicht „auf 0 setzen".
  */
-export function monthTargetFor(monthKey: string): MonthTarget | null {
+export function monthTargetFor(
+  monthKey: string,
+  overrideTotal?: number | null,
+): MonthTarget | null {
   const fixed = MONTH_TARGETS[monthKey]
-  if (fixed) return { ...fixed, generated: false }
+  if (fixed) {
+    if (overrideTotal && overrideTotal > 0 && overrideTotal !== fixed.total) {
+      const faktor = overrideTotal / fixed.total
+      return {
+        label: fixed.label,
+        total: overrideTotal,
+        curve: fixed.curve.map((w) => ({ ...w, sollKumuliert: Math.round(w.sollKumuliert * faktor) })),
+        generated: false,
+      }
+    }
+    return { ...fixed, generated: false }
+  }
 
   const [ys, ms] = monthKey.split('-')
   const year = Number(ys)
   const monthIndex = Number(ms) - 1
   if (!Number.isFinite(year) || monthIndex < 0 || monthIndex > 11) return null
 
-  const total = monthTotalOverride(monthKey) ?? DEFAULT_MONTH_TOTAL
+  const total = overrideTotal ?? monthTotalOverride(monthKey) ?? DEFAULT_MONTH_TOTAL
   return {
     label: `${MONTHS_DE[monthIndex]} ${year}`,
     total,
     curve: backLoadedCurve(isoMondaysOfMonth(year, monthIndex), total),
-    generated: true,
+    // „geplant" heißt: niemand hat für diesen Monat ein Ziel gesetzt.
+    generated: overrideTotal == null,
   }
+}
+
+/** Monatsschlüssel `YYYY-MM` für ein Datum (überall derselbe Schlüssel). */
+export function monthKeyOf(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 }

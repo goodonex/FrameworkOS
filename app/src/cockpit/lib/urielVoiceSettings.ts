@@ -42,16 +42,9 @@ export interface UrielVoiceSettings {
   speed: number // 0.7..1.2 — Sprechtempo
 }
 
-/** Kuratierte, mehrsprachige Stimmen (funktionieren auf Deutsch). */
-export const URIEL_VOICES: { id: string; label: string; note: string }[] = [
-  { id: 'onwK4e9ZLuTAKqWW03F9', label: 'Daniel', note: 'britisch, autoritär — Jarvis-nah' },
-  { id: 'JBFqnCBsd6RMkjVDRZzb', label: 'George', note: 'britisch, warm' },
-  { id: 'pNInz6obpgDQGcFmaJgB', label: 'Adam', note: 'tief, ruhig' },
-  { id: 'TxGEqnHWrfWFTfGW9XjX', label: 'Josh', note: 'jung, männlich' },
-  { id: 'ErXwobaYiN019PkySvjV', label: 'Antoni', note: 'männlich, klar' },
-  { id: '21m00Tcm4TlvDq8ikWAM', label: 'Rachel', note: 'weiblich, ruhig' },
-  { id: 'XB0fDUnXU5powFXDhCwa', label: 'Charlotte', note: 'weiblich, weich' },
-]
+// URIEL_VOICES (kuratierte Festliste) entfernt: die Auswahl kommt seit dem
+// ElevenLabs-Anschluss aus fetchAccountVoices() — nur Stimmen, die im Konto
+// wirklich nutzbar sind. Die Festliste hatte keinen Importeur mehr.
 
 export const URIEL_MODELS: { id: UrielModelId; label: string; note: string }[] = [
   { id: 'eleven_flash_v2_5', label: 'Schnell', note: 'niedrigste Latenz' },

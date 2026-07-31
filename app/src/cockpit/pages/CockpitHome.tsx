@@ -18,7 +18,8 @@ import {
   saveCockpitLayout,
 } from '../lib/cockpitLayoutStorage'
 import type { CockpitLayout } from '../lib/cockpitLayoutStorage'
-import { WEEK_TARGETS, currentSoll, monthTargetFor } from '../lib/goals'
+import { WEEK_TARGETS, currentSoll, monthKeyOf, monthTargetFor } from '../lib/goals'
+import { useMonthGoal } from '../lib/useMonthGoal'
 import { sumField, weekVitals } from '../lib/metricsAggregate'
 import { postRun } from '../lib/runnerApi'
 import { buildFollowupInput } from '../lib/approvalDrafts'
@@ -164,6 +165,9 @@ export function CockpitHome() {
   const { runner, runs, refresh } = useRunnerData()
   const { osMap, refresh: refreshOsMap } = useOsMap(runner.state)
   const contacts = useContacts(activeBrand?.slug)
+  // Gesetztes Monatsziel für die Agenten-Inputs (Wochenrecap/Morgenbrief) —
+  // sonst berichten sie ab September gegen den 40.000-€-Default.
+  const monatsziel = useMonthGoal(activeBrand?.id, monthKeyOf())
   const [openRunId, setOpenRunId] = useState<string | null>(null)
   const [selNode, setSelNode] = useState<NebulaNode | null>(null)
   const [layout, setLayout] = useState<CockpitLayout>(loadCockpitLayout)
@@ -186,8 +190,8 @@ export function CockpitHome() {
   }, [])
 
   const vitals = useMemo(
-    () => weekVitals(metrics.weekRows, metrics.monthRows),
-    [metrics.weekRows, metrics.monthRows],
+    () => weekVitals(metrics.weekRows, metrics.windowRows),
+    [metrics.weekRows, metrics.windowRows],
   )
   const monthRevenue = useMemo(() => sumField(metrics.monthRows, 'umsatz'), [metrics.monthRows])
 
@@ -231,8 +235,7 @@ export function CockpitHome() {
     async (agentId: string, extra?: Record<string, unknown>) => {
       let input: Record<string, unknown> = { ...extra }
       if (agentId === 'wochenrecap') {
-        const monthKey = new Date().toISOString().slice(0, 7)
-        const month = monthTargetFor(monthKey)
+        const month = monthTargetFor(monthKeyOf(), monatsziel.total)
         input = {
           weekRows: metrics.weekRows,
           targets: WEEK_TARGETS,
@@ -257,8 +260,7 @@ export function CockpitHome() {
         const withFu = contacts.items.filter(
           (c) => c.next_follow_up_at && c.pipeline_stage !== 'paused',
         )
-        const monthKey = now.toISOString().slice(0, 7)
-        const month = monthTargetFor(monthKey)
+        const month = monthTargetFor(monthKeyOf(now), monatsziel.total)
         input = {
           weekday: now.toLocaleDateString('de-DE', { weekday: 'long' }),
           date: now.toLocaleDateString('de-DE', { day: '2-digit', month: 'long', year: 'numeric' }),
@@ -280,7 +282,7 @@ export function CockpitHome() {
       await postRun(agentId, input)
       await refresh()
     },
-    [metrics.weekRows, monthRevenue, contacts.items, vitals, refresh],
+    [metrics.weekRows, monthRevenue, contacts.items, vitals, refresh, monatsziel.total],
   )
 
   return (

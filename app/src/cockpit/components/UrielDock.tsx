@@ -13,7 +13,8 @@ import {
   termineVereinbartTotal,
   weekVitals,
 } from '../lib/metricsAggregate'
-import { currentSoll, formatEuro, monthTargetFor } from '../lib/goals'
+import { currentSoll, formatEuro, monthKeyOf, monthTargetFor } from '../lib/goals'
+import { useMonthGoal } from '../lib/useMonthGoal'
 import { useUrielVoice } from '../lib/useUrielVoice'
 import {
   URIEL_MODELS,
@@ -125,6 +126,7 @@ export function UrielDock() {
   const { activeBrand, activeSlug, brands, setActiveSlug } = useActiveBrand()
   const metrics = useDailyMetrics()
   const contacts = useContacts(activeSlug)
+  const monatsziel = useMonthGoal(activeBrand?.id, monthKeyOf())
   const requestGraph = useUrielBus((s) => s.requestGraph)
   const voice = useUrielVoice()
 
@@ -222,7 +224,7 @@ export function UrielDock() {
           return { ok: true, summary: 'Heutige KPIs gelesen', data }
         }
         case 'get_week_vitals': {
-          const vitals = weekVitals(metrics.weekRows, metrics.monthRows).map((v) => ({
+          const vitals = weekVitals(metrics.weekRows, metrics.windowRows).map((v) => ({
             kategorie: v.label,
             aktuell: v.current,
             ziel: v.target,
@@ -230,8 +232,10 @@ export function UrielDock() {
           return { ok: true, summary: 'Wochen-Vitals gelesen', data: { brand: activeBrand?.name ?? activeSlug, vitals } }
         }
         case 'get_month_revenue': {
-          const monthKey = new Date().toISOString().slice(0, 7)
-          const target = monthTargetFor(monthKey)
+          const monthKey = monthKeyOf()
+          // Gesetztes Ziel aus month_goals — sonst meldete der Assistent ab
+          // September den 40.000-€-Default als Monatsziel.
+          const target = monthTargetFor(monthKey, monatsziel.total)
           const monthRevenue = sumField(metrics.monthRows, 'umsatz')
           const data = {
             brand: activeBrand?.name ?? activeSlug,

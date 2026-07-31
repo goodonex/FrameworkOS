@@ -1,6 +1,6 @@
 import type { Vital } from '../components/VitalsPanel'
 import type { DailyMetricsRow } from './useDailyMetrics'
-import { toIsoDate } from './useDailyMetrics'
+import { toIsoDate } from './metricsDates'
 import { CONVERSION_TARGETS, WEEK_TARGETS } from './goals'
 
 export function sumField(rows: DailyMetricsRow[], field: keyof DailyMetricsRow): number {
@@ -37,9 +37,8 @@ export function aktionenTotal(row: DailyMetricsRow): number {
   )
 }
 
-export function antwortenTotal(row: DailyMetricsRow): number {
-  return row.antworten_li + row.antworten_inmail + row.antworten_ig + row.antworten_cold
-}
+// antwortenTotal entfernt (ohne Importeur): Antworten werden je Kanal gelesen
+// (channelRates), eine Sammelzahl über alle Kanäle brauchte niemand.
 
 /** Geführte Calls (Coach-Funnel: Quali + Sales). */
 export function termineTotal(row: DailyMetricsRow): number {
@@ -56,10 +55,11 @@ export function historySeries(
   rows: DailyMetricsRow[],
   pick: (row: DailyMetricsRow) => number,
   days = 14,
+  now: Date = new Date(),
 ): number[] {
   const byDate = new Map(rows.map((r) => [r.datum, r]))
   const out: number[] = []
-  const d = new Date()
+  const d = new Date(now)
   d.setDate(d.getDate() - (days - 1))
   for (let i = 0; i < days; i++) {
     const row = byDate.get(toIsoDate(d))
@@ -69,43 +69,53 @@ export function historySeries(
   return out
 }
 
-/** Wochen-Vitals in der Form, die VitalsPanel erwartet (ersetzt Mock). */
-export function weekVitals(weekRows: DailyMetricsRow[], monthRows: DailyMetricsRow[]): Vital[] {
+/**
+ * Wochen-Vitals in der Form, die VitalsPanel erwartet (ersetzt Mock).
+ *
+ * `historyRows` speist nur die 14-Tage-Sparklines und muss darum das ganze
+ * Ladefenster sein (`metrics.windowRows`), nicht der laufende Monat — sonst
+ * ist der Verlauf an jedem Monatsersten bis auf einen Balken leer.
+ */
+export function weekVitals(
+  weekRows: DailyMetricsRow[],
+  historyRows: DailyMetricsRow[],
+  now: Date = new Date(),
+): Vital[] {
   return [
     {
       key: 'anfragen',
       label: 'Anfragen',
       current: weekRows.reduce((a, r) => a + anfragenSum(r), 0),
       target: WEEK_TARGETS.anfragen,
-      history: historySeries(monthRows, anfragenSum),
+      history: historySeries(historyRows, anfragenSum, 14, now),
     },
     {
       key: 'nachrichten',
       label: 'Nachrichten',
       current: weekRows.reduce((a, r) => a + nachrichtenSum(r), 0),
       target: WEEK_TARGETS.nachrichten,
-      history: historySeries(monthRows, nachrichtenSum),
+      history: historySeries(historyRows, nachrichtenSum, 14, now),
     },
     {
       key: 'looms',
       label: 'Looms',
       current: sumField(weekRows, 'looms'),
       target: WEEK_TARGETS.looms,
-      history: historySeries(monthRows, (r) => r.looms),
+      history: historySeries(historyRows, (r) => r.looms, 14, now),
     },
     {
       key: 'termine',
       label: 'Termine',
       current: weekRows.reduce((a, r) => a + termineVereinbartTotal(r), 0),
       target: WEEK_TARGETS.termine,
-      history: historySeries(monthRows, termineVereinbartTotal),
+      history: historySeries(historyRows, termineVereinbartTotal, 14, now),
     },
     {
       key: 'abschluesse',
       label: 'Abschlüsse',
       current: sumField(weekRows, 'abschluesse'),
       target: WEEK_TARGETS.abschluesse,
-      history: historySeries(monthRows, (r) => r.abschluesse),
+      history: historySeries(historyRows, (r) => r.abschluesse, 14, now),
     },
   ]
 }

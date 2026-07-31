@@ -37,6 +37,7 @@ import { TermineArea } from './cockpit/pages/TermineArea'
 import { FreigabenArea } from './cockpit/pages/FreigabenArea'
 import { LinkedinArea } from './cockpit/pages/LinkedinArea'
 import { SalesVorschau } from './dev/SalesVorschau'
+import { ZielVorschau } from './dev/ZielVorschau'
 
 
 /** CRM → Sales (Juli 2026): alte /crm-Links/Bookmarks/Deep-Links auf /sales umleiten. */
@@ -160,16 +161,39 @@ function OwnerWorkspaceShell() {
   )
 }
 
+/** Routen unter <CockpitShell> — Reihenfolge egal, muss zum Routen-Block passen. */
+const COCKPIT_PREFIXES = [
+  '/cockpit',
+  '/aufgaben',
+  '/termine',
+  '/freigaben',
+  '/linkedin',
+  '/sales',
+  '/crm',
+  '/projekte',
+  '/ads',
+  '/content',
+  '/agenten',
+  '/email',
+  '/tracking',
+] as const
+
 function App() {
   const location = useLocation()
   useViewport() // hält Viewport-Listener aktiv (Mobile-Gates in Unterseiten)
   const isHome = location.pathname === '/'
   const isBrandWorkspace = location.pathname.startsWith('/brand/')
+  // Die Cockpit-Shell (.ck-root) liegt fixed über dem ganzen Viewport, ist
+  // deckend und darüber (z-index 2). Die drei blur(80px)-Blobs des Backgrounds
+  // wurden dort also jeden Frame umsonst compositet — auf Cockpit-Routen aus.
+  const isCockpit = COCKPIT_PREFIXES.some(
+    (p) => location.pathname === p || location.pathname.startsWith(`${p}/`),
+  )
 
   return (
     <ToastProvider>
       <SaveStatusProvider>
-      <Background />
+      {isCockpit ? null : <Background />}
       {/* Phase 6: Three.js-Welt abgerissen — reines DOM-Layout. */}
       <div
         id="app-ui-overlay"
@@ -214,6 +238,7 @@ function App() {
             <Route path="/leads/:brandSlug" element={<LeadIntakePage />} />
             {/* Dev-only: Sales-Bausteine mit Fixtures, ohne Login prüfbar */}
             {import.meta.env.DEV ? <Route path="/dev/sales-vorschau" element={<SalesVorschau />} /> : null}
+            {import.meta.env.DEV ? <Route path="/dev/ziel-vorschau" element={<ZielVorschau />} /> : null}
             <Route element={<OwnerWorkspaceShell />}>
               {/* Neue Cockpit-Shell (REBUILD-PLAN §5) */}
               <Route element={<CockpitShell />}>

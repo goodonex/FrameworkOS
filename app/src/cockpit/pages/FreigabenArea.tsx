@@ -11,17 +11,33 @@ import {
   type DraftChannel,
   type FollowupDraft,
 } from '../lib/approvalDrafts'
+import {
+  clearDraftStatus,
+  draftKey,
+  loadRunStatuses,
+  saveDraftStatus,
+  type PersistedStatus,
+} from '../lib/approvalStatus'
 import { fetchRun, postRun } from '../lib/runnerApi'
 import { useRunnerData } from '../lib/useRunnerData'
+import { supabase } from '../../lib/supabase'
 
-type CardStatus = 'pending' | 'sending' | 'sent' | 'copied' | 'done' | 'rejected'
+type CardStatus = 'pending' | 'sending' | PersistedStatus
+
+/** Status, die eine Karte abschließen — genau diese werden persistiert. */
+const PERSISTED: readonly CardStatus[] = ['sent', 'copied', 'done', 'rejected']
+const isPersisted = (s: CardStatus): s is PersistedStatus => PERSISTED.includes(s)
 
 interface Card extends FollowupDraft {
   key: number
+  /** Stabile Identität über Reloads hinweg (approvalStatus.draftKey). */
+  id: string
   subject: string
   status: CardStatus
   error: string | null
   confirming: boolean
+  /** Laut sales_email_logs ging seit dem Run schon eine Mail an diesen Kontakt. */
+  alreadySent: string | null
 }
 
 /** Agenten, deren Runs Freigabe-Karten liefern (parseDrafts-JSON-Block). */
@@ -79,15 +95,23 @@ export function FreigabenArea() {
       .then((detail) => {
         if (cancelled) return
         const drafts = parseDrafts(detail.content)
+        // Abgeschlossene Karten aus dem letzten Besuch zurückholen — sonst stünde
+        // nach einem Reload alles wieder auf „pending" (Doppelversand-Risiko).
+        const gespeichert = loadRunStatuses(latestRun.id)
         setCards(
-          drafts.map((d, i) => ({
-            ...d,
-            key: i,
-            subject: d.subject ?? '',
-            status: 'pending' as CardStatus,
-            error: null,
-            confirming: false,
-          })),
+          drafts.map((d, i) => {
+            const id = draftKey(d, i)
+            return {
+              ...d,
+              key: i,
+              id,
+              subject: d.subject ?? '',
+              status: (gespeichert[id] ?? 'pending') as CardStatus,
+              error: null,
+              confirming: false,
+              alreadySent: null,
+            }
+          }),
         )
         setLoadedRunId(latestRun.id)
       })
@@ -102,8 +126,50 @@ export function FreigabenArea() {
     }
   }, [latestRun, loadedRunId])
 
+  // Zweite Sicherung gegen Doppelversand, geräteunabhängig: was seit dem Run
+  // tatsächlich rausging, steht in sales_email_logs (von der send-email-Function
+  // geschrieben). Markiert die Karte nur mit einem Hinweis — nicht stillschweigend
+  // als erledigt, sonst verschwände ein noch offener Entwurf ungesehen.
+  useEffect(() => {
+    if (!supabase || !brandId || !loadedRunId || !latestRun) return
+    let cancelled = false
+    void supabase
+      .from('sales_email_logs')
+      .select('contact_id, sent_at')
+      .eq('brand_id', brandId)
+      .eq('direction', 'outbound')
+      .gte('sent_at', latestRun.started)
+      .then(({ data, error }) => {
+        if (cancelled || error || !data) return
+        const letzte = new Map<string, string>()
+        for (const row of data as Array<{ contact_id: string; sent_at: string }>) {
+          const bisher = letzte.get(row.contact_id)
+          if (!bisher || row.sent_at > bisher) letzte.set(row.contact_id, row.sent_at)
+        }
+        if (letzte.size === 0) return
+        setCards((cs) =>
+          cs.map((c) =>
+            c.channel === 'email' && c.contact_id && letzte.has(c.contact_id)
+              ? { ...c, alreadySent: letzte.get(c.contact_id) ?? null }
+              : c,
+          ),
+        )
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [brandId, loadedRunId, latestRun])
+
   const patch = (key: number, next: Partial<Card>) =>
     setCards((cs) => cs.map((c) => (c.key === key ? { ...c, ...next } : c)))
+
+  /** Status setzen UND festschreiben — der eigentliche Persistenz-Pfad. */
+  const setStatus = (card: Card, status: CardStatus, next: Partial<Card> = {}) => {
+    patch(card.key, { status, ...next })
+    if (!loadedRunId) return
+    if (isPersisted(status)) saveDraftStatus(loadedRunId, card.id, status)
+    else clearDraftStatus(loadedRunId, card.id)
+  }
 
   const generate = async () => {
     if (!slug) return
@@ -134,10 +200,9 @@ export function FreigabenArea() {
       to_email: toEmail,
     })
     if (res.ok) {
-      patch(card.key, { status: 'sent' })
+      setStatus(card, 'sent')
     } else {
-      patch(card.key, {
-        status: 'pending',
+      setStatus(card, 'pending', {
         error: `Versand fehlgeschlagen: ${res.detail || res.error}`,
       })
     }
@@ -146,7 +211,7 @@ export function FreigabenArea() {
   const copy = async (card: Card) => {
     try {
       await navigator.clipboard.writeText(card.message)
-      patch(card.key, { status: 'copied', error: null })
+      setStatus(card, 'copied', { error: null })
     } catch {
       patch(card.key, { error: 'Kopieren nicht möglich — Text manuell markieren.' })
     }
@@ -263,15 +328,45 @@ export function FreigabenArea() {
                 <div style={{ fontSize: 11.5, color: 'var(--ck-warn)', marginTop: 6 }}>{card.error}</div>
               ) : null}
 
+              {card.alreadySent && card.status !== 'sent' ? (
+                <div style={{ fontSize: 11.5, color: 'var(--ck-warn)', marginTop: 6 }}>
+                  An diesen Kontakt ging seit dem Run bereits eine E-Mail raus (
+                  {new Date(card.alreadySent).toLocaleString('de-DE', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                  ) — vor dem Senden prüfen.
+                </div>
+              ) : null}
+
               <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                {card.status === 'sent' ? (
-                  <span style={{ fontSize: 12, color: 'var(--ck-accent)' }}>✓ gesendet</span>
-                ) : card.status === 'copied' ? (
-                  <span style={{ fontSize: 12, color: 'var(--ck-accent)' }}>✓ kopiert</span>
-                ) : card.status === 'done' ? (
-                  <span style={{ fontSize: 12, color: 'var(--ck-text-3)' }}>✓ erledigt</span>
-                ) : card.status === 'rejected' ? (
-                  <span style={{ fontSize: 12, color: 'var(--ck-text-3)' }}>verworfen</span>
+                {done ? (
+                  <>
+                    {card.status === 'sent' ? (
+                      <span style={{ fontSize: 12, color: 'var(--ck-accent)' }}>✓ gesendet</span>
+                    ) : card.status === 'copied' ? (
+                      <span style={{ fontSize: 12, color: 'var(--ck-accent)' }}>✓ kopiert</span>
+                    ) : card.status === 'done' ? (
+                      <span style={{ fontSize: 12, color: 'var(--ck-text-3)' }}>✓ erledigt</span>
+                    ) : (
+                      <span style={{ fontSize: 12, color: 'var(--ck-text-3)' }}>verworfen</span>
+                    )}
+                    {/* Der Status überlebt jetzt den Reload — darum braucht ein
+                        versehentliches „Verwerfen"/„Erledigt" einen Weg zurück.
+                        Ein echter Versand bleibt endgültig. */}
+                    {card.status !== 'sent' ? (
+                      <button
+                        type="button"
+                        className="ck-btn"
+                        style={{ fontSize: 10, marginLeft: 'auto', color: 'var(--ck-text-3)' }}
+                        onClick={() => setStatus(card, 'pending', { error: null })}
+                      >
+                        Zurückholen
+                      </button>
+                    ) : null}
+                  </>
                 ) : card.confirming ? (
                   <>
                     <span style={{ fontSize: 12, color: 'var(--ck-text-2)' }}>
@@ -301,7 +396,7 @@ export function FreigabenArea() {
                       Kopieren
                     </button>
                     {!isEmail ? (
-                      <button type="button" className="ck-btn" style={{ fontSize: 10 }} onClick={() => patch(card.key, { status: 'done' })}>
+                      <button type="button" className="ck-btn" style={{ fontSize: 10 }} onClick={() => setStatus(card, 'done')}>
                         Erledigt
                       </button>
                     ) : null}
@@ -309,7 +404,7 @@ export function FreigabenArea() {
                       type="button"
                       className="ck-btn"
                       style={{ fontSize: 10, marginLeft: 'auto', color: 'var(--ck-text-3)' }}
-                      onClick={() => patch(card.key, { status: 'rejected' })}
+                      onClick={() => setStatus(card, 'rejected')}
                     >
                       Verwerfen
                     </button>
