@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { RUNNER_BASE_URL } from './useRunnerStatus'
 import { leseSpiegel, runnerDirekt } from './runnerBridge'
+import { bereiteDateienVor, gespiegelteDateiUrl } from './runnerFiles'
 import { useActiveBrandOptional } from './activeBrand'
 import { loadSocialBatchList, saveSocialBatch } from './socialBatchStore'
 
@@ -28,14 +29,20 @@ export async function fetchSocialWeeks(): Promise<SocialWeek[]> {
   if (!runnerDirekt()) {
     const spiegel = await leseSpiegel<{ weeks: SocialWeek[] }>('social_weeks')
     if (!spiegel) throw new Error('Noch kein Spiegel vorhanden — Runner einmal laufen lassen.')
+    await bereiteDateienVor('social', spiegel.data.weeks.map((w) => w.htmlPath))
     return spiegel.data.weeks
   }
   const { weeks } = await req<{ weeks: SocialWeek[] }>('/social/weeks')
   return weeks
 }
 
-/** Runner-URL der self-contained Wochen-HTML (segmentweise encoden). */
-export function socialFileUrl(htmlPath: string): string {
+/**
+ * URL der self-contained Wochen-HTML: lokal über den Runner, sonst signiert aus
+ * dem Storage-Spiegel. Null = nicht gespiegelt (z.B. Slide-HTMLs einzelner Posts,
+ * die relative Asset-Pfade haben und deshalb nur lokal funktionieren).
+ */
+export function socialFileUrl(htmlPath: string): string | null {
+  if (!runnerDirekt()) return gespiegelteDateiUrl('social', htmlPath)
   const encoded = htmlPath.split('/').map(encodeURIComponent).join('/')
   return `${RUNNER_BASE_URL}/files/social/${encoded}`
 }
@@ -85,7 +92,9 @@ export async function syncSocialBatchesFromRunner(brandSlug: string): Promise<nu
     const have = known.get(w.week)
     if (have != null && have >= w.mtime) continue // schon aktuell
     try {
-      const res = await fetch(socialFileUrl(w.htmlPath), { cache: 'no-store' })
+      const url = socialFileUrl(w.htmlPath)
+      if (!url) continue
+      const res = await fetch(url, { cache: 'no-store' })
       if (!res.ok) continue
       const html = await res.text()
       await saveSocialBatch(brandSlug, {

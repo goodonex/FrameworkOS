@@ -227,21 +227,19 @@ export function Arbeitsmodus({ posten, onErledigt, onClose, loom }: Arbeitsmodus
           ) : null}
           {aktuell.spur === 'loom' && loom ? (
             loom.skriptUrl(aktuell) ? (
-              loom.dateiOeffenbar ? (
-                <a
-                  className="ck-btn ck-btn--primary"
-                  style={{ minHeight: 48, flex: '1 1 100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-                  href={loom.skriptUrl(aktuell) ?? undefined}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Skript öffnen ↗
-                </a>
-              ) : (
-                <div style={{ fontSize: 13, color: 'var(--ck-accent)', flex: '1 1 100%', textAlign: 'center' }}>
-                  Skript bereit — am Mac öffnen
-                </div>
-              )
+              <a
+                className="ck-btn ck-btn--primary"
+                style={{ minHeight: 48, flex: '1 1 100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                href={loom.skriptUrl(aktuell) ?? undefined}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Skript öffnen ↗
+              </a>
+            ) : loom.skriptVorhanden(aktuell) ? (
+              <div style={{ fontSize: 13, color: 'var(--ck-accent)', flex: '1 1 100%', textAlign: 'center' }}>
+                Skript fertig — wird gerade gespiegelt
+              </div>
             ) : (
               <button
                 type="button"

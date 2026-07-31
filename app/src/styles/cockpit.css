@@ -218,6 +218,8 @@
   border: 1px solid transparent;
   transition: color 120ms ease, background 120ms ease;
 }
+/* „Mehr" und die Sheet-Einträge sind Knöpfe, keine Links — gleiche Optik. */
+button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; text-align: left; }
 .ck-nav-item:hover { color: var(--ck-text-1); background: var(--ck-panel-2); }
 .ck-nav-item.active {
   color: var(--ck-accent);
@@ -431,6 +433,43 @@
     text-align: center;
   }
   .ck-nav-icon { font-size: 17px; width: auto; }
+  /* Nur 5 Ziele in der Bar: die Label bleiben lesbar statt auf 9px gequetscht. */
+  .ck-nav-item .ck-nav-label { font-size: 10px; letter-spacing: 0.04em; }
+
+  /* „Mehr"-Sheet: sitzt ÜBER der Bar, nicht auf ihr — die Bar bleibt sichtbar
+     und tippbar, ein zweiter Tipp auf „Mehr" schließt wieder. */
+  .ck-mehr-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: calc(58px + env(safe-area-inset-bottom));
+    z-index: 60;
+    display: flex;
+    align-items: flex-end;
+    background: color-mix(in srgb, #000 45%, transparent);
+  }
+  .ck-mehr-sheet {
+    width: 100%;
+    background: var(--ck-bg);
+    border-top: 1px solid var(--ck-border);
+    border-radius: 12px 12px 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px max(10px, env(safe-area-inset-left)) 12px max(10px, env(safe-area-inset-right));
+  }
+  /* Im Sheet ist Platz — dort steht das Label wieder neben dem Zeichen,
+     linksbündig (die Bar-Regel oben zentriert). */
+  .ck-mehr-sheet .ck-nav-item {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 9px 12px;
+    font-size: 12px;
+    text-align: left;
+  }
+  .ck-mehr-sheet .ck-nav-item .ck-nav-label { font-size: 12px; letter-spacing: 0.08em; }
 
   /* Content braucht Platz für die fixe Bottom-Bar + Safe-Area. */
   .ck-main { padding: 12px 12px calc(78px + env(safe-area-inset-bottom)) 12px; }

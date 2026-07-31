@@ -277,18 +277,21 @@ function KundePage() {
       {manifest && manifest.overviewFiles.length > 0 ? (
         <div className="ck-panel" style={{ padding: '10px 14px', marginBottom: 14, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <span className="ck-label" style={{ marginRight: 4 }}>Kampagnen-Seiten:</span>
-          {manifest.overviewFiles.map((f) => (
-            <a
-              key={f.path}
-              className="ck-btn"
-              style={{ fontSize: 11.5, textDecoration: 'none' }}
-              href={kundenFileUrl(kunde, f.path)}
-              target="_blank"
-              rel="noreferrer"
-            >
-              {f.label} ↗
-            </a>
-          ))}
+          {manifest.overviewFiles.map((f) => {
+            const url = kundenFileUrl(kunde, f.path)
+            return url ? (
+              <a
+                key={f.path}
+                className="ck-btn"
+                style={{ fontSize: 11.5, textDecoration: 'none' }}
+                href={url}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {f.label} ↗
+              </a>
+            ) : null
+          })}
         </div>
       ) : null}
 

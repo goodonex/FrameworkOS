@@ -78,6 +78,13 @@ const SALES_ROOT = resolve(
 )
 const SALES_VAULT_DIR = join(VAULT, '03 Bereiche', 'Vertrieb & Outreach')
 
+// Kalender (Cockpit /termine): der `/calendar`-Proxy bekommt die iCal-URL sonst
+// vom Cockpit mitgeschickt — die liegt aber im localStorage des Macs, also hat
+// das Handy sie nie. Für den Spiegel braucht der Runner deshalb eine eigene
+// Adresse. Der private iCal-Link ist ein Geheimnis wie der Service-Role-Key und
+// bleibt aus demselben Grund in runner/.env, statt in die Datenbank zu wandern.
+const CALENDAR_ICAL_URL = process.env.CALENDAR_ICAL_URL ?? ''
+
 // Content-Manifest pro Brand (Cockpit /content, Post-Ebene). Feste Allowlist —
 // der Brand-Slug wird NIE in einen Pfad interpoliert (kein Traversal). MVP: nur
 // HERRMANN; weitere Brands (CoLective …) bekommen in Phase 3 einen eigenen Ordner.
@@ -256,6 +263,11 @@ async function writeRunFile(id, agent, status, startedAt, content) {
   return file
 }
 
+/** Wie viele Runs der Spiegel mitnimmt (Liste + Inhalt). */
+const RUNS_SPIEGEL_LIMIT = 20
+/** Deckel je Run-Inhalt im Spiegel — ein Ausreißer soll die Zeile nicht sprengen. */
+const RUN_CONTENT_MAX = 40_000
+
 /** Frontmatter-light-Parser für die Runs-Liste. */
 function parseRun(name, raw) {
   const meta = { agent: 'unbekannt', status: 'done', started: '', finished: '' }
@@ -269,6 +281,38 @@ function parseRun(name, raw) {
   const body = m ? raw.slice(m[0].length) : raw
   const preview = body.trim().split('\n').slice(0, 3).join(' ').slice(0, 160)
   return { id: name.replace(/\.md$/, ''), ...meta, preview }
+}
+
+/**
+ * Runs-Liste, laufende voran — Quelle für `/runs` UND für den Spiegel.
+ * `mitInhalt` hängt den Run-Text an: der Spiegel braucht ihn, damit die
+ * Freigaben-Queue und der Run-Drawer auch ohne Runner-Port lesen können.
+ */
+async function runsListe(limit, mitInhalt = false) {
+  const names = (await readdir(RUNS_DIR))
+    .filter((n) => n.endsWith('.md'))
+    .sort()
+    .reverse()
+    .slice(0, limit)
+  const runs = []
+  for (const name of names) {
+    const raw = await readFile(join(RUNS_DIR, name), 'utf8')
+    const eintrag = parseRun(name, raw)
+    if (mitInhalt) {
+      eintrag.content = raw.replace(/^---\n[\s\S]*?\n---\n?/, '').slice(0, RUN_CONTENT_MAX)
+    }
+    runs.push(eintrag)
+  }
+  const aktiv = [...running.values()].map(({ id, agent, startedAt }) => ({
+    id,
+    agent,
+    status: 'running',
+    started: startedAt,
+    finished: '',
+    preview: 'läuft…',
+    ...(mitInhalt ? { content: '' } : {}),
+  }))
+  return [...aktiv, ...runs]
 }
 
 // ---------- Agent starten ----------
@@ -339,6 +383,7 @@ async function startRun(agent, input) {
       /* Log reicht */
     }
     console.error(`[runner] spawn-Fehler für ${id}:`, e?.message ?? e)
+    await pushRunsSnapshot()
   })
 
   proc.on('close', async (code) => {
@@ -360,7 +405,17 @@ async function startRun(agent, input) {
     } catch (e) {
       console.error(`[runner] Run-Datei für ${id} konnte nicht geschrieben werden:`, e)
     }
+    // Ergebnis direkt spiegeln statt auf den 60s-Tick zu warten — daran hängen
+    // Freigaben-Queue, Run-Toasts und der „Skript fertig"-Zustand am Handy.
+    await pushRunsSnapshot()
   })
+
+  // Erst hier spiegeln — und bewusst abwarten: über die Brücke gilt der Auftrag
+  // als erledigt, sobald startRun zurückkommt; ohne das Warten könnte das
+  // Cockpit direkt danach noch den alten Spiegel lesen und den Start für
+  // verpufft halten. NACH den Handlern, sonst verpasst das await ein 'close'
+  // oder 'error', das während des Netzwerk-Aufrufs feuert.
+  await pushRunsSnapshot()
 
   return { id, agent, startedAt }
 }
@@ -497,6 +552,12 @@ async function buildOsMap() {
       description: 'Analysiert Skill-/Run-Nutzung, 1-2 Verbesserungsvorschläge',
       schedule: 'täglich (erster Runner-Start)',
     },
+    {
+      id: 'routine:morgenbrief',
+      name: 'Morgen-Brief',
+      description: 'Fällige Follow-ups, Akquise-Stand, ein Fokus-Satz — liegt fertig da',
+      schedule: `werktags ab ${String(MORGENBRIEF_AB_STUNDE).padStart(2, '0')}:00`,
+    },
     ...(Array.isArray(appsConfig.routines) ? appsConfig.routines : []).map((r, i) => ({
       id: `routine:${r.id ?? i}`,
       name: r.name ?? String(r.id ?? i),
@@ -613,10 +674,17 @@ function supabaseHeaders(extra = {}) {
   }
 }
 
+/** Zuletzt erfolgreich gespiegelter Inhalt je Schlüssel (Signatur-Vergleich). */
+const letzteSpiegelSig = new Map()
+
 /** Spiegelt Daten, die sonst nur über den lokalen Port lesbar wären. */
 async function pushSnapshotKey(key, ladeDaten) {
   try {
     const data = await ladeDaten()
+    // Unverändert → nicht erneut schreiben. Der Runs-Spiegel läuft jetzt auch bei
+    // jedem Start/Ende eines Runs, nicht nur im Tick (Muster von pushSnapshot).
+    const sig = JSON.stringify(data)
+    if (letzteSpiegelSig.get(key) === sig) return
     const res = await fetch(`${SUPABASE_URL}/rest/v1/runner_snapshots`, {
       method: 'POST',
       headers: supabaseHeaders({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
@@ -625,10 +693,208 @@ async function pushSnapshotKey(key, ladeDaten) {
     if (!res.ok) {
       const txt = await res.text().catch(() => '')
       console.error(`[runner] Spiegel "${key}" HTTP ${res.status}: ${txt.slice(0, 160)}`)
+      return
     }
+    letzteSpiegelSig.set(key, sig)
   } catch (e) {
     console.error(`[runner] Spiegel "${key}" fehlgeschlagen:`, e?.message ?? e)
   }
+}
+
+/**
+ * Runs-Spiegel (Liste + Inhalt). Ohne ihn sind auf der HTTPS-Domain „Letzte
+ * Runs", die Freigaben-Queue, die Run-Toasts und der Loom-Fertig-Zustand tot —
+ * `/runs` hängt sonst an 127.0.0.1.
+ */
+async function pushRunsSnapshot() {
+  if (!SNAPSHOT_ENABLED) return
+  await pushSnapshotKey('runs', async () => ({ runs: await runsListe(RUNS_SPIEGEL_LIMIT, true) }))
+}
+
+/**
+ * Holt eine iCal-Quelle server-seitig (der Browser blockt das als
+ * Mixed-Content/CORS). Nur https, 10s-Timeout, ~4MB-Cap. Das Parsen macht die
+ * App — gleiche Quelle für den `/calendar`-Proxy und den Spiegel.
+ */
+async function holeIcal(icalUrl) {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), 10_000)
+  try {
+    const r = await fetch(icalUrl, { signal: ctrl.signal, redirect: 'follow' })
+    if (!r.ok) throw new Error(`Kalender-Quelle antwortete ${r.status}`)
+    return (await r.text()).slice(0, 4_000_000)
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+// ---------- Datei-Spiegel (Supabase Storage) ----------
+// Loom-Skripte, Follow-up-PDFs, Wochen-Galerien und Ad-Creatives liegen auf der
+// Platte und hingen bisher an `/files/...` auf 127.0.0.1 — am Handy tote Links.
+// Der Runner lädt genau die Dateien, die die Oberfläche verlinkt, in den privaten
+// Bucket `runner-files` und veröffentlicht ein Verzeichnis als Snapshot; das
+// Cockpit macht daraus signierte URLs (Muster: project-files, Migration 0051).
+const FILES_BUCKET = 'runner-files'
+/** Ausreißer (Video-Exporte o.ä.) nicht spiegeln — sie gehören nicht aufs Handy. */
+const FILE_MAX_BYTES = 25_000_000
+
+/** Wurzelverzeichnis je Sorte. Die rel-Pfade sind dieselben wie in `/files/<sorte>/`. */
+const DATEI_WURZEL = {
+  sales: () => SALES_ROOT,
+  social: () => SOCIAL_ROOT,
+  kunden: () => KUNDEN_ROOT,
+}
+
+/**
+ * Storage-Key aus einem Pfad. Umlaute/Leerzeichen/Klammern raus — Loom-Skripte
+ * heißen „Loom-Skript 2026-07-30 (Müller Immobilien).html". Welcher Key zu
+ * welchem rel-Pfad gehört, steht im Verzeichnis-Snapshot; die App rät nie.
+ */
+function storageKey(kind, rel) {
+  const safe = rel
+    .split('/')
+    .map((seg) =>
+      seg
+        .normalize('NFKD')
+        .replace(/[̀-ͯ]/g, '')
+        .replace(/[^A-Za-z0-9._-]+/g, '-')
+        .replace(/-{2,}/g, '-')
+        .replace(/^-|-$/g, ''),
+    )
+    .filter(Boolean)
+    .join('/')
+  return `${kind}/${safe}`
+}
+
+/** Was die Oberfläche verlinkt: Sales-Bibliothek, Wochen-HTMLs, Ad-Dateien. */
+async function zuSpiegelndeDateien() {
+  const liste = []
+  try {
+    const lib = await salesLibrary()
+    for (const f of lib.skripte) liste.push({ kind: 'sales', rel: f.rel })
+  } catch (e) {
+    console.error('[runner] Datei-Spiegel: Sales-Liste fehlgeschlagen:', e?.message ?? e)
+  }
+  try {
+    for (const w of await socialWeeks()) liste.push({ kind: 'social', rel: w.htmlPath })
+  } catch (e) {
+    console.error('[runner] Datei-Spiegel: Wochen-Liste fehlgeschlagen:', e?.message ?? e)
+  }
+  for (const k of await kundenRegistry()) {
+    if (typeof k.folder !== 'string') continue
+    const basis = `${k.folder}/${k.adsDir ?? '05_leadgen'}`
+    let manifest
+    try {
+      manifest = JSON.parse(await readFile(join(KUNDEN_ROOT, basis, 'ads.json'), 'utf8'))
+    } catch {
+      continue // kein Manifest → nichts zu spiegeln
+    }
+    const refs = new Set()
+    for (const o of manifest.overviewFiles ?? []) if (o?.path) refs.add(o.path)
+    for (const a of manifest.ads ?? []) {
+      for (const v of a.versions ?? []) {
+        for (const f of v.files ?? []) if (f?.path) refs.add(f.path)
+        if (v.preview) refs.add(v.preview)
+      }
+    }
+    for (const r of refs) liste.push({ kind: 'kunden', rel: `${basis}/${r}` })
+  }
+  return liste
+}
+
+/** rel-Pfad → absoluter Pfad, aber nur innerhalb der erlaubten Wurzel (wie `/files/…`). */
+async function dateiPfad(kind, rel) {
+  const wurzel = DATEI_WURZEL[kind]?.()
+  if (!wurzel) return null
+  const real = await realpath(resolve(join(wurzel, rel))).catch(() => null)
+  if (!real) return null
+  const wurzelReal = await realpath(wurzel).catch(() => null)
+  if (!wurzelReal) return null
+  if (real !== wurzelReal && !real.startsWith(wurzelReal + sep)) return null
+  return real
+}
+
+/** Was schon oben liegt: `<kind>:<rel>` → mtimeMs. Beim Start aus dem Verzeichnis geladen. */
+const gespiegelteDateien = new Map()
+let dateiIndexGeladen = false
+
+async function ladeDateiIndex() {
+  if (dateiIndexGeladen) return
+  dateiIndexGeladen = true
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/runner_snapshots?key=eq.files_index&select=data`,
+      { headers: supabaseHeaders() },
+    )
+    if (!res.ok) return
+    const [row] = await res.json()
+    for (const [id, eintrag] of Object.entries(row?.data?.files ?? {})) {
+      if (eintrag?.mtime) gespiegelteDateien.set(id, eintrag.mtime)
+    }
+  } catch {
+    /* kein Verzeichnis lesbar → einmal alles neu hochladen, kein Drama */
+  }
+}
+
+async function ladeDateiHoch(key, buf, mime) {
+  const res = await fetch(
+    `${SUPABASE_URL}/storage/v1/object/${FILES_BUCKET}/${key.split('/').map(encodeURIComponent).join('/')}`,
+    {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': mime,
+        'x-upsert': 'true',
+      },
+      body: buf,
+    },
+  )
+  if (!res.ok) {
+    const txt = await res.text().catch(() => '')
+    throw new Error(`HTTP ${res.status}: ${txt.slice(0, 160)}`)
+  }
+}
+
+/**
+ * Lädt geänderte Dateien hoch (mtime-Vergleich) und veröffentlicht das
+ * Verzeichnis als Snapshot `files_index`: `<kind>:<rel>` → { key, mtime, size }.
+ */
+async function spiegleDateien() {
+  await ladeDateiIndex()
+  const index = {}
+  let neu = 0
+  for (const { kind, rel } of await zuSpiegelndeDateien()) {
+    const id = `${kind}:${rel}`
+    const mime = KUNDEN_MIME[rel.slice(rel.lastIndexOf('.')).toLowerCase()]
+    if (!mime) continue // Dateityp, den auch `/files/…` nicht ausliefert
+    const pfad = await dateiPfad(kind, rel)
+    if (!pfad) continue
+    let st
+    try {
+      st = await stat(pfad)
+    } catch {
+      continue // im Manifest verlinkt, aber nicht (mehr) da
+    }
+    if (st.size > FILE_MAX_BYTES) {
+      console.warn(`[runner] Datei-Spiegel: ${rel} übersprungen (${Math.round(st.size / 1e6)} MB)`)
+      continue
+    }
+    const key = storageKey(kind, rel)
+    if (gespiegelteDateien.get(id) !== st.mtimeMs) {
+      try {
+        await ladeDateiHoch(key, await readFile(pfad), mime)
+        gespiegelteDateien.set(id, st.mtimeMs)
+        neu++
+      } catch (e) {
+        console.error(`[runner] Datei-Spiegel "${rel}" fehlgeschlagen:`, e?.message ?? e)
+        continue // ohne Upload nicht ins Verzeichnis — sonst zeigt die App ins Leere
+      }
+    }
+    index[id] = { key, mtime: st.mtimeMs, size: st.size }
+  }
+  if (neu) console.log(`[runner] Datei-Spiegel: ${neu} Datei(en) hochgeladen`)
+  await pushSnapshotKey('files_index', async () => ({ files: index }))
 }
 
 async function mirrorAll() {
@@ -663,6 +929,15 @@ async function mirrorAll() {
       })),
     }
   })
+  await pushRunsSnapshot()
+  await spiegleDateien()
+  // Kalender: ohne Adresse in runner/.env bleibt der Spiegel bewusst leer —
+  // das Cockpit sagt das dann auch so, statt einen leeren Monat zu zeigen.
+  if (CALENDAR_ICAL_URL) {
+    // Kein Zeitstempel im Datensatz: der Signatur-Schutz soll greifen, solange
+    // sich am Kalender nichts ändert. Wie frisch er ist, steht in updated_at.
+    await pushSnapshotKey('calendar', async () => ({ ical: await holeIcal(CALENDAR_ICAL_URL) }))
+  }
 }
 
 /**
@@ -1105,17 +1380,7 @@ const server = createServer(async (req, res) => {
 
     if (req.method === 'GET' && url.pathname === '/runs') {
       const limit = Math.min(Number(url.searchParams.get('limit') ?? 20), 100)
-      const names = (await readdir(RUNS_DIR)).filter((n) => n.endsWith('.md')).sort().reverse().slice(0, limit)
-      const runs = []
-      for (const name of names) {
-        const raw = await readFile(join(RUNS_DIR, name), 'utf8')
-        runs.push(parseRun(name, raw))
-      }
-      // laufende Runs voranstellen
-      const active = [...running.values()].map(({ id, agent, startedAt }) => ({
-        id, agent, status: 'running', started: startedAt, finished: '', preview: 'läuft…',
-      }))
-      return json(res, 200, { runs: [...active, ...runs] })
+      return json(res, 200, { runs: await runsListe(limit) })
     }
 
     if (req.method === 'GET' && url.pathname.startsWith('/runs/')) {
@@ -1144,17 +1409,10 @@ const server = createServer(async (req, res) => {
     if (req.method === 'GET' && url.pathname === '/calendar') {
       const ical = url.searchParams.get('url') ?? ''
       if (!/^https:\/\//i.test(ical)) return json(res, 400, { error: 'nur https iCal-URL erlaubt' })
-      const ctrl = new AbortController()
-      const timer = setTimeout(() => ctrl.abort(), 10_000)
       try {
-        const r = await fetch(ical, { signal: ctrl.signal, redirect: 'follow' })
-        if (!r.ok) return json(res, 502, { error: `Kalender-Quelle antwortete ${r.status}` })
-        const text = (await r.text()).slice(0, 4_000_000)
-        return json(res, 200, { ical: text })
+        return json(res, 200, { ical: await holeIcal(ical) })
       } catch (e) {
         return json(res, 502, { error: `Kalender nicht erreichbar: ${e instanceof Error ? e.message : e}` })
-      } finally {
-        clearTimeout(timer)
       }
     }
 
@@ -1388,6 +1646,34 @@ const server = createServer(async (req, res) => {
 await mkdir(RUNS_DIR, { recursive: true })
 await mkdir(QUEUE_DIR, { recursive: true })
 
+/**
+ * Morgenbrief als Routine statt Knopf (Ideen-Sammlung, Etappe 2): werktags ab
+ * ~7:00 einmal pro Kalendertag von selbst. Muster von maybeDream — die Runs
+ * im Vault sind das Gedächtnis, es braucht keinen eigenen Zustand. Läuft der
+ * Mac erst um 9 an, kommt der Brief eben um 9; Kevin findet ihn fertig vor.
+ */
+const MORGENBRIEF_AB_STUNDE = Number(process.env.MORGENBRIEF_STUNDE ?? 7)
+const MORGENBRIEF_CHECK_MS = 5 * 60 * 1000
+
+async function maybeMorgenbrief() {
+  try {
+    const jetzt = new Date()
+    const wochentag = jetzt.getDay() // 0 = Sonntag, 6 = Samstag
+    if (wochentag === 0 || wochentag === 6) return
+    if (jetzt.getHours() < MORGENBRIEF_AB_STUNDE) return
+    // Läuft er gerade noch, darf der nächste Tick keinen zweiten starten —
+    // die Run-Datei entsteht ja erst am Ende.
+    if ([...running.values()].some((r) => r.agent === 'morgenbrief')) return
+    const heute = nowStamp().slice(0, 10)
+    const names = await readdir(RUNS_DIR)
+    if (names.some((n) => n.startsWith(heute) && n.includes('morgenbrief'))) return
+    console.log('[runner] morgenbrief startet (erster Werktags-Lauf heute)…')
+    await startRun('morgenbrief', {})
+  } catch (e) {
+    console.error('[runner] morgenbrief übersprungen:', e?.message ?? e)
+  }
+}
+
 /** Dream-Check (REBUILD-PLAN §8): beim Start, max. 1x pro Kalendertag. */
 async function maybeDream() {
   try {
@@ -1412,6 +1698,12 @@ server.listen(PORT, '127.0.0.1', () => {
   console.log(`[runner] alive auf http://127.0.0.1:${PORT} · Vault: ${VAULT}`)
   // leicht verzögert, damit der Start nicht blockiert
   setTimeout(() => void maybeDream(), 5000)
+
+  // Morgenbrief: kurz nach dem Start prüfen (Mac gerade aufgeklappt) und dann
+  // alle 5 Minuten — so kommt er auch, wenn der Rechner erst um 9 angeht.
+  setTimeout(() => void maybeMorgenbrief(), 10_000)
+  const mb = setInterval(() => void maybeMorgenbrief(), MORGENBRIEF_CHECK_MS)
+  mb.unref?.()
 
   // OS-Map-Snapshot für die Live-Domain: einmal beim Start + periodisch spiegeln.
   if (SNAPSHOT_ENABLED) {

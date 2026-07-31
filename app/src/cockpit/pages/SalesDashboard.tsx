@@ -27,7 +27,6 @@ import { bucketOf } from '../lib/linkedinFollowups'
 import { funnelKpis, sumField } from '../lib/metricsAggregate'
 import { ordnePosten, tagesstand, type Posten, type PostenQuellen, type Spur } from '../lib/prioritaet'
 import { postRun } from '../lib/runnerApi'
-import { runnerDirekt } from '../lib/runnerBridge'
 import { fetchSalesLibrary, salesFileUrl, type SalesLibrary } from '../lib/salesLibraryApi'
 import { useDailyMetrics } from '../lib/useDailyMetrics'
 import { useRunnerData } from '../lib/useRunnerData'
@@ -328,10 +327,10 @@ export function SalesDashboard() {
   const [library, setLibrary] = useState<SalesLibrary | null>(null)
   const [loomFehler, setLoomFehler] = useState<string | null>(null)
   const [loomAngefordert, setLoomAngefordert] = useState<Set<string>>(new Set())
-  /** Lokal gemerkter laufender Auftrag: auf der Live-Domain gibt es kein
-      fetchRuns-Signal (kein Spiegel-Pfad) — ohne das hier bliebe der
-      Generieren-Knopf aktiv und „Skript öffnen" erschiene nie von selbst. */
-  const [loomPending, setLoomPending] = useState<{ id: string; name: string; startedAt: number } | null>(null)
+  /** Nur die Lücke zwischen Klick und „Auftrag angenommen": auf der Live-Domain
+      läuft der Start über die Runner-Brücke und braucht ein paar Sekunden. Den
+      Rest meldet seit dem Runs-Spiegel das echte Signal (`loomLaeuft`). */
+  const [loomStartet, setLoomStartet] = useState(false)
 
   const ladeLibrary = useCallback(async () => {
     try {
@@ -356,48 +355,51 @@ export function SalesDashboard() {
     loomLiefZuvor.current = loomLaeuft
   }, [loomLaeuft, ladeLibrary])
 
-  // Solange ein Auftrag offen ist: Bibliothek pollen, bis das Skript auftaucht —
-  // mit Zeitdeckel, falls der Lauf serverseitig hängen bleibt.
-  useEffect(() => {
-    if (!loomPending) return
-    const id = window.setInterval(() => {
-      void ladeLibrary()
-      if (Date.now() - loomPending.startedAt > 15 * 60_000) {
-        setLoomPending(null)
-        setLoomFehler('Loom-Skript-Lauf dauert ungewöhnlich lange — Status unter Agenten prüfen.')
-      }
-    }, 15_000)
-    return () => window.clearInterval(id)
-  }, [loomPending, ladeLibrary])
+  /** Neuestes Loom-Skript zu diesem Posten aus der Bibliothek, sonst null. */
+  const loomSkript = useCallback(
+    (p: Posten) =>
+      (library?.skripte ?? [])
+        .filter(
+          (s) =>
+            s.kind === 'html' &&
+            s.name.startsWith('Loom-Skript') &&
+            s.name.toLowerCase().includes(`(${p.name.toLowerCase()})`),
+        )
+        .sort((a, b) => new Date(b.mtime).getTime() - new Date(a.mtime).getTime())[0] ?? null,
+    [library],
+  )
+
+  // Nach einem fertigen Lauf steht das Skript zwar in der Bibliothek, im
+  // Datei-Spiegel aber erst beim nächsten Runner-Tick. Solange nachladen, bis
+  // die URL da ist — sonst bliebe „wird gerade gespiegelt" stehen, bis Kevin den
+  // Bereich verlässt und neu betritt. Lokal ist die URL sofort da: nie aktiv.
+  const wartetAufSpiegel = useMemo(
+    () =>
+      loomsSichtbar &&
+      loomListe.some((p) => {
+        const s = loomSkript(p)
+        return s !== null && salesFileUrl(s.rel) === null
+      }),
+    [loomsSichtbar, loomListe, loomSkript],
+  )
 
   useEffect(() => {
-    if (!loomPending || !library) return
-    const fertig = library.skripte.some(
-      (s) =>
-        s.kind === 'html' &&
-        s.name.startsWith('Loom-Skript') &&
-        s.name.toLowerCase().includes(`(${loomPending.name.toLowerCase()})`),
-    )
-    if (fertig) setLoomPending(null)
-  }, [library, loomPending])
+    if (!wartetAufSpiegel) return
+    const id = window.setInterval(() => void ladeLibrary(), 20_000)
+    return () => window.clearInterval(id)
+  }, [wartetAufSpiegel, ladeLibrary])
 
   const loomAktionen: LoomSkriptAktionen = useMemo(
     () => ({
       skriptUrl: (p) => {
-        const treffer = (library?.skripte ?? [])
-          .filter(
-            (s) =>
-              s.kind === 'html' &&
-              s.name.startsWith('Loom-Skript') &&
-              s.name.toLowerCase().includes(`(${p.name.toLowerCase()})`),
-          )
-          .sort((a, b) => new Date(b.mtime).getTime() - new Date(a.mtime).getTime())[0]
+        const treffer = loomSkript(p)
         return treffer ? salesFileUrl(treffer.rel) : null
       },
+      skriptVorhanden: (p) => loomSkript(p) !== null,
       generiere: (p) => {
         setLoomFehler(null)
         setLoomAngefordert((prev) => new Set(prev).add(p.id))
-        setLoomPending({ id: p.id, name: p.name, startedAt: Date.now() })
+        setLoomStartet(true)
         // profile_url (LinkedIn) ist keine analysierbare Firmen-Website —
         // dann recherchiert der Agent selbst.
         const website = p.website && !p.website.includes('linkedin.com') ? p.website : undefined
@@ -405,7 +407,6 @@ export function SalesDashboard() {
           .then(() => refreshRuns())
           .catch((e) => {
             setLoomFehler((e as Error).message)
-            setLoomPending(null)
             // sonst zeigt dieser Posten bei jedem späteren Lauf fälschlich „wird generiert"
             setLoomAngefordert((prev) => {
               const next = new Set(prev)
@@ -413,14 +414,14 @@ export function SalesDashboard() {
               return next
             })
           })
+          .finally(() => setLoomStartet(false))
       },
-      laeuft: loomLaeuft || loomPending !== null,
+      laeuft: loomLaeuft || loomStartet,
       angefordert: (p) => loomAngefordert.has(p.id),
       verfuegbar: runner.state === 'online',
-      dateiOeffenbar: runnerDirekt(),
       fehler: loomFehler,
     }),
-    [library, loomLaeuft, loomPending, loomAngefordert, loomFehler, runner.state, refreshRuns],
+    [loomSkript, loomLaeuft, loomStartet, loomAngefordert, loomFehler, runner.state, refreshRuns],
   )
 
   const projektLink = useCallback(

@@ -63,17 +63,63 @@ export async function postRun(agent: string, input?: Record<string, unknown>) {
   })
 }
 
+/**
+ * Runs-Spiegel: der Runner legt Liste UND Inhalt der letzten ~20 Läufe in
+ * Supabase ab — bei jedem Start/Ende sofort, nicht erst im Minuten-Tick.
+ * Ohne das wären auf der HTTPS-Domain Freigaben-Queue, Run-Toasts und der
+ * „Skript fertig"-Zustand tot (`/runs` hängt an 127.0.0.1).
+ */
+async function leseRunsSpiegel(): Promise<RunDetail[]> {
+  const spiegel = await leseSpiegel<{ runs: RunDetail[] }>('runs')
+  if (!spiegel) throw new Error('Noch kein Spiegel vorhanden — Runner einmal laufen lassen.')
+  return spiegel.data.runs
+}
+
 export async function fetchRuns(limit = 20): Promise<RunSummary[]> {
+  if (!runnerDirekt()) {
+    // Inhalt hier abstreifen — die Liste ist eine Übersicht, den Text holt
+    // fetchRun. (Sonst hinge er an jeder Poll-Runde im React-State.)
+    return (await leseRunsSpiegel())
+      .slice(0, limit)
+      .map(({ id, agent, status, started, finished, preview }) => ({
+        id,
+        agent,
+        status,
+        started,
+        finished,
+        preview,
+      }))
+  }
   const { runs } = await req<{ runs: RunSummary[] }>(`/runs?limit=${limit}`)
   return runs
 }
 
-export function fetchRun(id: string): Promise<RunDetail> {
+export async function fetchRun(id: string): Promise<RunDetail> {
+  if (!runnerDirekt()) {
+    const treffer = (await leseRunsSpiegel()).find((r) => r.id === id)
+    if (!treffer) throw new Error('Dieser Run liegt nicht im Spiegel — gespiegelt werden die letzten 20.')
+    return treffer
+  }
   return req<RunDetail>(`/runs/${encodeURIComponent(id)}`)
 }
 
-/** Holt eine private iCal-URL über den Runner-Proxy (umgeht Browser-CORS). */
-export async function fetchCalendar(icalUrl: string): Promise<string> {
+/**
+ * Holt eine private iCal-URL über den Runner-Proxy (umgeht Browser-CORS).
+ *
+ * Ohne direkten Draht kommt der Kalender aus dem Spiegel — die übergebene URL
+ * spielt dort keine Rolle: sie liegt im localStorage des Macs und ist auf dem
+ * Handy nie gesetzt. Der Runner holt den Feed mit `CALENDAR_ICAL_URL` aus
+ * runner/.env.
+ */
+export async function fetchCalendar(icalUrl: string | null): Promise<string> {
+  if (!runnerDirekt()) {
+    const spiegel = await leseSpiegel<{ ical: string }>('calendar')
+    if (!spiegel) {
+      throw new Error('Kein Kalender-Spiegel — CALENDAR_ICAL_URL in runner/.env setzen, Runner neu starten.')
+    }
+    return spiegel.data.ical
+  }
+  if (!icalUrl) throw new Error('Keine iCal-URL hinterlegt.')
   const { ical } = await req<{ ical: string }>(`/calendar?url=${encodeURIComponent(icalUrl)}`)
   return ical
 }

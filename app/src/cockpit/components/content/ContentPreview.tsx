@@ -35,6 +35,11 @@ export function ContentPreview({ post }: { post: ContentPost }) {
     return <p className="ck-label">Keine Slides in diesem Post.</p>
   }
   const url = socialFileUrl(slide.path)
+  if (!url) {
+    // Slide-HTMLs verweisen relativ auf design/slides.css und Logos — das
+    // funktioniert nur über den Runner. Ehrlicher Hinweis statt leerem Rahmen.
+    return <p className="ck-label">Slide-Vorschau nur am Mac — die Slides laden ihre Assets lokal.</p>
+  }
 
   return (
     <div>

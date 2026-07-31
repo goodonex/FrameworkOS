@@ -16,6 +16,9 @@ export function AdPreview({ kunde, version }: { kunde: Kunde; version: AdVersion
     return <p className="ck-label">Keine Dateien in dieser Version.</p>
   }
   const url = kundenFileUrl(kunde, file.path)
+  if (!url) {
+    return <p className="ck-label">Diese Datei liegt noch nicht im Spiegel — am Mac ist sie da.</p>
+  }
   const isHtml = file.path.endsWith('.html')
 
   return (

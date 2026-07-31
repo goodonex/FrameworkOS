@@ -150,7 +150,6 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
     for (const item of [
       { id: 'nav-cockpit', title: 'Cockpit', path: '/cockpit', keywords: ['home', 'start', 'übersicht', 'graph'] },
       { id: 'nav-sales', title: 'Sales', path: '/sales', keywords: ['crm', 'pipeline', 'kontakte', 'leads', 'call', 'bibliothek'] },
-      { id: 'nav-email', title: 'E-Mail', path: '/email', keywords: ['mail', 'sequenzen', 'flows', 'versand'] },
       { id: 'nav-tracking', title: 'Tracking', path: '/tracking', keywords: ['kpi', 'looms', 'anfragen', 'umsatz', 'ziele'] },
     ]) {
       list.push({

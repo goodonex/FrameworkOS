@@ -1,5 +1,6 @@
 import { RUNNER_BASE_URL } from './useRunnerStatus'
 import { leseSpiegel, runnerDirekt } from './runnerBridge'
+import { bereiteDateienVor, gespiegelteDateiUrl } from './runnerFiles'
 
 /**
  * Kunden-Ads (Cockpit /ads): Typen + Fetcher für das Dateisystem-Manifest.
@@ -152,6 +153,23 @@ export async function fetchAdsOverview(): Promise<AdsOverviewEntry[]> {
   if (!runnerDirekt()) {
     const spiegel = await leseSpiegel<{ entries: AdsOverviewEntry[] }>('ads_overview')
     if (!spiegel) throw new Error('Noch kein Spiegel vorhanden — Runner einmal laufen lassen.')
+    // Vorschau-Bilder und Creatives kommen aus dem Storage-Spiegel — signieren,
+    // solange die Liste noch geladen wird (kundenFileUrl liest danach synchron).
+    await bereiteDateienVor(
+      'kunden',
+      spiegel.data.entries.flatMap(({ kunde, manifest }) => {
+        const basis = `${kunde.folder}/${kunde.adsDir ?? '05_leadgen'}`
+        const rels = new Set<string>()
+        for (const o of manifest.overviewFiles ?? []) if (o?.path) rels.add(o.path)
+        for (const a of manifest.ads ?? []) {
+          for (const v of a.versions ?? []) {
+            for (const f of v.files ?? []) if (f?.path) rels.add(f.path)
+            if (v.preview) rels.add(v.preview)
+          }
+        }
+        return [...rels].map((r) => `${basis}/${r}`)
+      }),
+    )
     return spiegel.data.entries
   }
   const { entries } = await req<{ entries: AdsOverviewEntry[] }>('/ads/overview')
@@ -234,11 +252,13 @@ export function putAdManifest(
 
 /**
  * URL für eine Datei aus dem Ads-Ordner des Kunden (relativ zu adsDir).
- * Segmentweise encoden: der Ordnername enthält Leerzeichen ("KP - Reichentrog"),
- * die Slashes müssen aber Pfadtrenner bleiben.
+ * Lokal über den Runner — segmentweise encoden, der Ordnername enthält
+ * Leerzeichen ("KP - Reichentrog"), die Slashes müssen Pfadtrenner bleiben.
+ * Sonst die signierte Storage-URL; null = (noch) nicht gespiegelt.
  */
-export function kundenFileUrl(kunde: Kunde, relPath: string): string {
+export function kundenFileUrl(kunde: Kunde, relPath: string): string | null {
   const full = `${kunde.folder}/${kunde.adsDir ?? '05_leadgen'}/${relPath}`
+  if (!runnerDirekt()) return gespiegelteDateiUrl('kunden', full)
   const encoded = full.split('/').map(encodeURIComponent).join('/')
   return `${RUNNER_BASE_URL}/files/kunden/${encoded}`
 }

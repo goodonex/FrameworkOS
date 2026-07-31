@@ -6,6 +6,7 @@ import { useBookings } from '../../hooks/useSalesPro'
 import type { Contact } from '../../types/db'
 import { HeuteTabs } from '../components/HeuteTabs'
 import { useActiveBrand } from '../lib/activeBrand'
+import { runnerDirekt } from '../lib/runnerBridge'
 import { CALENDAR_ICAL_KEY, useCalendarFeed } from '../lib/useCalendarFeed'
 
 type EventKind = 'booking' | 'followup' | 'content' | 'external'
@@ -242,6 +243,15 @@ export function TermineArea() {
       {showSettings ? (
         <section className="ck-panel" style={{ padding: 12 }}>
           <div className="ck-label" style={{ marginBottom: 6 }}>Kalender-Feed (privater iCal-Link)</div>
+          {!runnerDirekt() ? (
+            // Der Link hier ist an diesen Browser gebunden — vom Handy aus wäre
+            // ein Eingabefeld eine Falle. Hier kommt der Kalender aus dem Spiegel.
+            <div style={{ fontSize: 11.5, color: 'var(--ck-text-3)', lineHeight: 1.5 }}>
+              Der Kalender kommt hier aus dem Spiegel, den der Runner auf dem Mac füllt
+              (<code>CALENDAR_ICAL_URL</code> in runner/.env). Einstellen lässt er sich nur dort.
+            </div>
+          ) : (
+          <>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <input
               className="ck-input"
@@ -273,11 +283,13 @@ export function TermineArea() {
             Nur lesend, wird über den lokalen Runner geholt (der muss laufen). Wiederkehrende Termine
             erscheinen v1 nur zu ihrem ersten Datum.
           </div>
+          </>
+          )}
           {cal.loading ? (
             <div style={{ fontSize: 11, color: 'var(--ck-text-3)', marginTop: 6 }}>lädt Kalender…</div>
           ) : cal.error ? (
             <div style={{ fontSize: 11, color: 'var(--ck-warn)', marginTop: 6 }}>{cal.error}</div>
-          ) : icalUrl ? (
+          ) : icalUrl || cal.events.length > 0 ? (
             <div style={{ fontSize: 11, color: 'var(--ck-accent)', marginTop: 6 }}>
               ✓ verbunden · {cal.events.length} Termine
             </div>

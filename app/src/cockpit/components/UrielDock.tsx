@@ -45,7 +45,6 @@ const AREA_PATH: Record<string, string> = {
   ads: '/ads',
   content: '/content',
   agenten: '/agenten',
-  email: '/email',
   tracking: '/tracking',
 }
 const VIEW_LABEL: Record<ViewMode, string> = {

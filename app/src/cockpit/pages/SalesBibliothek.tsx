@@ -128,9 +128,18 @@ function VaultPreview({ path }: { path: string }) {
 
 function SkriptePreview({ rel, kind }: { rel: string; kind: 'md' | 'html' | 'pdf' }) {
   if (kind === 'html' || kind === 'pdf') {
+    const url = salesFileUrl(rel)
+    if (!url) {
+      return (
+        <p style={{ fontSize: 12.5, color: 'var(--ck-text-3)' }}>
+          Diese Datei ist noch nicht im Spiegel — sobald der Runner sie hochgeladen hat, steht sie
+          hier auch unterwegs.
+        </p>
+      )
+    }
     return (
       <iframe
-        src={salesFileUrl(rel)}
+        src={url}
         title={rel}
         style={{ width: '100%', height: '78vh', border: '1px solid var(--ck-border)', borderRadius: 8, background: '#fff' }}
       />

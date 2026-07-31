@@ -35,11 +35,11 @@ export function SalesVorschau() {
   const loomAktionen: LoomSkriptAktionen = {
     // Fixture: für Andreas Blasch existiert bereits ein Skript
     skriptUrl: (p) => (p.id === 'loom:1' ? '#skript-andreas-blasch' : null),
+    skriptVorhanden: (p) => p.id === 'loom:1',
     generiere: () => {},
     laeuft: false,
     angefordert: () => false,
     verfuegbar: true,
-    dateiOeffenbar: true,
     fehler: null,
   }
 

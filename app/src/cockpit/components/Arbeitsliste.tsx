@@ -14,8 +14,13 @@ import type { ArbeitsmodusErgebnis } from './Arbeitsmodus'
  */
 
 export interface LoomSkriptAktionen {
-  /** URL des bereits generierten Skripts (Sales-Bibliothek), sonst null */
+  /** öffenbare URL des generierten Skripts (lokal Runner, sonst Storage-Spiegel) */
   skriptUrl: (p: Posten) => string | null
+  /**
+   * Skript existiert laut Bibliothek. Ohne URL heißt das: es ist fertig, aber
+   * noch nicht im Datei-Spiegel — dann darf NICHT wieder „generieren" stehen.
+   */
+  skriptVorhanden: (p: Posten) => boolean
   generiere: (p: Posten) => void
   /** Agent `loom-skript` läuft gerade (Runner erlaubt nur einen gleichzeitig) */
   laeuft: boolean
@@ -23,8 +28,6 @@ export interface LoomSkriptAktionen {
   angefordert: (p: Posten) => boolean
   /** Runner erreichbar — sonst bleibt der Generieren-Knopf aus */
   verfuegbar: boolean
-  /** Skript-Dateien liegen am Mac (Runner-Origin) — vom Handy aus nicht öffenbar */
-  dateiOeffenbar: boolean
   /** letzter Fehler beim Generieren — wird direkt am Loom-Posten angezeigt */
   fehler: string | null
 }
@@ -208,23 +211,21 @@ export function Arbeitsliste({ posten, onErledigt, loom, projektLink, onNavigier
                   ) : null}
                   {p.spur === 'loom' && loom ? (
                     skriptUrl ? (
-                      loom.dateiOeffenbar ? (
-                        <a
-                          className="ck-btn ck-btn--primary"
-                          style={{ minHeight: 40, display: 'inline-flex', alignItems: 'center' }}
-                          href={skriptUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          Skript öffnen ↗
-                        </a>
-                      ) : (
-                        // Die Datei liegt beim Runner auf dem Mac — ein Link darauf
-                        // wäre vom Handy aus tot. Ehrlicher Zustand statt toter Knopf.
-                        <span style={{ fontSize: 13, color: 'var(--ck-accent)', alignSelf: 'center' }}>
-                          Skript bereit — am Mac öffnen
-                        </span>
-                      )
+                      <a
+                        className="ck-btn ck-btn--primary"
+                        style={{ minHeight: 40, display: 'inline-flex', alignItems: 'center' }}
+                        href={skriptUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Skript öffnen ↗
+                      </a>
+                    ) : loom.skriptVorhanden(p) ? (
+                      // Fertig, aber noch nicht im Datei-Spiegel. Ehrlicher
+                      // Zwischenstand statt eines zweiten Generieren-Laufs.
+                      <span style={{ fontSize: 13, color: 'var(--ck-accent)', alignSelf: 'center' }}>
+                        Skript fertig — wird gerade gespiegelt
+                      </span>
                     ) : (
                       <button
                         type="button"

@@ -27,7 +27,6 @@ import { CockpitShell } from './cockpit/CockpitShell'
 import { CockpitHome } from './cockpit/pages/CockpitHome'
 import { SalesArea } from './cockpit/pages/SalesArea'
 import { ProjekteArea } from './cockpit/pages/ProjekteArea'
-import { EmailArea } from './cockpit/pages/EmailArea'
 import { TrackingArea } from './cockpit/pages/TrackingArea'
 import { AdsArea } from './cockpit/pages/AdsArea'
 import { SocialArea } from './cockpit/pages/SocialArea'
@@ -38,6 +37,7 @@ import { FreigabenArea } from './cockpit/pages/FreigabenArea'
 import { LinkedinArea } from './cockpit/pages/LinkedinArea'
 import { SalesVorschau } from './dev/SalesVorschau'
 import { ZielVorschau } from './dev/ZielVorschau'
+import { NavVorschau } from './dev/NavVorschau'
 
 
 /** CRM → Sales (Juli 2026): alte /crm-Links/Bookmarks/Deep-Links auf /sales umleiten. */
@@ -110,7 +110,6 @@ function OwnerWorkspaceShell() {
         const map: Record<string, string> = {
           c: '/cockpit',
           s: '/sales',
-          e: '/email',
           t: '/tracking',
         }
         const target = map[key]
@@ -174,7 +173,6 @@ const COCKPIT_PREFIXES = [
   '/ads',
   '/content',
   '/agenten',
-  '/email',
   '/tracking',
 ] as const
 
@@ -239,6 +237,7 @@ function App() {
             {/* Dev-only: Sales-Bausteine mit Fixtures, ohne Login prüfbar */}
             {import.meta.env.DEV ? <Route path="/dev/sales-vorschau" element={<SalesVorschau />} /> : null}
             {import.meta.env.DEV ? <Route path="/dev/ziel-vorschau" element={<ZielVorschau />} /> : null}
+            {import.meta.env.DEV ? <Route path="/dev/nav-vorschau" element={<NavVorschau />} /> : null}
             <Route element={<OwnerWorkspaceShell />}>
               {/* Neue Cockpit-Shell (REBUILD-PLAN §5) */}
               <Route element={<CockpitShell />}>
@@ -253,7 +252,6 @@ function App() {
                 <Route path="/ads/*" element={<AdsArea />} />
               <Route path="/content/*" element={<SocialArea />} />
               <Route path="/agenten" element={<AgentsArea />} />
-                <Route path="/email/*" element={<EmailArea />} />
                 <Route path="/tracking" element={<TrackingArea />} />
               </Route>
               {/* Phase 6: Universe + Denk-Modi abgerissen → Cockpit ist Home */}
