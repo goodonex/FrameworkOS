@@ -83,7 +83,13 @@ const SALES_VAULT_DIR = join(VAULT, '03 Bereiche', 'Vertrieb & Outreach')
 // das Handy sie nie. Für den Spiegel braucht der Runner deshalb eine eigene
 // Adresse. Der private iCal-Link ist ein Geheimnis wie der Service-Role-Key und
 // bleibt aus demselben Grund in runner/.env, statt in die Datenbank zu wandern.
-const CALENDAR_ICAL_URL = process.env.CALENDAR_ICAL_URL ?? ''
+// Mehrere Kalender sind der Normalfall (Arbeit, Gesundheit, Planung, Tracking):
+// kommagetrennte Liste, die Reihenfolge ist egal. Der Parser (icalParse.ts) ist
+// zeilenbasiert und verträgt aneinandergehängte VCALENDAR-Blöcke.
+const CALENDAR_ICAL_URLS = (process.env.CALENDAR_ICAL_URL ?? '')
+  .split(',')
+  .map((u) => u.trim())
+  .filter((u) => /^https:\/\//i.test(u))
 
 // Content-Manifest pro Brand (Cockpit /content, Post-Ebene). Feste Allowlist —
 // der Brand-Slug wird NIE in einen Pfad interpoliert (kein Traversal). MVP: nur
@@ -728,6 +734,29 @@ async function holeIcal(icalUrl) {
   }
 }
 
+/**
+ * Holt mehrere Kalender und hängt sie aneinander (der Parser liest VEVENTs,
+ * egal wie viele VCALENDAR-Blöcke im Text stehen).
+ *
+ * Ein kaputter Kalender darf die anderen nicht mitreißen: er wird geloggt und
+ * übersprungen. Nur wenn ALLE scheitern, wirft die Funktion — dann bleibt der
+ * alte Spiegel-Stand stehen, statt durch einen leeren ersetzt zu werden.
+ */
+async function holeIcals(urls) {
+  const texte = []
+  const fehler = []
+  for (const url of urls) {
+    try {
+      texte.push(await holeIcal(url))
+    } catch (e) {
+      fehler.push(e?.message ?? String(e))
+      console.error('[runner] Kalender übersprungen:', e?.message ?? e)
+    }
+  }
+  if (!texte.length) throw new Error(`kein Kalender erreichbar: ${fehler.join(' · ')}`)
+  return texte.join('\n')
+}
+
 // ---------- Datei-Spiegel (Supabase Storage) ----------
 // Loom-Skripte, Follow-up-PDFs, Wochen-Galerien und Ad-Creatives liegen auf der
 // Platte und hingen bisher an `/files/...` auf 127.0.0.1 — am Handy tote Links.
@@ -933,10 +962,10 @@ async function mirrorAll() {
   await spiegleDateien()
   // Kalender: ohne Adresse in runner/.env bleibt der Spiegel bewusst leer —
   // das Cockpit sagt das dann auch so, statt einen leeren Monat zu zeigen.
-  if (CALENDAR_ICAL_URL) {
+  if (CALENDAR_ICAL_URLS.length) {
     // Kein Zeitstempel im Datensatz: der Signatur-Schutz soll greifen, solange
     // sich am Kalender nichts ändert. Wie frisch er ist, steht in updated_at.
-    await pushSnapshotKey('calendar', async () => ({ ical: await holeIcal(CALENDAR_ICAL_URL) }))
+    await pushSnapshotKey('calendar', async () => ({ ical: await holeIcals(CALENDAR_ICAL_URLS) }))
   }
 }
 
