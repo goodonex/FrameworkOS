@@ -41,7 +41,11 @@ interface Card extends FollowupDraft {
 }
 
 /** Agenten, deren Runs Freigabe-Karten liefern (parseDrafts-JSON-Block). */
-const DRAFT_AGENTS = new Set(['followup-entwuerfe', 'linkedin-followup-entwuerfe'])
+const DRAFT_AGENTS = new Set([
+  'followup-entwuerfe',
+  'linkedin-followup-entwuerfe',
+  'linkedin-antwort-entwuerfe',
+])
 
 const CHANNEL_LABEL: Record<DraftChannel, string> = {
   email: 'E-Mail',

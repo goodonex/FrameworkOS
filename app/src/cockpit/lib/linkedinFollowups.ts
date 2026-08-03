@@ -75,7 +75,16 @@ export function bucketOf(thread: LinkedinThread, now: Date): FollowupBucket {
 
 /** Feld-Änderungen, die ein „Erledigt" auf einem Thread auslöst. */
 export type MarkDonePatch = Partial<
-  Pick<LinkedinThread, 'followup_stage' | 'last_from' | 'last_message_at' | 'snoozed_until' | 'status'>
+  Pick<
+    LinkedinThread,
+    | 'followup_stage'
+    | 'last_from'
+    | 'last_message_at'
+    | 'snoozed_until'
+    | 'status'
+    | 'entwurf'
+    | 'entwurf_at'
+  >
 >
 
 /**
@@ -92,12 +101,19 @@ export type MarkDonePatch = Partial<
  * - Sonst (fällig, Altlast, prüfen) → eine Stufe weiter.
  *
  * Gibt `null` zurück, wenn nichts zu tun ist (Thread schon in einem Endzustand).
+ *
+ * In jedem Fall wird ein anliegender Entwurf (0065) gelöscht: „Erledigt" heißt,
+ * die Nachricht ist raus. Bliebe er stehen, böte die Liste morgen an, dieselbe
+ * Nachricht ein zweites Mal zu verschicken.
  */
 export function markDonePatch(thread: LinkedinThread, now: Date = new Date()): MarkDonePatch | null {
   if (isTerminal(thread.status)) return null
 
+  const entwurfWeg = { entwurf: null, entwurf_at: null } as const
+
   if (thread.last_from === 'them') {
     return {
+      ...entwurfWeg,
       followup_stage: 0,
       // Kevin hat eben geantwortet — der Sync bestätigt das beim nächsten Lauf,
       // bis dahin zählt die Leiter ab jetzt statt ab der Nachricht des Leads.
@@ -110,9 +126,9 @@ export function markDonePatch(thread: LinkedinThread, now: Date = new Date()): M
     }
   }
 
-  if (thread.followup_stage >= 3) return { status: 'archived' }
+  if (thread.followup_stage >= 3) return { ...entwurfWeg, status: 'archived' }
 
-  return { followup_stage: thread.followup_stage + 1 }
+  return { ...entwurfWeg, followup_stage: thread.followup_stage + 1 }
 }
 
 export interface FollowupCoverage {

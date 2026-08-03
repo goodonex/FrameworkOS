@@ -1,32 +1,30 @@
 import { useCallback, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { Contact, Task } from '../../types/db'
-import { useTaskBuckets, useTasks, type CreateTaskInput } from '../../hooks/useTasks'
-import type { UseContactsResult } from '../../hooks/useContacts'
+import { useArbeitsDauern } from '../../hooks/useArbeitsDauern'
+import { useContentPieces } from '../../hooks/useContentPieces'
+import { entwuerfeOffen, usePosten } from '../../hooks/usePosten'
+import { useBookings } from '../../hooks/useSalesPro'
+import { eventsByDate, termineAmTag, ymd, type CalEvent } from '../lib/termineEvents'
+import type { Posten } from '../lib/prioritaet'
+import { KACHEL_JE_SPUR, SPUR_LABEL } from '../lib/spurAnzeige'
+import { tagesansage } from '../lib/tagesansage'
+import { CALENDAR_ICAL_KEY, useCalendarFeed } from '../lib/useCalendarFeed'
 
 const COLLAPSE_KEY = 'ck.heute.collapsed'
+const TOP = 5
 
-function ymdToday(): string {
-  const t = new Date()
-  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(
-    t.getDate(),
-  ).padStart(2, '0')}`
-}
-
-function ymdFromIso(iso: string | null): string | null {
-  return iso ? iso.slice(0, 10) : null
-}
-
-function tomorrowNoonIso(): string {
-  const d = new Date()
-  d.setDate(d.getDate() + 1)
-  d.setHours(12, 0, 0, 0)
-  return d.toISOString()
-}
-
-function contactLabel(c: Contact): string {
-  return c.name?.trim() || c.company?.trim() || c.email?.trim() || 'Kontakt'
-}
+/**
+ * Heute-Deck v2 (Etappe 3, Schritt 4) — der EINE Morgen-Einstieg.
+ *
+ * Vorher beantwortete das Deck „was zuerst?" mit einer eigenen Kontakt-Logik
+ * (next_follow_up_at), während die Posten-Engine hinter dem Sales-Dashboard
+ * dieselbe Frage anders beantwortete. Jetzt liest es `ordnePosten` über
+ * `usePosten` — dieselbe Rangfolge wie „Jetzt dran".
+ *
+ * Es baut bewusst KEINE eigene Abarbeitungs-UI: Klick auf einen Posten öffnet
+ * das zuständige Kachel-Fenster im Sales-Bereich (`/sales?kachel=…`), wo Haken,
+ * Kopieren und Entwurf schon liegen. Sonst gäbe es zwei Orte zum Abhaken.
+ */
 
 function greeting(): string {
   const h = new Date().getHours()
@@ -35,33 +33,23 @@ function greeting(): string {
   return 'Guten Abend'
 }
 
-interface DueContact {
-  contact: Contact
-  tone: 'overdue' | 'today'
-  label: string
-}
-
-/**
- * Heute-Deck — die „was tue ich zuerst?"-Antwort auf der Home.
- * Aggregiert fällige Kontakte (aus next_follow_up_at) + fällige Aufgaben
- * (foundation_tasks) in einer Leiste. Nutzt die bereits geladenen Kontakte der
- * Home (kein Doppel-Load) und den bestehenden useTasks-Hook.
- */
-export function HeuteDeck({
-  slug,
-  contacts,
-}: {
-  slug: string | undefined
-  contacts: UseContactsResult
-}) {
+export function HeuteDeck({ slug }: { slug: string | undefined }) {
   const navigate = useNavigate()
-  const tasks = useTasks(slug)
-  const buckets = useTaskBuckets(tasks.items)
-  const [collapsed, setCollapsed] = useState(
-    () => localStorage.getItem(COLLAPSE_KEY) === '1',
-  )
-  const [adding, setAdding] = useState('')
+  const { geordnet, jetzt, contacts } = usePosten(slug)
+  const dauern = useArbeitsDauern(slug)
+  const bookings = useBookings(slug)
+  const content = useContentPieces(slug)
 
+  const [icalUrl] = useState<string>(() => {
+    try {
+      return localStorage.getItem(CALENDAR_ICAL_KEY) ?? ''
+    } catch {
+      return ''
+    }
+  })
+  const cal = useCalendarFeed(icalUrl || null)
+
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSE_KEY) === '1')
   const toggleCollapsed = useCallback(() => {
     setCollapsed((c) => {
       const next = !c
@@ -70,59 +58,26 @@ export function HeuteDeck({
     })
   }, [])
 
-  const dueContacts = useMemo<DueContact[]>(() => {
-    const today = ymdToday()
-    const out: DueContact[] = []
-    for (const c of contacts.items) {
-      if (c.pipeline_stage === 'paused') continue
-      const fu = ymdFromIso(c.next_follow_up_at)
-      if (!fu) continue
-      if (fu < today) out.push({ contact: c, tone: 'overdue', label: 'Follow-up überfällig' })
-      else if (fu === today) out.push({ contact: c, tone: 'today', label: 'Follow-up heute' })
-    }
-    out.sort((a, b) => {
-      if (a.tone !== b.tone) return a.tone === 'overdue' ? -1 : 1
-      return String(a.contact.next_follow_up_at).localeCompare(
-        String(b.contact.next_follow_up_at),
-      )
+  const heuteTermine = useMemo<CalEvent[]>(() => {
+    const map = eventsByDate({
+      bookings: bookings.items,
+      contacts: contacts.items,
+      content: content.items,
+      kalender: cal.events,
     })
-    return out
-  }, [contacts.items])
+    return termineAmTag(map, ymd(jetzt))
+  }, [bookings.items, contacts.items, content.items, cal.events, jetzt])
 
-  const dueTasks = useMemo<Task[]>(
-    () => [...buckets.overdue, ...buckets.today],
-    [buckets.overdue, buckets.today],
+  const offeneEntwuerfe = useMemo(() => entwuerfeOffen(geordnet), [geordnet])
+  const ansage = useMemo(() => tagesansage(geordnet, dauern, jetzt), [geordnet, dauern, jetzt])
+
+  const oeffnePosten = useCallback(
+    (p: Posten) => navigate(`/sales?kachel=${KACHEL_JE_SPUR[p.spur]}`),
+    [navigate],
   )
 
-  const overdueContactCount = dueContacts.filter((d) => d.tone === 'overdue').length
-  const todayContactCount = dueContacts.filter((d) => d.tone === 'today').length
-  const nothingDue = dueContacts.length === 0 && dueTasks.length === 0
-
-  const summary = useMemo(() => {
-    const parts: string[] = []
-    if (overdueContactCount) parts.push(`${overdueContactCount} Kontakt${overdueContactCount === 1 ? '' : 'e'} überfällig`)
-    if (todayContactCount) parts.push(`${todayContactCount} heute fällig`)
-    if (dueTasks.length) parts.push(`${dueTasks.length} Aufgabe${dueTasks.length === 1 ? '' : 'n'} offen`)
-    if (parts.length === 0) return 'Sauberer Start — keine offenen Fälligkeiten. Fokus auf Akquise.'
-    return parts.join(' · ')
-  }, [overdueContactCount, todayContactCount, dueTasks.length])
-
-  const skip = useCallback(
-    (id: string) => contacts.update(id, { next_follow_up_at: tomorrowNoonIso() }),
-    [contacts],
-  )
-
-  const submitTask = useCallback(() => {
-    const title = adding.trim()
-    if (!title || !slug) return
-    const input: CreateTaskInput = {
-      title,
-      due_at: new Date().toISOString(),
-      source: 'manual',
-    }
-    tasks.create(input)
-    setAdding('')
-  }, [adding, slug, tasks])
+  const top = geordnet.slice(0, TOP)
+  const rest = geordnet.length - top.length
 
   return (
     <section className="ck-panel" aria-label="Heute" style={{ overflow: 'hidden' }}>
@@ -145,7 +100,10 @@ export function HeuteDeck({
         }}
       >
         <span style={{ display: 'flex', alignItems: 'baseline', gap: 10, minWidth: 0 }}>
-          <span className="ck-label" style={{ color: nothingDue ? 'var(--ck-text-3)' : 'var(--ck-accent)' }}>
+          <span
+            className="ck-label"
+            style={{ color: geordnet.length ? 'var(--ck-accent)' : 'var(--ck-text-3)' }}
+          >
             Heute
           </span>
           <span
@@ -157,7 +115,7 @@ export function HeuteDeck({
               whiteSpace: 'nowrap',
             }}
           >
-            {greeting()}. {summary}
+            {greeting()}. {ansage}
           </span>
         </span>
         <span aria-hidden style={{ color: 'var(--ck-text-3)', fontSize: 12, flexShrink: 0 }}>
@@ -166,182 +124,135 @@ export function HeuteDeck({
       </button>
 
       {collapsed ? null : (
-        <div className="ck-heute-grid" style={{ display: 'grid', gap: 0 }}>
-          {/* Kontakte fällig */}
-          <div style={{ borderRight: '1px solid var(--ck-border)' }}>
-            <div className="ck-label" style={{ padding: '10px 14px 6px' }}>
-              Kontakte fällig
-            </div>
-            {dueContacts.length === 0 ? (
-              <div style={{ padding: '4px 14px 12px', fontSize: 12, color: 'var(--ck-text-3)' }}>
-                Keine fälligen Follow-ups.
-              </div>
+        <>
+          {/* Zuerst die Termine: was heute feststeht, rahmt alles andere ein. */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              flexWrap: 'wrap',
+              padding: '9px 14px',
+              borderBottom: '1px solid var(--ck-border)',
+              fontSize: 12.5,
+            }}
+          >
+            <span className="ck-label" style={{ flexShrink: 0 }}>
+              Termine
+            </span>
+            {heuteTermine.length === 0 ? (
+              <span style={{ color: 'var(--ck-text-3)' }}>Heute keine.</span>
             ) : (
-              <div style={{ paddingBottom: 6 }}>
-                {dueContacts.slice(0, 12).map((d) => (
-                  <div
-                    key={d.contact.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      padding: '7px 14px',
-                    }}
-                  >
-                    <span
-                      aria-hidden
-                      style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: 999,
-                        flexShrink: 0,
-                        background: d.tone === 'overdue' ? 'var(--ck-warn)' : 'var(--ck-accent)',
-                      }}
-                    />
+              heuteTermine.map((e) => (
+                <span key={e.id} style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6 }}>
+                  <span style={{ color: 'var(--ck-accent)', fontVariantNumeric: 'tabular-nums' }}>
+                    {e.time ?? '—'}
+                  </span>
+                  {e.href ? (
                     <button
                       type="button"
-                      onClick={() => navigate(`/sales/${d.contact.id}`)}
+                      onClick={() => navigate(e.href as string)}
                       style={{
-                        flex: 1,
-                        minWidth: 0,
-                        textAlign: 'left',
                         background: 'none',
                         border: 'none',
                         padding: 0,
                         cursor: 'pointer',
+                        color: 'var(--ck-text-1)',
+                        font: 'inherit',
                       }}
                     >
-                      <div
-                        style={{
-                          fontSize: 12.5,
-                          color: 'var(--ck-text-1)',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {contactLabel(d.contact)}
-                      </div>
-                      <div style={{ fontSize: 10, color: d.tone === 'overdue' ? 'var(--ck-warn)' : 'var(--ck-text-3)' }}>
-                        {d.label}
-                      </div>
+                      {e.title}
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => void skip(d.contact.id)}
-                      title="Auf morgen verschieben"
-                      style={{
-                        flexShrink: 0,
-                        fontSize: 10,
-                        color: 'var(--ck-text-3)',
-                        background: 'none',
-                        border: '1px solid transparent',
-                        borderRadius: 5,
-                        padding: '2px 6px',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      → morgen
-                    </button>
-                  </div>
-                ))}
-              </div>
+                  ) : (
+                    <span style={{ color: 'var(--ck-text-1)' }}>{e.title}</span>
+                  )}
+                </span>
+              ))
             )}
-          </div>
-
-          {/* Aufgaben */}
-          <div>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'baseline',
-                padding: '10px 14px 6px',
-              }}
-            >
-              <span className="ck-label">Aufgaben</span>
+            <span style={{ flex: 1 }} />
+            {offeneEntwuerfe > 0 ? (
               <button
                 type="button"
-                onClick={() => navigate('/aufgaben')}
-                style={{
-                  fontSize: 10,
-                  color: 'var(--ck-text-3)',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                }}
+                onClick={() => navigate('/sales?kachel=antworten')}
+                className="ck-btn"
+                style={{ fontSize: 11, padding: '4px 10px', color: 'var(--ck-accent)' }}
               >
-                alle →
+                {offeneEntwuerfe} {offeneEntwuerfe === 1 ? 'Entwurf wartet' : 'Entwürfe warten'}
               </button>
-            </div>
-
-            <div style={{ padding: '0 14px 8px' }}>
-              <input
-                className="ck-input"
-                value={adding}
-                onChange={(e) => setAdding(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault()
-                    submitTask()
-                  }
-                }}
-                placeholder="Aufgabe für heute …"
-                style={{ width: '100%', fontSize: 13 }}
-                aria-label="Aufgabe für heute hinzufügen"
-              />
-            </div>
-
-            {dueTasks.length === 0 ? (
-              <div style={{ padding: '2px 14px 12px', fontSize: 12, color: 'var(--ck-text-3)' }}>
-                Keine offenen Aufgaben.
-              </div>
-            ) : (
-              <div style={{ paddingBottom: 6 }}>
-                {dueTasks.slice(0, 12).map((t) => {
-                  const overdue = buckets.overdue.includes(t)
-                  return (
-                    <div
-                      key={t.id}
-                      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px' }}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => tasks.toggle(t.id)}
-                        title="Erledigt markieren"
-                        style={{
-                          width: 16,
-                          height: 16,
-                          flexShrink: 0,
-                          borderRadius: 4,
-                          border: '1.5px solid var(--ck-border-strong)',
-                          background: 'transparent',
-                          cursor: 'pointer',
-                        }}
-                      />
-                      <span
-                        style={{
-                          flex: 1,
-                          minWidth: 0,
-                          fontSize: 12.5,
-                          color: 'var(--ck-text-1)',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {t.title}
-                      </span>
-                      {overdue ? (
-                        <span style={{ flexShrink: 0, fontSize: 10, color: 'var(--ck-warn)' }}>überfällig</span>
-                      ) : null}
-                    </div>
-                  )
-                })}
-              </div>
-            )}
+            ) : null}
           </div>
-        </div>
+
+          {/* Top-5 der Posten-Engine — Klick springt ins zuständige Kachel-Fenster. */}
+          {top.length === 0 ? (
+            <div style={{ padding: '12px 14px', fontSize: 12.5, color: 'var(--ck-text-3)' }}>
+              Liste leer. Für heute ist alles abgearbeitet.
+            </div>
+          ) : (
+            <div style={{ paddingBottom: 6 }}>
+              {top.map((p) => (
+                <div
+                  key={p.id}
+                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 14px' }}
+                >
+                  <span
+                    className="ck-label"
+                    style={{ flexShrink: 0, minWidth: 92, color: 'var(--ck-text-3)' }}
+                  >
+                    {SPUR_LABEL[p.spur]}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => oeffnePosten(p)}
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      textAlign: 'left',
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      cursor: 'pointer',
+                      font: 'inherit',
+                      color: 'var(--ck-text-1)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {p.name}
+                    {p.firma && p.firma !== p.name ? (
+                      <span style={{ color: 'var(--ck-text-3)' }}> · {p.firma}</span>
+                    ) : null}
+                  </button>
+                  {p.entwurf && !p.entwurf.veraltet ? (
+                    <span style={{ flexShrink: 0, fontSize: 10, color: 'var(--ck-accent)' }}>Entwurf da</span>
+                  ) : null}
+                  {p.starred ? (
+                    <span aria-label="Loom zugesagt" style={{ flexShrink: 0, fontSize: 10, color: 'var(--ck-warn)' }}>
+                      ★
+                    </span>
+                  ) : null}
+                </div>
+              ))}
+              {rest > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => navigate('/sales?kachel=jetzt-dran')}
+                  style={{
+                    margin: '4px 14px 8px',
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                    fontSize: 11,
+                    color: 'var(--ck-text-3)',
+                  }}
+                >
+                  {rest} weitere in „Jetzt dran" →
+                </button>
+              ) : null}
+            </div>
+          )}
+        </>
       )}
     </section>
   )

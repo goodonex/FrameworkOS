@@ -19,6 +19,7 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { resolve as resolvePath } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { VERLAUF_MAX, VERLAUF_TEXT_MAX, verlaufAusMessages } from './verlauf.mjs'
 
 const CDP = 'http://127.0.0.1:9222'
 const MESSAGING = 'https://www.linkedin.com/messaging/'
@@ -104,6 +105,11 @@ function evaluate(wsUrl, expression) {
 const buildSyncExpr = (cachedQid, scanTage) => `(async () => {
   const CACHED_QID = ${JSON.stringify(cachedQid || null)};
   const SCAN_TAGE = ${Number(scanTage)};
+
+  // Verlauf-Auswertung aus runner/linkedin/verlauf.mjs — als Quelltext injiziert,
+  // damit dieselbe Funktion hier im Seitenkontext läuft, die das verify-Skript
+  // gegen Fixtures prüft. Sie ist bewusst geschlossen (keine Closures/Imports).
+  ${verlaufAusMessages.toString()}
   if (document.querySelector('input[type=password]') || location.href.includes('/uas/login')) {
     return { loginWall: true };
   }
@@ -267,6 +273,12 @@ const buildSyncExpr = (cachedQid, scanTage) => `(async () => {
   let skippedNonInbox = 0;
   let skippedAds = 0;
   let rawConversationCount = 0;
+  // Diagnose: wie viel Gespräch die Katalog-Abfrage tatsächlich mitliefert.
+  // Voyager hat hier bisher meist genau eine Nachricht je Thread geliefert —
+  // ob das immer noch so ist, muss der Lauf selbst beantworten, nicht eine
+  // Vermutung im Quelltext.
+  let verlaufNachrichten = 0;
+  let threadsMitMehrAlsEiner = 0;
   const threads = [];
   const gesehen = new Set();
 
@@ -308,11 +320,16 @@ const buildSyncExpr = (cachedQid, scanTage) => `(async () => {
     const other = byUrn[otherUrn];
 
     // Neueste Nachricht, nicht die erste im Array — die Reihenfolge der
-    // included-Liste ist nicht garantiert, und Voyager liefert heute nur zufällig
-    // genau eine Nachricht je Thread.
+    // included-Liste ist nicht garantiert.
     const m = msgs
       .filter((x) => x['*conversation'] === c.entityUrn)
       .sort((a, b) => (b.deliveredAt ?? 0) - (a.deliveredAt ?? 0))[0];
+
+    // Derselbe Datenbestand, nur nicht mehr weggeworfen: die letzten N
+    // Nachrichten als Gesprächsverlauf für den Antwort-Entwürfe-Agenten.
+    const verlauf = verlaufAusMessages(msgs, c.entityUrn, isSelf, ${VERLAUF_MAX}, ${VERLAUF_TEXT_MAX});
+    verlaufNachrichten += verlauf.length;
+    if (verlauf.length > 1) threadsMitMehrAlsEiner++;
 
     // Ohne Absender wird NICHT geraten: 'unknown' landet im Bucket „prüfen"
     // statt ein Follow-up zur falschen Zeit auszulösen.
@@ -325,6 +342,7 @@ const buildSyncExpr = (cachedQid, scanTage) => `(async () => {
       company: other?.participantType?.member?.headline?.text || '',
       profile_url: other?.participantType?.member?.profileUrl || '',
       preview: m?.body?.text || '',
+      verlauf,
       last_message_at: lastMessageAt,
       last_from: lastFrom,
       // c.read kann fehlen — dann NICHT pauschal „ungelesen" annehmen.
@@ -351,6 +369,8 @@ const buildSyncExpr = (cachedQid, scanTage) => `(async () => {
     skippedNonInbox,
     skippedAds,
     rawConversationCount,
+    verlaufNachrichten,
+    threadsMitMehrAlsEiner,
   };
 })()`
 
@@ -415,6 +435,11 @@ export async function syncThreads({ dryRun = false } = {}) {
     skippedGroups: result.skippedGroups,
     skippedNonInbox: result.skippedNonInbox,
     skippedAds: result.skippedAds,
+    // Wie viel Gespräch je Thread aus der Katalog-Abfrage fällt. Fällt das auf
+    // ~1 Nachricht je Thread zurück, arbeitet der Entwürfe-Agent wieder blind —
+    // dann steht die Zahl wenigstens im Auftrags-Ergebnis statt im Nebel.
+    verlaufNachrichten: result.verlaufNachrichten,
+    threadsMitMehrAlsEiner: result.threadsMitMehrAlsEiner,
     mailboxUrn: result.mailboxUrn,
     dryRun,
     elapsedMs: Date.now() - startedAt,

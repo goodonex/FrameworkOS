@@ -63,6 +63,16 @@ function normalizeName(n) {
   return String(n ?? '').trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
+/**
+ * Verlauf für eine Zeile: der frische aus dem Sync, sonst der bereits
+ * gespeicherte. Nie ein leeres Array über eine vorhandene Historie schreiben.
+ */
+function verlaufFuer(thread, prior) {
+  if (Array.isArray(thread.verlauf) && thread.verlauf.length) return thread.verlauf
+  if (prior && Array.isArray(prior.verlauf)) return prior.verlauf
+  return []
+}
+
 /** Ein kaputter Zeitstempel darf nicht den ganzen Lauf mit RangeError killen. */
 function toIsoOrNull(v) {
   if (v == null) return null
@@ -96,9 +106,19 @@ export async function upsertThreads(threads, { dryRun = false } = {}) {
   }
 
   const brandId = await resolveBrandId()
+  // `verlauf` (0064) darf noch fehlen: solange die Migration nicht gepusht ist,
+  // antwortet PostgREST auf die Spalte mit 400. Dann läuft der Sync wie vorher
+  // weiter, nur ohne Gesprächsverlauf — statt komplett auszufallen.
+  let verlaufSpalteFehlt = false
   const [contacts, existing] = await Promise.all([
     fetchAll(`contacts?brand_id=eq.${brandId}&select=id,name,linkedin`),
-    fetchAll(`linkedin_threads?brand_id=eq.${brandId}&select=thread_key,contact_id,status`),
+    fetchAll(`linkedin_threads?brand_id=eq.${brandId}&select=thread_key,contact_id,status,verlauf`).catch(
+      (e) => {
+        if (!/verlauf/i.test(String(e?.message ?? ''))) throw e
+        verlaufSpalteFehlt = true
+        return fetchAll(`linkedin_threads?brand_id=eq.${brandId}&select=thread_key,contact_id,status`)
+      },
+    ),
   ])
 
   const existingByKey = new Map(existing.map((r) => [r.thread_key, r]))
@@ -156,6 +176,12 @@ export async function upsertThreads(threads, { dryRun = false } = {}) {
       unread: t.unread,
       starred: t.starred,
       last_synced_at: now,
+      // Liefert die Katalog-Abfrage für einen Thread ausnahmsweise keine
+      // Nachricht mit, bleibt der zuletzt gespeicherte Verlauf stehen — ein
+      // leeres Array würde die Historie lautlos löschen. Die Spaltenliste des
+      // Upserts muss über alle Zeilen gleich sein, deshalb wird der alte Wert
+      // zurückgeschrieben statt das Feld wegzulassen.
+      ...(verlaufSpalteFehlt ? {} : { verlauf: verlaufFuer(t, prior) }),
     })
   }
 
@@ -179,7 +205,7 @@ export async function upsertThreads(threads, { dryRun = false } = {}) {
   }
 
   if (dryRun) {
-    return { inserted, updated, unmatched, contactChanges, wouldWrite: rows.length, dryRun: true }
+    return { inserted, updated, unmatched, contactChanges, verlaufSpalteFehlt, wouldWrite: rows.length, dryRun: true }
   }
 
   const res = await fetch(`${SUPABASE_URL}/rest/v1/linkedin_threads?on_conflict=brand_id,thread_key`, {
@@ -192,7 +218,7 @@ export async function upsertThreads(threads, { dryRun = false } = {}) {
     throw new Error(`ABBRUCH: Upsert HTTP ${res.status}: ${txt.slice(0, 300)}`)
   }
 
-  return { inserted, updated, unmatched, contactChanges }
+  return { inserted, updated, unmatched, contactChanges, verlaufSpalteFehlt }
 }
 
 // CLI: `node runner/linkedin/upsert.mjs [--dry-run]` — synct live und schreibt (außer --dry-run).

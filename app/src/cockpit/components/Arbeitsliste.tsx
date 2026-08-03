@@ -8,9 +8,10 @@ import type { ArbeitsmodusErgebnis } from './Arbeitsmodus'
  * darunter auf, daneben Haken (erledigt), Kopieren (nur bei versandfertigem
  * Text) und bei Looms Skript öffnen/generieren.
  *
- * Kopieren gibt es bewusst NUR für Erstnachrichten — dort ist `text` eine
- * versandfertige Nachricht. Bei Aufgaben/Follow-ups/Antworten ist `text`
- * Kontext, kein Text zum Einfügen; ein Kopieren-Knopf wäre dort sinnlos.
+ * Kopieren gibt es genau dort, wo ein versandfertiger Text liegt: bei
+ * Erstnachrichten (`text` IST die Nachricht) und bei Posten mit `entwurf` —
+ * dem vom Nacht-Agenten vorbereiteten Antwort-Entwurf. Bei allem anderen ist
+ * `text` Kontext, kein Text zum Einfügen; ein Kopieren-Knopf wäre dort sinnlos.
  */
 
 export interface LoomSkriptAktionen {
@@ -54,6 +55,20 @@ function linkHref(url: string): string {
   return /^https?:\/\//.test(url) ? url : `https://${url}`
 }
 
+/** „von heute Nacht" trägt mehr als ein Zeitstempel — das ist die Frage dahinter. */
+export function entwurfStand(erstelltAm: string | null, jetzt: Date = new Date()): string {
+  if (!erstelltAm) return 'vorbereitet'
+  const t = new Date(erstelltAm).getTime()
+  if (Number.isNaN(t)) return 'vorbereitet'
+  const stunden = Math.floor((jetzt.getTime() - t) / (60 * 60 * 1000))
+  if (stunden < 1) return 'gerade eben'
+  if (stunden < 12) return `vor ${stunden} h`
+  const tage = Math.floor(stunden / 24)
+  if (tage < 1) return 'von heute Nacht'
+  if (tage === 1) return 'von gestern'
+  return `vor ${tage} Tagen`
+}
+
 export function Arbeitsliste({ posten, onErledigt, loom, projektLink, onNavigiere }: ArbeitslisteProps) {
   const [offenId, setOffenId] = useState<string | null>(null)
   const [offenSeit, setOffenSeit] = useState(0)
@@ -79,9 +94,11 @@ export function Arbeitsliste({ posten, onErledigt, loom, projektLink, onNavigier
     [erledigt, offenId, offenSeit, onErledigt],
   )
 
+  // Kopiert IMMER den versandfertigen Text: liegt ein Entwurf an, ist das der
+  // Entwurf — `p.text` ist bei Antworten die Nachricht des Leads.
   const kopiere = useCallback(async (p: Posten) => {
     try {
-      await navigator.clipboard.writeText(p.text)
+      await navigator.clipboard.writeText(p.entwurf?.text ?? p.text)
       setKopiertId(p.id)
       window.setTimeout(() => setKopiertId((prev) => (prev === p.id ? null : prev)), 2000)
     } catch {
@@ -98,7 +115,7 @@ export function Arbeitsliste({ posten, onErledigt, loom, projektLink, onNavigier
       {posten.map((p) => {
         const istOffen = offenId === p.id
         const istErledigt = erledigt.has(p.id)
-        const kopierbar = p.spur === 'erstnachricht'
+        const kopierbar = p.spur === 'erstnachricht' || Boolean(p.entwurf)
         const skriptUrl = p.spur === 'loom' ? (loom?.skriptUrl(p) ?? null) : null
         const projekt = p.spur === 'kundenaufgabe' ? (projektLink?.(p) ?? null) : null
         return (
@@ -151,6 +168,19 @@ export function Arbeitsliste({ posten, onErledigt, loom, projektLink, onNavigier
                 {p.spur === 'loom' && skriptUrl ? (
                   <span style={{ fontSize: 11, color: 'var(--ck-accent)', flexShrink: 0 }}>Skript da</span>
                 ) : null}
+                {/* Am eingeklappten Namen sichtbar, damit Kevin nicht aufklappen
+                    muss, um zu sehen, ob etwas vorbereitet ist. */}
+                {p.entwurf ? (
+                  <span
+                    style={{
+                      fontSize: 11,
+                      flexShrink: 0,
+                      color: p.entwurf.veraltet ? 'var(--ck-warn)' : 'var(--ck-accent)',
+                    }}
+                  >
+                    {p.entwurf.veraltet ? 'Entwurf veraltet' : 'Entwurf da'}
+                  </span>
+                ) : null}
               </button>
               <button
                 type="button"
@@ -193,6 +223,44 @@ export function Arbeitsliste({ posten, onErledigt, loom, projektLink, onNavigier
                 >
                   {p.text}
                 </div>
+                {p.entwurf ? (
+                  <div
+                    style={{
+                      border: '1px solid var(--ck-border-strong)',
+                      borderRadius: 6,
+                      padding: '10px 12px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 6,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+                      <span className="ck-label" style={{ color: 'var(--ck-accent)' }}>
+                        Entwurf
+                      </span>
+                      <span style={{ fontSize: 11, color: 'var(--ck-text-3)' }}>
+                        {entwurfStand(p.entwurf.erstelltAm)}
+                      </span>
+                    </div>
+                    {p.entwurf.veraltet ? (
+                      <span style={{ fontSize: 12, color: 'var(--ck-warn)' }}>
+                        Der Lead hat danach nochmal geschrieben — vor dem Senden gegenlesen.
+                      </span>
+                    ) : null}
+                    <div
+                      style={{
+                        whiteSpace: 'pre-wrap',
+                        fontSize: 13,
+                        lineHeight: 1.6,
+                        color: 'var(--ck-text-1)',
+                        maxHeight: 260,
+                        overflowY: 'auto',
+                      }}
+                    >
+                      {p.entwurf.text}
+                    </div>
+                  </div>
+                ) : null}
                 {kopierGesperrt ? (
                   <span style={{ fontSize: 12, color: 'var(--ck-warn)' }}>
                     Zwischenablage gesperrt — Text markieren und kopieren.

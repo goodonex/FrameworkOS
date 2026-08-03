@@ -10,7 +10,26 @@
 import type { Erstnachricht } from '../../hooks/useErstnachrichten'
 import type { LinkedinThread } from '../../types/db'
 import { bucketOf } from './linkedinFollowups'
-import type { Posten } from './prioritaet'
+import type { Posten, PostenEntwurf } from './prioritaet'
+
+/**
+ * Entwurf des Nacht-Agenten am Thread (Migration 0065), sofern einer anliegt.
+ *
+ * `veraltet` ist die eine Sicherung, die es hier braucht: hat der Lead nach dem
+ * Entwurf erneut geschrieben, antwortet der Text auf eine überholte Nachricht.
+ * Der Entwurf wird dann angezeigt, aber markiert — verworfen wird er nicht,
+ * denn oft trägt er trotzdem.
+ */
+function entwurfVon(t: LinkedinThread): PostenEntwurf | undefined {
+  const text = typeof t.entwurf === 'string' ? t.entwurf.trim() : ''
+  if (!text) return undefined
+  const erstelltAm = t.entwurf_at ?? null
+  const veraltet =
+    erstelltAm != null &&
+    t.last_message_at != null &&
+    new Date(t.last_message_at).getTime() > new Date(erstelltAm).getTime()
+  return { text, veraltet, erstelltAm }
+}
 
 function threadZuPosten(t: LinkedinThread, spur: Posten['spur'], praefix: string, text: string): Posten {
   return {
@@ -27,11 +46,17 @@ function threadZuPosten(t: LinkedinThread, spur: Posten['spur'], praefix: string
   }
 }
 
-/** Rang 3 — Lead hat geantwortet, wartet auf Kevin (bucketOf === 'du_bist_dran'). */
+/**
+ * Rang 3 — Lead hat geantwortet, wartet auf Kevin (bucketOf === 'du_bist_dran').
+ * `text` bleibt die Nachricht des Leads (der Kontext), der Entwurf hängt daneben.
+ */
 export function antwortPosten(threads: LinkedinThread[], heute: Date): Posten[] {
   return threads
     .filter((t) => bucketOf(t, heute) === 'du_bist_dran')
-    .map((t) => threadZuPosten(t, 'antwort', 'thread', t.preview || `Antwort an ${t.name || 'den Lead'} vorbereiten.`))
+    .map((t) => ({
+      ...threadZuPosten(t, 'antwort', 'thread', t.preview || `Antwort an ${t.name || 'den Lead'} vorbereiten.`),
+      entwurf: entwurfVon(t),
+    }))
 }
 
 /** Rang 4 — Lead hat Ja zum Loom gesagt, Skript/Aufnahme steht noch aus. */
@@ -47,7 +72,10 @@ export function loomPosten(threads: LinkedinThread[]): Posten[] {
 export function followupPosten(threads: LinkedinThread[], heute: Date): Posten[] {
   return threads
     .filter((t) => bucketOf(t, heute) === 'faellig')
-    .map((t) => threadZuPosten(t, 'followup', 'thread', t.preview || `Follow-up an ${t.name || 'den Lead'}.`))
+    .map((t) => ({
+      ...threadZuPosten(t, 'followup', 'thread', t.preview || `Follow-up an ${t.name || 'den Lead'}.`),
+      entwurf: entwurfVon(t),
+    }))
 }
 
 /** Rang 5 — versandfertige Erstnachrichten (Migration 0060). */

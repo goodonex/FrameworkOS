@@ -1,11 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion, MotionConfig } from 'framer-motion'
-import { useContacts } from '../../hooks/useContacts'
-import { useDeliverProjects } from '../../hooks/useDeliverProjects'
-import { useErstnachrichten } from '../../hooks/useErstnachrichten'
-import { useLinkedinThreads } from '../../hooks/useLinkedinThreads'
-import { useTasks } from '../../hooks/useTasks'
+import { useArbeitsDauern } from '../../hooks/useArbeitsDauern'
+import { usePosten } from '../../hooks/usePosten'
 import { useIsMobile } from '../../hooks/useViewport'
 import { supabase } from '../../lib/supabase'
 import { AnfragenZaehler } from '../components/AnfragenZaehler'
@@ -14,18 +11,12 @@ import { Arbeitsmodus, type ArbeitsmodusErgebnis } from '../components/Arbeitsmo
 import { ConversionPanel } from '../components/ConversionPanel'
 import { WerkzeugePanel } from '../components/WerkzeugePanel'
 import { useActiveBrand } from '../lib/activeBrand'
-import {
-  antwortPosten,
-  erstnachrichtPosten,
-  followupPosten,
-  loomPosten,
-  zeilenId,
-} from '../lib/arbeitsmodusQuellen'
+import { zeilenId } from '../lib/arbeitsmodusQuellen'
 import { erledigePosten } from '../lib/arbeitsmodusTracking'
-import { kundeLiegtPosten, kundenaufgabenPosten, liegendeProjekte } from '../lib/kundenarbeit'
 import { bucketOf } from '../lib/linkedinFollowups'
 import { funnelKpis, sumField } from '../lib/metricsAggregate'
-import { ordnePosten, tagesstand, type Posten, type PostenQuellen, type Spur } from '../lib/prioritaet'
+import { tagesstand, type Posten, type Spur } from '../lib/prioritaet'
+import { tagesansage } from '../lib/tagesansage'
 import { postRun } from '../lib/runnerApi'
 import { fetchSalesLibrary, salesFileUrl, type SalesLibrary } from '../lib/salesLibraryApi'
 import { useDailyMetrics } from '../lib/useDailyMetrics'
@@ -43,17 +34,6 @@ import { useRunnerData } from '../lib/useRunnerData'
  * Fenster heraus) und den Ein-Knopf-Anfragen-Zähler. Am Desktop bleibt
  * alles im Fenster — Vollbild wäre dort verschenkter Platz.
  */
-
-const SPUR_LABEL: Record<Spur, string> = {
-  kundenaufgabe: 'Kundenaufgabe',
-  kunde_liegt: 'Projekt liegt',
-  antwort: 'Antwort',
-  loom: 'Loom',
-  erstnachricht: 'Erstnachricht',
-  followup: 'Follow-up',
-  anfrage: 'Anfrage',
-  inmail: 'InMail',
-}
 
 function pct(v: number | null): string {
   return v == null ? '—' : `${Math.round(v * 100)}%`
@@ -208,11 +188,10 @@ export function SalesDashboard() {
   const { activeBrand } = useActiveBrand()
   const slug = activeBrand?.slug
   const metrics = useDailyMetrics()
-  const contacts = useContacts(slug)
-  const projekte = useDeliverProjects(slug)
-  const tasks = useTasks(slug)
-  const linkedinThreads = useLinkedinThreads(slug)
-  const erstnachrichten = useErstnachrichten(slug)
+  // Posten-Verdrahtung liegt seit Etappe 3 im gemeinsamen Hook — das Heute-Deck
+  // liest exakt dieselbe Rangfolge.
+  const { geordnet, quellen, liegend, jetzt, tasks, linkedinThreads, erstnachrichten } = usePosten(slug)
+  const dauern = useArbeitsDauern(slug)
   const { runner, runs, refresh: refreshRuns } = useRunnerData()
 
   const [offenKachelId, setOffenKachelId] = useState<string | null>(null)
@@ -222,30 +201,12 @@ export function SalesDashboard() {
   const [arbeitsmodus, setArbeitsmodus] = useState<{ spur: Spur | 'alle'; posten: Posten[] } | null>(null)
   const [anfragenVollbild, setAnfragenVollbild] = useState(false)
 
-  // Minutentakt statt Date.now() bei jedem Render (Muster aus LinkedinArea) —
-  // sonst rechnen die useMemos unten bei jedem Tastendruck neu.
-  const [jetzt, setJetzt] = useState(() => new Date())
-  useEffect(() => {
-    const id = window.setInterval(() => setJetzt(new Date()), 60_000)
-    return () => window.clearInterval(id)
-  }, [])
-
-  const kundenaufgabePosten = useMemo(
-    () => kundenaufgabenPosten(tasks.items, projekte.items, contacts.items),
-    [tasks.items, projekte.items, contacts.items],
-  )
-  const liegend = useMemo(
-    () => liegendeProjekte(projekte.items, tasks.items, contacts.items, jetzt),
-    [projekte.items, tasks.items, contacts.items, jetzt],
-  )
-  const kundeLiegtListe = useMemo(
-    () => kundeLiegtPosten(projekte.items, tasks.items, contacts.items, jetzt),
-    [projekte.items, tasks.items, contacts.items, jetzt],
-  )
-  const antwortListe = useMemo(() => antwortPosten(linkedinThreads.items, jetzt), [linkedinThreads.items, jetzt])
-  const loomListe = useMemo(() => loomPosten(linkedinThreads.items), [linkedinThreads.items])
-  const followupListe = useMemo(() => followupPosten(linkedinThreads.items, jetzt), [linkedinThreads.items, jetzt])
-  const erstnachrichtListe = useMemo(() => erstnachrichtPosten(erstnachrichten.items), [erstnachrichten.items])
+  const kundenaufgabePosten = quellen.kundenaufgabe ?? []
+  const kundeLiegtListe = quellen.kunde_liegt ?? []
+  const antwortListe = quellen.antwort ?? []
+  const loomListe = quellen.loom ?? []
+  const followupListe = quellen.followup ?? []
+  const erstnachrichtListe = quellen.erstnachricht ?? []
 
   const verwaistAnzahl = useMemo(
     () => linkedinThreads.items.filter((t) => bucketOf(t, jetzt) === 'verwaist').length,
@@ -256,22 +217,6 @@ export function SalesDashboard() {
     () => linkedinThreads.items.filter((t) => t.starred && t.loom_status === 'verschickt').length,
     [linkedinThreads.items],
   )
-
-  const quellen: PostenQuellen = useMemo(
-    () => ({
-      kundenaufgabe: kundenaufgabePosten,
-      kunde_liegt: kundeLiegtListe,
-      antwort: antwortListe,
-      loom: loomListe,
-      erstnachricht: erstnachrichtListe,
-      followup: followupListe,
-      anfrage: [],
-      inmail: [],
-    }),
-    [kundenaufgabePosten, kundeLiegtListe, antwortListe, loomListe, erstnachrichtListe, followupListe],
-  )
-
-  const geordnet = useMemo(() => ordnePosten(quellen, jetzt), [quellen, jetzt])
 
   const monthRevenue = useMemo(() => sumField(metrics.monthRows, 'umsatz'), [metrics.monthRows])
   const funnel = useMemo(() => funnelKpis(metrics.monthRows, monthRevenue), [metrics.monthRows, monthRevenue])
@@ -468,9 +413,9 @@ export function SalesDashboard() {
       id: 'jetzt-dran',
       titel: 'Jetzt dran',
       kennzahl: geordnet.length ? `${geordnet.length} offen` : 'Alles abgearbeitet',
-      unterzeile: geordnet.length
-        ? `zuerst: ${SPUR_LABEL[geordnet[0].spur]} — ${geordnet[0].name}`
-        : undefined,
+      // Kevins Morgen-Frage, aus seinen eigenen Messdaten (arbeits_dauern):
+      // „12 offen · ≈ 1 h 40 · um 13:25 durch".
+      unterzeile: geordnet.length ? tagesansage(geordnet, dauern, jetzt) : undefined,
       inhalt: liste(geordnet),
       fensterAktion: mobilArbeitsmodus('alle', geordnet),
     },
@@ -575,6 +520,22 @@ export function SalesDashboard() {
   ]
 
   const offenKachel = kacheln.find((k) => k.id === offenKachelId) ?? null
+
+  // Sprung aus dem Heute-Deck: `/sales?kachel=antworten` öffnet direkt das
+  // zuständige Fenster. Der Parameter wird danach entfernt, sonst öffnete sich
+  // die Kachel nach jedem Schließen wieder.
+  const [suchParams, setSuchParams] = useSearchParams()
+  const kachelParam = suchParams.get('kachel')
+  useEffect(() => {
+    if (!kachelParam) return
+    if (kacheln.some((k) => k.id === kachelParam)) setOffenKachelId(kachelParam)
+    const next = new URLSearchParams(suchParams)
+    next.delete('kachel')
+    setSuchParams(next, { replace: true })
+    // kacheln wird bei jedem Render neu gebaut — die Abhängigkeit ist bewusst
+    // nur der Parameter, sonst liefe der Effekt endlos.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kachelParam])
 
   const oeffneKachel = useCallback(
     (id: string) => {

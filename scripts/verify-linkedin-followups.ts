@@ -248,20 +248,40 @@ check('11b knapp über Schwelle', isDue(makeThread({ followup_stage: 0, last_mes
 
   // Unveraendertes Verhalten: eigener Thread auf Stufe 3 wird archiviert.
   const abschluss = makeThread({ last_from: 'me', last_message_at: dayAgo(20), followup_stage: 3, status: 'active' })
-  check('13h Break-up faellig -> archiviert', markDonePatch(abschluss, NOW), { status: 'archived' })
+  check('13h Break-up faellig -> archiviert', markDonePatch(abschluss, NOW), {
+    entwurf: null,
+    entwurf_at: null,
+    status: 'archived',
+  })
 
   // Unveraendertes Verhalten: faelliger eigener Thread geht eine Stufe weiter.
   const faellig = makeThread({ last_from: 'me', last_message_at: dayAgo(5), followup_stage: 0, status: 'active' })
-  check('13i faellig -> naechste Stufe', markDonePatch(faellig, NOW), { followup_stage: 1 })
+  check('13i faellig -> naechste Stufe', markDonePatch(faellig, NOW), {
+    entwurf: null,
+    entwurf_at: null,
+    followup_stage: 1,
+  })
 
   // Altlast (30+ Tage, nie nachgefasst) wird wiederbelebt, nicht archiviert.
   const verwaist = makeThread({ last_from: 'me', last_message_at: dayAgo(40), followup_stage: 0, status: 'active' })
-  check('13j Altlast -> Stufe 1', markDonePatch(verwaist, NOW), { followup_stage: 1 })
+  check('13j Altlast -> Stufe 1', markDonePatch(verwaist, NOW)?.followup_stage, 1)
 
   // Endzustaende ruehrt markDone nicht mehr an.
   for (const status of ['archived', 'won', 'lost'] as const) {
     const t = makeThread({ last_from: 'them', last_message_at: dayAgo(1), followup_stage: 3, status })
     check(`13k ${status} bleibt unberuehrt`, markDonePatch(t, NOW), null)
+  }
+
+  // 13l: „Erledigt" räumt den Entwurf in JEDEM Zweig weg (0065) — sonst böte die
+  // Liste morgen an, dieselbe Nachricht ein zweites Mal zu verschicken.
+  for (const [label, t] of [
+    ['Antwort', makeThread({ last_from: 'them', last_message_at: dayAgo(1), status: 'active' })],
+    ['faellig', faellig],
+    ['Break-up', abschluss],
+  ] as const) {
+    const patch = markDonePatch({ ...t, entwurf: 'Moin …', entwurf_at: dayAgo(1) }, NOW)
+    check(`13l ${label}: Entwurf wird geloescht`, patch?.entwurf, null)
+    check(`13l ${label}: Entwurfs-Zeitstempel weg`, patch?.entwurf_at, null)
   }
 }
 

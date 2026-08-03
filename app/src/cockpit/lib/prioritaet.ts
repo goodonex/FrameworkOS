@@ -31,6 +31,19 @@ export const RANGFOLGE: Spur[] = [
   'inmail',
 ]
 
+/**
+ * Vorbereiteter, versandfertiger Text am Posten (Etappe 3, Schritt 3) — heute
+ * der Antwort-Entwurf des Nacht-Agenten. Liegt einer an, gilt das Kopier-Gesetz:
+ * die Oberfläche zeigt „Nachricht kopieren".
+ */
+export interface PostenEntwurf {
+  text: string
+  /** Der Lead hat NACH dem Entwurf erneut geschrieben — nicht blind verschicken. */
+  veraltet: boolean
+  /** Wann der Entwurf entstand (ISO), für die Zeile am Posten. */
+  erstelltAm: string | null
+}
+
 /** Ein Arbeitsposten für den Arbeitsmodus (Zug 3). */
 export interface Posten {
   /** eindeutig über alle Spuren hinweg (z. B. `thread:<id>`, `task:<id>`) */
@@ -45,6 +58,8 @@ export interface Posten {
   timestamp: string | null
   /** LinkedIn-Stern (Loom zugesagt) — sticht innerhalb der Spur vor das Alter */
   starred?: boolean
+  /** Vorbereitete Nachricht, die hier nur noch kopiert werden muss */
+  entwurf?: PostenEntwurf
 }
 
 /** Rohquellen je Spur — fehlt eine (Tabelle nicht migriert), fehlt nur diese Spur. */

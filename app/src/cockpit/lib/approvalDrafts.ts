@@ -21,6 +21,12 @@ export interface FollowupDraft {
    * `contact_id`) — sonst stünde auf der Freigabe-Karte nur „Unbekannter Kontakt".
    */
   name?: string
+  /**
+   * LinkedIn-Thread, zu dem der Entwurf gehört. Erst damit kann der Entwurf am
+   * Posten kleben statt nur in der Freigaben-Queue zu liegen (Etappe 3,
+   * Schritt 3) — `contact_id` trägt das nicht, die ist bei Threads meist null.
+   */
+  thread_key?: string
 }
 
 function coerceChannel(x: unknown): DraftChannel {
@@ -58,6 +64,8 @@ export function parseDrafts(content: string): FollowupDraft[] {
         subject: typeof rec.subject === 'string' ? rec.subject : undefined,
         message,
         name: typeof rec.name === 'string' && rec.name.trim() ? rec.name.trim() : undefined,
+        thread_key:
+          typeof rec.thread_key === 'string' && rec.thread_key.trim() ? rec.thread_key.trim() : undefined,
       })
     }
     return out

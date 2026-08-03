@@ -16,6 +16,8 @@ import { join, resolve, sep } from 'node:path'
 import { syncThreads } from './linkedin/sync.mjs'
 import { upsertThreads } from './linkedin/upsert.mjs'
 import { ladeErstnachrichten } from './linkedin/erstnachrichten.mjs'
+import { baueAntwortInput, holeAntwortThreads } from './linkedin/antwortThreads.mjs'
+import { parseDraftsRoh, schreibeEntwuerfe } from './linkedin/entwuerfe.mjs'
 
 // ---------- Lokale .env (nur für Secrets wie den Supabase-Key; gitignored) ----------
 // Minimaler Parser (zero-dependency). Prozess-Env hat Vorrang vor der Datei.
@@ -149,6 +151,13 @@ const AGENT_CATALOG = [
     id: 'linkedin-followup-entwuerfe',
     label: 'LinkedIn-Follow-up-Entwürfe',
     description: 'Entwirft Follow-up-DMs für fällige LinkedIn-Threads (Wargame linkedin-followups).',
+    kind: 'readonly',
+  },
+  {
+    id: 'linkedin-antwort-entwuerfe',
+    label: 'Antwort-Entwürfe (LinkedIn)',
+    description:
+      'Entwirft Antworten auf Leads, die geschrieben haben und auf Kevin warten. Läuft nachts von selbst.',
     kind: 'readonly',
   },
   {
@@ -321,10 +330,79 @@ async function runsListe(limit, mitInhalt = false) {
   return [...aktiv, ...runs]
 }
 
+/**
+ * Eingabe für `linkedin-antwort-entwuerfe`: die Threads, in denen der Lead
+ * geschrieben hat und auf Kevin wartet. Wird hier im Runner gebaut, nicht im
+ * Cockpit — so gibt es genau eine Fassung der Auswahlregel, und der Knopf am
+ * Handy schickt keine Thread-Daten über die Brücke.
+ */
+async function antwortEntwuerfeInput(now = new Date()) {
+  if (!SNAPSHOT_ENABLED) return null
+  const { threads } = await holeAntwortThreads({
+    supabaseUrl: SUPABASE_URL,
+    headers: supabaseHeaders(),
+    brandSlug: process.env.LINKEDIN_BRAND_SLUG ?? 'herrmann',
+    now,
+  })
+  if (!threads.length) return null
+  return baueAntwortInput(threads, now)
+}
+
+/**
+ * Nach einem fertigen `linkedin-antwort-entwuerfe`-Lauf: Entwürfe aus dem
+ * Markdown lösen und an die Threads schreiben. Erst damit klebt der Entwurf am
+ * Posten statt im Run — der Unterschied zwischen „ist irgendwo" und „ist da".
+ *
+ * Fehler hier dürfen den Lauf nicht nachträglich zum Fehlschlag machen: das
+ * Markdown steht bereits in der Run-Datei und in der Freigaben-Queue.
+ */
+async function entwuerfeAnThreads(runId, markdown) {
+  if (!SNAPSHOT_ENABLED) return
+  try {
+    const drafts = parseDraftsRoh(markdown)
+    if (!drafts.length) {
+      console.warn(`[runner] ${runId}: kein verwertbarer json-Block — keine Entwürfe am Posten`)
+      return
+    }
+    const brandSlug = process.env.LINKEDIN_BRAND_SLUG ?? 'herrmann'
+    const br = await fetch(
+      `${SUPABASE_URL}/rest/v1/brands?slug=eq.${encodeURIComponent(brandSlug)}&select=id&limit=1`,
+      { headers: supabaseHeaders() },
+    )
+    const [brand] = br.ok ? await br.json() : []
+    if (!brand?.id) return
+
+    const r = await schreibeEntwuerfe({
+      supabaseUrl: SUPABASE_URL,
+      headers: supabaseHeaders(),
+      brandId: brand.id,
+      runId,
+      drafts,
+    })
+    console.log(
+      `[runner] Entwürfe am Posten: ${r.geschrieben} geschrieben` +
+        (r.ohneThread ? ` · ${r.ohneThread} ohne thread_key` : '') +
+        (r.nichtGefunden ? ` · ${r.nichtGefunden} ohne passenden Thread` : ''),
+    )
+  } catch (e) {
+    console.error('[runner] Entwürfe konnten nicht an die Threads geschrieben werden:', e?.message ?? e)
+  }
+}
+
 // ---------- Agent starten ----------
 async function startRun(agent, input) {
   const id = `${nowStamp()}-${agent}`
   const startedAt = new Date().toISOString()
+
+  // Der Antwort-Entwürfe-Agent holt seine Threads immer hier — egal ob der
+  // Start vom Cockpit, von der Brücke oder aus der Nacht-Routine kommt.
+  if (agent === 'linkedin-antwort-entwuerfe' && !Array.isArray(input?.threads)) {
+    const gebaut = await antwortEntwuerfeInput()
+    if (!gebaut) {
+      throw Object.assign(new Error('Keine wartenden Antworten — nichts zu entwerfen.'), { code: 'ELEER' })
+    }
+    input = gebaut.input
+  }
 
   // Intent in die Queue (Nachvollziehbarkeit + Debugging)
   await writeFile(
@@ -398,6 +476,7 @@ async function startRun(agent, input) {
     try {
       if (code === 0 && stdout.trim()) {
         await writeRunFile(id, agent, 'done', startedAt, stdout.trim() + '\n')
+        if (agent === 'linkedin-antwort-entwuerfe') await entwuerfeAnThreads(id, stdout)
       } else {
         const err = [
           `# Run fehlgeschlagen (Exit ${code})`,
@@ -1703,6 +1782,44 @@ async function maybeMorgenbrief() {
   }
 }
 
+/**
+ * Antwort-Entwürfe als Nacht-Routine (Etappe 3, Schritt 2 — Leitprinzip
+ * Klick-Ökonomie, Punkt 3: „Was ein Agent vorwegnehmen kann, ist kein Klick
+ * mehr"). Werktags ab ~6:00 einmal pro Kalendertag, also vor dem Morgenbrief:
+ * Kevin setzt sich hin, und an jedem wartenden Lead klebt schon ein Entwurf.
+ *
+ * Gleiches Muster wie maybeDream/maybeMorgenbrief — die Run-Dateien im Vault
+ * sind das Gedächtnis, es braucht keinen eigenen Zustand.
+ */
+const ENTWUERFE_AB_STUNDE = Number(process.env.ANTWORT_ENTWUERFE_STUNDE ?? 6)
+
+async function maybeAntwortEntwuerfe() {
+  try {
+    if (!SNAPSHOT_ENABLED) return // ohne service_role kein Zugriff auf linkedin_threads
+    const jetzt = new Date()
+    const wochentag = jetzt.getDay()
+    if (wochentag === 0 || wochentag === 6) return
+    if (jetzt.getHours() < ENTWUERFE_AB_STUNDE) return
+    if ([...running.values()].some((r) => r.agent === 'linkedin-antwort-entwuerfe')) return
+    const heute = nowStamp().slice(0, 10)
+    const names = await readdir(RUNS_DIR)
+    if (names.some((n) => n.startsWith(heute) && n.includes('linkedin-antwort-entwuerfe'))) return
+
+    // Keine wartenden Leads → kein Lauf. Ein leerer Entwurfs-Run wäre nur eine
+    // Zeile Rauschen in der Freigaben-Queue.
+    const gebaut = await antwortEntwuerfeInput(jetzt)
+    if (!gebaut) return
+
+    console.log(
+      `[runner] antwort-entwuerfe startet — ${gebaut.input.threads.length} wartende Leads` +
+        (gebaut.weitereWarten ? ` (+${gebaut.weitereWarten} über dem Limit)` : ''),
+    )
+    await startRun('linkedin-antwort-entwuerfe', gebaut.input)
+  } catch (e) {
+    console.error('[runner] antwort-entwuerfe übersprungen:', e?.message ?? e)
+  }
+}
+
 /** Dream-Check (REBUILD-PLAN §8): beim Start, max. 1x pro Kalendertag. */
 async function maybeDream() {
   try {
@@ -1733,6 +1850,12 @@ server.listen(PORT, '127.0.0.1', () => {
   setTimeout(() => void maybeMorgenbrief(), 10_000)
   const mb = setInterval(() => void maybeMorgenbrief(), MORGENBRIEF_CHECK_MS)
   mb.unref?.()
+
+  // Antwort-Entwürfe im selben Takt, aber eine Stunde früher als der Morgenbrief:
+  // beim Aufklappen des Macs prüfen und dann alle 5 Minuten.
+  setTimeout(() => void maybeAntwortEntwuerfe(), 20_000)
+  const ae = setInterval(() => void maybeAntwortEntwuerfe(), MORGENBRIEF_CHECK_MS)
+  ae.unref?.()
 
   // OS-Map-Snapshot für die Live-Domain: einmal beim Start + periodisch spiegeln.
   if (SNAPSHOT_ENABLED) {

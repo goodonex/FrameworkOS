@@ -378,6 +378,14 @@ export type LinkedinThreadStatus = 'active' | 'waiting_reply' | 'won' | 'lost' |
 export type LinkedinLastFrom = 'me' | 'them' | 'unknown'
 export type LoomStatus = 'offen' | 'aufgenommen' | 'verschickt' | 'entfaellt'
 
+/** Eine Nachricht im gespiegelten Gesprächsverlauf (0064). */
+export interface LinkedinNachricht {
+  sender: LinkedinLastFrom
+  text: string
+  /** ISO-Zeitstempel; null, wenn Voyager keinen brauchbaren geliefert hat. */
+  ts: string | null
+}
+
 /** Siehe supabase/migrations/0058_linkedin_threads.sql + 0061_loom_status.sql. */
 export interface LinkedinThread {
   id: string
@@ -401,6 +409,17 @@ export interface LinkedinThread {
   /** 0061: Status des zugesagten Looms — nur relevant, wenn `starred`. */
   loom_status: LoomStatus
   loom_erledigt_at: string | null
+  /**
+   * 0064: die letzten ~10 Nachrichten, älteste zuerst. Optional, weil die Spalte
+   * vor der Migration schlicht fehlt — immer über `verlaufVon()` lesen.
+   */
+  verlauf?: LinkedinNachricht[]
+  /** 0065: versandfertiger Antwort-Entwurf des Agenten; null = keiner offen. */
+  entwurf?: string | null
+  /** 0065: wann der Entwurf entstand — älter als `last_message_at` heißt veraltet. */
+  entwurf_at?: string | null
+  /** 0065: Run, aus dem der Entwurf stammt (Nachvollziehbarkeit). */
+  entwurf_run_id?: string | null
 }
 
 export type SalesFieldType = 'textarea' | 'text' | 'number' | 'toggle'

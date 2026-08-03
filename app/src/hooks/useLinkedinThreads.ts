@@ -69,7 +69,13 @@ export function useLinkedinThreads(brandSlug: string | undefined): UseLinkedinTh
   const applyPatch = useCallback(
     async (id: string, patch: Record<string, unknown>) => {
       if (!supabase) return
-      const { error: err } = await supabase.from('linkedin_threads').update(patch).eq('id', id)
+      let { error: err } = await supabase.from('linkedin_threads').update(patch).eq('id', id)
+      // Solange 0065 nicht gepusht ist, kennt die Tabelle die Entwurfs-Spalten
+      // nicht. „Erledigt" darf daran nicht scheitern — dann eben ohne sie.
+      if (err && /entwurf/i.test(err.message)) {
+        const { entwurf: _e, entwurf_at: _a, ...ohneEntwurf } = patch
+        ;({ error: err } = await supabase.from('linkedin_threads').update(ohneEntwurf).eq('id', id))
+      }
       if (err) {
         setError(err.message)
         return

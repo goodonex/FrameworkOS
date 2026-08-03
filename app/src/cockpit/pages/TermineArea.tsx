@@ -3,59 +3,23 @@ import { useNavigate } from 'react-router-dom'
 import { useContacts } from '../../hooks/useContacts'
 import { useContentPieces } from '../../hooks/useContentPieces'
 import { useBookings } from '../../hooks/useSalesPro'
-import type { Contact } from '../../types/db'
 import { HeuteTabs } from '../components/HeuteTabs'
 import { useActiveBrand } from '../lib/activeBrand'
 import { runnerDirekt } from '../lib/runnerBridge'
+import {
+  eventsByDate as baueEvents,
+  KIND_LABEL,
+  KIND_TONE,
+  ymd,
+  type EventKind,
+} from '../lib/termineEvents'
 import { CALENDAR_ICAL_KEY, useCalendarFeed } from '../lib/useCalendarFeed'
-
-type EventKind = 'booking' | 'followup' | 'content' | 'external'
-
-interface CalEvent {
-  id: string
-  date: string // YYYY-MM-DD
-  time?: string
-  kind: EventKind
-  title: string
-  sub?: string
-  href?: string
-  muted?: boolean
-}
-
-const KIND_TONE: Record<EventKind, string> = {
-  booking: 'var(--ck-accent)',
-  followup: 'var(--ck-warn)',
-  content: 'var(--ck-idle)',
-  external: '#a78bfa',
-}
-const KIND_LABEL: Record<EventKind, string> = {
-  booking: 'Termin',
-  followup: 'Follow-up',
-  content: 'Content',
-  external: 'Kalender',
-}
 
 const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
 const MONTHS = [
   'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
   'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
 ]
-
-function ymd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
-    d.getDate(),
-  ).padStart(2, '0')}`
-}
-
-function contactLabel(c: Contact): string {
-  return c.name?.trim() || c.company?.trim() || c.email?.trim() || 'Kontakt'
-}
-
-function hhmm(iso: string): string | undefined {
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return undefined
-  return d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
-}
 
 /** 42-Tage-Raster ab dem Montag vor dem Monatsersten. */
 function monthGrid(year: number, month: number): Date[] {
@@ -113,71 +77,16 @@ export function TermineArea() {
 
   const todayYmd = ymd(new Date())
 
-  const eventsByDate = useMemo(() => {
-    const map = new Map<string, CalEvent[]>()
-    const push = (e: CalEvent) => {
-      const arr = map.get(e.date)
-      if (arr) arr.push(e)
-      else map.set(e.date, [e])
-    }
-
-    for (const b of bookings.items) {
-      if (!b.starts_at) continue
-      const muted = b.status === 'cancelled' || b.status === 'no_show'
-      push({
-        id: `b-${b.id}`,
-        date: b.starts_at.slice(0, 10),
-        time: hhmm(b.starts_at),
-        kind: 'booking',
-        title: b.name || 'Termin',
-        sub: b.status === 'cancelled' ? 'abgesagt' : b.status === 'no_show' ? 'No-Show' : undefined,
-        href: b.contact_id ? `/sales/${b.contact_id}` : undefined,
-        muted,
-      })
-    }
-
-    for (const c of contacts.items) {
-      if (!c.next_follow_up_at || c.pipeline_stage === 'paused') continue
-      const typ = c.custom_fields?.next_termin_typ
-      push({
-        id: `f-${c.id}`,
-        date: c.next_follow_up_at.slice(0, 10),
-        time: c.next_follow_up_at.length > 10 ? hhmm(c.next_follow_up_at) : undefined,
-        kind: 'followup',
-        title: contactLabel(c),
-        sub: typeof typ === 'string' && typ ? typ : 'Follow-up',
-        href: `/sales/${c.id}`,
-      })
-    }
-
-    for (const p of content.items) {
-      if (!p.scheduled_at) continue
-      push({
-        id: `c-${p.id}`,
-        date: p.scheduled_at.slice(0, 10),
-        kind: 'content',
-        title: p.title || 'Content',
-        sub: p.published_at ? 'live' : 'geplant',
-        href: '/content',
-        muted: Boolean(p.published_at),
-      })
-    }
-
-    for (const e of cal.events) {
-      push({
-        id: `x-${e.id}`,
-        date: e.date,
-        time: e.time,
-        kind: 'external',
-        title: e.title,
-      })
-    }
-
-    for (const arr of map.values()) {
-      arr.sort((a, b) => (a.time ?? '99').localeCompare(b.time ?? '99'))
-    }
-    return map
-  }, [bookings.items, contacts.items, content.items, cal.events])
+  const eventsByDate = useMemo(
+    () =>
+      baueEvents({
+        bookings: bookings.items,
+        contacts: contacts.items,
+        content: content.items,
+        kalender: cal.events,
+      }),
+    [bookings.items, contacts.items, content.items, cal.events],
+  )
 
   const grid = useMemo(() => monthGrid(cursor.year, cursor.month), [cursor])
 

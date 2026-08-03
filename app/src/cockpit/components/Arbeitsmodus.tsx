@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import type { Posten } from '../lib/prioritaet'
-import type { LoomSkriptAktionen } from './Arbeitsliste'
+import { entwurfStand, type LoomSkriptAktionen } from './Arbeitsliste'
 
 /** Ergebnis eines abgehakten Postens — Zug 4 schreibt daraus genau ein Metrik-Feld + die Dauer. */
 export interface ArbeitsmodusErgebnis {
@@ -57,10 +57,12 @@ export function Arbeitsmodus({ posten, onErledigt, onClose, loom }: Arbeitsmodus
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
+  // Wie in der Arbeitsliste: liegt ein Entwurf an, ist ER der versandfertige
+  // Text — `text` ist bei Antworten die Nachricht des Leads.
   const kopieren = useCallback(async () => {
     if (!aktuell) return
     try {
-      await navigator.clipboard.writeText(aktuell.text)
+      await navigator.clipboard.writeText(aktuell.entwurf?.text ?? aktuell.text)
       setKopiert(true)
       setKopierGesperrt(false)
       window.setTimeout(() => setKopiert(false), 2000)
@@ -200,6 +202,32 @@ export function Arbeitsmodus({ posten, onErledigt, onClose, loom }: Arbeitsmodus
           }}
         >
           {aktuell.text}
+
+          {aktuell.entwurf ? (
+            <div
+              style={{
+                marginTop: 14,
+                border: '1px solid var(--ck-border-strong)',
+                borderRadius: 6,
+                padding: '10px 12px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+                <span className="ck-label" style={{ color: 'var(--ck-accent)' }}>
+                  Entwurf
+                </span>
+                <span style={{ fontSize: 11, color: 'var(--ck-text-3)' }}>
+                  {entwurfStand(aktuell.entwurf.erstelltAm)}
+                </span>
+              </div>
+              {aktuell.entwurf.veraltet ? (
+                <div style={{ fontSize: 12, color: 'var(--ck-warn)', marginBottom: 6 }}>
+                  Der Lead hat danach nochmal geschrieben — vor dem Senden gegenlesen.
+                </div>
+              ) : null}
+              <div style={{ color: 'var(--ck-text-1)' }}>{aktuell.entwurf.text}</div>
+            </div>
+          ) : null}
         </div>
 
         {kopierGesperrt ? (
@@ -209,10 +237,10 @@ export function Arbeitsmodus({ posten, onErledigt, onClose, loom }: Arbeitsmodus
         ) : null}
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, flexShrink: 0 }}>
-          {/* Kopieren nur, wo `text` eine versandfertige Nachricht ist — eine
-              Aufgabenbeschreibung zu kopieren ist sinnlos. Bei Looms führt der
-              Weg stattdessen zum Skript. */}
-          {aktuell.spur === 'erstnachricht' ? (
+          {/* Kopieren nur, wo ein versandfertiger Text liegt: Erstnachricht oder
+              vorbereiteter Entwurf. Eine Aufgabenbeschreibung zu kopieren ist
+              sinnlos; bei Looms führt der Weg stattdessen zum Skript. */}
+          {aktuell.spur === 'erstnachricht' || aktuell.entwurf ? (
             <button
               type="button"
               className="ck-btn ck-btn--primary"
@@ -258,7 +286,7 @@ export function Arbeitsmodus({ posten, onErledigt, onClose, loom }: Arbeitsmodus
           ) : null}
           <button
             type="button"
-            className={`ck-btn${aktuell.spur === 'erstnachricht' || aktuell.spur === 'loom' ? '' : ' ck-btn--primary'}`}
+            className={`ck-btn${aktuell.spur === 'erstnachricht' || aktuell.spur === 'loom' || aktuell.entwurf ? '' : ' ck-btn--primary'}`}
             style={{ minHeight: 48, flex: '1 1 auto' }}
             onClick={erledigt}
           >

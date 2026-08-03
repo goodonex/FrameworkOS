@@ -308,7 +308,7 @@ export function CockpitHome() {
       </div>
     ) : null}
     <div style={{ marginBottom: 12 }}>
-      <HeuteDeck slug={activeBrand?.slug} contacts={contacts} />
+      <HeuteDeck slug={activeBrand?.slug} />
     </div>
     <div
       ref={gridRef}
