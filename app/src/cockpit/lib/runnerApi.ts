@@ -104,20 +104,19 @@ export async function fetchRun(id: string): Promise<RunDetail> {
 }
 
 /**
- * Holt eine private iCal-URL über den Runner-Proxy (umgeht Browser-CORS).
+ * Kalender-Rohtext für /termine.
  *
- * Ohne direkten Draht kommt der Kalender aus dem Spiegel — die übergebene URL
- * spielt dort keine Rolle: sie liegt im localStorage des Macs und ist auf dem
- * Handy nie gesetzt. Der Runner holt den Feed mit `CALENDAR_ICAL_URL` aus
- * runner/.env.
+ * Der Spiegel hat IMMER Vorrang — auch am Mac. Sonst zeigte derselbe Tag am
+ * Handy alle Kalender aus `CALENDAR_ICAL_URL` und am Rechner nur den einen aus
+ * dem ⚙-Panel (localStorage): zwei Wahrheiten auf dieselbe Frage. Die lokale
+ * URL bleibt Rückfallebene, solange der Runner keine Kalender kennt.
  */
 export async function fetchCalendar(icalUrl: string | null): Promise<string> {
+  const spiegel = await leseSpiegel<{ ical: string }>('calendar').catch(() => null)
+  if (spiegel?.data?.ical) return spiegel.data.ical
+
   if (!runnerDirekt()) {
-    const spiegel = await leseSpiegel<{ ical: string }>('calendar')
-    if (!spiegel) {
-      throw new Error('Kein Kalender-Spiegel — CALENDAR_ICAL_URL in runner/.env setzen, Runner neu starten.')
-    }
-    return spiegel.data.ical
+    throw new Error('Kein Kalender-Spiegel — CALENDAR_ICAL_URL in runner/.env setzen, Runner neu starten.')
   }
   if (!icalUrl) throw new Error('Keine iCal-URL hinterlegt.')
   const { ical } = await req<{ ical: string }>(`/calendar?url=${encodeURIComponent(icalUrl)}`)
