@@ -72,7 +72,7 @@ export function ProjectLeadsPanel({ slug, project }: ProjectLeadsPanelProps) {
     >
       <div className="flex flex-col gap-4">
         {error ? (
-          <p className="font-mono" style={{ fontSize: 11, color: 'var(--accent-coral)' }}>
+          <p className="font-mono" style={{ fontSize: 11, color: 'var(--ck-warn)' }}>
             {error}
           </p>
         ) : null}
@@ -85,9 +85,9 @@ export function ProjectLeadsPanel({ slug, project }: ProjectLeadsPanelProps) {
               flex: '1 1 180px',
               padding: '8px 10px',
               borderRadius: 10,
-              border: '1px solid var(--glass-border-2)',
-              background: 'var(--glass-1)',
-              color: 'var(--text-primary)',
+              border: '1px solid var(--ck-border-strong)',
+              background: 'var(--ck-panel)',
+              color: 'var(--ck-text-1)',
               fontSize: 12,
             }}
           >
@@ -107,8 +107,8 @@ export function ProjectLeadsPanel({ slug, project }: ProjectLeadsPanelProps) {
               fontSize: 11,
               padding: '8px 14px',
               borderRadius: 10,
-              border: '1px solid var(--accent-teal)',
-              color: 'var(--accent-teal)',
+              border: '1px solid var(--ck-accent)',
+              color: 'var(--ck-accent)',
             }}
           >
             Zuweisen
@@ -117,7 +117,7 @@ export function ProjectLeadsPanel({ slug, project }: ProjectLeadsPanelProps) {
 
         <div
           className="flex flex-wrap gap-2 rounded-xl p-3"
-          style={{ border: '1px solid var(--glass-border-2)' }}
+          style={{ border: '1px solid var(--ck-border-strong)' }}
         >
           <input
             type="text"
@@ -128,9 +128,9 @@ export function ProjectLeadsPanel({ slug, project }: ProjectLeadsPanelProps) {
               flex: '1 1 140px',
               padding: '8px 10px',
               borderRadius: 10,
-              border: '1px solid var(--glass-border-1)',
-              background: 'var(--glass-1)',
-              color: 'var(--text-primary)',
+              border: '1px solid var(--ck-border)',
+              background: 'var(--ck-panel)',
+              color: 'var(--ck-text-1)',
               fontSize: 12,
             }}
           />
@@ -143,9 +143,9 @@ export function ProjectLeadsPanel({ slug, project }: ProjectLeadsPanelProps) {
               flex: '1 1 140px',
               padding: '8px 10px',
               borderRadius: 10,
-              border: '1px solid var(--glass-border-1)',
-              background: 'var(--glass-1)',
-              color: 'var(--text-primary)',
+              border: '1px solid var(--ck-border)',
+              background: 'var(--ck-panel)',
+              color: 'var(--ck-text-1)',
               fontSize: 12,
             }}
           />
@@ -158,8 +158,8 @@ export function ProjectLeadsPanel({ slug, project }: ProjectLeadsPanelProps) {
               fontSize: 11,
               padding: '8px 14px',
               borderRadius: 10,
-              border: '1px solid var(--glass-border-2)',
-              color: 'var(--text-secondary)',
+              border: '1px solid var(--ck-border-strong)',
+              color: 'var(--ck-text-2)',
             }}
           >
             + Lead anlegen
@@ -167,18 +167,18 @@ export function ProjectLeadsPanel({ slug, project }: ProjectLeadsPanelProps) {
         </div>
 
         {loading ? (
-          <p className="font-mono" style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+          <p className="font-mono" style={{ fontSize: 11, color: 'var(--ck-text-3)' }}>
             Laden…
           </p>
         ) : leads.length === 0 ? (
-          <p className="font-mono" style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+          <p className="font-mono" style={{ fontSize: 11, color: 'var(--ck-text-3)' }}>
             Noch keine Leads zugeordnet.
           </p>
         ) : (
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
-                <tr className="font-mono" style={{ color: 'var(--text-tertiary)', fontSize: 10 }}>
+                <tr className="font-mono" style={{ color: 'var(--ck-text-3)', fontSize: 10 }}>
                   <th style={{ textAlign: 'left', padding: '6px 8px' }}>Name</th>
                   <th style={{ textAlign: 'left', padding: '6px 8px' }}>Pipeline</th>
                   <th style={{ textAlign: 'left', padding: '6px 8px' }}>Datum</th>
@@ -187,21 +187,21 @@ export function ProjectLeadsPanel({ slug, project }: ProjectLeadsPanelProps) {
               </thead>
               <tbody>
                 {leads.map((c) => (
-                  <tr key={c.id} style={{ borderTop: '1px solid var(--glass-border-1)' }}>
+                  <tr key={c.id} style={{ borderTop: '1px solid var(--ck-border)' }}>
                     <td style={{ padding: '8px' }}>{c.name || '—'}</td>
                     <td style={{ padding: '8px' }}>
                       {STAGE_LABEL[c.pipeline_stage] ?? c.pipeline_stage}
                     </td>
-                    <td style={{ padding: '8px', color: 'var(--text-secondary)' }}>
+                    <td style={{ padding: '8px', color: 'var(--ck-text-2)' }}>
                       {c.created_at
                         ? new Date(c.created_at).toLocaleDateString('de-DE')
                         : '—'}
                     </td>
                     <td style={{ padding: '8px' }}>
                       <Link
-                        to={`/brand/${slug}/sales/${c.id}`}
+                        to={`/sales/${c.id}`}
                         className="font-mono"
-                        style={{ fontSize: 10, color: 'var(--accent-teal)' }}
+                        style={{ fontSize: 10, color: 'var(--ck-accent)' }}
                       >
                         Öffnen →
                       </Link>

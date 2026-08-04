@@ -10,9 +10,6 @@ import { ToastProvider } from './components/Toast'
 import { CommandPaletteContext } from './lib/commandPaletteContext'
 import { COCKPIT_PREFIXES } from './cockpit/lib/bereiche'
 import { SaveStatusProvider } from './lib/saveStatusContext'
-import { BrandPage } from './pages/BrandPage'
-import { DeliverDefaultRouteGate } from './pages/deliver/DeliverDefaultRouteGate'
-import { ProjectPage } from './pages/deliver/ProjectPage'
 import { LoginPage } from './pages/LoginPage'
 import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { PortalLoginPage } from './pages/portal/PortalLoginPage'
@@ -20,9 +17,9 @@ import { PortalRoute } from './pages/portal/PortalRoute'
 import { PortalSetupPage } from './pages/portal/PortalSetupPage'
 import { BookingPublicPage } from './pages/public/BookingPublicPage'
 import { LeadIntakePage } from './pages/public/LeadIntakePage'
-import { PromoDefaultRouteGate } from './pages/promo/PromoDefaultRouteGate'
 import { useViewport } from './hooks/useViewport'
 import { LegacySalesRedirect } from './cockpit/lib/LegacySalesRedirect'
+import { LegacyBrandRedirect, LegacyDeliverRedirect } from './cockpit/lib/LegacyBrandRedirect'
 import { OnboardingPublicPage } from './pages/onboarding/OnboardingPublicPage'
 import { CockpitShell } from './cockpit/CockpitShell'
 import { CockpitHome } from './cockpit/pages/CockpitHome'
@@ -62,10 +59,6 @@ function OwnerWorkspaceShell() {
   const [cmdkOpen, setCmdkOpen] = useState(false)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const navigate = useNavigate()
-  const location = useLocation()
-  const slugMatch = location.pathname.match(/^\/brand\/([^/]+)/)
-  const slugRef = useRef<string | undefined>(slugMatch?.[1])
-  slugRef.current = slugMatch?.[1]
 
   const gPrefixRef = useRef<{ active: boolean; timeout: number | null }>({
     active: false,
@@ -107,23 +100,19 @@ function OwnerWorkspaceShell() {
       const key = e.key.toLowerCase()
 
       if (gPrefixRef.current.active) {
-        const slug = slugRef.current
-        // Denk-Modi abgerissen (Phase 6): g-Shortcuts zeigen auf die Cockpit-Welt
+        // Denk-Modi (Phase 6) und Brand-Oberfläche (Etappe 4/2) abgerissen:
+        // g-Shortcuts zeigen ausnahmslos in die Cockpit-Welt.
         const map: Record<string, string> = {
           c: '/cockpit',
           s: '/sales',
           t: '/tracking',
+          p: '/projekte',
+          h: '/cockpit',
         }
         const target = map[key]
         if (target) {
           e.preventDefault()
           navigate(target)
-        } else if (key === 'p' && slug) {
-          e.preventDefault()
-          navigate(`/brand/${slug}/deliver`)
-        } else if (key === 'h') {
-          e.preventDefault()
-          navigate('/cockpit')
         }
         clearGPrefix()
         return
@@ -166,7 +155,6 @@ function App() {
   const location = useLocation()
   useViewport() // hält Viewport-Listener aktiv (Mobile-Gates in Unterseiten)
   const isHome = location.pathname === '/'
-  const isBrandWorkspace = location.pathname.startsWith('/brand/')
   // Die Cockpit-Shell (.ck-root) liegt fixed über dem ganzen Viewport, ist
   // deckend und darüber (z-index 2). Die drei blur(80px)-Blobs des Backgrounds
   // wurden dort also jeden Frame umsonst compositet — auf Cockpit-Routen aus.
@@ -193,15 +181,15 @@ function App() {
       >
         <main
           className={
-            isHome || isBrandWorkspace
+            isHome
               ? 'relative mx-0 px-0 pb-0 pt-0'
               : 'relative mx-auto px-4 pb-10 pt-6 md:px-8 md:pb-12 md:pt-6'
           }
           style={{
             pointerEvents: 'none',
             background: 'transparent',
-            maxWidth: isHome || isBrandWorkspace ? 'none' : 1100,
-            margin: isHome || isBrandWorkspace ? 0 : '0 auto',
+            maxWidth: isHome ? 'none' : 1100,
+            margin: isHome ? 0 : '0 auto',
             minHeight: '100vh',
             maxHeight: '100vh',
             overflowY: isHome ? 'hidden' : 'auto',
@@ -243,24 +231,13 @@ function App() {
               </Route>
               {/* Phase 6: Universe + Denk-Modi abgerissen → Cockpit ist Home */}
               <Route path="/" element={<Navigate to="/cockpit" replace />} />
-              {/* Phase 4/6: Sales lebt im Cockpit — Redirect VOR BrandPage,
-                  damit deren Module-System für Sales-URLs nie mountet */}
+              {/* Etappe 4/2: Die alte Brand-Oberfläche ist abgerissen. Was bleibt,
+                  sind Weichen für alte Lesezeichen — Sales ins Cockpit-Sales,
+                  Deliver in die Projekte, alles übrige auf die Cockpit-Home. */}
               <Route path="/brand/:slug/sales/*" element={<LegacySalesRedirect />} />
-              <Route path="/brand/:slug" element={<BrandPage />}>
-                <Route path="dashboard" element={<Navigate to=".." replace />} />
-                <Route path="foundation" element={<Navigate to="/cockpit" replace />} />
-                <Route path="building" element={<Navigate to="/cockpit" replace />} />
-                <Route path="discovery" element={<Navigate to="/cockpit" replace />} />
-                <Route path="intelligence" element={<Navigate to="/cockpit" replace />} />
-                <Route path="promo" element={<PromoDefaultRouteGate />} />
-                <Route path="promo/email" element={<Navigate to="email-flows" replace />} />
-                <Route path="promo/flows" element={<Navigate to="email-flows" replace />} />
-                <Route path="promo/:panel" element={<PromoDefaultRouteGate />} />
-                <Route path="deliver" element={<DeliverDefaultRouteGate />} />
-                <Route path="deliver/completed" element={<DeliverDefaultRouteGate />} />
-                <Route path="deliver/moon" element={<DeliverDefaultRouteGate />} />
-                <Route path="deliver/:projectId" element={<ProjectPage />} />
-              </Route>
+              <Route path="/brand/:slug/deliver/*" element={<LegacyDeliverRedirect />} />
+              <Route path="/brand/:slug/*" element={<LegacyBrandRedirect />} />
+              <Route path="/brand/:slug" element={<LegacyBrandRedirect />} />
             </Route>
           </Routes>
         </main>

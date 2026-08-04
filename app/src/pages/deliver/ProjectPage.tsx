@@ -34,16 +34,6 @@ import type { ClientDocumentLink, DeliverableItem, DeliverProjectStage } from '.
 import { DELIVER_STAGE_ORDER } from '../../types/db'
 import { DELIVER_STAGE_LABEL } from './stageLabels'
 
-const FIELD = {
-  width: '100%',
-  padding: '10px 12px',
-  borderRadius: 10,
-  background: 'var(--glass-1)',
-  border: '1px solid var(--glass-border-1)',
-  color: 'var(--text-primary)',
-  fontSize: 13,
-} as const
-
 function InternalNotesEditor({
   doc,
   onDebouncedSave,
@@ -81,12 +71,8 @@ function InternalNotesEditor({
 
   return (
     <div
-      className="glass-2"
-      style={{
-        borderRadius: 12,
-        border: '1px solid var(--glass-border-1)',
-        overflow: 'hidden',
-      }}
+      className="ck-panel"
+      style={{ overflow: 'hidden' }}
     >
       <EditorContent editor={editor} />
     </div>
@@ -113,21 +99,13 @@ function StageKanban({
           <button
             key={s}
             type="button"
-            className="font-mono"
+            className={`ck-btn${active ? ' ck-btn--primary' : ''}`}
             onClick={() => onPick(s)}
             style={{
               flex: '1 1 100px',
               minWidth: 88,
-              padding: '10px 8px',
-              borderRadius: 12,
-              fontSize: 10,
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase',
-              border: active
-                ? '2px solid var(--accent-teal)'
-                : '1px solid var(--glass-border-2)',
-              background: active ? 'var(--glass-4)' : 'var(--glass-1)',
-              color: active ? 'var(--text-primary)' : 'var(--text-tertiary)',
+              justifyContent: 'center',
+              textAlign: 'center',
             }}
           >
             {DELIVER_STAGE_LABEL[s]}
@@ -141,7 +119,7 @@ function StageKanban({
 export function ProjectPage({
   slugOverride,
   projectIdOverride,
-  embeddedInTabs: _embeddedInTabs = false,
+  embeddedInTabs = false,
 }: {
   slugOverride?: string
   projectIdOverride?: string
@@ -224,7 +202,7 @@ export function ProjectPage({
       await projects.remove(project.id)
       show('Projekt gelöscht', 'success')
       setDeleteOpen(false)
-      navigate(`/brand/${slug}/deliver`)
+      navigate('/projekte')
     } catch (e) {
       show(e instanceof Error ? e.message : 'Löschen fehlgeschlagen', 'error')
     } finally {
@@ -353,24 +331,18 @@ export function ProjectPage({
       const areaItems = deliverablesForArea(deliverablesLocal, area)
       return (
         <div>
-          <div className="font-mono mb-2" style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+          <div className="font-mono mb-2" style={{ fontSize: 11, color: 'var(--ck-text-2)' }}>
             Deliverables bearbeiten ({area})
           </div>
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <span className="font-mono" style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
+            <span className="font-mono" style={{ fontSize: 10, color: 'var(--ck-text-3)' }}>
               Status &amp; URL für Kundenportal
             </span>
             {area === 'branding' ? (
               <button
                 type="button"
-                className="font-mono"
-                style={{
-                  fontSize: 10,
-                  padding: '6px 10px',
-                  borderRadius: 8,
-                  border: '1px solid var(--glass-border-2)',
-                  color: 'var(--accent-teal)',
-                }}
+                className="ck-btn"
+                style={{ padding: '5px 9px', color: 'var(--ck-accent)' }}
                 onClick={() =>
                   patchDeliverables([...deliverablesLocal, createCustomDeliverable()])
                 }
@@ -387,7 +359,7 @@ export function ProjectPage({
                 <div
                   key={row.id}
                   className="flex flex-col gap-2 rounded-xl p-3"
-                  style={{ border: '1px solid var(--glass-border-2)' }}
+                  style={{ border: '1px solid var(--ck-border-strong)' }}
                 >
                   <div className="flex flex-wrap gap-2">
                     {row.type === 'custom' ? (
@@ -406,7 +378,7 @@ export function ProjectPage({
                           }
                           patchDeliverables(next)
                         }}
-                        style={{ ...FIELD, flex: 1, minWidth: 140 }}
+                        className="ck-input" style={{ flex: 1, minWidth: 140 }}
                       >
                         {DELIVERABLE_TYPE_OPTIONS.map((o) => (
                           <option key={o.type} value={o.type}>
@@ -419,7 +391,7 @@ export function ProjectPage({
                         className="font-mono flex items-center px-3"
                         style={{
                           fontSize: 10,
-                          color: 'var(--text-tertiary)',
+                          color: 'var(--ck-text-3)',
                           flex: 1,
                           minWidth: 120,
                         }}
@@ -444,7 +416,7 @@ export function ProjectPage({
                         }
                         patchDeliverables(next)
                       }}
-                      style={{ ...FIELD, flex: 1, minWidth: 120 }}
+                      className="ck-input" style={{ flex: 1, minWidth: 120 }}
                     >
                       <option value="geplant">Ausstehend</option>
                       <option value="in_arbeit">In Arbeit</option>
@@ -453,14 +425,8 @@ export function ProjectPage({
                     {row.type === 'custom' ? (
                       <button
                         type="button"
-                        className="font-mono"
-                        style={{
-                          fontSize: 10,
-                          padding: '8px 10px',
-                          color: 'var(--accent-coral)',
-                          border: '1px solid var(--accent-coral)',
-                          borderRadius: 8,
-                        }}
+                        className="ck-btn"
+                        style={{ padding: '5px 9px', color: 'var(--ck-warn)', borderColor: 'var(--ck-warn)' }}
                         onClick={() => {
                           patchDeliverables(deliverablesLocal.filter((_, j) => j !== i))
                         }}
@@ -483,7 +449,8 @@ export function ProjectPage({
                         }
                         patchDeliverables(next)
                       }}
-                      style={FIELD}
+                      className="ck-input"
+                      style={{ width: '100%' }}
                     />
                   ) : null}
                   <input
@@ -499,13 +466,14 @@ export function ProjectPage({
                       }
                       patchDeliverables(next)
                     }}
-                    style={FIELD}
+                    className="ck-input"
+                    style={{ width: '100%' }}
                   />
                   {row.type === 'website_development' ? (
                     <div className="flex items-center gap-2">
                       <label
                         className="font-mono"
-                        style={{ fontSize: 10, color: 'var(--text-tertiary)' }}
+                        style={{ fontSize: 10, color: 'var(--ck-text-3)' }}
                       >
                         Fortschritt {row.progress ?? 0}%
                       </label>
@@ -538,23 +506,18 @@ export function ProjectPage({
   )
 
   if (!slug || !projectId) {
-    return <Navigate to={slug ? `/brand/${slug}/sales` : '/'} replace />
+    return <Navigate to="/projekte" replace />
   }
 
   if (!projects.loading && !projects.error && !project) {
-    return <Navigate to={`/brand/${slug}/deliver`} replace />
+    return <Navigate to="/projekte" replace />
   }
 
   if (projects.loading && !project) {
     return (
       <div
-        className="animate-pulse"
-        style={{
-          minHeight: 400,
-          borderRadius: 16,
-          background: 'var(--glass-1)',
-          border: '1px solid var(--glass-border-1)',
-        }}
+        className="ck-panel animate-pulse"
+        style={{ minHeight: 400 }}
       />
     )
   }
@@ -564,60 +527,38 @@ export function ProjectPage({
   return (
     <motion.div
       key={projectId}
+      // ck-deliver schiebt den geteilten Portal-Bausteinen die Cockpit-Werte
+      // unter (siehe cockpit.css) — das Portal selbst bleibt unberührt.
+      className="ck-deliver"
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+      transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
       style={{ pointerEvents: 'auto', background: 'transparent' }}
     >
-      <div className="mb-5">
-        <Link
-          to={`/brand/${slug}/deliver`}
-          className="font-mono"
-          style={{
-            fontSize: 12,
-            color: 'var(--accent-teal)',
-            textDecoration: 'none',
-            padding: '8px 14px',
-            borderRadius: 10,
-            border: '1px solid var(--glass-border-2)',
-            background: 'var(--glass-2)',
-          }}
-        >
-          ← Alle Projekte
-        </Link>
-      </div>
+      {/* Eingebettet (Cockpit /projekte) stellt die Hülle den Zurück-Weg —
+          sonst stehen zwei „Alle Projekte" übereinander. */}
+      {embeddedInTabs ? null : (
+        <div className="mb-5">
+          <Link to="/projekte" className="ck-btn" style={{ textDecoration: 'none' }}>
+            ← Alle Projekte
+          </Link>
+        </div>
+      )}
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="font-mono" style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
-            Deliver
-          </div>
-          <h1
-            className="font-display mt-1"
-            style={{ fontSize: 24, fontWeight: 600, color: 'var(--text-primary)' }}
-          >
+          <div className="ck-label">Projekt</div>
+          <h1 className="mt-1" style={{ fontSize: 20, fontWeight: 600, color: 'var(--ck-text-1)' }}>
             {project.name}
           </h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            className="font-mono"
-            onClick={() => setInviteOpen(true)}
-            style={{
-              fontSize: 11,
-              padding: '8px 14px',
-              borderRadius: 10,
-              border: '1px solid var(--glass-border-2)',
-              background: 'var(--glass-3)',
-              color: 'var(--text-primary)',
-            }}
-          >
+          <button type="button" className="ck-btn" onClick={() => setInviteOpen(true)}>
             Kunden einladen
           </button>
           <button
             type="button"
-            className="font-mono"
+            className="ck-btn ck-btn--primary"
             onClick={() => {
               const origin =
                 typeof window !== 'undefined' ? window.location.origin : ''
@@ -635,44 +576,24 @@ export function ProjectPage({
                 () => show('Kopieren fehlgeschlagen', 'error'),
               )
             }}
-            style={{
-              fontSize: 11,
-              padding: '8px 14px',
-              borderRadius: 10,
-              border: '1px solid var(--accent-teal)',
-              background: 'color-mix(in srgb, var(--accent-teal) 12%, transparent)',
-              color: 'var(--accent-teal)',
-            }}
           >
             Portal-Link kopieren
           </button>
           <button
             type="button"
-            className="font-mono"
+            className="ck-btn"
             onClick={() => window.open(`/portal/${project.id}?als=kunde`, '_blank', 'noopener')}
             title="Portal genau so sehen, wie es dein Kunde sieht"
-            style={{
-              fontSize: 11,
-              padding: '8px 14px',
-              borderRadius: 10,
-              border: '1px solid var(--accent-blue)',
-              background: 'color-mix(in srgb, var(--accent-blue) 12%, transparent)',
-              color: 'var(--accent-blue)',
-            }}
           >
             Als Kunde ansehen
           </button>
           <button
             type="button"
-            className="font-mono"
+            className="ck-btn"
             onClick={() => setDeleteOpen(true)}
             style={{
-              fontSize: 11,
-              padding: '8px 14px',
-              borderRadius: 10,
-              border: '1px solid color-mix(in srgb, var(--accent-coral) 40%, var(--glass-border-2))',
-              background: 'transparent',
-              color: 'var(--accent-coral)',
+              color: 'var(--ck-warn)',
+              borderColor: 'color-mix(in srgb, var(--ck-warn) 40%, var(--ck-border-strong))',
             }}
           >
             Projekt löschen
@@ -680,7 +601,7 @@ export function ProjectPage({
           {project.brand_id ? (
             <button
               type="button"
-              className="font-mono inline-flex items-center gap-1.5"
+              className="ck-btn"
               onClick={() => {
                 const origin =
                   typeof window !== 'undefined' ? window.location.origin : ''
@@ -695,14 +616,6 @@ export function ProjectPage({
                 )
               }}
               title="Onboarding-Fragebogen für den Kunden"
-              style={{
-                fontSize: 11,
-                padding: '8px 14px',
-                borderRadius: 10,
-                border: '1px solid var(--glass-border-2)',
-                background: 'var(--glass-2)',
-                color: 'var(--text-secondary)',
-              }}
             >
               <svg
                 width={12}
@@ -719,34 +632,28 @@ export function ProjectPage({
               Fragebogen-Link
             </button>
           ) : null}
-          {(['internal', 'client'] as const).map((t) => (
-            <button
-              key={t}
-              type="button"
-              className="font-mono"
-              onClick={() => setTab(t)}
-              style={{
-                fontSize: 11,
-                padding: '8px 14px',
-                borderRadius: 10,
-                border:
-                  tab === t
-                    ? '2px solid var(--accent-teal)'
-                    : '1px solid var(--glass-border-2)',
-                background: tab === t ? 'var(--glass-4)' : 'var(--glass-1)',
-                color: 'var(--text-primary)',
-              }}
-            >
-              {t === 'internal' ? 'Intern' : 'Kundenbereich'}
-            </button>
-          ))}
         </div>
       </div>
 
+      {/* Ansicht-Umschalter — eigene Zeile, damit er nicht als sechste Aktion
+          zwischen den Knöpfen verschwindet. */}
+      <nav aria-label="Projekt-Ansicht" className="mb-4 flex gap-1.5">
+        {(['internal', 'client'] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => setTab(t)}
+            aria-current={tab === t ? 'page' : undefined}
+            className={`ck-nav-item${tab === t ? ' active' : ''}`}
+            style={{ padding: '6px 10px', whiteSpace: 'nowrap', flexShrink: 0 }}
+          >
+            {t === 'internal' ? 'Intern' : 'Kundenbereich'}
+          </button>
+        ))}
+      </nav>
+
       {projects.error ? (
-        <p className="font-mono" style={{ fontSize: 12, color: 'var(--accent-coral)' }}>
-          {projects.error}
-        </p>
+        <p style={{ fontSize: 12, color: 'var(--ck-warn)' }}>{projects.error}</p>
       ) : null}
 
       {tab === 'internal' ? (
@@ -780,7 +687,7 @@ export function ProjectPage({
             onStageChange={(s) => void projects.update(project.id, { internal_stage: s })}
           />
           <div>
-            <div className="font-mono mb-2" style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+            <div className="font-mono mb-2" style={{ fontSize: 11, color: 'var(--ck-text-2)' }}>
               Interne Projekt-Stages
             </div>
             <StageKanban
@@ -790,7 +697,7 @@ export function ProjectPage({
             />
           </div>
           <div>
-            <div className="font-mono mb-2" style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+            <div className="font-mono mb-2" style={{ fontSize: 11, color: 'var(--ck-text-2)' }}>
               Freie Notizen
             </div>
             <InternalNotesEditor
@@ -799,18 +706,18 @@ export function ProjectPage({
             />
           </div>
           <div>
-            <label className="font-mono mb-1 block" style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
+            <label className="font-mono mb-1 block" style={{ fontSize: 10, color: 'var(--ck-text-3)' }}>
               Interne Dateien (eine URL pro Zeile)
             </label>
             <textarea
               value={linksText}
               onChange={(e) => onLinksChange(e.target.value)}
               rows={4}
-              style={{ ...FIELD, resize: 'vertical', fontFamily: 'var(--font-mono)' }}
+              className="ck-input" style={{ width: '100%', resize: 'vertical', fontFamily: 'var(--ck-font)' }}
             />
           </div>
           <div>
-            <label className="font-mono mb-1 block" style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
+            <label className="font-mono mb-1 block" style={{ fontSize: 10, color: 'var(--ck-text-3)' }}>
               Team-Notizen
             </label>
             <textarea
@@ -821,12 +728,12 @@ export function ProjectPage({
                 debouncedTeamNotes(project.id, v)
               }}
               rows={4}
-              style={{ ...FIELD, resize: 'vertical' }}
+              className="ck-input" style={{ width: '100%', resize: 'vertical' }}
             />
           </div>
 
           <div>
-            <label className="font-mono mb-1 block" style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
+            <label className="font-mono mb-1 block" style={{ fontSize: 10, color: 'var(--ck-text-3)' }}>
               Calendly oder Buchungs-Link (Kundenportal)
             </label>
             <input
@@ -834,7 +741,8 @@ export function ProjectPage({
               value={bookingLocal}
               onChange={(e) => onBookingChange(e.target.value)}
               placeholder="https://…"
-              style={FIELD}
+              className="ck-input"
+              style={{ width: '100%' }}
             />
           </div>
         </div>
@@ -847,7 +755,7 @@ export function ProjectPage({
             loading={outcomesLoading}
           />
 
-          <div className="font-mono mb-1" style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
+          <div className="font-mono mb-1" style={{ fontSize: 10, color: 'var(--ck-text-3)' }}>
             Vorschau — Kundenportal (client_stage)
           </div>
 
@@ -867,7 +775,7 @@ export function ProjectPage({
           />
 
           <div>
-            <label className="font-mono mb-1 block" style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
+            <label className="font-mono mb-1 block" style={{ fontSize: 10, color: 'var(--ck-text-3)' }}>
               Willkommenstext (sichtbar für Kunden)
             </label>
             <textarea
@@ -878,11 +786,11 @@ export function ProjectPage({
                 debouncedWelcome(project.id, v)
               }}
               rows={4}
-              style={{ ...FIELD, resize: 'vertical' }}
+              className="ck-input" style={{ width: '100%', resize: 'vertical' }}
             />
           </div>
           <div>
-            <div className="font-mono mb-2" style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+            <div className="font-mono mb-2" style={{ fontSize: 11, color: 'var(--ck-text-2)' }}>
               Kunden-Stages (Kanban)
             </div>
             <StageKanban
@@ -893,19 +801,13 @@ export function ProjectPage({
           </div>
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <span className="font-mono" style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+              <span className="font-mono" style={{ fontSize: 11, color: 'var(--ck-text-2)' }}>
                 Dokumente &amp; Links
               </span>
               <button
                 type="button"
-                className="font-mono"
-                style={{
-                  fontSize: 10,
-                  padding: '6px 10px',
-                  borderRadius: 8,
-                  border: '1px solid var(--glass-border-2)',
-                  color: 'var(--accent-teal)',
-                }}
+                className="ck-btn"
+                style={{ padding: '5px 9px', color: 'var(--ck-accent)' }}
                 onClick={() =>
                   patchDocs([
                     ...docs,
@@ -918,7 +820,7 @@ export function ProjectPage({
             </div>
             <div className="flex flex-col gap-2">
               {docs.map((row, i) => (
-                <div key={i} className="flex flex-col gap-2 rounded-xl p-3" style={{ border: '1px solid var(--glass-border-2)' }}>
+                <div key={i} className="flex flex-col gap-2 rounded-xl p-3" style={{ border: '1px solid var(--ck-border-strong)' }}>
                   <div className="flex flex-wrap gap-2">
                     <input
                       type="text"
@@ -929,7 +831,7 @@ export function ProjectPage({
                         next[i] = { ...row, label: e.target.value }
                         patchDocs(next)
                       }}
-                      style={{ ...FIELD, flex: 1, minWidth: 120 }}
+                      className="ck-input" style={{ flex: 1, minWidth: 120 }}
                     />
                     <input
                       type="text"
@@ -940,18 +842,12 @@ export function ProjectPage({
                         next[i] = { ...row, url: e.target.value }
                         patchDocs(next)
                       }}
-                      style={{ ...FIELD, flex: 2, minWidth: 160 }}
+                      className="ck-input" style={{ flex: 2, minWidth: 160 }}
                     />
                     <button
                       type="button"
-                      className="font-mono"
-                      style={{
-                        fontSize: 10,
-                        padding: '8px 10px',
-                        color: 'var(--accent-coral)',
-                        border: '1px solid var(--accent-coral)',
-                        borderRadius: 8,
-                      }}
+                      className="ck-btn"
+                      style={{ padding: '5px 9px', color: 'var(--ck-warn)', borderColor: 'var(--ck-warn)' }}
                       onClick={() => {
                         if (
                           !window.confirm(
@@ -978,14 +874,14 @@ export function ProjectPage({
                       }
                       patchDocs(next)
                     }}
-                    style={{ ...FIELD, width: '100%' }}
+                    className="ck-input" style={{ width: '100%' }}
                   />
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="glass-2" style={{ borderRadius: 16, padding: 20, marginTop: 16 }}>
+          <div className="ck-panel" style={{ padding: 20, marginTop: 16 }}>
             <PortalFilesSection
               projectId={project.id}
               documents={project.client_documents}
@@ -1006,30 +902,30 @@ export function ProjectPage({
         width={400}
       >
         <div className="flex flex-col gap-4">
-          <p className="font-mono" style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.55 }}>
+          <p className="font-mono" style={{ fontSize: 12, color: 'var(--ck-text-2)', lineHeight: 1.55 }}>
             Der Kunde erhält eine E-Mail und legt einmalig sein eigenes Passwort fest — danach
             meldet er sich jederzeit mit E-Mail + Passwort an. Bestehende Accounts werden mit
             diesem Projekt verknüpft.
           </p>
           {existingClientUser !== null ? (
-            <p className="font-mono" style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+            <p className="font-mono" style={{ fontSize: 11, color: 'var(--ck-text-3)' }}>
               {existingClientUser
                 ? 'Hinweis: Es existiert bereits ein Account mit dieser E-Mail.'
                 : 'Neuer Account wird angelegt.'}
             </p>
           ) : null}
           {inviteState === 'sent' ? (
-            <p className="font-mono" style={{ fontSize: 12, color: 'var(--accent-teal)' }}>
+            <p className="font-mono" style={{ fontSize: 12, color: 'var(--ck-accent)' }}>
               Einladung gesendet. Der Kunde sollte die E-Mail in wenigen Minuten erhalten.
             </p>
           ) : null}
           {inviteError ? (
-            <p className="font-mono" style={{ fontSize: 12, color: 'var(--accent-coral)' }}>
+            <p className="font-mono" style={{ fontSize: 12, color: 'var(--ck-warn)' }}>
               {inviteError}
             </p>
           ) : null}
           <label className="flex flex-col gap-1.5">
-            <span className="font-mono" style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
+            <span className="font-mono" style={{ fontSize: 10, color: 'var(--ck-text-3)' }}>
               Name des Kunden
             </span>
             <input
@@ -1037,11 +933,12 @@ export function ProjectPage({
               value={inviteName}
               onChange={(e) => setInviteName(e.target.value)}
               placeholder="Max Mustermann"
-              style={FIELD}
+              className="ck-input"
+              style={{ width: '100%' }}
             />
           </label>
           <label className="flex flex-col gap-1.5">
-            <span className="font-mono" style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>
+            <span className="font-mono" style={{ fontSize: 10, color: 'var(--ck-text-3)' }}>
               E-Mail des Kunden
             </span>
             <input
@@ -1050,22 +947,15 @@ export function ProjectPage({
               value={inviteEmail}
               onChange={(e) => setInviteEmail(e.target.value)}
               placeholder="kunde@firma.de"
-              style={FIELD}
+              className="ck-input"
+              style={{ width: '100%' }}
             />
           </label>
           <button
             type="button"
-            className="font-mono"
+            className="ck-btn ck-btn--primary"
             disabled={inviteState === 'sending'}
-            style={{
-              fontSize: 12,
-              padding: '12px 16px',
-              borderRadius: 12,
-              border: '1px solid var(--accent-teal)',
-              background: 'color-mix(in srgb, var(--accent-teal) 18%, transparent)',
-              color: 'var(--accent-teal)',
-              opacity: inviteState === 'sending' ? 0.6 : 1,
-            }}
+            style={{ justifyContent: 'center', padding: '10px 16px' }}
             onClick={() => {
               if (!inviteEmail.trim()) {
                 show('Bitte eine E-Mail eingeben.', 'error')

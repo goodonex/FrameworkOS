@@ -691,3 +691,31 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
   --ck-graph-label: #46525a;
   --ck-graph-panel: rgba(255, 255, 255, 0.94);
 }
+
+/* --- Projekt-Detail: Glass-Bausteine im Cockpit-Look (Etappe 4, Schritt 2) ---
+   Die Phasen-Karten (PhaseCard/PhaseDashboard/OutcomeHeader) und die
+   Datei-Sektion teilt sich die ProjectPage mit dem Kundenportal. Statt sie zu
+   duplizieren oder das Portal mitzuziehen, bekommen sie hier — und nur unter
+   .ck-deliver — die Cockpit-Werte untergeschoben. Das Portal rendert dieselben
+   Komponenten weiterhin unverändert in seiner eigenen Optik.
+   Die echte Kundensicht prüft Kevin über „Als Kunde ansehen" (öffnet /portal). */
+.ck-deliver {
+  --glass-1: var(--ck-panel);
+  --glass-2: var(--ck-panel);
+  --glass-3: var(--ck-panel-2);
+  --glass-4: var(--ck-panel-2);
+  --glass-border-1: var(--ck-border);
+  --glass-border-2: var(--ck-border-strong);
+  --text-primary: var(--ck-text-1);
+  --text-secondary: var(--ck-text-2);
+  --text-tertiary: var(--ck-text-3);
+  --accent-teal: var(--ck-accent);
+  --accent-coral: var(--ck-warn);
+  --accent-blue: var(--ck-idle);
+  --chip-text-on-accent: var(--ck-bg);
+}
+/* Im Cockpit ist Mono die Stimme — keine zweite Schriftfamilie im Bild. */
+.ck-deliver .font-display,
+.ck-deliver .deliver-internal-editor {
+  font-family: var(--ck-font);
+}

@@ -28,9 +28,9 @@ export function ProjectTimelinePanel({ project, onStageChange }: ProjectTimeline
   return (
     <div
       className="rounded-2xl p-4"
-      style={{ border: '1px solid var(--glass-border-2)', background: 'var(--glass-1)' }}
+      style={{ border: '1px solid var(--ck-border-strong)', background: 'var(--ck-panel)' }}
     >
-      <div className="font-mono mb-3" style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+      <div className="font-mono mb-3" style={{ fontSize: 11, color: 'var(--ck-text-2)' }}>
         Projekt-Fortschritt (intern)
       </div>
       <div className="hidden sm:flex items-center gap-1">
@@ -49,14 +49,14 @@ export function ProjectTimelinePanel({ project, onStageChange }: ProjectTimeline
                   borderRadius: 10,
                   fontSize: 9,
                   border: current
-                    ? '2px solid var(--accent-teal)'
-                    : '1px solid var(--glass-border-2)',
+                    ? '2px solid var(--ck-accent)'
+                    : '1px solid var(--ck-border-strong)',
                   background: done
-                    ? 'var(--accent-teal)'
+                    ? 'var(--ck-accent)'
                     : current
-                      ? 'color-mix(in srgb, var(--accent-teal) 20%, transparent)'
-                      : 'var(--glass-2)',
-                  color: done ? 'var(--chip-text-on-accent)' : 'var(--text-secondary)',
+                      ? 'color-mix(in srgb, var(--ck-accent) 20%, transparent)'
+                      : 'var(--ck-panel)',
+                  color: done ? 'var(--ck-bg)' : 'var(--ck-text-2)',
                 }}
               >
                 {done ? '✓' : i + 1}
@@ -66,7 +66,7 @@ export function ProjectTimelinePanel({ project, onStageChange }: ProjectTimeline
                   style={{
                     width: 8,
                     height: 2,
-                    background: done ? 'var(--accent-teal)' : 'var(--glass-border-2)',
+                    background: done ? 'var(--ck-accent)' : 'var(--ck-border-strong)',
                     flexShrink: 0,
                   }}
                 />
@@ -87,31 +87,31 @@ export function ProjectTimelinePanel({ project, onStageChange }: ProjectTimeline
               className="flex items-center gap-3 rounded-xl p-3 text-left"
               style={{
                 border: current
-                  ? '2px solid var(--accent-teal)'
-                  : '1px solid var(--glass-border-2)',
+                  ? '2px solid var(--ck-accent)'
+                  : '1px solid var(--ck-border-strong)',
                 background: done
-                  ? 'color-mix(in srgb, var(--accent-teal) 15%, transparent)'
-                  : 'var(--glass-2)',
+                  ? 'color-mix(in srgb, var(--ck-accent) 15%, transparent)'
+                  : 'var(--ck-panel)',
               }}
             >
               <span
                 className="font-mono flex h-7 w-7 shrink-0 items-center justify-center rounded-full"
                 style={{
                   fontSize: 11,
-                  background: done ? 'var(--accent-teal)' : 'var(--glass-3)',
-                  color: done ? 'var(--chip-text-on-accent)' : 'var(--text-secondary)',
+                  background: done ? 'var(--ck-accent)' : 'var(--ck-panel-2)',
+                  color: done ? 'var(--ck-bg)' : 'var(--ck-text-2)',
                 }}
               >
                 {done ? '✓' : i + 1}
               </span>
-              <span className="font-display" style={{ fontSize: 14, color: 'var(--text-primary)' }}>
+              <span  style={{ fontSize: 14, color: 'var(--ck-text-1)' }}>
                 {DELIVER_STAGE_LABEL[stage]}
               </span>
             </button>
           )
         })}
       </div>
-      <div className="font-mono mt-3" style={{ fontSize: 10, color: 'var(--accent-teal)' }}>
+      <div className="font-mono mt-3" style={{ fontSize: 10, color: 'var(--ck-accent)' }}>
         Aktuell: {DELIVER_STAGE_LABEL[project.internal_stage]}
       </div>
     </div>

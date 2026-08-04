@@ -244,7 +244,7 @@ export function ContactPage({
     if (!d || !slug) return
     const existing = findDeliverProjectForContact(deliver.items, d)
     if (existing) {
-      navigate(`/brand/${slug}/deliver/${existing.id}`)
+      navigate(`/projekte/${existing.id}`)
       return
     }
     const payload = {
@@ -273,7 +273,7 @@ export function ContactPage({
           onField({ pipeline_stage: 'proposal' })
         }
         showToast('Pitch-Projekt angelegt', 'success')
-        navigate(`/brand/${slug}/deliver/${proj.id}`)
+        navigate(`/projekte/${proj.id}`)
       })
       .catch(async (err) => {
         // Fallback: einige Kontakte sind nicht FK-kompatibel (z. B. legacy/local IDs).
@@ -284,7 +284,7 @@ export function ContactPage({
             client_contact_id: null,
           })
           showToast('Pitch-Projekt angelegt (ohne Kontaktverknüpfung)', 'info')
-          navigate(`/brand/${slug}/deliver/${fallback.id}`)
+          navigate(`/projekte/${fallback.id}`)
           return
         } catch (fallbackErr) {
           const msg =
@@ -398,7 +398,7 @@ export function ContactPage({
             <button
               type="button"
               className="font-mono"
-              onClick={() => navigate(`/brand/${slug}/deliver/${duplicateProject.id}`)}
+              onClick={() => navigate(`/projekte/${duplicateProject.id}`)}
               style={{
                 fontSize: 12,
                 padding: '8px 14px',

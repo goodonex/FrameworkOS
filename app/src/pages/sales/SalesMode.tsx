@@ -1478,7 +1478,7 @@ function PipelineBoard({
                     deliverProjectId={deliverProjectId}
                     onOpenDeliverProject={
                       deliverProjectId
-                        ? () => navigate(`/brand/${slug}/deliver/${deliverProjectId}`)
+                        ? () => navigate(`/projekte/${deliverProjectId}`)
                         : undefined
                     }
                     onSelect={() => {
@@ -1835,7 +1835,7 @@ export function SalesMode({
           client_stage: 'onboarding',
           status: 'active',
         })
-        .then((proj) => navigate(`/brand/${slug}/deliver/${proj.id}`))
+        .then((proj) => navigate(`/projekte/${proj.id}`))
     },
     [deliver, navigate, slug],
   )

@@ -232,8 +232,28 @@ export function ProjectCard({ project: p, onOpen }: { project: DeliverProject; o
 
 function ProjektDetail() {
   const { projectId } = useParams<{ projectId: string }>()
-  const { activeBrand } = useActiveBrand()
+  const { activeBrand, loading, error } = useActiveBrand()
   const navigate = useNavigate()
+
+  // Kaltstart auf /projekte/:id (Lesezeichen, Reload, Weiche aus der alten
+  // Brand-Welt): Die Brands laden asynchron, und `loading` steht dabei schon
+  // auf false, während `activeBrand` noch null ist. Ohne dieses Warten
+  // bekommt die ProjectPage `slug === undefined`, hält das für „kein Projekt"
+  // und wirft auf die Cockpit-Home — das Lesezeichen führte ins Leere.
+  if (!activeBrand) {
+    return (
+      <div className="ck-panel" style={{ padding: '12px 16px' }}>
+        <p className="ck-label" style={{ margin: 0 }}>
+          {error
+            ? `Marke lädt nicht: ${error}`
+            : loading
+              ? 'Lade Projekt…'
+              : 'Keine Marke verbunden — das Projekt kann nicht geladen werden.'}
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div>
       <button
@@ -243,7 +263,11 @@ function ProjektDetail() {
       >
         ← Alle Projekte
       </button>
-      <ProjectPage slugOverride={activeBrand?.slug} projectIdOverride={projectId} />
+      <ProjectPage
+        slugOverride={activeBrand?.slug}
+        projectIdOverride={projectId}
+        embeddedInTabs
+      />
     </div>
   )
 }

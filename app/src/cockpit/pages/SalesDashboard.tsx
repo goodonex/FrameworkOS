@@ -371,11 +371,11 @@ export function SalesDashboard() {
 
   const projektLink = useCallback(
     (p: Posten) => {
-      if (!slug) return null
       const task = tasks.items.find((t) => t.id === zeilenId(p.id))
-      return task?.project_id ? `/brand/${slug}/deliver/${task.project_id}` : null
+      // Die Projekte leben im Cockpit; die alte /brand/…/deliver-Welt ist weg.
+      return task?.project_id ? `/projekte/${task.project_id}` : null
     },
-    [slug, tasks.items],
+    [tasks.items],
   )
 
   const navigiere = useCallback(

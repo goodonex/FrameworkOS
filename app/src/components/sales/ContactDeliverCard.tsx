@@ -66,7 +66,7 @@ export function ContactDeliverCard({
               cursor: 'pointer',
               minWidth: 0,
             }}
-            onClick={() => navigate(`/brand/${brandSlug}/deliver/${project.id}`)}
+            onClick={() => navigate(`/projekte/${project.id}`)}
           >
             → Zum Projekt {project.name}
           </button>
@@ -77,7 +77,7 @@ export function ContactDeliverCard({
                   key={chip.key}
                   type="button"
                   className="font-mono"
-                  onClick={() => navigate(`/brand/${brandSlug}/deliver/${project.id}?area=${chip.key}`)}
+                  onClick={() => navigate(`/projekte/${project.id}?area=${chip.key}`)}
                   style={{
                     fontSize: 10,
                     padding: '4px 8px',
@@ -109,7 +109,7 @@ export function ContactDeliverCard({
                 client_stage: 'onboarding',
                 status: 'active',
               })
-              .then((proj) => navigate(`/brand/${brandSlug}/deliver/${proj.id}`))
+              .then((proj) => navigate(`/projekte/${proj.id}`))
           }}
           style={{
             fontSize: 12,

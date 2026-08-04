@@ -86,7 +86,7 @@ export function ContactPhaseHeader({
       <button
         type="button"
         className="font-mono"
-        onClick={() => navigate(`/brand/${brandSlug}/deliver/${project!.id}`)}
+        onClick={() => navigate(`/projekte/${project!.id}`)}
         style={{
           fontSize: 10,
           padding: '4px 8px',
@@ -265,7 +265,7 @@ export function ContactPhaseHeader({
               className="font-mono"
               onClick={() => {
                 if (!brandSlug || !project) return
-                navigate(`/brand/${brandSlug}/deliver/${project.id}`)
+                navigate(`/projekte/${project.id}`)
               }}
               style={{
                 fontSize: 12,
@@ -289,7 +289,7 @@ export function ContactPhaseHeader({
                 className="font-mono"
                 onClick={() =>
                   brandSlug && project
-                    ? navigate(`/brand/${brandSlug}/deliver/${project.id}?area=${chip.key}`)
+                    ? navigate(`/projekte/${project.id}?area=${chip.key}`)
                     : null
                 }
                 style={{

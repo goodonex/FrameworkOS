@@ -8,13 +8,22 @@ import {
   type ReactNode,
 } from 'react'
 import { useLocation } from 'react-router-dom'
-import type { WorkItem } from './useDailyWorkList'
+import type { Contact } from '../types/db'
 
 export type PostCallSource = 'daily' | 'contact'
 
+/**
+ * Ein Posten der Anruf-Warteschlange. Lag früher in `useDailyWorkList` — der
+ * Hook ist mit der alten Brand-Sales-Welt gefallen (Etappe 4/2), der Typ ist
+ * das Einzige, was der Post-Call-Flow davon je gebraucht hat.
+ */
+export interface PostCallQueueItem {
+  contact: Contact
+}
+
 export interface PostCallSession {
   contactId: string
-  queue?: WorkItem[]
+  queue?: PostCallQueueItem[]
   queueIndex?: number
   source: PostCallSource
 }

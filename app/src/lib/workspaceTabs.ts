@@ -110,13 +110,9 @@ export function contactSalesPath(slug: string, contactId: string): string {
   return `/brand/${slug}/sales/${contactId}`
 }
 
-export function adCampaignPath(slug: string, campaignId: string): string {
-  return `/brand/${slug}/promo/ads?campaign=${encodeURIComponent(campaignId)}`
-}
-
-export function deliverProjectPath(slug: string, projectId: string): string {
-  return `/brand/${slug}/deliver/${projectId}`
-}
+// adCampaignPath/deliverProjectPath sind mit der alten Brand-Oberfläche
+// gefallen (Etappe 4/2): keine Aufrufer mehr, und ihre Ziele — /brand/:slug/
+// promo/ads bzw. /brand/:slug/deliver/:id — gibt es nicht mehr.
 
 /** @deprecated Tabs open via context menu only — kept for type compat in bulk APIs */
 export function shouldOpenInNewTab(): boolean {

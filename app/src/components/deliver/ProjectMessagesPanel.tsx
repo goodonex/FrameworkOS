@@ -44,17 +44,17 @@ export function ProjectMessagesPanel({ projectId, senderName }: ProjectMessagesP
     >
       <div className="flex flex-col gap-3">
         {error ? (
-          <p className="font-mono" style={{ fontSize: 11, color: 'var(--accent-coral)' }}>
+          <p className="font-mono" style={{ fontSize: 11, color: 'var(--ck-warn)' }}>
             {error}
           </p>
         ) : null}
         {loading && messages.length === 0 ? (
-          <p className="font-mono" style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+          <p className="font-mono" style={{ fontSize: 11, color: 'var(--ck-text-3)' }}>
             Nachrichten werden geladen…
           </p>
         ) : null}
         {!loading && messages.length === 0 ? (
-          <p className="font-mono" style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+          <p className="font-mono" style={{ fontSize: 11, color: 'var(--ck-text-3)' }}>
             Noch keine Nachrichten. Schreib deinem Kunden hier.
           </p>
         ) : null}
@@ -68,9 +68,9 @@ export function ProjectMessagesPanel({ projectId, senderName }: ProjectMessagesP
                 className="rounded-xl p-3"
                 style={{
                   border: unread
-                    ? '1px solid var(--accent-teal)'
-                    : '1px solid var(--glass-border-2)',
-                  background: unread ? 'color-mix(in srgb, var(--accent-teal) 8%, transparent)' : 'var(--glass-1)',
+                    ? '1px solid var(--ck-accent)'
+                    : '1px solid var(--ck-border-strong)',
+                  background: unread ? 'color-mix(in srgb, var(--ck-accent) 8%, transparent)' : 'var(--ck-panel)',
                 }}
               >
                 <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
@@ -78,19 +78,19 @@ export function ProjectMessagesPanel({ projectId, senderName }: ProjectMessagesP
                     className="font-mono"
                     style={{
                       fontSize: 10,
-                      color: isClient ? 'var(--accent-teal)' : 'var(--text-secondary)',
+                      color: isClient ? 'var(--ck-accent)' : 'var(--ck-text-2)',
                     }}
                   >
                     {isClient ? (msg.sender_name ?? 'Kunde') : 'Du'}
                     {unread ? ' · neu' : ''}
                   </span>
-                  <span className="font-mono" style={{ fontSize: 9, color: 'var(--text-tertiary)' }}>
+                  <span className="font-mono" style={{ fontSize: 9, color: 'var(--ck-text-3)' }}>
                     {formatTime(msg.created_at)}
                   </span>
                 </div>
                 <p
                   className="font-body whitespace-pre-wrap"
-                  style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--text-primary)', margin: 0 }}
+                  style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--ck-text-1)', margin: 0 }}
                 >
                   {msg.body}
                 </p>
@@ -113,9 +113,9 @@ export function ProjectMessagesPanel({ projectId, senderName }: ProjectMessagesP
             fontSize: 11,
             padding: '8px 16px',
             borderRadius: 10,
-            border: '1px solid var(--accent-teal)',
-            background: 'color-mix(in srgb, var(--accent-teal) 15%, transparent)',
-            color: 'var(--accent-teal)',
+            border: '1px solid var(--ck-accent)',
+            background: 'color-mix(in srgb, var(--ck-accent) 15%, transparent)',
+            color: 'var(--ck-accent)',
             opacity: sending || !draft.trim() ? 0.5 : 1,
           }}
         >

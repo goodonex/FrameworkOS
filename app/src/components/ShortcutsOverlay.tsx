@@ -28,11 +28,11 @@ const GROUPS: ShortcutGroup[] = [
   {
     title: 'Navigation',
     items: [
-      { keys: ['G', 'D'], label: 'Zum Dashboard' },
-      { keys: ['G', 'B'], label: 'Zum Building Mode' },
-      { keys: ['G', 'S'], label: 'Zum Sales Mode' },
-      { keys: ['G', 'I'], label: 'Zum Intelligence Mode' },
-      { keys: ['G', 'P'], label: 'Zum Deliver Mode' },
+      { keys: ['G', 'C'], label: 'Zum Cockpit' },
+      { keys: ['G', 'H'], label: 'Zum Cockpit (Home)' },
+      { keys: ['G', 'S'], label: 'Zu Sales' },
+      { keys: ['G', 'P'], label: 'Zu Projekten' },
+      { keys: ['G', 'T'], label: 'Zum Tracking' },
     ],
   },
   {

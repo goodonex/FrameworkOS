@@ -19,7 +19,7 @@ export function OwnerDeliverPhaseContent({
   phase,
   project,
   slug,
-  accentColor = 'var(--accent-teal)',
+  accentColor = 'var(--ck-accent)',
   senderName,
   renderDeliverablesEditor,
 }: OwnerDeliverPhaseContentProps) {
@@ -66,7 +66,7 @@ export function OwnerDeliverPhaseContent({
 export function OwnerClientPreviewPhaseContent({
   phase,
   project,
-  accentColor = 'var(--accent-teal)',
+  accentColor = 'var(--ck-accent)',
 }: {
   phase: PhaseKey
   project: DeliverProject
