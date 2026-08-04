@@ -8,6 +8,7 @@ import { SaveStatusIndicator } from './components/SaveStatusIndicator'
 import { ShortcutsOverlay } from './components/ShortcutsOverlay'
 import { ToastProvider } from './components/Toast'
 import { CommandPaletteContext } from './lib/commandPaletteContext'
+import { COCKPIT_PREFIXES } from './cockpit/lib/bereiche'
 import { SaveStatusProvider } from './lib/saveStatusContext'
 import { BrandPage } from './pages/BrandPage'
 import { DeliverDefaultRouteGate } from './pages/deliver/DeliverDefaultRouteGate'
@@ -38,6 +39,7 @@ import { LinkedinArea } from './cockpit/pages/LinkedinArea'
 import { SalesVorschau } from './dev/SalesVorschau'
 import { ZielVorschau } from './dev/ZielVorschau'
 import { NavVorschau } from './dev/NavVorschau'
+import { ShellVorschau } from './dev/ShellVorschau'
 
 
 /** CRM → Sales (Juli 2026): alte /crm-Links/Bookmarks/Deep-Links auf /sales umleiten. */
@@ -160,22 +162,6 @@ function OwnerWorkspaceShell() {
   )
 }
 
-/** Routen unter <CockpitShell> — Reihenfolge egal, muss zum Routen-Block passen. */
-const COCKPIT_PREFIXES = [
-  '/cockpit',
-  '/aufgaben',
-  '/termine',
-  '/freigaben',
-  '/linkedin',
-  '/sales',
-  '/crm',
-  '/projekte',
-  '/ads',
-  '/content',
-  '/agenten',
-  '/tracking',
-] as const
-
 function App() {
   const location = useLocation()
   useViewport() // hält Viewport-Listener aktiv (Mobile-Gates in Unterseiten)
@@ -238,6 +224,7 @@ function App() {
             {import.meta.env.DEV ? <Route path="/dev/sales-vorschau" element={<SalesVorschau />} /> : null}
             {import.meta.env.DEV ? <Route path="/dev/ziel-vorschau" element={<ZielVorschau />} /> : null}
             {import.meta.env.DEV ? <Route path="/dev/nav-vorschau" element={<NavVorschau />} /> : null}
+            {import.meta.env.DEV ? <Route path="/dev/shell-vorschau" element={<ShellVorschau />} /> : null}
             <Route element={<OwnerWorkspaceShell />}>
               {/* Neue Cockpit-Shell (REBUILD-PLAN §5) */}
               <Route element={<CockpitShell />}>

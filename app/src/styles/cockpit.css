@@ -4,7 +4,12 @@
    Regel: Kontrast ≥ 4.5:1, Bewegung nur Graph-Physik + Job-Puls.
    ============================================================ */
 
-.ck-root {
+/* Tokens getrennt vom Anwenden: Toast und Command-Palette hängen über der
+   Shell (App.tsx) und damit AUSSERHALB von .ck-root. Ohne diese Trennung
+   stünden ihre Farben als Literale ein zweites Mal im Quelltext. */
+.ck-root,
+.ck-toast-stack,
+.ck-cmdk-backdrop {
   /* Farben */
   --ck-bg: #050708;
   --ck-panel: #0b0e10;
@@ -33,12 +38,29 @@
 
   /* Geometrie */
   --ck-radius: 8px;
+}
 
+.ck-root {
   font-family: var(--ck-font);
   background: var(--ck-bg);
   color: var(--ck-text-1);
   font-size: 13px;
   line-height: 1.5;
+}
+
+/* Fokus-Ring: tokens.css setzt global Teal (--semantic-primary) — im Cockpit
+   ist der Akzent Phosphor-Grün. Nur die Farbe wird überschrieben, Stärke und
+   Offset bleiben, damit Tastatur-Navigation überall gleich aussieht. */
+.ck-root button:focus-visible,
+.ck-root [role='button']:focus-visible,
+.ck-root a:focus-visible,
+.ck-root input:focus-visible,
+.ck-root textarea:focus-visible,
+.ck-root select:focus-visible,
+.ck-toast-stack :focus-visible,
+.ck-cmdk-backdrop :focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--ck-accent) 70%, transparent);
+  outline-offset: 2px;
 }
 
 /* --- Micro-Label: 10-11px, UPPERCASE, weiter Letter-Spacing --- */
@@ -156,6 +178,147 @@
 /* Uriel-Launcher links neben der Chat-Blase, Panel darüber. */
 .ck-uriel-fab { position: fixed; right: 80px; bottom: 20px; z-index: 61; }
 .ck-uriel-panel { position: fixed; right: 20px; bottom: 84px; z-index: 62; }
+
+/* --- Toast: über beiden FABs, nie darauf --------------------------------
+   Der Stapel selbst fängt keine Klicks ab; nur die Meldungen sind sichtbar. */
+.ck-toast-stack {
+  position: fixed;
+  right: 20px;
+  bottom: 84px;               /* FAB sitzt auf 20 und ist ~44 hoch */
+  z-index: 70;                /* über Chat-FAB (60) und Uriel-FAB (61) */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.ck-toast {
+  font-family: var(--ck-font);
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 10px 14px;
+  border-radius: var(--ck-radius);
+  background: var(--ck-panel);
+  border: 1px solid var(--ck-border-strong);
+  color: var(--ck-text-1);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  max-width: min(420px, calc(100vw - 40px));
+}
+.ck-toast--gut { border-color: var(--ck-accent); }
+.ck-toast--fehler { border-color: var(--ck-warn); }
+
+/* --- Command-Palette: ck-Optik, kein Glas ------------------------------- */
+.ck-cmdk-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+  background: rgba(2, 3, 4, 0.72);
+  pointer-events: auto;
+}
+
+.ck-cmdk {
+  font-family: var(--ck-font);
+  width: min(640px, calc(100vw - 32px));
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--ck-panel);
+  border: 1px solid var(--ck-border-strong);
+  border-radius: var(--ck-radius);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  color: var(--ck-text-1);
+  overflow: hidden;
+}
+
+.ck-cmdk-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--ck-border);
+}
+.ck-cmdk-glyph { color: var(--ck-text-3); font-size: 14px; flex-shrink: 0; }
+.ck-cmdk-input {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  outline: none;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ck-text-1);
+}
+.ck-cmdk-input::placeholder { color: var(--ck-text-3); }
+.ck-cmdk-key {
+  flex-shrink: 0;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  padding: 2px 7px;
+  border-radius: 5px;
+  border: 1px solid var(--ck-border-strong);
+  color: var(--ck-text-3);
+}
+
+.ck-cmdk-list { flex: 1; min-height: 0; overflow-y: auto; padding: 6px; margin: 0; list-style: none; }
+.ck-cmdk-gruppe { padding: 10px 10px 4px; }
+.ck-cmdk-leer { padding: 24px 12px; text-align: center; font-size: 12px; color: var(--ck-text-3); }
+
+.ck-cmdk-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: none;
+  font: inherit;
+  color: var(--ck-text-1);
+  text-align: left;
+  cursor: pointer;
+}
+.ck-cmdk-row--aktiv { background: var(--ck-panel-2); border-color: var(--ck-border-strong); }
+.ck-cmdk-row-glyph {
+  flex-shrink: 0;
+  width: 22px;
+  text-align: center;
+  color: var(--ck-accent);
+  font-size: 12px;
+}
+.ck-cmdk-row-text { flex: 1; min-width: 0; }
+.ck-cmdk-row-titel {
+  display: block;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ck-cmdk-row-sub {
+  display: block;
+  font-size: 10.5px;
+  color: var(--ck-text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ck-cmdk-fuss {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--ck-border);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--ck-text-3);
+}
 
 /* Wortmarke als Uriel-Trigger */
 .ck-uriel-trigger {
@@ -487,13 +650,26 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
     right: 10px;
     width: min(400px, calc(100vw - 20px)) !important;
   }
+
+  /* Toast über FAB UND Bottom-Bar — gleiche Höhe wie die Panels oben. */
+  .ck-toast-stack {
+    left: 10px;
+    right: 10px;
+    bottom: calc(130px + env(safe-area-inset-bottom));
+    align-items: stretch;
+  }
+
+  .ck-cmdk-backdrop { padding-top: 8vh; }
+  .ck-cmdk { max-height: 78vh; }
 }
 
 /* ============================================================
    COCKPIT — Plain Light
    Gleiche Geometrie, helle Flächen, Kontrast ≥ 4.5:1 bleibt Regel.
    ============================================================ */
-[data-ui-theme='plain-light'] .ck-root {
+[data-ui-theme='plain-light'] .ck-root,
+[data-ui-theme='plain-light'] .ck-toast-stack,
+[data-ui-theme='plain-light'] .ck-cmdk-backdrop {
   --ck-bg: #f4f6f7;
   --ck-panel: #ffffff;
   --ck-panel-2: #eef1f3;

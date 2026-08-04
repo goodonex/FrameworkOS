@@ -4,7 +4,16 @@ import { supabase } from '../../lib/supabase'
 import { useActiveBrand } from './activeBrand'
 import { toIsoDate, weekRowsOf } from './metricsDates'
 
-/** Eine Tageszeile aus daily_metrics (Migration 0049). */
+/**
+ * Eine Tageszeile aus daily_metrics (Migration 0049).
+ *
+ * Etappe 4, Schritt 2c: die vier herkunftslosen Sammelfelder `coldmails`,
+ * `followups`, `antworten_cold` und `termine_vereinbart` sind raus. Seit 0053/0055
+ * wird je Kanal gezählt (li_/ig_/call_), und die Sammelspalten wurden nur noch
+ * mit Nullen beschrieben — kein Leser im ganzen Code, kein Eintrag in QuickTrack
+ * oder TrackingArea. Die Spalten selbst bleiben bis zur Migration 0066 stehen
+ * (`not null default 0`), der Upsert lässt sie ab jetzt einfach aus.
+ */
 export interface DailyMetricsRow {
   id?: string
   datum: string // YYYY-MM-DD
@@ -15,20 +24,16 @@ export interface DailyMetricsRow {
   ig_anfragen: number
   ig_nachrichten: number
   cold_calls: number
-  coldmails: number
-  followups: number
-  // Follow-ups je Kanal (0055) — ersetzen fachlich das Sammelfeld `followups`
+  // Follow-ups je Kanal (0055)
   li_followups: number
   ig_followups: number
   call_followups: number
   antworten_li: number
   antworten_inmail: number
   antworten_ig: number
-  antworten_cold: number
   quali_termine: number
   sales_calls: number
-  termine_vereinbart: number
-  // Termine mit Kanal-Herkunft (0055) — ersetzen fachlich `termine_vereinbart`
+  // Termine mit Kanal-Herkunft (0055)
   termine_li: number
   termine_ig: number
   termine_call: number
@@ -45,18 +50,14 @@ export const METRIC_FIELDS = [
   'ig_anfragen',
   'ig_nachrichten',
   'cold_calls',
-  'coldmails',
-  'followups',
   'li_followups',
   'ig_followups',
   'call_followups',
   'antworten_li',
   'antworten_inmail',
   'antworten_ig',
-  'antworten_cold',
   'quali_termine',
   'sales_calls',
-  'termine_vereinbart',
   'termine_li',
   'termine_ig',
   'termine_call',
@@ -74,18 +75,14 @@ export function emptyRow(datum: string): DailyMetricsRow {
     ig_anfragen: 0,
     ig_nachrichten: 0,
     cold_calls: 0,
-    coldmails: 0,
-    followups: 0,
     li_followups: 0,
     ig_followups: 0,
     call_followups: 0,
     antworten_li: 0,
     antworten_inmail: 0,
     antworten_ig: 0,
-    antworten_cold: 0,
     quali_termine: 0,
     sales_calls: 0,
-    termine_vereinbart: 0,
     termine_li: 0,
     termine_ig: 0,
     termine_call: 0,

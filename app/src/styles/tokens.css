@@ -1,27 +1,24 @@
 /* ============================================================
-   BRAND OS — Design Tokens
-   Stack: React + Vite + Tailwind + Three.js + Framer Motion
-   Theme: Dark glass / blur / spatial depth
+   BRAND OS — Design Tokens (Glass-Restwelt)
+   Stack: React + Vite + Tailwind + Framer Motion
+   Theme: Dark glass / blur
+
+   Etappe 4, Schritt 1: eingedampft auf das, was noch jemand liest. Entfernt
+   wurden 34 Tokens ohne einen einzigen `var()`-Verweis im gesamten `app/`
+   (inkl. tailwind.config.js) — Spacing- und Duration-Skalen, die Tailwind
+   ohnehin selbst mitbringt, sowie die 3D-Reste (--node-size-*, --shadow-node,
+   --glow-*) aus der abgerissenen Three.js-Welt.
+
+   Das Cockpit hat eigene Tokens (--ck-*) in cockpit.css und hängt hier NICHT
+   mit drin. Was hier steht, gehört der Legacy-Welt; sie schrumpft weiter.
    ============================================================ */
 
 :root {
-  /* --- Spacing --- */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 20px;
-  --space-6: 24px;
-  --space-8: 32px;
-  --space-10: 40px;
-  --space-12: 48px;
-
-  /* --- Radius --- */
+  /* --- Radius (via tailwind.config.js) --- */
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-xl: 24px;
-  --radius-full: 9999px;
 
   /* --- Base colors (dark theme primary) --- */
   --bg-void:        #060610;   /* deepest background — 3D canvas */
@@ -39,10 +36,8 @@
   --glass-border-3: rgba(255, 255, 255, 0.20);
 
   /* --- Blur --- */
-  --blur-sm:  blur(8px);
   --blur-md:  blur(16px);
   --blur-lg:  blur(28px);
-  --blur-xl:  blur(48px);
 
   /* --- Brand accent colors --- */
   --accent-blue:    #4f7fff;
@@ -50,25 +45,13 @@
   --accent-teal:    #2dd4bf;
   --accent-amber:   #f59e0b;
   --accent-coral:   #f97316;
-  --accent-ember:   #e0593e;
   --accent-success: #4ade80;   /* erledigt, positiv */
 
-  /* --- Semantic color language (Phase 7) ---
-     Teal/Akzent → primäre Aktion, CTA, aktiver Zustand
-     Coral       → Warnung, überfällig, Aufmerksamkeit
-     Success     → erledigt, positiv
-     Muted       → inaktiv, sekundär, deaktiviert
-     Primary     → primärer Content/Fokus  */
+  /* --- Semantic color language ---
+     Nur noch die zwei, die diese Datei selbst benutzt: Fokus-Ring und
+     .dot-pulse. Die übrigen (success/muted/focus) hatte niemand je gelesen. */
   --semantic-primary:  var(--accent-teal);
   --semantic-warn:     var(--accent-coral);
-  --semantic-success:  var(--accent-success);
-  --semantic-muted:    var(--text-tertiary);
-  --semantic-focus:    var(--text-primary);
-
-  /* --- Glow colors (for 3D nodes + active states) --- */
-  --glow-blue:   rgba(79, 127, 255, 0.35);
-  --glow-purple: rgba(139, 92, 246, 0.35);
-  --glow-teal:   rgba(45, 212, 191, 0.30);
 
   /* --- Text --- */
   --text-primary:   rgba(255, 255, 255, 0.92);
@@ -94,25 +77,6 @@
   --text-lg:   20px;
   --text-xl:   26px;
   --text-2xl:  36px;
-
-  /* --- Transitions --- */
-  --ease-out:   cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --duration-fast:   150ms;
-  --duration-base:   250ms;
-  --duration-slow:   400ms;
-  --duration-enter:  600ms;
-
-  /* --- Shadows --- */
-  --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255,255,255,0.06);
-  --shadow-node:  0 0 40px rgba(79, 127, 255, 0.2), 0 16px 48px rgba(0, 0, 0, 0.5);
-  --shadow-glow-blue:   0 0 60px rgba(79, 127, 255, 0.25);
-  --shadow-glow-purple: 0 0 60px rgba(139, 92, 246, 0.25);
-
-  /* --- 3D / Canvas --- */
-  --node-size-brand:  80px;   /* brand nodes in 3D graph */
-  --node-size-module: 48px;   /* module nodes */
-  --node-size-item:   28px;   /* leaf nodes */
 
   /* --- Surfaces & overlays --- */
   --overlay-backdrop:       rgba(8, 12, 22, 0.55);   /* drawer/modal backdrop */
@@ -140,8 +104,6 @@
   --status-danger-bg:   rgba(40, 15, 15, 0.82);
   --status-warn-bg:     rgba(245, 158, 11, 0.14);
   --status-success-bg:  rgba(74, 222, 128, 0.14);
-  --trend-up:           #86efac;
-  --trend-down:         #fca5a5;
 
   color-scheme: dark;
 }
@@ -289,12 +251,8 @@ select:focus-visible {
   --text-tertiary: #6b6b7f;
   --text-accent: #2f5fd4;
 
-  --blur-sm: none;
   --blur-md: none;
   --blur-lg: none;
-  --blur-xl: none;
-
-  --shadow-glass: 0 1px 4px rgba(0, 0, 0, 0.07);
 
   /* Akzente — für weiße Flächen abgedunkelt (textsicher) */
   --accent-blue:    #2f5fd4;
@@ -302,7 +260,6 @@ select:focus-visible {
   --accent-teal:    #0f766e;
   --accent-amber:   #b45309;
   --accent-coral:   #c2410c;
-  --accent-ember:   #b23c22;
   --accent-success: #16a34a;
 
   /* Mode-Farben */
@@ -310,14 +267,6 @@ select:focus-visible {
   --mode-promo:        #6d28d9;
   --mode-sales:        #0f766e;
   --mode-intelligence: #b45309;
-
-  /* Glows — deutlich weicher auf hell */
-  --glow-blue:   rgba(47, 95, 212, 0.16);
-  --glow-purple: rgba(109, 40, 217, 0.14);
-  --glow-teal:   rgba(15, 118, 110, 0.14);
-  --shadow-node:        0 2px 10px rgba(15, 23, 42, 0.12);
-  --shadow-glow-blue:   0 0 24px rgba(47, 95, 212, 0.14);
-  --shadow-glow-purple: 0 0 24px rgba(109, 40, 217, 0.12);
 
   /* Surfaces & Overlays */
   --overlay-backdrop:     rgba(15, 23, 42, 0.30);
@@ -341,8 +290,6 @@ select:focus-visible {
   --status-danger-bg:  #fee2e2;
   --status-warn-bg:    #fef3c7;
   --status-success-bg: #dcfce7;
-  --trend-up:          #15803d;
-  --trend-down:        #b91c1c;
 }
 
 [data-ui-theme='plain-light'] body {
