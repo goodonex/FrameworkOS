@@ -7,6 +7,7 @@ import { DELIVER_STAGE_LABEL } from '../../pages/deliver/stageLabels'
 import { DELIVER_STAGE_ORDER } from '../../types/db'
 import type { DeliverProject } from '../../types/db'
 import { useActiveBrand } from '../lib/activeBrand'
+import { useKundenPosteingang } from '../lib/useKundenPosteingang'
 
 /**
  * Projekte/Kundenportal im Cockpit (REBUILD): Liste der Deliver-Projekte der
@@ -18,6 +19,9 @@ function ProjekteList() {
   const { show } = useToast()
   const { activeBrand } = useActiveBrand()
   const projects = useDeliverProjects(activeBrand?.slug)
+  // „An diesem Projekt liegt etwas" — offene Kundennachrichten und eingereichte
+  // Website-Änderungen, gezählt aus derselben Quelle wie /freigaben.
+  const { jeProjekt } = useKundenPosteingang(activeBrand?.slug)
   const [creating, setCreating] = useState(false)
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
@@ -115,7 +119,12 @@ function ProjekteList() {
           }}
         >
           {projects.items.map((p) => (
-            <ProjectCard key={p.id} project={p} onOpen={() => navigate(`/projekte/${p.id}`)} />
+            <ProjectCard
+              key={p.id}
+              project={p}
+              offenePost={jeProjekt.get(p.id) ?? 0}
+              onOpen={() => navigate(`/projekte/${p.id}`)}
+            />
           ))}
         </div>
       )}
@@ -123,7 +132,16 @@ function ProjekteList() {
   )
 }
 
-export function ProjectCard({ project: p, onOpen }: { project: DeliverProject; onOpen: () => void }) {
+export function ProjectCard({
+  project: p,
+  onOpen,
+  offenePost = 0,
+}: {
+  project: DeliverProject
+  onOpen: () => void
+  /** Offene Kundennachrichten + eingereichte Website-Änderungen dieses Projekts. */
+  offenePost?: number
+}) {
   const items = p.deliverables ?? []
   const total = items.length
   const done = items.filter((d) => d.status === 'fertig').length
@@ -174,17 +192,33 @@ export function ProjectCard({ project: p, onOpen }: { project: DeliverProject; o
             {p.client_email ? ` · ${p.client_email}` : ''}
           </span>
         </span>
-        <span
-          className="ck-label"
-          style={{
-            flexShrink: 0,
-            padding: '3px 9px',
-            borderRadius: 99,
-            border: `1px solid ${complete ? 'var(--ck-accent)' : 'var(--ck-border)'}`,
-            color: complete ? 'var(--ck-accent)' : undefined,
-          }}
-        >
-          {DELIVER_STAGE_LABEL[p.client_stage] ?? p.client_stage}
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          {offenePost > 0 ? (
+            <span
+              className="ck-label"
+              title={`${offenePost} offene${offenePost === 1 ? 'r' : ''} Posten vom Kunden — in /freigaben`}
+              style={{
+                padding: '3px 9px',
+                borderRadius: 99,
+                border: '1px solid var(--ck-accent)',
+                background: 'var(--ck-accent-dim)',
+                color: 'var(--ck-accent)',
+              }}
+            >
+              {offenePost} neu
+            </span>
+          ) : null}
+          <span
+            className="ck-label"
+            style={{
+              padding: '3px 9px',
+              borderRadius: 99,
+              border: `1px solid ${complete ? 'var(--ck-accent)' : 'var(--ck-border)'}`,
+              color: complete ? 'var(--ck-accent)' : undefined,
+            }}
+          >
+            {DELIVER_STAGE_LABEL[p.client_stage] ?? p.client_stage}
+          </span>
         </span>
       </div>
 

@@ -1,76 +1,109 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useBrandId } from './useBrandId'
+
+/**
+ * Kundennachrichten über ALLE Projekte einer Marke — die Owner-Seite von
+ * `project_messages`.
+ *
+ * Lag seit dem Abriss der alten Brand-Oberfläche ohne Oberfläche da; seit
+ * Etappe 4/3 trägt der Hook den Kunden-Posteingang in /freigaben, den Zähler
+ * auf der ProjectCard und die Zeile im Heute-Deck.
+ *
+ * `read_at` IST das Erledigt-Flag: Es gibt kein zweites Statusfeld, und dieselbe
+ * Bedingung (sender_role='client' AND read_at IS NULL) definiert überall
+ * „liegt noch an". Deshalb wird hier NICHT beim Laden gelesen-markiert — das
+ * würde die Warteschlange beim Öffnen von /freigaben leeren.
+ */
 
 export interface GlobalMessageRow {
   id: string
   project_id: string
+  project_name: string
   sender_name: string | null
   body: string
   created_at: string
-  project_name?: string
+  read_at: string | null
 }
+
+export interface ProjektKurz {
+  id: string
+  name: string
+}
+
+const LIMIT = 60
 
 export function useGlobalMessages(brandSlug: string | undefined) {
   const brandId = useBrandId(brandSlug)
   const [messages, setMessages] = useState<GlobalMessageRow[]>([])
-  const [unreadCount, setUnreadCount] = useState(0)
+  const [projekte, setProjekte] = useState<ProjektKurz[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const reload = useCallback(async () => {
     if (!brandId || !supabase) {
       setMessages([])
-      setUnreadCount(0)
+      setProjekte([])
       setLoading(false)
       return
     }
 
     setLoading(true)
 
-    const { data: projects } = await supabase
+    const { data: projectRows, error: projErr } = await supabase
       .from('deliver_projects')
       .select('id, name')
-      .eq('brand_id', brandId)
+      .eq('owner_brand_id', brandId)
       .is('deleted_at', null)
 
-    const projectIds = (projects ?? []).map((p) => p.id as string)
-    if (projectIds.length === 0) {
+    if (projErr) {
+      setError(projErr.message)
       setMessages([])
-      setUnreadCount(0)
+      setProjekte([])
       setLoading(false)
       return
     }
 
-    const nameById = new Map(
-      (projects ?? []).map((p) => [String(p.id), String(p.name ?? 'Projekt')]),
-    )
+    const liste: ProjektKurz[] = (projectRows ?? []).map((p) => ({
+      id: String(p.id),
+      name: String(p.name ?? 'Projekt'),
+    }))
+    setProjekte(liste)
 
-    const { data, error } = await supabase
+    if (liste.length === 0) {
+      setMessages([])
+      setError(null)
+      setLoading(false)
+      return
+    }
+
+    const nameById = new Map(liste.map((p) => [p.id, p.name]))
+
+    const { data, error: err } = await supabase
       .from('project_messages')
       .select('id, project_id, sender_name, body, created_at, read_at')
-      .in('project_id', projectIds)
+      .in('project_id', liste.map((p) => p.id))
       .eq('sender_role', 'client')
       .is('deleted_at', null)
       .order('created_at', { ascending: false })
-      .limit(40)
+      .limit(LIMIT)
 
-    if (error) {
+    if (err) {
+      setError(err.message)
       setMessages([])
-      setUnreadCount(0)
     } else {
-      const rows = (data ?? []).map((r) => ({
-        id: String(r.id),
-        project_id: String(r.project_id),
-        sender_name: typeof r.sender_name === 'string' ? r.sender_name : null,
-        body: String(r.body ?? ''),
-        created_at: String(r.created_at ?? ''),
-        project_name: nameById.get(String(r.project_id)),
-      }))
-      setMessages(rows)
-      setUnreadCount(rows.filter((r) => {
-        const raw = (data ?? []).find((d) => String(d.id) === r.id)
-        return raw && !raw.read_at
-      }).length)
+      setError(null)
+      setMessages(
+        (data ?? []).map((r) => ({
+          id: String(r.id),
+          project_id: String(r.project_id),
+          project_name: nameById.get(String(r.project_id)) ?? 'Projekt',
+          sender_name: typeof r.sender_name === 'string' ? r.sender_name : null,
+          body: String(r.body ?? ''),
+          created_at: String(r.created_at ?? ''),
+          read_at: typeof r.read_at === 'string' ? r.read_at : null,
+        })),
+      )
     }
     setLoading(false)
   }, [brandId])
@@ -81,61 +114,57 @@ export function useGlobalMessages(brandSlug: string | undefined) {
     return () => window.clearInterval(interval)
   }, [reload])
 
+  /** Eine Nachricht abhaken. Der bewusste Klick, nicht das Öffnen der Seite. */
+  const markRead = useCallback(async (messageId: string) => {
+    if (!supabase) return
+    const now = new Date().toISOString()
+    // Optimistisch: der Haken soll sofort sitzen, auch bei träger Verbindung.
+    setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, read_at: now } : m)))
+    const { error: err } = await supabase
+      .from('project_messages')
+      .update({ read_at: now })
+      .eq('id', messageId)
+      .is('read_at', null)
+    if (err) {
+      setError(err.message)
+      await reload()
+    }
+  }, [reload])
+
+  /** Ganzen Projekt-Thread abhaken (Projekt-Detail: Kevin hat den Verlauf gelesen). */
   const markProjectRead = useCallback(
     async (projectId: string) => {
       if (!supabase) return
       const now = new Date().toISOString()
-      await supabase
+      setMessages((prev) =>
+        prev.map((m) => (m.project_id === projectId && !m.read_at ? { ...m, read_at: now } : m)),
+      )
+      const { error: err } = await supabase
         .from('project_messages')
         .update({ read_at: now })
         .eq('project_id', projectId)
         .eq('sender_role', 'client')
         .is('read_at', null)
         .is('deleted_at', null)
-      await reload()
+      if (err) {
+        setError(err.message)
+        await reload()
+      }
     },
     [reload],
   )
 
-  return { messages, unreadCount, loading, reload, markProjectRead }
-}
+  const ungelesen = useMemo(() => messages.filter((m) => !m.read_at), [messages])
 
-export function useHubBadgeCount(brandSlug: string | undefined) {
-  const brandId = useBrandId(brandSlug)
-  const { unreadCount: messageCount } = useGlobalMessages(brandSlug)
-  const [extraCount, setExtraCount] = useState(0)
-
-  const reload = useCallback(async () => {
-    if (!brandId || !supabase) {
-      setExtraCount(0)
-      return
-    }
-
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-    let count = 0
-
-    const { count: bookingCount } = await supabase
-      .from('sales_bookings')
-      .select('id', { count: 'exact', head: true })
-      .eq('brand_id', brandId)
-      .gte('created_at', since)
-
-    const { count: contactCount } = await supabase
-      .from('contacts')
-      .select('id', { count: 'exact', head: true })
-      .eq('brand_id', brandId)
-      .gte('created_at', since)
-
-    count += bookingCount ?? 0
-    count += contactCount ?? 0
-    setExtraCount(count)
-  }, [brandId])
-
-  useEffect(() => {
-    void reload()
-    const interval = window.setInterval(() => void reload(), 60_000)
-    return () => window.clearInterval(interval)
-  }, [reload])
-
-  return messageCount + extraCount
+  return {
+    messages,
+    ungelesen,
+    projekte,
+    unreadCount: ungelesen.length,
+    loading,
+    error,
+    reload,
+    markRead,
+    markProjectRead,
+  }
 }

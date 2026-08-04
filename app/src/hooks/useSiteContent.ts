@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { gibSiteContentFrei, verwirfSiteContentEntwurf } from '../lib/siteContentService'
 
 /**
  * Website-CMS (Migration 0052): feste Text-/Bild-Felder je Projekt.
@@ -114,20 +115,13 @@ export function useSiteContent(projectId: string | undefined): UseSiteContentRes
 
   const approve = useCallback(
     async (fieldIds: string[]) => {
-      if (!supabase || fieldIds.length === 0) return
-      const now = new Date().toISOString()
+      if (fieldIds.length === 0) return
       for (const id of fieldIds) {
         const f = fields.find((x) => x.id === id)
         if (!f) continue
-        const { error: err } = await supabase
-          .from('site_content')
-          .update({
-            value_published: f.value_draft,
-            status: 'published',
-            published_at: now,
-          })
-          .eq('id', id)
-        if (err) setError(err.message)
+        // Gemeinsamer Pfad mit dem Kunden-Posteingang (siteContentService).
+        const res = await gibSiteContentFrei(id, f.value_draft)
+        if (!res.ok) setError(res.error)
       }
       await reload()
     },
@@ -136,14 +130,10 @@ export function useSiteContent(projectId: string | undefined): UseSiteContentRes
 
   const discardDraft = useCallback(
     async (fieldId: string) => {
-      if (!supabase) return
       const f = fields.find((x) => x.id === fieldId)
       if (!f) return
-      const { error: err } = await supabase
-        .from('site_content')
-        .update({ value_draft: f.value_published, status: 'published' })
-        .eq('id', fieldId)
-      if (err) setError(err.message)
+      const res = await verwirfSiteContentEntwurf(fieldId, f.value_published)
+      if (!res.ok) setError(res.error)
       await reload()
     },
     [fields, reload],

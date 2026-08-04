@@ -4,7 +4,10 @@ import { useContacts } from '../../hooks/useContacts'
 import type { Contact } from '../../types/db'
 import { sendEmail } from '../../lib/emailService'
 import { HeuteTabs } from '../components/HeuteTabs'
+import { KundenPosteingang } from '../components/KundenPosteingang'
+import { useKundenPosteingang } from '../lib/useKundenPosteingang'
 import { useActiveBrand } from '../lib/activeBrand'
+import { useAuth } from '../../hooks/useAuth'
 import {
   buildFollowupInput,
   parseDrafts,
@@ -71,6 +74,11 @@ export function FreigabenArea() {
   const brandId = activeBrand?.id
   const contacts = useContacts(slug)
   const { runner, runs, refresh } = useRunnerData()
+  const posteingang = useKundenPosteingang(slug)
+  const { user } = useAuth()
+  const senderName =
+    (typeof user?.user_metadata?.full_name === 'string' ? user.user_metadata.full_name : null) ??
+    'Team'
 
   const [cards, setCards] = useState<Card[]>([])
   const [loadedRunId, setLoadedRunId] = useState<string | null>(null)
@@ -230,7 +238,9 @@ export function FreigabenArea() {
         <div>
           <h1 style={{ fontSize: 18, fontWeight: 600, color: 'var(--ck-text-1)', margin: 0 }}>Freigaben</h1>
           <div className="ck-label" style={{ marginTop: 2 }}>
-            {openCount} offen · Agent bereitet vor, du gibst frei
+            {posteingang.eintraege.length > 0
+              ? `${posteingang.eintraege.length} von Kunden · ${openCount} Entwürfe`
+              : `${openCount} offen · Agent bereitet vor, du gibst frei`}
           </div>
         </div>
         <button
@@ -244,6 +254,23 @@ export function FreigabenArea() {
           {generating || runningFollowup ? 'läuft…' : '▶ Entwürfe erzeugen'}
         </button>
       </div>
+
+      {/* Kundenpost zuerst: Das Portal verspricht Antwort in 24 h, die
+          Agenten-Entwürfe haben keine Frist. */}
+      <KundenPosteingang
+        eintraege={posteingang.eintraege}
+        loading={posteingang.loading}
+        onAntworten={(e, text) => posteingang.antworte(e.projektId, text, senderName)}
+        onNachrichtAbhaken={posteingang.hakeNachrichtAb}
+        onWebsiteFreigeben={posteingang.gibWebsiteFrei}
+        onWebsiteVerwerfen={posteingang.verwirfWebsite}
+      />
+
+      {posteingang.error ? (
+        <div className="ck-panel" style={{ padding: '10px 14px', fontSize: 12.5, color: 'var(--ck-warn)' }}>
+          Kundenpost lädt nicht: {posteingang.error}
+        </div>
+      ) : null}
 
       {runner.state !== 'online' ? (
         <div className="ck-panel" style={{ padding: '10px 14px', fontSize: 12.5, color: 'var(--ck-text-3)' }}>

@@ -1,19 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { rowToProjectMessage as rowToMessage, sendeProjektNachricht } from '../lib/projectMessageService'
 import type { ProjectMessage } from '../types/db'
-
-function rowToMessage(row: Record<string, unknown>): ProjectMessage {
-  return {
-    id: String(row.id ?? ''),
-    project_id: String(row.project_id ?? ''),
-    sender_role: row.sender_role === 'client' ? 'client' : 'owner',
-    sender_name: typeof row.sender_name === 'string' ? row.sender_name : null,
-    body: String(row.body ?? ''),
-    read_at: typeof row.read_at === 'string' ? row.read_at : null,
-    deleted_at: typeof row.deleted_at === 'string' ? row.deleted_at : null,
-    created_at: typeof row.created_at === 'string' ? row.created_at : new Date().toISOString(),
-  }
-}
 
 export function useProjectMessages(
   projectId: string | undefined,
@@ -87,42 +75,28 @@ export function useProjectMessages(
 
   const send = useCallback(
     async (body: string) => {
-      const trimmed = body.trim()
-      if (!trimmed || !projectId || !supabase) return { ok: false as const, error: 'empty' }
+      if (!projectId) return { ok: false as const, error: 'empty' }
       setSending(true)
       setError(null)
 
-      const { data, error: insErr } = await supabase
-        .from('project_messages')
-        .insert({
-          project_id: projectId,
-          sender_role: viewerRole,
-          sender_name: senderName.trim() || null,
-          body: trimmed,
-        })
-        .select('*')
-        .maybeSingle()
-
-      if (insErr || !data) {
-        setSending(false)
-        setError(insErr?.message ?? 'Senden fehlgeschlagen')
-        return { ok: false as const, error: insErr?.message ?? 'insert_failed' }
-      }
-
-      const msg = rowToMessage(data as Record<string, unknown>)
-      setMessages((prev) => [...prev, msg])
-
-      void supabase.functions.invoke('send-email', {
-        body: {
-          mode: 'project_message',
-          project_id: projectId,
-          message_id: msg.id,
-          sender_role: viewerRole,
-        },
+      // Gemeinsamer Pfad mit dem Kunden-Posteingang (projectMessageService) —
+      // Insert plus Benachrichtigungs-Mail an die Gegenseite.
+      const res = await sendeProjektNachricht({
+        projectId,
+        senderRole: viewerRole,
+        senderName,
+        body,
       })
 
+      if (!res.ok) {
+        setSending(false)
+        if (res.error !== 'leer') setError(res.error)
+        return { ok: false as const, error: res.error }
+      }
+
+      setMessages((prev) => [...prev, res.message])
       setSending(false)
-      return { ok: true as const, message: msg }
+      return { ok: true as const, message: res.message }
     },
     [projectId, senderName, viewerRole],
   )

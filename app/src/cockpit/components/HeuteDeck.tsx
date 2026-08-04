@@ -9,6 +9,7 @@ import type { Posten } from '../lib/prioritaet'
 import { KACHEL_JE_SPUR, SPUR_LABEL } from '../lib/spurAnzeige'
 import { tagesansage } from '../lib/tagesansage'
 import { CALENDAR_ICAL_KEY, useCalendarFeed } from '../lib/useCalendarFeed'
+import { useKundenPosteingang } from '../lib/useKundenPosteingang'
 
 const COLLAPSE_KEY = 'ck.heute.collapsed'
 const TOP = 5
@@ -39,6 +40,7 @@ export function HeuteDeck({ slug }: { slug: string | undefined }) {
   const dauern = useArbeitsDauern(slug)
   const bookings = useBookings(slug)
   const content = useContentPieces(slug)
+  const { nachrichtenAnzahl } = useKundenPosteingang(slug)
 
   const [icalUrl] = useState<string>(() => {
     try {
@@ -170,6 +172,19 @@ export function HeuteDeck({ slug }: { slug: string | undefined }) {
               ))
             )}
             <span style={{ flex: 1 }} />
+            {/* Nur zählen und hinspringen — abgearbeitet wird in /freigaben,
+                sonst gäbe es zwei Orte für dieselbe Warteschlange. */}
+            {nachrichtenAnzahl > 0 ? (
+              <button
+                type="button"
+                onClick={() => navigate('/freigaben')}
+                className="ck-btn"
+                style={{ fontSize: 11, padding: '4px 10px', color: 'var(--ck-accent)' }}
+              >
+                {nachrichtenAnzahl}{' '}
+                {nachrichtenAnzahl === 1 ? 'Kundennachricht' : 'Kundennachrichten'}
+              </button>
+            ) : null}
             {offeneEntwuerfe > 0 ? (
               <button
                 type="button"

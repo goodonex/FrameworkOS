@@ -37,6 +37,7 @@ import { SalesVorschau } from './dev/SalesVorschau'
 import { ZielVorschau } from './dev/ZielVorschau'
 import { NavVorschau } from './dev/NavVorschau'
 import { ShellVorschau } from './dev/ShellVorschau'
+import { PosteingangVorschau } from './dev/PosteingangVorschau'
 
 
 /** CRM → Sales (Juli 2026): alte /crm-Links/Bookmarks/Deep-Links auf /sales umleiten. */
@@ -213,6 +214,7 @@ function App() {
             {import.meta.env.DEV ? <Route path="/dev/ziel-vorschau" element={<ZielVorschau />} /> : null}
             {import.meta.env.DEV ? <Route path="/dev/nav-vorschau" element={<NavVorschau />} /> : null}
             {import.meta.env.DEV ? <Route path="/dev/shell-vorschau" element={<ShellVorschau />} /> : null}
+            {import.meta.env.DEV ? <Route path="/dev/posteingang-vorschau" element={<PosteingangVorschau />} /> : null}
             <Route element={<OwnerWorkspaceShell />}>
               {/* Neue Cockpit-Shell (REBUILD-PLAN §5) */}
               <Route element={<CockpitShell />}>
