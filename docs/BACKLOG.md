@@ -33,22 +33,22 @@ Alles hier steht zwischen dem heutigen Code und „läuft in Produktion".
 Was in diesem Abschnitt abgehakt ist, ist wirklich in Produktion; die Edge Functions
 (L4, L5) deployen unabhängig vom Frontend und sind es bereits.
 
-### L1 · Fast-Forward — **Etappen 1–4 sind live, der Rest hängt** (Stand 06.08. abends)
-`main` steht auf `b9fb090` (letzter Etappe-4-Commit) und ist gepusht — die vier
-Etappen laufen auf frameworkos.de. Ausgeliefert wird `index-CvTize-3.js`.
+### L1 · Fast-Forward — **die fuenf Commits sind live, sechs neue haengen** (Stand 06.08. spaetabends)
+`main` steht auf `de60288` und ist gepusht — der Fast-Forward aus dem
+vorherigen Stand dieses Dokuments **ist erfolgt**. Netlify hat neu gebaut:
+ausgeliefert wird `index-BjbadBHB.js` (vorher `index-CvTize-3.js`, geprueft per
+`curl https://frameworkos.de/`). Damit ist auch der `send-email`-Deep-Link-Fix
+regulaer auf `main`, die dokumentierte Drift ist aufgeloest.
 
-**Noch nicht live: 5 Commits auf `cockpit-rebuild`** — `a79ddca` (Backlog + HANDOFF),
-`2a71d59`, `d62d5eb` (Backlog-Nachträge), `77d157c` (send-email-Fix), `9eac2df`
-(`log_metric`). Verbindlich ist immer `git log --oneline main..cockpit-rebuild`.
+**Noch nicht live: 6 Commits auf `cockpit-rebuild`** — die Aufraeum-Runde vom
+Abend des 06.08.: `6a8d605` (O2), `22d454a` (O1), `bc07a63` (O10), `57663f2` (O6),
+`6b8e4a5` (O4/O5), `e1ce382` (O13). Verbindlich ist immer
+`git log --oneline main..cockpit-rebuild` — jede Zahl hier ist ab dem naechsten
+Commit veraltet.
 
-**⚠ Drift, solange das offen ist:** Edge Functions deployen aus dem
-Arbeitsverzeichnis, nicht aus `main`. Die live laufende `send-email` **v20** enthält
-den Deep-Link-Fix aus `77d157c`, obwohl der Commit nicht auf `main` ist. Ein
-späterer `send-email`-Deploy **von `main` aus** würde den Fix stillschweigend
-zurückdrehen. Der nächste Fast-Forward löst das auf.
-
-**Vor dem nächsten Livegang:** einmal in der Netlify-UI prüfen, welcher Branch als
-Production eingestellt ist — `netlify.toml` legt ihn nicht fest (**ungeprüft**).
+**Vor dem naechsten Livegang:** einmal in der Netlify-UI pruefen, welcher Branch als
+Production eingestellt ist — `netlify.toml` legt ihn nicht fest. Der Rebuild auf
+`de60288` ist ein starkes Indiz fuer `main`, aber kein Beleg (**ungeprueft**).
 *Herkunft: Session-Inventur, was-ansteht.html*
 
 ### L2 · ~~Migrations-Historie reparieren~~ ✅ **erledigt 06.08.2026**
@@ -546,16 +546,22 @@ Fläche der alten Optik. Sinnvoll erst, wenn entschieden ist, was von
 Pipeline/Listen/Call-Mode/Kontakt überhaupt bleibt (O13, letzte Zeile).
 *Herkunft: IDEEN „Schöner"*
 
-### O15 · Hygiene — **S**
-- ~~Worktree `sharp-lehmann-9787a0` auflösen~~ ✅ **erledigt 06.08.2026.** Von den acht
-  uncommitteten Änderungen hatte Etappe 1 sechs identisch gemacht; die zwei mit
-  eigenem Wert (`HANDOFF.md`, vier Warnhinweise in `docs/data-model.md`) sind mit
-  diesem Backlog übernommen. Worktree und Branch `claude/sharp-lehmann-9787a0` sind
-  entfernt. *Rest: der leere Ordner `.claude/worktrees/` kann weg.*
-- **Duplikat-Ordner `cursor/` neben `.cursor/`** im Repo-Root — identischer Inhalt.
-- **Vault:** `02 Projekte/Uriel.md` ist ein Stub vom 09.06. („Aktuell bei Migration
-  0039–0043"). `[[ai-os-setup]]` wird im Masterplan zweimal verlinkt, existiert aber
-  nicht — Dangling Link.
+### O15 · ~~Hygiene~~ ✅ **erledigt 06.08.2026**
+- ~~Worktree `sharp-lehmann-9787a0` aufloesen~~ ✅ (frueher am 06.08.). Der zurueckgebliebene
+  leere Ordner `.claude/worktrees/` ist jetzt ebenfalls weg.
+- ~~**Duplikat-Ordner `cursor/` neben `.cursor/`**~~ ✅ `cursor/rules.md` entfernt.
+  Beide waren **versioniert und inhaltsgleich** (`diff -rq` ohne Ausgabe); geblieben
+  ist `.cursor/`, weil Cursor genau dort liest.
+- ~~**Vault:** `02 Projekte/Uriel.md` ist ein Stub vom 09.06.~~ ✅ **Befund war
+  ueberholt:** die Notiz war bereits am 06.08. ueberarbeitet worden, stand aber auf
+  „Etappen gebaut, noch nicht live“ und „12 Commits hinterher“. Jetzt auf dem echten
+  Stand: `main` = `de60288` live, 6 Commits offen, die Entscheidungen dieser Runde
+  in drei Zeilen.
+- ~~**Dangling Link `[[ai-os-setup]]`**~~ ✅ alle drei Vorkommen im Masterplan
+  aufgeloest. Die Notiz gab es im Vault **nie**; die Verweise galten der fruehen
+  Hostinger-Planung, die inzwischen verworfen ist. Bewusst **kein** nachtraeglich
+  erfundenes Dokument — stattdessen zeigen die Stellen jetzt auf die Begruendung in
+  Phase 2 bzw. Backlog Abschnitt 5, mit einer Fussnote, warum der Link verschwand.
 
 ### O16 · Zwei Vorhaben aus Sessions, die nie in einem Doc landeten
 - **LinkedIn als Kanal im Content-Bereich** (Session 21.07., „TODO 1"): Kanal
