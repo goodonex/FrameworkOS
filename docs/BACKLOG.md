@@ -519,9 +519,9 @@ Jeder Punkt einzeln bestätigt, keiner dringend, jeder kommt sonst zurück.
 | Doppelte Zielverwaltung: `SalesGoalsDrawer` konkurriert mit dem neuen Monatsziel | `SalesMode.tsx:2470`, `hooks/useSalesPro.ts:747` |
 | InMail-Credits hart im Code | `cockpit/lib/prioritaet.ts:99` (`INMAIL_CREDITS_STAND = 150`) |
 | `useBrands`-Seed schreibt bei jedem Aufruf | `hooks/useBrands.ts:171/187/226/237` |
-| `.ck-heute-grid` ohne `display: grid` (wird inline nachgepatcht) | `styles/cockpit.css:497-499` |
+| ~~`.ck-heute-grid` ohne `display: grid`~~ ✅ 06.08. — `display: grid` + `gap` ergänzt. Befund präzisiert: die Klasse wird von **keiner** Komponente benutzt (HeuteDeck v2 rendert eine Liste), sie war also nicht „inline nachgepatcht", sondern eine stille Nulloperation. Bleibt korrekt stehen für den Mobile-Umbau | `styles/cockpit.css` |
 | `entwurfMoeglich` hart auf `true` | `cockpit/pages/LinkedinArea.tsx:459` und `:470` |
-| Run-Drawer fällt auf Weiß zurück — `--ck-bg-1` und `--ck-danger` existieren nicht | `cockpit/pages/AgentsArea.tsx:200` und `:34`, keine Definition in `cockpit.css` |
+| ~~Run-Drawer fällt auf Weiß zurück~~ ✅ 06.08. — `--ck-bg-1` (Alias auf `--ck-panel`, zieht im Hell-Modus automatisch mit) und `--ck-danger` (#e5484d dunkel / #b42318 hell) definiert, die `var(--x, fallback)`-Krücken in AgentsArea entfernt. **Im laufenden Build gemessen:** Drawer `rgb(11,14,16)` statt Weiß, Fehlerfarbe `rgb(229,72,77)`; im Hell-Modus `#ffffff` / `#b42318` | `styles/cockpit.css`, `cockpit/pages/AgentsArea.tsx` |
 | Agenten mit Pflicht-Input blind startbar (`loom-skript`, `followup-pdf` ohne Name/Website) | `cockpit/pages/AgentsArea.tsx:74` (`postRun(agent.id)` ohne Input) |
 | Vault-Queue wächst unbegrenzt, `queued: []` hart | `runner/index.mjs:50`, `:407-412`, `:1755`; `:1191`, `:1460` |
 | Pitch-Modus hängt am Namens-Suffix | `lib/projectAreas.ts` → `isPitchProject`, `components/portal/PortalShell.tsx:33` |
@@ -534,7 +534,7 @@ Jeder Punkt einzeln bestätigt, keiner dringend, jeder kommt sonst zurück.
 | iCal-Serientermine verschwinden ab Woche 2 (kein RRULE) | kein `RRULE` in `cockpit/lib/icalParse.ts` |
 | Auto-getrackte Felder nicht als „auto" gekennzeichnet | kein Badge in `TrackingArea.tsx` |
 | Ads-Dashboard zeigt vier leere KPI-Kacheln statt Review-Fortschritt | `AdsArea.tsx:123-126` (alle „—") |
-| Nav-Icons ☑ ⚙ rendern auf iOS als bunte Emoji | `NavRail.tsx:20/29` |
+| ~~Nav-Icons ☑ ⚙ rendern auf iOS als bunte Emoji~~ ✅ 06.08. — beide tragen jetzt U+FE0E (Variation Selector-15, Text-Variante), dazu `font-variant-emoji: text` auf `.ck-nav-icon`. Bewusst kein Zeichentausch: alle anderen Icons sind Geometric Shapes, ein fremdes Zeichen hätte Tofu riskiert. **Nicht von hier prüfbar** — braucht einen Blick auf echtem iOS | `NavRail.tsx`, `styles/cockpit.css` |
 | Beziehungs-Reminder „Still geworden" | kein `last_contact_at` in `cockpit/` |
 | Umsatz per Uriel eintragen — `log_metric` kann nur zählen, nicht setzen; braucht ein eigenes `set_revenue` mit Setz-Semantik | `metrikFelder.ts` (umsatz bewusst ausgelassen), `useDailyMetrics.setUmsatzOn` |
 | Call-Mode auf den echten Funnel stellen oder streichen | `SalesArea.tsx:18/58` — Sub-Tab existiert weiter |

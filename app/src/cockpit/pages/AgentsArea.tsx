@@ -31,7 +31,7 @@ function fmt(iso: string): string {
 const STATUS_COLOR: Record<RunSummary['status'], string> = {
   running: 'var(--ck-warn)',
   done: 'var(--ck-accent)',
-  error: 'var(--ck-danger, #e5484d)',
+  error: 'var(--ck-danger)',
 }
 const STATUS_LABEL: Record<RunSummary['status'], string> = {
   running: 'läuft…',
@@ -197,7 +197,7 @@ function RunDetailDrawer({ run, onClose }: { run: RunDetail; onClose: () => void
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ width: 'min(680px, 92vw)', height: '100%', background: 'var(--ck-bg-1, #fff)', borderLeft: '1px solid var(--ck-border)', display: 'flex', flexDirection: 'column' }}
+        style={{ width: 'min(680px, 92vw)', height: '100%', background: 'var(--ck-bg-1)', borderLeft: '1px solid var(--ck-border)', display: 'flex', flexDirection: 'column' }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', borderBottom: '1px solid var(--ck-border)' }}>
           <span style={{ fontSize: 13.5, fontWeight: 600 }}>{run.agent}</span>

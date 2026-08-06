@@ -22,8 +22,14 @@
   --ck-accent: #34d399;       /* Phosphor-Grün: running, CTA, positiv */
   --ck-accent-dim: rgba(52, 211, 153, 0.14);
   --ck-idle: #64748b;         /* Blaugrau: idle */
-  --ck-warn: #f59e0b;         /* Amber: error/warn */
+  --ck-warn: #f59e0b;         /* Amber: warn, laufend */
   --ck-warn-dim: rgba(245, 158, 11, 0.14);
+  /* O13: beide fehlten und wurden nur per var(--x, fallback) abgefangen. Der
+     Run-Drawer fiel damit auf #fff zurück — weiße Fläche im dunklen Cockpit.
+     --ck-bg-1 ist bewusst ein Alias auf --ck-panel: Custom Properties lösen
+     erst am Element auf, der Hell-Block unten zieht also automatisch mit. */
+  --ck-bg-1: var(--ck-panel);
+  --ck-danger: #e5484d;       /* Rot: Fehler-Zustand (5,15:1 gegen --ck-bg) */
 
   /* Graph (OsNebula) */
   --ck-graph-bg: #05080c;
@@ -168,7 +174,15 @@
   width: 148px;
   flex-shrink: 0;
 }
-.ck-nav-icon { font-size: 13px; width: 16px; text-align: center; flex-shrink: 0; }
+.ck-nav-icon {
+  font-size: 13px;
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+  /* O13: zweite Sicherung gegen bunte Emoji auf iOS. Die Zeichen tragen bereits
+     U+FE0E (NavRail.tsx); wo der Browser es kennt, entscheidet das hier zusätzlich. */
+  font-variant-emoji: text;
+}
 
 .ck-main { padding: 18px; }
 
@@ -493,9 +507,16 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
   color: var(--ck-accent);
 }
 /* Command Deck + Dream unter dem Graphen: nebeneinander, auf schmal gestapelt */
-/* Heute-Deck: Kontakte-fällig ⇄ Aufgaben nebeneinander, auf schmal gestapelt */
+/* Heute-Deck: Kontakte-fällig ⇄ Aufgaben nebeneinander, auf schmal gestapelt.
+   O13: `display: grid` fehlte — die Regel setzte Spalten auf einem Block-Element
+   und tat damit nichts. Heute nutzt sie keine Komponente (HeuteDeck v2 rendert
+   eine Liste), sie bleibt aber korrekt stehen statt kaputt: wer sie im
+   Mobile-Umbau greift, bekommt ein Grid und keine stille Nulloperation. */
 .ck-heute-grid {
+  display: grid;
   grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  align-items: start;
 }
 @media (max-width: 900px) {
   .ck-home-grid { grid-template-columns: 1fr; }
@@ -683,6 +704,7 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
   --ck-idle: #64748b;
   --ck-warn: #b45309;
   --ck-warn-dim: rgba(180, 83, 7, 0.12);
+  --ck-danger: #b42318;                 /* Rot dunkler, damit es auf Hell trägt */
 
   --ck-graph-bg: #eef1f4;
   --ck-graph-star: #9aa8b8;
