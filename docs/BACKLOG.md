@@ -28,8 +28,10 @@ und Policy-Details in der Prod-DB.
 ## 1 — Livegang
 
 Alles hier steht zwischen dem heutigen Code und „läuft in Produktion".
-**Vier Etappen sind gebaut und committet, aber nichts davon ist live.**
-`main` hat keinen eigenen Commit — der Livegang ist ein Fast-Forward, kein Merge.
+**Etappen 1–4 sind seit dem 06.08. live**, fünf jüngere Commits noch nicht (L1).
+`main` hat keinen eigenen Commit — der Livegang bleibt ein Fast-Forward, kein Merge.
+Was in diesem Abschnitt abgehakt ist, ist wirklich in Produktion; die Edge Functions
+(L4, L5) deployen unabhängig vom Frontend und sind es bereits.
 
 ### L1 · Fast-Forward — **Etappen 1–4 sind live, der Rest hängt** (Stand 06.08. abends)
 `main` steht auf `b9fb090` (letzter Etappe-4-Commit) und ist gepusht — die vier
