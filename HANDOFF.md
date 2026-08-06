@@ -14,9 +14,9 @@ Kompakter Einstieg in den **realen** Stand nach Cockpit-Rebuild und den Etappen 
 ## Der wichtigste Satz für eine neue Session
 
 **Die Etappen 1–4 sind live** (`main` = `de60288`, ausgeliefert `index-BjbadBHB.js`).
-Auf `cockpit-rebuild` liegen **7 Commits, die noch nicht live sind** — die
-Aufräum-Runde vom Abend des 06.08. Verbindlich ist immer
-`git log --oneline main..cockpit-rebuild`, nicht diese Zahl.
+Auf `cockpit-rebuild` liegt die **Aufräum-Runde vom Abend des 06.08.**, noch nicht
+live. Wie viele Commits das sind, sagt `git log --oneline main..cockpit-rebuild` —
+eine Zahl in diesem Dokument wäre ab dem nächsten Commit falsch.
 Der Livegang ist ein Fast-Forward (`main` hat keinen eigenen Commit) und steht als
 Abschnitt 1 im Backlog. **Kevin schaltet live, niemand sonst.**
 

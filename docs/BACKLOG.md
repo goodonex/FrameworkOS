@@ -4,7 +4,7 @@
 
 **Runde vom Abend des 06.08.** (Vorbereitung der Mobile-Session): O1, O2, O4, O5,
 O6, O10, O13 (drei Punkte), O15 erledigt · L5b, O9 (erste Handlung) und O12
-entschieden. Sieben Commits, noch nicht live. Nicht angefasst und weiter offen:
+entschieden. Alles committet, nichts davon live. Nicht angefasst und weiter offen:
 O3, O7, O8, O11, O14, O16 und der Rest von O9/O13.
 
 Dieses Dokument ersetzt das Nebeneinander von `IDEEN-2026-07-30-nutzbarkeit.md`,
@@ -51,11 +51,11 @@ ausgeliefert wird `index-BjbadBHB.js` (vorher `index-CvTize-3.js`, geprueft per
 `curl https://frameworkos.de/`). Damit ist auch der `send-email`-Deep-Link-Fix
 regulaer auf `main`, die dokumentierte Drift ist aufgeloest.
 
-**Noch nicht live: 6 Commits auf `cockpit-rebuild`** — die Aufraeum-Runde vom
-Abend des 06.08.: `6a8d605` (O2), `22d454a` (O1), `bc07a63` (O10), `57663f2` (O6),
-`6b8e4a5` (O4/O5), `e1ce382` (O13). Verbindlich ist immer
-`git log --oneline main..cockpit-rebuild` — jede Zahl hier ist ab dem naechsten
-Commit veraltet.
+**Noch nicht live: die Aufraeum-Runde vom Abend des 06.08.** — `6a8d605` (O2),
+`22d454a` (O1), `bc07a63` (O10), `57663f2` (O6), `6b8e4a5` (O4/O5), `e1ce382` (O13),
+`74ad91f` (O15) und die Entscheidungs-Commits danach. **Eine Anzahl steht hier
+bewusst nicht**: sie waere ab dem naechsten Commit falsch. Verbindlich ist
+`git log --oneline main..cockpit-rebuild`.
 
 **Vor dem naechsten Livegang:** einmal in der Netlify-UI pruefen, welcher Branch als
 Production eingestellt ist — `netlify.toml` legt ihn nicht fest. Der Rebuild auf
