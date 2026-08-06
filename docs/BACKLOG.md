@@ -42,20 +42,26 @@ auslesbar (**ungeprüft**). In den Sessions vom 14.07. war es zeitweise
 `cockpit-rebuild`, ab 20.07. `main`.
 *Herkunft: Session-Inventur, was-ansteht.html*
 
-### L2 · Migrations-Historie reparieren — **S**, blockiert jede weitere Migration
-`supabase migration list --linked` zeigt **0059–0066 mit leerer Remote-Spalte**.
+### L2 · ~~Migrations-Historie reparieren~~ ✅ **erledigt 06.08.2026**
+`supabase migration repair --status applied 0059 … 0066` gelaufen, danach zeigt
+`supabase migration list --linked` **0001–0066 lückenlos in Local *und* Remote**.
+`db push` ist damit wieder benutzbar — Voraussetzung für 0067 (O3) ist erfüllt.
+Nur die Buchführung wurde geschrieben, am Schema nichts geändert.
+
+**Warum es kaputt war** (als Lehre, damit es nicht wiederkommt):
+`supabase migration list --linked` zeigte **0059–0066 mit leerer Remote-Spalte**.
 Die Objekte sind alle in der DB (per REST bestätigt: `month_goals` 200,
 `linkedin_threads.verlauf`/`entwurf` vorhanden, `arbeits_dauern` gefüllt, Bucket
 `runner-files` existiert, `daily_metrics.coldmails` ist weg) — sie wurden am
 SQL-Editor vorbei eingespielt und nie als angewendet verbucht.
 
-**Folge:** Das nächste `supabase db push` will 0059–0066 erneut ausführen. Das ist
-exakt Abbruchbedingung 2 des Morgen-Wargames — und sie ist bereits scharf, bevor
-0067 überhaupt geschrieben ist.
+**Folge, hätte man es nicht bemerkt:** Das nächste `db push` hätte 0059–0066 erneut
+ausgeführt — exakt Abbruchbedingung 2 des Morgen-Wargames, scharf, bevor 0067
+überhaupt geschrieben war.
 
-**Fix:** `supabase migration repair --status applied 0059 0060 0061 0062 0063 0064 0065 0066`,
-danach `migration list` gegenprüfen (Remote-Spalte muss 0066 zeigen).
-*Neu — steht in keinem Dokument.*
+**Regel ab jetzt:** Migrationen ausschließlich über `db push`, nie im SQL-Editor.
+Genau das war die Ursache — dieselbe Lehre stand schon nach dem 15.07. im Raum.
+*Am 06.08. gefunden; stand in keinem Dokument.*
 
 ### L3 · `site_content_published` mit `security_invoker` — **S**
 `0052_site_content.sql:108` legt die View mit `create or replace view` an, **ohne**
@@ -103,9 +109,9 @@ abgelehnt wurde, geht aus keinem Dokument hervor. **Ungeprüft — nicht raten.*
 Fällt ohnehin erst auf, wenn das Löschen von Nachrichten verdrahtet wird.
 *Herkunft: Session-Inventur*
 
-### L8 · Morgen-Workflow-Blaupause committen — **S**
-`docs/wargames/morgen-workflow.md` ist die einzige unversionierte Datei im Repo
-(`git status --short`). 421 Zeilen Planungsarbeit, die nur lokal liegt.
+### L8 · ~~Morgen-Workflow-Blaupause committen~~ ✅ **erledigt 06.08.2026**
+`docs/wargames/morgen-workflow.md` war die einzige unversionierte Datei im Repo —
+421 Zeilen Planungsarbeit, die nur lokal lagen. Jetzt versioniert.
 
 **Nicht mehr offen, entgegen der Session-Inventur:** Das Content-Modul ist
 committet (Working Tree sauber), `social_batches` hat **4 Zeilen**, `content.json`
