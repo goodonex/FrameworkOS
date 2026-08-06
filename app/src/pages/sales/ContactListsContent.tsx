@@ -395,6 +395,9 @@ export function ContactListsContent({
         },
       })
       const contact = r.ok ? r.contact : r.duplicate
+      // O1: Ohne Kontakt ist der Lead nicht in der Pipeline — dann auch den
+      // Listeneintrag nicht als „in_pipeline" abhaken, sonst ist er verloren.
+      if (!contact) return
       await updateItem(row.id, {
         status: 'in_pipeline',
         called_at: row.called_at ?? new Date().toISOString(),

@@ -18,8 +18,14 @@ import type {
 import { useBrandId } from './useBrandId'
 
 export type CreateContactResult =
-  | { ok: true; contact: Contact; syncWarning?: string }
-  | { ok: false; duplicate: Contact }
+  | { ok: true; contact: Contact }
+  /** Dublette gefunden — der bestehende Kontakt kommt zurück. */
+  | { ok: false; duplicate: Contact; error?: undefined }
+  /**
+   * Schreiben war nicht möglich (Supabase nicht erreichbar oder Insert abgelehnt).
+   * O1: Es gibt bewusst KEINE lokale Ersatzwahrheit mehr — nichts wurde angelegt.
+   */
+  | { ok: false; duplicate?: undefined; error: string }
 
 export type CreateContactOptions = {
   /** Wenn true: Duplikat-Check (E-Mail / Name) überspringen */
@@ -259,54 +265,6 @@ function rowToContact(row: Record<string, unknown>): Contact {
   })
 }
 
-function enrichContactFromLocal(
-  server: Contact,
-  local: Contact | undefined,
-): Contact {
-  if (!local) return normalizeContact(server)
-  const blank = (s: string | null | undefined) => !s || !String(s).trim()
-  const cfMerge = { ...server.custom_fields, ...local.custom_fields }
-  return normalizeContact({
-    ...server,
-    name: blank(server.name) ? local.name : server.name,
-    email: blank(server.email) ? local.email : server.email,
-    phone: blank(server.phone) ? local.phone : server.phone,
-    website: blank(server.website) ? local.website : server.website,
-    instagram: blank(server.instagram) ? local.instagram : server.instagram,
-    linkedin: blank(server.linkedin) ? local.linkedin : server.linkedin,
-    company: blank(server.company) ? local.company : server.company,
-    notes: blank(server.notes) ? local.notes : server.notes,
-    call_notes: blank(server.call_notes) ? local.call_notes : server.call_notes,
-    bedarf: blank(server.bedarf) ? local.bedarf : server.bedarf,
-    ansprechpartner: blank(server.ansprechpartner) ? local.ansprechpartner : server.ansprechpartner,
-    aktuelle_situation: blank(server.aktuelle_situation)
-      ? local.aktuelle_situation
-      : server.aktuelle_situation,
-    hauptproblem: blank(server.hauptproblem) ? local.hauptproblem : server.hauptproblem,
-    timeline: blank(server.timeline) ? local.timeline : server.timeline,
-    budget: blank(server.budget) ? local.budget : server.budget,
-    entscheider_name: blank(server.entscheider_name)
-      ? local.entscheider_name
-      : server.entscheider_name,
-    einwaende: blank(server.einwaende) ? local.einwaende : server.einwaende,
-    naechste_schritte: blank(server.naechste_schritte)
-      ? local.naechste_schritte
-      : server.naechste_schritte,
-    potenzial_betrag:
-      (server.potenzial_betrag ?? 0) === 0 && (local.potenzial_betrag ?? 0) > 0
-        ? local.potenzial_betrag
-        : server.potenzial_betrag,
-    potenzial_notiz: blank(server.potenzial_notiz) ? local.potenzial_notiz : server.potenzial_notiz,
-    custom_fields: cfMerge,
-    activity_log:
-      server.activity_log.length === 0 && local.activity_log.length > 0
-        ? local.activity_log
-        : server.activity_log,
-    next_follow_up_at: server.next_follow_up_at ?? local.next_follow_up_at,
-    last_contact_at: server.last_contact_at ?? local.last_contact_at,
-  })
-}
-
 function contactToRow(
   c: Contact,
   brandId: string,
@@ -371,30 +329,24 @@ function contactToRow(
 }
 
 const STORAGE_KEY = 'contacts' as const
-const DELETED_IDS_KEY = 'contacts-deleted-ids' as const
 
-function readDeletedContactIds(brandSlug: string): Set<string> {
-  const raw = loadList<string>([brandSlug, DELETED_IDS_KEY])
-  if (!Array.isArray(raw)) return new Set()
-  return new Set(raw.filter((id) => typeof id === 'string' && id.length > 0))
-}
-
-function markContactDeleted(brandSlug: string, id: string): void {
-  const ids = readDeletedContactIds(brandSlug)
-  ids.add(id)
-  saveList([brandSlug, DELETED_IDS_KEY], [...ids])
-}
-
-function withoutDeleted(brandSlug: string, rows: Contact[]): Contact[] {
-  const deleted = readDeletedContactIds(brandSlug)
-  if (deleted.size === 0) return rows
-  return rows.filter((c) => !deleted.has(c.id))
-}
+/**
+ * O1 (06.08.2026): Der Tombstone-Schlüssel `contacts-deleted-ids` ist ersatzlos
+ * entfallen. Er existierte nur, weil localStorage gelöschte Kontakte sonst beim
+ * nächsten Merge wieder auferstehen ließ — mit Supabase als einziger Wahrheit
+ * gibt es keinen Merge und damit nichts zu beerdigen.
+ */
 
 export interface UseContactsResult {
   items: Contact[]
   loading: boolean
   error: string | null
+  /**
+   * O1: true, wenn Supabase gerade nicht antwortet und nur der Lese-Cache
+   * angezeigt wird. In diesem Zustand schreibt der Hook nichts — create/update/
+   * remove lehnen ab, statt eine zweite Wahrheit im Browser aufzubauen.
+   */
+  readOnly: boolean
   reload: () => Promise<void>
   create: (
     partial?: Partial<Omit<Contact, 'id' | 'brand_id' | 'updated_at'>>,
@@ -408,6 +360,13 @@ export interface UseContactsResult {
   clearError: () => void
 }
 
+/**
+ * Liest den **Lese-Cache** aus dem localStorage. O1 (06.08.2026): Das ist keine
+ * zweite Datenquelle mehr, sondern ein Abbild des letzten erfolgreichen
+ * Supabase-Ladevorgangs — nützlich, um bei einem Ausfall etwas zeigen zu können
+ * und für Nachschlagen ohne Hook (useTasks, ContactPage). Wer hier schreibt,
+ * baut die Geisterwelt neu auf, die dieser Umbau beseitigt hat.
+ */
 export function readContactsLocal(brandSlug: string): Contact[] {
   const raw = loadList<Partial<Contact> & { id: string; brand_id: string }>([
     brandSlug,
@@ -423,13 +382,29 @@ export function useContacts(brandSlug: string | undefined): UseContactsResult {
   const [error, setError] = useState<string | null>(null)
   const itemsRef = useRef<Contact[]>([])
   itemsRef.current = items
-  const localOnlyRef = useRef(false)
+  /**
+   * O1: löst `localOnlyRef` ab. Früher hieß der Zustand „ab jetzt ist der
+   * Browser die Wahrheit" und Schreibvorgänge liefen still ins localStorage.
+   * Jetzt heißt er „Supabase antwortet nicht — nur gucken".
+   */
+  const [readOnly, setReadOnly] = useState(false)
+  const readOnlyRef = useRef(false)
+  const setzeReadOnly = useCallback((v: boolean) => {
+    readOnlyRef.current = v
+    setReadOnly(v)
+  }, [])
 
-  const loadLocal = useCallback(() => {
-    if (!brandSlug) return
-    setItems(withoutDeleted(brandSlug, readContactsLocal(brandSlug)))
-    setError(null)
-  }, [brandSlug])
+  /** Zeigt den Lese-Cache an, ohne ihn zur Wahrheit zu erklären. */
+  const zeigeCache = useCallback(
+    (meldung: string) => {
+      if (!brandSlug) return
+      const cache = readContactsLocal(brandSlug)
+      setzeReadOnly(true)
+      setItems(cache)
+      setError(cache.length > 0 ? meldung : `${meldung} Es liegt auch kein Cache vor.`)
+    },
+    [brandSlug, setzeReadOnly],
+  )
 
   const persistLocal = useCallback(
     (next: Contact[]) => {
@@ -439,16 +414,22 @@ export function useContacts(brandSlug: string | undefined): UseContactsResult {
     [brandSlug],
   )
 
+  /**
+   * O1 (06.08.2026): Supabase ist die einzige Wahrheit. Was der Server liefert,
+   * ist die Liste — kein Merge, kein Anreichern aus dem Cache, kein Wiederbeleben
+   * lokaler Zeilen. Antwortet der Server nicht, zeigt der Hook den Cache und
+   * schaltet auf Nur-Lesen; er baut nie eine zweite Wahrheit auf.
+   */
   const reload = useCallback(async () => {
     if (!brandSlug) {
       setItems([])
       setLoading(false)
       setError(null)
+      setzeReadOnly(false)
       return
     }
     if (!supabase || !brandId) {
-      localOnlyRef.current = true
-      loadLocal()
+      zeigeCache('Keine Verbindung zu Supabase — Kontakte sind schreibgeschützt.')
       setLoading(false)
       return
     }
@@ -459,64 +440,37 @@ export function useContacts(brandSlug: string | undefined): UseContactsResult {
       .eq('brand_id', brandId)
       .order('updated_at', { ascending: false })
 
-    if (err && isMissingSupabaseTableError(err.message)) {
-      console.warn('[useContacts] → localStorage', err.message)
-      localOnlyRef.current = true
-      loadLocal()
-      setLoading(false)
-      return
-    }
     if (err) {
-      setError(err.message)
-      const localRows = readContactsLocal(brandSlug)
-      if (localRows.length > 0) {
-        console.warn('[useContacts] Supabase-Fehler — zeige localStorage')
-        localOnlyRef.current = true
-        setItems(localRows)
-      } else {
-        setItems([])
-      }
+      const grund = isMissingSupabaseTableError(err.message)
+        ? 'Tabelle `contacts` ist nicht erreichbar'
+        : err.message
+      console.warn('[useContacts] Supabase-Fehler — Cache, schreibgeschützt:', err.message)
+      zeigeCache(`${grund} — Kontakte sind schreibgeschützt.`)
       setLoading(false)
       return
     }
+
     const serverRows = (data ?? []).map(rowToContact)
-    const localRows = readContactsLocal(brandSlug)
+    const cache = readContactsLocal(brandSlug)
 
-    if (serverRows.length === 0 && localRows.length > 0) {
-      console.warn(
-        '[useContacts] Supabase liefert 0 Zeilen — nutze localStorage (leere DB / RLS / noch nicht migriert).',
-      )
-      localOnlyRef.current = true
-      setItems(localRows)
-      // Nicht mehr still: In diesem Modus landen Änderungen NUR im Browser
-      // und syncen nie nach Supabase (Datenverlust-Risiko auf anderen Geräten).
-      setError(
-        'Achtung: lokale Kopie aktiv — Supabase lieferte 0 Kontakte. Änderungen werden NICHT synchronisiert. Seite neu laden; besteht das Problem, RLS/Verbindung prüfen.',
+    // 0 Zeilen bei gefülltem Cache ist fast immer RLS oder ein halb aufgebauter
+    // Client, nicht „alle Kontakte gelöscht". Anzeigen ja, überschreiben nein:
+    // ein persistLocal([]) an dieser Stelle würde den Cache vernichten.
+    if (serverRows.length === 0 && cache.length > 0) {
+      console.warn('[useContacts] Supabase liefert 0 Zeilen bei gefülltem Cache — schreibgeschützt.')
+      zeigeCache(
+        'Supabase lieferte 0 Kontakte, der Cache ist aber gefüllt. Angezeigt wird der Cache, Änderungen sind gesperrt. Seite neu laden; besteht das Problem, RLS/Verbindung prüfen.',
       )
       setLoading(false)
       return
     }
 
-    localOnlyRef.current = false
+    setzeReadOnly(false)
     setError(null)
-    const byId = new Map<string, Contact>()
-    for (const r of serverRows) {
-      const local = localRows.find((l) => l.id === r.id)
-      byId.set(r.id, enrichContactFromLocal(r, local))
-    }
-    const deletedIds = readDeletedContactIds(brandSlug)
-    for (const l of localRows) {
-      if (deletedIds.has(l.id)) continue
-      if (!byId.has(l.id)) byId.set(l.id, l)
-    }
-    const merged = withoutDeleted(
-      brandSlug,
-      Array.from(byId.values()).sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
-    )
-    setItems(merged)
-    persistLocal(merged)
+    setItems(serverRows)
+    persistLocal(serverRows)
     setLoading(false)
-  }, [brandId, brandSlug, loadLocal, persistLocal])
+  }, [brandId, brandSlug, persistLocal, setzeReadOnly, zeigeCache])
 
   useEffect(() => {
     void reload()
@@ -547,6 +501,11 @@ export function useContacts(brandSlug: string | undefined): UseContactsResult {
       options?: CreateContactOptions,
     ): Promise<CreateContactResult> => {
       if (!brandSlug) throw new Error('Kein Brand-Slug')
+      if (readOnlyRef.current || !supabase || !brandId) {
+        const meldung = 'Kontakt konnte nicht angelegt werden: keine Verbindung zu Supabase.'
+        setError(meldung)
+        return { ok: false, error: meldung }
+      }
       if (!options?.skipDuplicateCheck) {
         const dup = findDuplicateInContacts(itemsRef.current, {
           name: partial?.name,
@@ -557,32 +516,26 @@ export function useContacts(brandSlug: string | undefined): UseContactsResult {
       const now = new Date().toISOString()
       const item = normalizeContact({
         id: generateId(),
-        brand_id: localOnlyRef.current ? brandSlug : (brandId ?? brandSlug),
+        brand_id: brandId,
         stage_changed_at: now,
         ...partial,
         updated_at: now,
       })
-      const optimisticNext = [...itemsRef.current, item]
-      itemsRef.current = optimisticNext
-      setItems(optimisticNext)
-      persistLocal(optimisticNext)
 
-      if (localOnlyRef.current || !supabase || !brandId) {
-        return { ok: true, contact: item }
-      }
-
+      // O1: erst schreiben, dann anzeigen. Der frühere optimistische Einschub
+      // blieb bei einem Insert-Fehler als Geist in Liste und Cache zurück.
       const row = contactToRow(item, brandId)
       const { error: insErr } = await supabase.from('contacts').insert(row)
       if (insErr) {
-        if (isMissingSupabaseTableError(insErr.message)) {
-          localOnlyRef.current = true
-          return { ok: true, contact: item }
-        }
-        console.warn('[useContacts] insert failed — local copy kept', insErr.message)
-        localOnlyRef.current = true
+        console.warn('[useContacts] insert fehlgeschlagen — nichts angelegt', insErr.message)
         setError(insErr.message)
-        return { ok: true, contact: item, syncWarning: insErr.message }
+        return { ok: false, error: insErr.message }
       }
+
+      const next = [...itemsRef.current, item]
+      itemsRef.current = next
+      setItems(next)
+      persistLocal(next)
 
       logActivity({
         brand_id: brandId,
@@ -600,6 +553,10 @@ export function useContacts(brandSlug: string | undefined): UseContactsResult {
   const update = useCallback(
     (id: string, patch: Partial<Omit<Contact, 'id' | 'brand_id'>>) => {
       if (!brandSlug) return
+      if (readOnlyRef.current || !supabase || !brandId) {
+        setError('Änderung nicht gespeichert: keine Verbindung zu Supabase.')
+        return
+      }
       const now = new Date().toISOString()
       const prev = itemsRef.current.find((c) => c.id === id)
       if (!prev) return
@@ -625,10 +582,9 @@ export function useContacts(brandSlug: string | undefined): UseContactsResult {
       const next = itemsRef.current.map((c) => (c.id === id ? merged : c))
       itemsRef.current = next
       setItems(next)
-      if (localOnlyRef.current || !supabase || !brandId) {
-        persistLocal(next)
-        return
-      }
+      persistLocal(next)
+      // Optimistisch bleibt erlaubt — aber jeder Fehler zieht die Wahrheit vom
+      // Server nach, statt die Abweichung im Browser einzufrieren.
       void supabase
         .from('contacts')
         .update({ ...basePatch, updated_at: now })
@@ -636,13 +592,9 @@ export function useContacts(brandSlug: string | undefined): UseContactsResult {
         .eq('brand_id', brandId)
         .then(({ error: updErr }) => {
           if (updErr) {
-            if (isMissingSupabaseTableError(updErr.message)) {
-              localOnlyRef.current = true
-              persistLocal(next)
-            } else {
-              setError(updErr.message)
-              void reload()
-            }
+            console.warn('[useContacts] update fehlgeschlagen — lade neu', updErr.message)
+            setError(updErr.message)
+            void reload()
           }
         })
 
@@ -675,16 +627,14 @@ export function useContacts(brandSlug: string | undefined): UseContactsResult {
       const prev = itemsRef.current
       const next = prev.filter((c) => c.id !== id)
       if (next.length === prev.length) return false
-
-      markContactDeleted(brandSlug, id)
-      itemsRef.current = next
-      setItems(next)
-      persistLocal(next)
-
-      if (localOnlyRef.current || !supabase || !brandId) {
-        return true
+      if (readOnlyRef.current || !supabase || !brandId) {
+        setError('Kontakt nicht gelöscht: keine Verbindung zu Supabase.')
+        return false
       }
 
+      // O1: erst der Server, dann die Liste. Vorher wurde lokal gelöscht und ein
+      // Tombstone gesetzt, damit der Merge die Zeile nicht wieder auferstehen
+      // lässt — beides entfällt, weil es keinen Merge mehr gibt.
       const { data, error: delErr } = await supabase
         .from('contacts')
         .delete()
@@ -692,20 +642,28 @@ export function useContacts(brandSlug: string | undefined): UseContactsResult {
         .eq('brand_id', brandId)
         .select('id')
 
-      if (delErr && !isMissingSupabaseTableError(delErr.message)) {
-        console.warn('[useContacts] delete failed', delErr.message)
-      } else if (!data?.length) {
+      if (delErr) {
+        console.warn('[useContacts] delete fehlgeschlagen', delErr.message)
+        setError(delErr.message)
+        return false
+      }
+      if (!data?.length) {
+        // Keine Zeile getroffen: entweder schon weg oder die Policy hat sie
+        // ausgeblendet. Nachsehen statt blind ein zweites Mal löschen.
         const { data: remote } = await supabase.from('contacts').select('id').eq('id', id).maybeSingle()
         if (remote) {
-          const { error: retryErr } = await supabase.from('contacts').delete().eq('id', id).select('id')
-          if (retryErr) console.warn('[useContacts] delete retry failed', retryErr.message)
+          setError('Kontakt konnte nicht gelöscht werden — die Zeile existiert weiter (RLS?).')
+          return false
         }
       }
 
+      itemsRef.current = next
+      setItems(next)
+      persistLocal(next)
       return true
     },
     [brandId, brandSlug, persistLocal],
   )
 
-  return { items, loading, error, reload, create, update, remove, clearError }
+  return { items, loading, error, readOnly, reload, create, update, remove, clearError }
 }

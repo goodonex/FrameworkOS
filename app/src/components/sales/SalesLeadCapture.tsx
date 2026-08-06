@@ -94,12 +94,11 @@ export function useSalesQuickLead(brandSlug: string, callModeSearch = '') {
       const r = await contacts.create(partial, { skipDuplicateCheck: true })
       if (r.ok) {
         setDupModal(null)
-        if (r.syncWarning) {
-          showToast(`Kontakt lokal gespeichert (Sync: ${r.syncWarning})`, 'info')
-        } else {
-          showToast('Kontakt angelegt', 'success')
-        }
+        showToast('Kontakt angelegt', 'success')
         navigate(`/brand/${brandSlug}/sales/${r.contact.id}`)
+      } else if (r.error) {
+        // O1: keine lokale Ersatzwahrheit mehr — hier ist wirklich nichts entstanden.
+        showToast(`Kontakt nicht angelegt: ${r.error}`, 'error')
       }
     },
     [brandSlug, contacts, navigate, showToast],
@@ -110,14 +109,12 @@ export function useSalesQuickLead(brandSlug: string, callModeSearch = '') {
       const r = await contacts.create(partial)
       if (r.ok) {
         setDupModal(null)
-        if (r.syncWarning) {
-          showToast(`Kontakt lokal gespeichert (Sync: ${r.syncWarning})`, 'info')
-        } else {
-          showToast('Kontakt angelegt', 'success')
-        }
+        showToast('Kontakt angelegt', 'success')
         navigate(`/brand/${brandSlug}/sales/${r.contact.id}`)
-      } else {
+      } else if (r.duplicate) {
         setDupModal({ partial, existing: r.duplicate })
+      } else {
+        showToast(`Kontakt nicht angelegt: ${r.error}`, 'error')
       }
     },
     [brandSlug, contacts, navigate, showToast],

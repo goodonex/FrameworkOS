@@ -286,14 +286,39 @@ nicht. Der offene Rest steht als **O12**.
 
 ## 3 — Offen, nach Wirkung sortiert
 
-### O1 · `useContacts` hält Kontakte doppelt — **M** · *der größte Posten*
-Supabase **und** localStorage mit Merge/Resurrect (`hooks/useContacts.ts`, 711
-Zeilen; `enrichContactFromLocal` `:262`, Fallbacks `:463/473/487/505`). Ergebnis:
-Geister-Kontakte über Geräte hinweg — und die Freigaben-Queue verschickt
-inzwischen echte E-Mails auf dieser Basis. 44 Kontakte in der DB.
-**Ziel:** Supabase ist die einzige Wahrheit, localStorage nur Lese-Cache;
-resurrect/enrich/Tombstones raus.
-**Abhängigkeiten:** keine. Braucht einen manuellen Durchlauf der Pipeline-Flows.
+### O1 · ~~`useContacts` hält Kontakte doppelt~~ ✅ **entdoppelt 06.08.2026**
+Supabase ist die einzige Wahrheit, localStorage nur noch Lese-Cache.
+
+**Die Zahl, die vorher fehlte — 0.** Vor dem Umbau geprüft (Kevins Chrome,
+`brand-os:herrmann:contacts` gegen die Prod-DB): **44 im localStorage, 44 in
+Supabase, dieselben 44 IDs**, kein Eintrag nur auf einer Seite. Den
+Tombstone-Schlüssel `contacts-deleted-ids` gab es gar nicht. Damit war es
+Aufräumen, keine Migration — hätte auch nur ein Lead ausschließlich lokal
+gelegen, wäre der Umbau erst nach einer Übernahme erlaubt gewesen.
+*Grenze der Prüfung:* geprüft ist der Browser, in dem das Cockpit benutzt wird.
+Ein abweichender Stand auf einem anderen Gerät wird beim nächsten Laden dort
+verworfen — genau der Geister-Mechanismus, den der Umbau abstellt.
+
+**Was gefallen ist**
+| Baustein | vorher | jetzt |
+|---|---|---|
+| `enrichContactFromLocal` (Feld-für-Feld-Merge) | 46 Zeilen | weg |
+| Resurrect: lokale Zeile ohne Server-Gegenstück wandert in die Liste | `reload` | weg — `setItems(serverRows)` |
+| Tombstones `contacts-deleted-ids` + drei Helfer | nötig gegen Resurrect | weg |
+| `localOnlyRef` („ab jetzt ist der Browser die Wahrheit") | schrieb still ins localStorage | ersetzt durch `readOnly` = „Server antwortet nicht, nur gucken" |
+| `create` schrieb optimistisch, Insert-Fehler ließ den Geist stehen | ja | erst Insert, dann anzeigen; Fehler → `{ ok: false, error }` |
+| `remove` löschte lokal + Tombstone | ja | erst Server, dann Liste; scheitert sichtbar |
+
+**Neu im Hook-Ergebnis:** `readOnly`. Solange es true ist, lehnen create/update/
+remove ab und setzen eine Meldung, statt eine zweite Wahrheit aufzubauen.
+`CreateContactResult` hat dafür eine dritte Variante `{ ok: false, error }` —
+`syncWarning` ist weg, weil „lokal gespeichert, Sync später" nicht mehr existiert.
+
+**Drift-Wache:** `scripts/verify-contacts-quelle.ts`, 14 Prüfungen — schlägt an,
+sobald einer der Bausteine zurückkommt.
+
+**Offen für Kevin (nicht von hier prüfbar):** ein manueller Durchlauf der
+Pipeline-Flows (Lead anlegen, Stage ziehen, löschen) mit Session im Browser.
 *Herkunft: REBUILD-PLAN §12.5 (07.07.) · IDEAS-2026 §2.6 + §3.5 · IDEEN Abriss-Liste ·
 Session-Inventur. Vier Dokumente, ein Punkt, offen seit dem 07.07.*
 

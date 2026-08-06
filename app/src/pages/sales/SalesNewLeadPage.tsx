@@ -22,15 +22,18 @@ export function SalesNewLeadPage() {
           skipDuplicateCheck: options?.skipDuplicateCheck ?? false,
         })
         if (!r1.ok) {
-          showToast('Firma konnte nicht angelegt werden', 'error')
+          showToast(
+            r1.error ? `Firma nicht angelegt: ${r1.error}` : 'Firma konnte nicht angelegt werden',
+            'error',
+          )
           return
         }
         const r2 = await contacts.create(
           { ...person, parent_company_id: r1.contact.id },
           { skipDuplicateCheck: options?.skipDuplicateCheck ?? false },
         )
-        if (r1.syncWarning || (r2.ok && r2.syncWarning)) {
-          showToast('Lokal gespeichert (Sync-Hinweis)', 'info')
+        if (!r2.ok && r2.error) {
+          showToast(`Person nicht angelegt: ${r2.error}`, 'error')
         }
         if (initialNote && initialNote.trim()) {
           const personId = r2.ok ? r2.contact.id : null
