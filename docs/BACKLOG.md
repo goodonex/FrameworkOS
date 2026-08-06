@@ -30,9 +30,15 @@ jedem Schritt · `curl https://frameworkos.de/` für das ausgelieferte Bundle ·
 localStorage-Abgleich im laufenden Chrome · gemessene CSS-Tokens im laufenden Build.
 Nicht verifizierbar ohne Docker/SQL-Zugang: Sichtbarkeitsregeln (`security_invoker`)
 und Policy-Details in der Prod-DB.
-Nicht verifizierbar ohne Session im Browser: die Cockpit-Oberflächen selbst — der
-Dev-Server leitet ohne Login auf `/login` um, und Anmeldedaten sind für mich tabu.
-Was daran hängt, steht am jeweiligen Punkt als **offen für Kevin**.
+**07.08. nachgeholt:** Kevin hat eingeloggt, das Cockpit lief am Dev-Server. Damit
+sind O1 (Cache = 44 = Server, kein Tombstone-Key, keine Nur-Lese-Meldung), O2/O5
+(Queue über mehrere Läufe, 25 → 24 Karten), O10 (880 px = Bottom-Bar + Arbeitsmodus,
+920 px = Rail, ohne Arbeitsmodus), O12 (Knopf abgeschaltet mit Erklärung, nachdem
+Web Speech entfernt wurde) und O13 (Drawer `rgb(11,14,16)`, Fehler `rgb(229,72,77)`)
+**am laufenden System** geprüft. Dabei fielen das Grenz-Loch in O2 und O17 auf.
+*Test-Artefakt, kein Befund:* Bei einer Größenänderung im Hintergrund-Tab folgt
+`useViewport` nicht — `document.visibilityState` ist dort `hidden` und
+`requestAnimationFrame` feuert nicht. Im sichtbaren Fenster greift es.
 
 ---
 
@@ -368,6 +374,21 @@ nie kontaktiert, `lead_source` bei 43 leer; daneben 3 × `deal`, 1 × `proposal`
 der einzige `first_contact` mit E-Mail-Adresse und damit der einzige, an den die
 Queue tatsächlich eine kalte Mail hätte schicken können.
 
+**⚠ Nachtrag 07.08., am eingeloggten Cockpit gefunden — die Grenze hatte ein Loch.**
+`dueFollowupContacts` filtert nur, **was der Agent als Eingabe sieht**. Die Karten in
+der Queue kommen aber aus dem Run-Markdown, und seit O5 aus den letzten fünf Läufen.
+Ein Entwurf, den der Agent **vor** der Entscheidung für Franz & Köhler gebaut hatte,
+stand damit wieder da — inklusive „Freigeben & senden". O5 hatte die Lücke sogar
+vergrößert, weil ältere Läufe jetzt mitgelesen werden.
+**Fix:** dieselbe Grenze ein zweites Mal beim **Anzeigen** — `darfFollowupErhalten`
+(`approvalDrafts.ts`), angewendet in `FreigabenArea` auf jede Karte mit CRM-Kontakt.
+Entwürfe ohne `contact_id` sind LinkedIn-Threads und bleiben unangetastet.
+**Gemessen im laufenden Cockpit:** 25 Karten vorher, 24 nachher; Franz & Köhler weg,
+die vier Kunden/Deal-Karten (Detti, Bestgen, Hinsch, Develo) stehen.
+**Lehre:** Eine Regel, die nur an der Erzeugung hängt, gilt nicht für Daten, die
+vor ihr entstanden sind. Wo Historie mitgelesen wird, muss die Regel auch beim Lesen
+greifen.
+
 **Bewusst nicht gemacht:** Die 36 Recherche-Leads bleiben unverändert in `contacts`
 liegen (Kevins Entscheidung 06.08.). Sie stören die Pipeline-Optik, nicht die Queue.
 Aufräumen wäre ein eigener Schritt mit Blick auf die Namen — kein Nebenbei-Löschen.
@@ -570,6 +591,33 @@ Jeder Punkt einzeln bestätigt, keiner dringend, jeder kommt sonst zurück.
 | Umsatz per Uriel eintragen — `log_metric` kann nur zählen, nicht setzen; braucht ein eigenes `set_revenue` mit Setz-Semantik | `metrikFelder.ts` (umsatz bewusst ausgelassen), `useDailyMetrics.setUmsatzOn` |
 | Call-Mode auf den echten Funnel stellen oder streichen | `SalesArea.tsx:18/58` — Sub-Tab existiert weiter |
 | Website-CMS entscheiden: keine Kundenseite liest `site_content_published`, `site_content` = **0 Zeilen** — dabei auch die Projekt-Scopierung der Definer-View lösen (Funktion mit `project_id` statt offener View, siehe L3) | `0052_site_content.sql:108-112`, `lib/siteContentService.ts` |
+
+### O17 · Die Morgen-Agenten laufen ins Timeout — **M** · *neu, 07.08.2026*
+Am eingeloggten Cockpit gefunden, stand in keinem Dokument: Von den letzten
+20 Läufen sind **8 mit Fehler** abgebrochen, und es trifft ausgerechnet die
+Routinen, die morgens von allein laufen sollen.
+
+| Agent | Läufe (letzte 20) | Ergebnis |
+|---|---|---|
+| `morgenbrief` | 4 × Fehler, 1 × fertig | „Run fehlgeschlagen (Exit 143)", **kein Output** |
+| `linkedin-antwort-entwuerfe` | 3 × Fehler, 1 × fertig | dito |
+| `dream-check` | 1 × Fehler, 7 × fertig | dito |
+
+**Ursache belegt:** Exit 143 = 128 + SIGTERM. `runner/index.mjs:51` setzt
+`TIMEOUT_MS = 10 * 60 * 1000`, `:446-448` schickt danach `proc.kill('SIGTERM')`.
+Die Agenten brauchen also länger als zehn Minuten und werden mitten im Lauf
+abgeschossen — ohne Teilergebnis, weil der Output erst am Ende geschrieben wird.
+
+**Was das praktisch heißt:** Kevins Morgenbrief ist an den meisten Tagen seit
+mindestens dem 04.08. nicht entstanden, und die Antwort-Entwürfe ebenso wenig.
+Beides fiel nicht auf, weil ein fehlgeschlagener Run nur im Agenten-Hub steht.
+
+**Drei Wege, Entscheidung nötig:** Timeout hochsetzen (billig, verschiebt das
+Problem) · den Agenten kürzen, damit er in zehn Minuten fertig ist (Prompt/Umfang)
+· Teilausgabe mitschreiben, damit ein Abbruch wenigstens etwas hinterlässt.
+**Hängt mit O3 zusammen:** Ein Morgen-Push, der einen Brief schickt, der gar nicht
+entsteht, wäre wertlos — das gehört vor O3 geklärt.
+*Gefunden am 07.08. gegen das laufende System; in keinem Plandokument.*
 
 ### O14 · Sales-Subtabs restylen — **L** · nach der Call-Mode-Entscheidung
 `pages/sales/SalesMode.tsx`: 2.504 Zeilen, **55** Glass-Treffer — die letzte große

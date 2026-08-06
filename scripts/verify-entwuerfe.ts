@@ -11,6 +11,7 @@
 // @ts-expect-error — .mjs ohne Typen; genau die Datei, die der Runner lädt.
 import { parseDraftsRoh } from '../runner/linkedin/entwuerfe.mjs'
 import {
+  darfFollowupErhalten,
   draftIdentitaet,
   dueFollowupContacts,
   parseDrafts,
@@ -243,6 +244,34 @@ ${JSON.stringify({ drafts }, null, 2)}
     namen([kontakt({ name: 'Pause', pipeline_stage: 'paused', next_follow_up_at: faellig })]),
     [],
   )
+  // Der Anzeige-Filter (O2 × O5): dieselbe Grenze, zweiter Ort. Am laufenden
+  // Cockpit gefunden — ein Entwurf aus einem Lauf VOR der Entscheidung stand
+  // sonst wieder in der Queue, mit Sende-Knopf.
+  check(
+    '8f darfFollowupErhalten sperrt first_contact',
+    darfFollowupErhalten(kontakt({ pipeline_stage: 'first_contact' })),
+    false,
+  )
+  check(
+    '8g darfFollowupErhalten sperrt paused',
+    darfFollowupErhalten(kontakt({ pipeline_stage: 'paused' })),
+    false,
+  )
+  check(
+    '8h darfFollowupErhalten lässt die Kunden/Deal-Welt durch',
+    (['conversation', 'follow_up', 'proposal', 'deal'] as const).map((st) =>
+      darfFollowupErhalten(kontakt({ pipeline_stage: st })),
+    ),
+    [true, true, true, true],
+  )
+  check(
+    '8i beide Orte benutzen dieselbe Grenze',
+    dueFollowupContacts([
+      kontakt({ name: 'Kalt', pipeline_stage: 'first_contact', next_follow_up_at: faellig }),
+    ]).length === 0 && !darfFollowupErhalten(kontakt({ pipeline_stage: 'first_contact' })),
+    true,
+  )
+
   check(
     '8e Zukunfts-Datum ist nicht fällig',
     namen([

@@ -10,6 +10,7 @@ import { useActiveBrand } from '../lib/activeBrand'
 import { useAuth } from '../../hooks/useAuth'
 import {
   buildFollowupInput,
+  darfFollowupErhalten,
   draftIdentitaet,
   parseDrafts,
   type DraftChannel,
@@ -272,7 +273,28 @@ export function FreigabenArea() {
     }
   }
 
-  const openCount = cards.filter((c) => c.status === 'pending' || c.status === 'sending').length
+  /**
+   * O2 × O5, am laufenden Cockpit gefunden (07.08.2026): `dueFollowupContacts`
+   * zieht die Kunden/Deal-Grenze nur beim **Erzeugen** eines Runs. Die Karten
+   * kommen aber aus dem Run-Markdown — und seit O5 aus den letzten fünf Läufen.
+   * Ein Entwurf, den der Agent VOR der Entscheidung für einen kalten
+   * `first_contact` gebaut hat, stand damit wieder in der Queue, samt
+   * „Freigeben & senden". Genau die Mail, die die Grenze verhindern soll.
+   *
+   * Deshalb die Grenze ein zweites Mal beim Anzeigen: Karten mit CRM-Kontakt
+   * müssen die Stufe erfüllen. Entwürfe ohne `contact_id` sind LinkedIn-Threads
+   * — das ist der Funnel, der gehört hierher und bleibt unangetastet.
+   */
+  const sichtbareCards = useMemo(() => {
+    return cards.filter((c) => {
+      if (!c.contact_id) return true
+      const kontakt = contactMap.get(c.contact_id)
+      if (!kontakt) return true // Kontakt gelöscht — Karte nicht stillschweigend schlucken
+      return darfFollowupErhalten(kontakt)
+    })
+  }, [cards, contactMap])
+
+  const openCount = sichtbareCards.filter((c) => c.status === 'pending' || c.status === 'sending').length
 
   return (
     <div style={{ maxWidth: 720, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -326,7 +348,7 @@ export function FreigabenArea() {
         <div className="ck-panel" style={{ padding: 14, fontSize: 12.5, color: 'var(--ck-text-3)' }}>
           Lädt Entwürfe …
         </div>
-      ) : cards.length === 0 ? (
+      ) : sichtbareCards.length === 0 ? (
         <div className="ck-panel" style={{ padding: '28px 16px', textAlign: 'center' }}>
           <div style={{ fontSize: 13.5, color: 'var(--ck-text-2)', marginBottom: 6 }}>
             Noch keine Entwürfe.
@@ -337,7 +359,7 @@ export function FreigabenArea() {
           </div>
         </div>
       ) : (
-        cards.map((card) => {
+        sichtbareCards.map((card) => {
           const contact = contactMap.get(card.contact_id)
           const name = contactLabel(contact, card.name || 'Unbekannter Kontakt')
           const toEmail = contact?.email?.trim() || null

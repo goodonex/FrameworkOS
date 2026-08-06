@@ -106,6 +106,18 @@ const FOLLOWUP_STAGES: ReadonlySet<Contact['pipeline_stage']> = new Set([
 ])
 
 /**
+ * Darf dieser Kontakt überhaupt ein Follow-up aus der Queue bekommen?
+ *
+ * Zweimal gebraucht, und das ist Absicht: beim **Erzeugen** eines Runs (welche
+ * Kontakte der Agent sieht) und beim **Anzeigen** der Karten. Ohne den zweiten
+ * Ort taucht ein Entwurf, den ein älterer Run vor der Entscheidung gebaut hat,
+ * seit O5 wieder in der Queue auf — mit Sende-Knopf.
+ */
+export function darfFollowupErhalten(contact: Contact): boolean {
+  return FOLLOWUP_STAGES.has(contact.pipeline_stage)
+}
+
+/**
  * Wartende Kontakte für Follow-ups: Stage follow_up ODER fälliger next_follow_up_at —
  * beides nur innerhalb der Kunden-/Deal-Welt (siehe FOLLOWUP_STAGES).
  */
@@ -114,7 +126,7 @@ export function dueFollowupContacts(contacts: Contact[], max = 10): Contact[] {
   return contacts
     .filter(
       (c) =>
-        FOLLOWUP_STAGES.has(c.pipeline_stage) &&
+        darfFollowupErhalten(c) &&
         (c.pipeline_stage === 'follow_up' ||
           (c.next_follow_up_at != null && c.next_follow_up_at <= now)),
     )
