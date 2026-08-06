@@ -1,6 +1,11 @@
 # Uriel — Backlog (die eine Quelle der Wahrheit)
 
-**Stand:** 2026-08-06 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
+**Stand:** 2026-08-06, abends · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
+
+**Runde vom Abend des 06.08.** (Vorbereitung der Mobile-Session): O1, O2, O4, O5,
+O6, O10, O13 (drei Punkte), O15 erledigt · L5b, O9 (erste Handlung) und O12
+entschieden. Sieben Commits, noch nicht live. Nicht angefasst und weiter offen:
+O3, O7, O8, O11, O14, O16 und der Rest von O9/O13.
 
 Dieses Dokument ersetzt das Nebeneinander von `IDEEN-2026-07-30-nutzbarkeit.md`,
 `IDEAS-2026.md`, `AGENTIC-OS-PLAN.md`, `REBUILD-PLAN.md`, dem Masterplan im Vault
@@ -20,8 +25,14 @@ etwas so entschieden wurde); **was noch zu tun ist, steht ausschließlich hier.*
 `git log main..cockpit-rebuild` · `supabase migration list --linked` ·
 REST-Abfragen mit `service_role` gegen die Prod-DB · Grep über `app/src`,
 `runner/`, `supabase/` · `git status` im Worktree.
+**Abends dazugekommen:** `npm run build` (tsc + Vite) und **18 verify-Skripte** nach
+jedem Schritt · `curl https://frameworkos.de/` für das ausgelieferte Bundle ·
+localStorage-Abgleich im laufenden Chrome · gemessene CSS-Tokens im laufenden Build.
 Nicht verifizierbar ohne Docker/SQL-Zugang: Sichtbarkeitsregeln (`security_invoker`)
 und Policy-Details in der Prod-DB.
+Nicht verifizierbar ohne Session im Browser: die Cockpit-Oberflächen selbst — der
+Dev-Server leitet ohne Login auf `/login` um, und Anmeldedaten sind für mich tabu.
+Was daran hängt, steht am jeweiligen Punkt als **offen für Kevin**.
 
 ---
 

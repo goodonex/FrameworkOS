@@ -1,4 +1,4 @@
-# Uriel — Handoff (Stand 2026-08-06)
+# Uriel — Handoff (Stand 2026-08-06, abends)
 
 Kompakter Einstieg in den **realen** Stand nach Cockpit-Rebuild und den Etappen 1–4.
 
@@ -13,14 +13,16 @@ Kompakter Einstieg in den **realen** Stand nach Cockpit-Rebuild und den Etappen 
 
 ## Der wichtigste Satz für eine neue Session
 
-**Der Code auf `cockpit-rebuild` ist 12 Commits weiter als `main` — und `main` ist,
-was auf frameworkos.de läuft. Vier gebaute Etappen sind nicht live.**
+**Die Etappen 1–4 sind live** (`main` = `de60288`, ausgeliefert `index-BjbadBHB.js`).
+Auf `cockpit-rebuild` liegen **7 Commits, die noch nicht live sind** — die
+Aufräum-Runde vom Abend des 06.08. Verbindlich ist immer
+`git log --oneline main..cockpit-rebuild`, nicht diese Zahl.
 Der Livegang ist ein Fast-Forward (`main` hat keinen eigenen Commit) und steht als
 Abschnitt 1 im Backlog. **Kevin schaltet live, niemand sonst.**
 
-Zweiter Fallstrick: `supabase migration list --linked` zeigt **0059–0066 nicht als
-angewendet**, obwohl die Objekte in der DB sind. Vor jeder neuen Migration erst
-`migration repair` (Backlog L2), sonst fährt `db push` acht Altmigrationen erneut.
+Zur Migrations-Historie: `0001–0066` sind seit dem 06.08. lückenlos als angewendet
+verbucht (Backlog L2). **Regel daraus:** Migrationen ausschließlich über `db push`,
+nie im SQL-Editor — genau das hatte die Historie zerlegt.
 
 ---
 
@@ -121,10 +123,14 @@ Buckets: `project-files`, `site-assets`, `runner-files`.
 
 ### Edge Functions
 
-`brand-assistant` · `discovery-agent` · `discovery-feed-refresh` · `email-inbound` ·
+`brand-assistant` · `discovery-agent` · `discovery-feed-refresh` ·
 `foundation-ai` · `icp-swarm` · `invite-client` · `lead-intake` · `marketing-ai` ·
 `process-sequences` · `send-email` · `track-click` · `track-open` · **`uriel`** ·
 **`uriel-voice`**.
+
+`email-inbound` ist am 06.08. **gestrichen** worden (Backlog L5b) — über den
+Lead-Eingang `leads+slug@…` kam nachweislich nie etwas an. `discovery-agent` und
+`discovery-feed-refresh` sind undeployt und bleiben es; ihre UI ist gelöscht.
 
 ---
 
@@ -151,14 +157,17 @@ cd app && npx tsc -b && npm run build     # muss grün sein
    außerhalb der CockpitShell braucht explizit `pointerEvents: 'auto'`.
 2. **`h-svh`-Falle:** mobil bei **390×664** prüfen, nicht im schmalen Desktop-Fenster.
    Sonst klemmt der Inhalt hinter der Nav.
-3. **Zwei Mobil-Grenzen:** `useViewport.ts` sagt 768, NavRail und `cockpit.css` sagen
-   900 (Backlog O10).
+3. **Eine Mobil-Grenze, und zwar 900:** `MOBILE_MAX_WIDTH` in `hooks/useViewport.ts`,
+   importiert von NavRail und CockpitHome, gespiegelt in den `@media`-Blöcken von
+   `cockpit.css`. Nicht abtippen — `scripts/verify-breakpoint.ts` schlägt sonst an.
+   Das Kundenportal (`pages/portal/portal.css`) hat bewusst seine eigene bei 768.
 4. **Slide-/Post-Vorschauen immer per `src`, nie `srcDoc`** — sonst brechen die
    relativen Pfade zu `slides.css`.
 5. **Hooks-Order-Warnungen direkt nach einem Edit** sind HMR-Artefakte — erst nach
    vollem Reload bewerten.
-6. **Uncommittete Arbeit im Working Tree** ist bei diesem Repo der Normalfall: jede
-   Datei vor dem Edit frisch lesen, nie `git checkout`/`stash` darüber.
+6. **Uncommittete Arbeit im Working Tree** war bei diesem Repo lange der Normalfall:
+   jede Datei vor dem Edit frisch lesen, nie `git checkout`/`stash` darüber. (Stand
+   06.08. abends ist der Tree sauber — das ist die Ausnahme, nicht die Regel.)
 7. **`ANTHROPIC_API_KEY` in den Supabase-Edge-Secrets** war am 07.07. ungültig (401).
    Bei KI-Fehlern zuerst dort nachsehen (Backlog L6).
 
@@ -169,7 +178,7 @@ cd app && npx tsc -b && npm run build     # muss grün sein
 | Stelle | Warum |
 |---|---|
 | localStorage-Namespace `brand-os` | Rename verwirft Theme, Layout, Notifications aller Nutzer |
-| `frameworkos.de` in `email-inbound` (Lead-Regex), `send-email`, `ContactBccHint` | **Funktionaler Lead-Eingang** `leads+slug@frameworkos.de` — Änderung ohne Domain-Umzug = Lead-Verlust |
+| ~~`frameworkos.de` im Lead-Regex~~ | **Seit 06.08. gegenstandslos** (L5b): `email-inbound` und `ContactBccHint` sind gestrichen. In `send-email` bleibt die Domain als `PUBLIC_APP_URL` — das ist ein Umzug, kein Lead-Risiko. |
 | CORS-Origins `frameworkos.de` im Runner | Die Live-Site heißt weiter so |
 | Supabase-Ref, Edge-Function-Namen, Netlify-siteId | Interne Identifier, Bruchrisiko ohne Nutzen |
 | Ablage-Wurzel `~/Kevin OS/` | Runner-Hardcodes, fünf Skills und CLAUDE.md hängen daran. Ablage ≠ Produkt |
