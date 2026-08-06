@@ -684,6 +684,11 @@ export function UrielDock() {
 
           {/* Eingabe */}
           <div style={{ display: 'flex', gap: 6, padding: 10, borderTop: '1px solid var(--ck-border)' }}>
+            {/* O12 (Entscheidung Kevin, 06.08.2026): „Sprache ist Desktop."
+                Web Speech gibt es nur in Chrome; in Safari und auf dem iPhone
+                bleibt `sttSupported` false. Der Knopf verschwand dort bisher
+                kommentarlos — man sah nur, dass etwas fehlt, nicht warum.
+                Jetzt steht er da, abgeschaltet, und sagt es. */}
             {voice.sttSupported ? (
               <button
                 className="ck-btn"
@@ -694,7 +699,17 @@ export function UrielDock() {
               >
                 {voice.listening ? '● …' : '🎤'}
               </button>
-            ) : null}
+            ) : (
+              <button
+                className="ck-btn"
+                disabled
+                aria-label="Sprechen — nur in Chrome am Rechner verfügbar"
+                title="Sprache läuft über die Web-Speech-Schnittstelle und gibt es nur in Chrome am Rechner. Am iPhone und in Safari tippen."
+                style={{ minWidth: 40, opacity: 0.45, cursor: 'not-allowed' }}
+              >
+                🎤
+              </button>
+            )}
             <textarea
               className="ck-input"
               style={{ flex: 1, resize: 'none', height: 60, lineHeight: 1.45 }}

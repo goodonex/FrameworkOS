@@ -128,18 +128,25 @@ Implementierung ist vollständig (326 Zeilen, `generateLink type: 'recovery'` �
 Sie tut nichts von allein — sie feuert nur auf einen Owner-JWT-Aufruf hin.
 *Neu — stand in keinem Plandokument, nur in einer Session vom 09.07.*
 
-### L5b · Drei weitere Functions sind nicht deployt — **Entscheidung nötig**
-Beim Prüfen von L5 aufgefallen: Von 15 Functions im Repo sind **11 live**. Es fehlen
-neben `invite-client` (jetzt behoben) noch drei:
+### L5b · ~~Drei weitere Functions sind nicht deployt~~ ✅ **entschieden 06.08.2026**
+Von 15 Functions im Repo waren 11 live. Nach `invite-client` (L5) blieben drei —
+**alle drei werden nicht deployt, sondern gestrichen bzw. bleiben tot.**
 
-| Function | Wofür | Einschätzung |
-|---|---|---|
-| **`email-inbound`** | Lead-Eingang `leads+slug@frameworkos.de` — der Regex, den der Rebrand ausdrücklich nicht anfassen durfte | **Der wichtigste.** Ob ein Resend-Inbound-Webhook überhaupt darauf zeigt, ist von hier nicht prüfbar (**ungeprüft**). Wenn ja, fallen eingehende Lead-Mails ins Leere. |
-| `discovery-agent` | Markt-/Wettbewerbs-Analyse der alten Discovery-Welt | Deren UI ist in Phase 6 gelöscht — vermutlich bewusst tot |
-| `discovery-feed-refresh` | Cron für denselben Feed | dito |
+| Function | Entscheidung |
+|---|---|
+| **`email-inbound`** | **Gestrichen (Kevin, 06.08.).** Der Outreach laeuft ueber LinkedIn; die Adresse tauchte nur als BCC-Hinweis auf der Kontaktseite auf. **Beleg:** `sales_email_logs` hat 7 Zeilen, **alle `outbound`, keine einzige `inbound`** — ueber diesen Weg ist nie etwas angekommen. Entfernt wurden `supabase/functions/email-inbound/` und `components/sales/ContactBccHint.tsx` samt Einbindung in `ContactPage`. Beides zusammen, sonst verspraeche der Hinweis eine Protokollierung, die es nicht mehr gibt. |
+| `discovery-agent` | bleibt undeployt — die zugehoerige UI ist in Phase 6 geloescht |
+| `discovery-feed-refresh` | dito |
 
-Nicht mitdeployt, weil es über L5 hinausgeht und `email-inbound` am Lead-Eingang
-hängt: erst klären, ob ein Webhook darauf zeigt, dann deployen oder streichen.
+**Nebenwirkung, die zaehlt:** Der Warnhinweis aus `wargames/rebrand-uriel.md`
+(„`frameworkos.de` im Lead-Regex nicht anfassen") ist damit gegenstandslos. Der
+Domain-Umzug auf `uriel-os.de` haengt nicht mehr an einem funktionalen
+Lead-Eingang — die Zurueckstellung in Abschnitt 4 ist entsprechend entschaerft.
+
+**Nicht von hier geprueft:** ob in Resend ueberhaupt ein Inbound-Webhook auf die
+Adresse zeigt. Falls ja, fielen die Mails schon vorher ins Leere (die Function war
+nie deployt) — das Streichen verliert also nichts. Wer das sauber abschliessen
+will, loescht den Webhook im Resend-Dashboard.
 
 ### L6 · `ANTHROPIC_API_KEY` — **gesetzt, letzte Bestätigung 19.07.**
 `supabase secrets list`: `ANTHROPIC_API_KEY` ist gesetzt. `ANTHROPIC_MODEL` ist per
@@ -455,16 +462,22 @@ hat kein Vor/Zurück (kein `onPrev`/`onNext` im File). Nötig: Pfeiltasten +
 „Ad 7/20, 3 freigegeben".
 *Herkunft: IDEEN „Nutzbarer"*
 
-### O9 · Content-Manifest schließen — **M**
+### O9 · Content-Manifest schliessen — **M** · *Testpost erledigt, Rest offen*
 Der `weekly-content`-Agent baut Wochen-HTMLs, schreibt aber nie ins Manifest — sein
 Prompt nennt nur `WEEKLY.md`, `backlog.md`, `log.md` (`runner/index.mjs:127-130`).
-`content.json` enthält deshalb bis heute **genau einen** Post: `w29-5s-test`,
-`plannedFor: 2026-07-21`, `status: scheduled` — seit sechs Wochen überfällig im
-Default-Tab. Dazu: „Als gepostet markieren" wird gerendert, hat aber keinen
-Schreiber.
-**Erste Handlung (S):** Testpost entscheiden — löschen oder auf `posted` setzen.
-**Danach (M):** Batch appendet seine 3 Posts.
-*Herkunft: IDEEN „Nützlicher" · content-modul-mvp.md „Phase 2" · Session-Inventur*
+Dazu: „Als gepostet markieren" wird gerendert, hat aber keinen Schreiber.
+
+**✅ Erste Handlung erledigt (06.08.2026):** Der Testpost `w29-5s-test`
+(„Der 5-Sekunden-Test", `scheduled`, geplant fuer den 21.07., seit sechs Wochen
+ueberfaellig im Default-Tab) ist **geloescht** — Kevins Entscheidung, weil der Post
+nie auf Instagram stand. Ihn auf `posted` zu setzen haette eine Falschmeldung in die
+Content-Historie geschrieben. `content.json` hat jetzt `posts: []`; die Slide-Datei
+`weekly/2026-W29/posts/post-01-fuenf-sekunden-test.html` bleibt liegen.
+
+**Offen (M):** Der Batch muss seine 3 Posts anhaengen, und „Als gepostet markieren"
+braucht einen Schreiber. Bis dahin ist das Manifest leer — was ehrlicher ist als ein
+einzelner ueberfaelliger Testeintrag, aber noch kein Content-Modul.
+*Herkunft: IDEEN „Nuetzlicher" · content-modul-mvp.md „Phase 2" · Session-Inventur*
 
 ### O10 · ~~Ein Mobile-Breakpoint~~ ✅ **vereinheitlicht 06.08.2026**
 `MOBILE_MAX_WIDTH = 900` und `MOBILE_MEDIA_QUERY` stehen jetzt in
@@ -501,14 +514,21 @@ Posteingang ist das die kürzeste Strecke zu „Kunden benutzen das Portal echt"
 nächsten Kunden an. Deshalb hier und nicht weiter oben.
 *Herkunft: IDEEN „Nützlicher"*
 
-### O12 · M2 zu Ende bringen: Sprache auch am Handy — **M**
-Push-to-talk läuft über Web Speech (`useUrielVoice.ts:43-49`) und damit nur in
-Chrome. Auf dem iPhone — Kevins Morgengerät — ist `sttSupported` false und der
-🎤-Knopf unsichtbar (`UrielDock.tsx:625`).
-**Zwei Wege:** entweder die Whisper-Variante aus dem Masterplan (Recorder →
-Edge Function → Text), oder bewusst „Sprache ist Desktop" festschreiben und den
-Knopf am Handy sauber erklären statt verschwinden zu lassen.
-**Abhängigkeit:** keine. Entscheidung vor Bau.
+### O12 · ~~M2 zu Ende bringen: Sprache auch am Handy~~ ✅ **entschieden 06.08.2026**
+**Entscheidung Kevin: „Sprache ist Desktop."** Push-to-talk laeuft ueber Web Speech
+(`useUrielVoice.ts:43-49`) und damit nur in Chrome. Die Whisper-Variante aus dem
+Masterplan wird **nicht** gebaut.
+
+**Was stattdessen gebaut wurde (S):** Der 🎤-Knopf verschwand am iPhone und in Safari
+kommentarlos (`UrielDock.tsx`, `sttSupported ? … : null`) — man sah, dass etwas fehlt,
+aber nicht warum. Jetzt steht er dort abgeschaltet und erklaert sich im `title`:
+„Sprache laeuft ueber die Web-Speech-Schnittstelle und gibt es nur in Chrome am
+Rechner. Am iPhone und in Safari tippen."
+
+**Wacht wieder auf, wenn:** der Morgen-Push (O3) steht und Kevin morgens
+tatsaechlich ins Handy sprechen will. Vorher gibt es am Handy gar keinen
+Morgen-Flow, in den die Sprache hineingehoerte. Der Bauweg bleibt der aus dem
+Masterplan: Recorder → Edge Function → Text.
 *Herkunft: Masterplan M2 (Formulierung dort war falsch, siehe §2)*
 
 ### O13 · Kleinkram, gegen den Code geprüft — je **S**
@@ -582,7 +602,7 @@ Nicht verworfen. Je mit der Bedingung, unter der es wieder aufwacht.
 |---|---|---|
 | **Uriel-Core 24/7 auf eigenem Heimserver** (Masterplan M3, „Jarvis Phase D") | Kostet Geld, Zeitrahmen Wochen bis Monate. **Kein Hostinger:** Der LinkedIn-Sync läuft mit Session-Cookies — eine Rechenzentrums-IP erhöht das Sperr-Risiko für den wichtigsten Vertriebskanal. Ein Heimserver behält die vertraute IP. Bis dahin decken Selbstwecker (`pmset`) und `caffeinate` rund 95 % der Morgen ab. | Kevin die Hardware anschafft — oder der Selbstwecker sich im Alltag als unzuverlässig erweist |
 | **Sprach-Satelliten + Wake-Word** (M4) und **Alexas abklemmen** (M5) | Kevin, 06.08.: „Das können wir erst mal vergessen, das ist nicht wichtig." ~250 € einmalig. | Nach dem Heimserver, frühestens |
-| **Domain `uriel-os.de`** (~15 €/Jahr) | Entscheidung offen seit 19.07. Der Umzug ist eine eigene Mission — `leads+slug@frameworkos.de` hängt funktional an der alten Domain (`email-inbound`-Regex). | Kevin die Domain sichert; der Umzug bleibt davon getrennt |
+| **Domain `uriel-os.de`** (~15 €/Jahr) | Entscheidung offen seit 19.07. **Seit 06.08. deutlich billiger:** mit dem Streichen von `email-inbound` (L5b) hängt kein funktionaler Lead-Eingang mehr an `frameworkos.de`. Was bleibt, ist der `PUBLIC_APP_URL`-Umzug und die Netlify-Domain. | Kevin die Domain sichert; der Umzug bleibt davon getrennt |
 | **Graph-Intelligenz** (IDEAS G1 Fluss-Ansicht, G3 Zentralität/Gap-Detection, G6 Graph-Erzähler) | Der Graph beantwortet heute „was ist angeschlossen". Die Steuerungsfragen beantwortet inzwischen das Sales-Dashboard besser. | Der Graph eine Frage beantworten soll, die keine Liste beantwortet |
 | **Meta-Ads-API statt Manifest** | Schmerz-Regel: erst wenn echte Kampagnen laufen. 20 Ads stehen auf „review", keine läuft. | Die erste Kampagne live geht |
 | **Uriel-MCP-Server** (IDEAS A5), **Event-Trigger** (A3), **Runner-Observability** (A4), **Skills-Registry** (A7) | Strukturell richtig, aber kein benannter Alltagsschmerz. | Ein konkreter Fall auftaucht — nicht vorher bauen (Foundation-Lektion) |

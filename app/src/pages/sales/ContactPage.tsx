@@ -18,7 +18,6 @@ import { useContactFieldConfig } from '../../hooks/useContactFieldConfig'
 import { readContactsLocal, useContacts } from '../../hooks/useContacts'
 import { useContactFieldSave } from '../../hooks/useContactFieldSave'
 import { ContactSaveStatusIndicator } from '../../components/sales/ContactSaveStatusIndicator'
-import { ContactBccHint } from '../../components/sales/ContactBccHint'
 import { useDeliverProjects } from '../../hooks/useDeliverProjects'
 import { useOpportunities } from '../../hooks/useOpportunities'
 import { pitchWebsiteDeliverables } from '../../lib/deliverableCatalog'
@@ -434,7 +433,6 @@ export function ContactPage({
         <ContactSaveStatusIndicator state={saveState} />
       </div>
 
-      {slug ? <ContactBccHint brandSlug={slug} /> : null}
 
       <div
         className="grid gap-4"
