@@ -1,3 +1,7 @@
+> **Phase 1 ist gebaut und committet.** Offen ist der geschlossene Kreis
+> (Agent füllt `content.json`) — als O9 in [`../BACKLOG.md`](../BACKLOG.md).
+> Gültig bleibt Randbedingung **R4**: Slide-Vorschau immer per `src`, nie `srcDoc`.
+
 # Wargame: Content-Modul MVP (Phase 1)
 
 Stand: 17.07.2026 · Durchgespielt von Opus (Denk-Session) · Executor: beliebiges Modell, blind ausführbar

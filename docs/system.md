@@ -1,3 +1,7 @@
+> ⚠️ **HISTORISCH (Mai 2026, „Brand OS“).** Beschreibt die Vor-Rebuild-Architektur
+> mit sechs Denk-Modi. Die heutige Arbeitsteilung ist: Vault = denken, Cockpit = tun.
+> Aktueller Stand: [`../HANDOFF.md`](../HANDOFF.md) · [`BACKLOG.md`](BACKLOG.md).
+
 # Brand OS — System Architecture
 
 ## Was ist Brand OS

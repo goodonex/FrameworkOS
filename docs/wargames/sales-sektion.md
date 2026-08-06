@@ -1,3 +1,8 @@
+> **Gebaut** (`/sales` mit Dashboard und Bibliothek, Agenten `loom-skript` und
+> `followup-pdf` im Katalog) — offene Punkte stehen in
+> [`../BACKLOG.md`](../BACKLOG.md). Gültig bleiben die Fachregeln **R7** (5-Akt-Loom)
+> und **R8** (Follow-up-PDF-Rubrik): sie sind die Grundlage der beiden Agent-Prompts.
+
 # Wargame: Sales-Sektion (CRM → Sales + Dashboard + Bibliothek + neue Agenten)
 
 Stand: 24.07.2026 · Durchgespielt von Fable 5 (Denk-Session) · Executor: Sonnet, blind ausführbar

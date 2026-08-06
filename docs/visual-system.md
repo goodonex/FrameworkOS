@@ -1,3 +1,7 @@
+> ⚠️ **HISTORISCH (Mai 2026).** Referenz für die 3D-Welt unter `app/src/three/` —
+> diesen Ordner gibt es nicht mehr (Phase 6, 07.07.2026). Nur noch Beleg dafür, woher
+> die Texturen in `app/public/textures/` stammen.
+
 # Visual System — 3D-Welt (Texturen & Licht)
 
 Referenz für Iterationen an der Framework-OS-Welt (`app/src/three/`).

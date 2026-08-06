@@ -1,77 +1,201 @@
-# Brand OS — Handoff (Stand für neuen Cursor-Chat)
+# Uriel — Handoff (Stand 2026-08-06)
 
-Kurzüberblick zum Einstieg. Details: `docs/system.md`, `docs/data-model.md`, `docs/open-questions.md`.
+Kompakter Einstieg in den **realen** Stand nach Cockpit-Rebuild und den Etappen 1–4.
+
+- **Was noch offen ist:** [`docs/BACKLOG.md`](docs/BACKLOG.md) — die eine Quelle der Wahrheit.
+- **Warum etwas so gebaut ist:** [`docs/rebuild-notes.md`](docs/rebuild-notes.md) + `git log`.
+- **Design-Regeln:** [`docs/REBUILD-PLAN.md`](docs/REBUILD-PLAN.md) §4 (Mission Control, verbindlich).
+
+> Ein früherer Handoff beschrieb die Vor-Rebuild-App („Brand OS", sechs Denk-Modi,
+> Three.js-Universe, Migrationen bis 0013). Das ist überholt.
+
+---
+
+## Der wichtigste Satz für eine neue Session
+
+**Der Code auf `cockpit-rebuild` ist 12 Commits weiter als `main` — und `main` ist,
+was auf frameworkos.de läuft. Vier gebaute Etappen sind nicht live.**
+Der Livegang ist ein Fast-Forward (`main` hat keinen eigenen Commit) und steht als
+Abschnitt 1 im Backlog. **Kevin schaltet live, niemand sonst.**
+
+Zweiter Fallstrick: `supabase migration list --linked` zeigt **0059–0066 nicht als
+angewendet**, obwohl die Objekte in der DB sind. Vor jeder neuen Migration erst
+`migration repair` (Backlog L2), sonst fährt `db push` acht Altmigrationen erneut.
 
 ---
 
 ## Was existiert
 
-### Zwei „Codebases“ (ein Repo)
+### Ein Repo, drei Teile
 
 | Teil | Pfad | Inhalt |
-|------|------|--------|
-| **Frontend** | `app/` | React 19 + TypeScript + Vite 8, React Router 7, Tailwind, Three.js (R3F), Framer Motion, Supabase Client, Zustand |
-| **Backend (Supabase)** | `supabase/` | SQL-Migrationen `0001`–`0013`, Edge Functions, `config.toml` (JWT pro Function) |
+|---|---|---|
+| **Frontend** | `app/` | React 19, TypeScript, Vite, React Router 7, Tailwind, Supabase-Client, Zustand, framer-motion, react-markdown + remark-gfm, Tiptap, dnd-kit. Graph via **d3-force auf Canvas-2D**. **Kein Three.js** (Phase 6 abgerissen). |
+| **Backend** | `supabase/` | Migrationen `0001`–`0066`, 15 Edge Functions, `config.toml` (JWT je Function). |
+| **Runner** | `runner/` | Zero-Dependency Node-Server auf `127.0.0.1:4711`, spawnt Vault-Agenten, spiegelt nach Supabase. |
 
-### Was grundsätzlich funktioniert
+### Cockpit-Shell (`app/src/cockpit/**`)
 
-- **6 Modi**: Building, Discovery, Promo, Sales, Deliver, Intelligence — Navigation & Routen (`/brand/:slug/...`).
-- **Brands**: Liste aus Supabase (mit Fallback/localStorage bei fehlender DB); Sortierung fester Slug-Reihenfolge; **Universe**-3D-Graph (`app/src/three/NodeGraph.tsx`) mit Brand-Nodes.
-- **Auth**: Supabase Auth + `useAuth`; `useBrands` hängt an eingeloggtem User.
-- **Foundation**: ICPs, Word Bank, Positioning (Tabellen + localStorage-Fallbacks in Hooks).
-- **Discovery**: Edge Function **`discovery-agent`** (Claude inkl. Web-Search-Tool + Speichern in `discovery_foundation` / Feed-Items); **`discovery-feed-refresh`** (Signale, Archiv >90 Tage; Cron + optional User-Invoke).
-- **Deliver / Sales / Promo / Client-Portal**: UI + Schema laut Migrationen (Details in `docs/` und SQL).
-- **Build**: `cd app && npx tsc -b && npm run build` — zuletzt grün im Projektverlauf.
+`/` redirected auf `/cockpit`. Keine Modus-Navigation mehr.
+
+| Route | Bereich | Seite |
+|---|---|---|
+| `/cockpit` | Home: Heute-Deck, Vitals, OS-Graph, Agenten, Ziel | `CockpitHome.tsx` |
+| `/aufgaben` `/termine` `/freigaben` | „Heute" (Sub-Tabs `HeuteTabs`) | `AufgabenArea` · `TermineArea` · `FreigabenArea` |
+| `/linkedin` | LinkedIn-Postfach: Buckets, Sterne, Entwürfe | `LinkedinArea.tsx` |
+| `/sales` | Kachel-Dashboard „Jetzt dran" + Arbeitsmodus | `SalesDashboard.tsx` |
+| `/sales/pipeline` `lists` `call-mode` `new` `:contactId` | Altes CRM, in der Shell | `pages/sales/*` (Glass-Ära) |
+| `/sales/bibliothek` | Skripte, Vorlagen, PDFs | `SalesBibliothek.tsx` |
+| `/projekte` | Deliver / Kundenprojekte + Posteingang | `ProjekteArea.tsx`, `ProjectPage.tsx` |
+| `/ads` | Ads-Review über alle Kunden | `AdsArea.tsx` |
+| `/content` | Wochen-Batches + Post-Ebene | `SocialArea.tsx` |
+| `/agenten` | Agenten-Hub, Run-Drawer | `AgentsArea.tsx` |
+| `/tracking` | Tages-KPIs, Wochen-/Monatskurve, Kanal-Raten | `TrackingArea.tsx` |
+
+**Navigation** (`NavRail.tsx`): vorne die Warteschlange — Cockpit · Heute · Sales ·
+Projekte; hinten das Nachschlagewerk — Ads · Content · Agenten · Tracking. Mobil
+sind es 5 Tabs (letzter = „Mehr"-Sheet). `/crm/*` redirected auf `/sales/*`,
+`/brand/:slug/*` auf das Cockpit.
+
+**Uriel selbst:** `UrielDock.tsx` + `UrielAura.tsx` — Chat mit Werkzeugen
+(`lib/urielTools.ts`: navigieren, Graph steuern, CRM/KPIs lesen, `remember`),
+Antwortmotor = Edge Function `uriel`. **Stimme:** ElevenLabs über `uriel-voice`;
+**Push-to-talk** über Web Speech (`lib/useUrielVoice.ts`) — funktioniert in Chrome,
+nicht in Safari/iOS (Backlog O12).
+
+**Kernlogik, die man kennen muss, bevor man etwas anfasst:**
+- `lib/prioritaet.ts` — die eine Rangfolge (`ordnePosten`). Feste Liste, kein Scoring.
+- `hooks/usePosten.ts` — verdrahtet alle Quellen. Heute-Deck und Sales-Dashboard
+  benutzen **denselben** Hook; keine zweite Fälligkeitslogik bauen.
+- `lib/arbeitsmodusTracking.ts` — Abhaken zählt **genau ein** `daily_metrics`-Feld
+  und misst die Dauer (`arbeits_dauern`). Keine neuen Metrikfelder.
+- `lib/linkedinFollowups.ts` — Buckets und `markDonePatch`. Geprüft per
+  `scripts/verify-linkedin-followups.ts`.
+- `lib/runnerBridge.ts` — **nie direkt auf `127.0.0.1`**. Lokal Runner, sonst Spiegel.
+
+### Legacy, noch gemountet
+
+Kundenportal (`/portal/...`), Booking (`/book/...`), Lead-Intake (`/leads/...`),
+Login/Reset/Onboarding. Die Sales-Altwelt lebt als Sub-Tabs unter `/sales`
+(`SalesMode.tsx`, 2.504 Zeilen, noch Glass — Backlog O14). Die Brand-Welt und
+Deliver-Altwelt sind in Etappe 4 abgerissen.
+
+### Runner (`runner/index.mjs`)
+
+Bindet ausschließlich `127.0.0.1:4711`. Autostart via launchd (`de.uriel.runner`,
+`scripts/install-runner-autostart.sh`). Nach jeder **Code**-Änderung am Runner:
+
+```bash
+launchctl kickstart -k gui/$(id -u)/de.uriel.runner
+```
+
+Skill-Änderungen brauchen das nicht (`claude -p` liest `SKILL.md` frisch).
+
+- **Endpoints:** `/status` `/run` `/runs` `/runs/:id` `/agents` `/vault/recent`
+  `/vault/graph` `/os/map` `/os/file` `/calendar` `/ads/{overview,manifest,customers}`
+  `/content/manifest` `/social/weeks` `/sales/library` `/linkedin/sync`
+  `/files/{kunden,social,sales}/…`
+- **Agenten:** `weekly-content` · `wochenrecap` · `morgenbrief` · `followup-entwuerfe` ·
+  `linkedin-followup-entwuerfe` · `linkedin-antwort-entwuerfe` · `lead-research` ·
+  `dream-check` · `loom-skript` · `followup-pdf`. Skills liegen im **Vault**
+  (`~/Second Brain/.claude/skills/`), nicht in diesem Repo.
+- **Zeit-Routinen:** `dream-check` (1×/Tag), `morgenbrief` (erster Werktags-Lauf),
+  Antwort-Entwürfe (werktags ab 6:00). Alle laufen **nur, wenn der Mac wach ist** —
+  das ist der Grund für den Selbstwecker (`pmset`) und den Heimserver-Plan.
+- **Spiegel nach Supabase** (`runner_snapshots`, damit das Handy etwas sieht):
+  `runs` · `files_index` · `calendar` · `agents` · `ads_overview` · `social_weeks` ·
+  `sales_library` · `erstnachrichten_meta`. Aufträge vom Handy laufen über
+  `runner_jobs` (Migration 0059), **nicht** über `System/Queue` — der Ordner ist nur
+  noch Debug-Protokoll.
+- **`runner/.env`** braucht `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (sonst fallen
+  Graph, Heartbeat und alle Spiegel still aus) und `CALENDAR_ICAL_URL`.
+
+### Datenbank (Auszug, Stand 06.08. live geprüft)
+
+`daily_metrics` (Tracking, kanalgetrennt) · `linkedin_threads` (160 Zeilen, mit
+`verlauf`, `entwurf`, `loom_status`, `starred`) · `linkedin_erstnachrichten` (91) ·
+`contacts` (44) · `arbeits_dauern` · `month_goals` · `runner_jobs` ·
+`runner_snapshots` · `os_map_snapshot` · `social_batches` (4) · `site_content` (0) ·
+`deliver_projects` / `project_messages` · `foundation_tasks` · `chat_threads`.
+Buckets: `project-files`, `site-assets`, `runner-files`.
+
+### Edge Functions
+
+`brand-assistant` · `discovery-agent` · `discovery-feed-refresh` · `email-inbound` ·
+`foundation-ai` · `icp-swarm` · `invite-client` · `lead-intake` · `marketing-ai` ·
+`process-sequences` · `send-email` · `track-click` · `track-open` · **`uriel`** ·
+**`uriel-voice`**.
 
 ---
 
-## Zuletzt umgesetzt (Branding, Daten, Sessions)
+## Build & Deploy
 
-- **Branding / Brand-Liste**: Offmarketbude → **Wertavio**; **Eversmell**, **Culturefit** (Farbe **Ember** `var(--accent-ember)` / `#e0593e` in 3D), **Homeflower** zuletzt in der Anzeige; Sync `offmarketbude` → `wertavio` + fehlende Brands per `useBrands` (`syncCanonicalBrandsForUser`).
-- **Wertavio Startdaten**: localStorage unter Slug `wertavio` (Positioning, Business Model, 2 ICPs, Word Bank) + Sentinel-Version; zusätzlich **Supabase-Foundation-Seed**, wenn Tabellen für die Wertavio-`brand_id` leer sind.
-- **ModeNav-Reihenfolge**: Building → Discovery → Promo → Sales → Deliver → Intelligence.
-- **Design-Tokens**: u. a. `--accent-ember` in `app/src/styles/tokens.css`.
-- **DB / Setup** (lokal & Remote): Migrationen bis **`0013_discovery_agent.sql`** (`analysis_status`, `archived_at` für Feed); RLS in `0009` + Erweiterungen in späteren Migrationen — **im jeweiligen Supabase-Projekt manuell ausführen**, siehe `docs/open-questions.md`.
-- **Sessions**: normale Supabase-Session im Browser; keine separaten „Session“-Experimente außerhalb davon.
+```bash
+cd app && npx tsc -b && npm run build     # muss grün sein
+```
 
----
-
-## Offen / als Nächstes (Priorität)
-
-1. **Role Guards**: Routen und ggf. UI hart absichern (Owner vs. Client, Portal nur mit `user_roles.project_id` etc.); RLS-Policy-Review mit Produktflow.
-2. **Schema-Match**: Tabellen/Policies mit `docs/data-model.md` und `docs/open-questions.md` abgleichen (fehlende Policies, `invite-client`, ggf. neue Tabellen).
-3. **Deploy**: Supabase Edge Functions deployen (`discovery-agent`, `discovery-feed-refresh`), Secrets setzen (`ANTHROPIC_API_KEY`, ggf. `DISCOVERY_CRON_SECRET`, … siehe `docs/open-questions.md`); Frontend-Build ausliefern; Cron-Header für Feed-Refresh.
-4. **Peripher**: `invite-client`-Function ist Platzhalter; `supabase login` für CLI ist interaktiv (lokal erledigen).
+- `npm run cockpit` — nur App · `npm run cockpit:full` — App + Runner · `npm run runner`
+- **Deploy:** Netlify (`netlify.toml`: base `app`, publish `dist`, Node 22,
+  SPA-Redirect). Env in der Netlify-UI: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
+  Welcher Branch als Production eingestellt ist, steht **nicht** in `netlify.toml` —
+  vor dem Livegang einmal in der UI nachsehen.
+- **Release-Weg:** Arbeitsbranch `cockpit-rebuild` → Fast-Forward-Push auf `main`.
+- **Migrationen:** nur noch `supabase db push` — **nicht** im SQL-Editor (das ist die
+  Ursache des heutigen Historie-Desyncs, Backlog L2).
 
 ---
 
-## Technische Fakten
+## Fallen, die schon Zeit gekostet haben
 
-- **Stack**: siehe Tabelle oben; Entry `app/index.html` / `app/src/main.tsx`.
-- **Supabase Project ID**: nicht im Git versioniert — **`VITE_SUPABASE_URL` in `app/.env.local`** (oder Dashboard): Project-Ref = **Subdomain** der URL (Teil vor `.supabase.co`). Beispielform: `https://<project-ref>.supabase.co`.
-- **Edge Functions** (Auszug):
-  - `discovery-agent`: `verify_jwt = true`
-  - `discovery-feed-refresh`: `verify_jwt = false` (Auth/Cron im Handler)
-- **Ordnerstruktur (Root)**:
+1. **`#app-ui-overlay` setzt global `pointer-events: none`** — jedes Vollbild-UI
+   außerhalb der CockpitShell braucht explizit `pointerEvents: 'auto'`.
+2. **`h-svh`-Falle:** mobil bei **390×664** prüfen, nicht im schmalen Desktop-Fenster.
+   Sonst klemmt der Inhalt hinter der Nav.
+3. **Zwei Mobil-Grenzen:** `useViewport.ts` sagt 768, NavRail und `cockpit.css` sagen
+   900 (Backlog O10).
+4. **Slide-/Post-Vorschauen immer per `src`, nie `srcDoc`** — sonst brechen die
+   relativen Pfade zu `slides.css`.
+5. **Hooks-Order-Warnungen direkt nach einem Edit** sind HMR-Artefakte — erst nach
+   vollem Reload bewerten.
+6. **Uncommittete Arbeit im Working Tree** ist bei diesem Repo der Normalfall: jede
+   Datei vor dem Edit frisch lesen, nie `git checkout`/`stash` darüber.
+7. **`ANTHROPIC_API_KEY` in den Supabase-Edge-Secrets** war am 07.07. ungültig (401).
+   Bei KI-Fehlern zuerst dort nachsehen (Backlog L6).
+
+---
+
+## Nicht anfassen (bewusste Ausnahmen aus dem Rebrand)
+
+| Stelle | Warum |
+|---|---|
+| localStorage-Namespace `brand-os` | Rename verwirft Theme, Layout, Notifications aller Nutzer |
+| `frameworkos.de` in `email-inbound` (Lead-Regex), `send-email`, `ContactBccHint` | **Funktionaler Lead-Eingang** `leads+slug@frameworkos.de` — Änderung ohne Domain-Umzug = Lead-Verlust |
+| CORS-Origins `frameworkos.de` im Runner | Die Live-Site heißt weiter so |
+| Supabase-Ref, Edge-Function-Namen, Netlify-siteId | Interne Identifier, Bruchrisiko ohne Nutzen |
+| Ablage-Wurzel `~/Kevin OS/` | Runner-Hardcodes, fünf Skills und CLAUDE.md hängen daran. Ablage ≠ Produkt |
+
+Details: [`docs/wargames/rebrand-uriel.md`](docs/wargames/rebrand-uriel.md).
+
+---
+
+## Ordnerstruktur
 
 ```
 uriel/
-├── app/                 # Vite SPA (Port 5173: npm run dev)
-│   ├── src/
-│   │   ├── components/
-│   │   ├── hooks/
-│   │   ├── pages/
-│   │   ├── three/
-│   │   └── …
-│   └── .env.local       # lokal: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY (nicht committen)
-├── docs/                # system, data-model, open-questions, …
-├── supabase/
-│   ├── config.toml
-│   ├── functions/       # discovery-agent, discovery-feed-refresh, invite-client, …
-│   └── migrations/
-└── HANDOFF.md           # diese Datei
+├── app/                    # Vite SPA
+│   └── src/
+│       ├── cockpit/        # Shell, Bereiche, Uriel, Graph, lib/, components/
+│       ├── components/     # Legacy Sales/Portal/Deliver + shared
+│       ├── hooks/  lib/  pages/  styles/  types/
+│       └── App.tsx  main.tsx
+├── runner/                 # index.mjs + linkedin/ (Voyager-Sync)
+├── scripts/                # install-runner-autostart.sh + verify-*.ts
+├── docs/                   # BACKLOG.md (Wahrheit) · rebuild-notes · wargames/ · data-model
+├── supabase/               # migrations/ 0001–0066 · functions/
+├── netlify.toml
+└── HANDOFF.md              # diese Datei
 ```
 
 ---
 
-*Generiert als kompakte Übergabe; bei Abweichung zum Live-System immer Dashboard + `git log` prüfen.*
+*Bei Zweifeln schlagen `docs/BACKLOG.md`, der Code und `git log` dieses Dokument.*

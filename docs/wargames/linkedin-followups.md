@@ -1,3 +1,8 @@
+> **Gebaut und im Betrieb** (160 Threads, 91 Erstnachrichten in der DB) — offene
+> Restpunkte stehen in [`../BACKLOG.md`](../BACKLOG.md) (O4, O6, O13).
+> Gültig bleibt der Voyager-Abschnitt: Feldkarte, Blätter-Query und die drei
+> Fallen sind die Wartungsanleitung, wenn LinkedIn die API umbaut.
+
 # Wargame — LinkedIn-Follow-up-System (Uriel-Modul)
 
 **Erstellt:** 2026-07-27 · **Planer:** Opus 5 · **Executor:** Sonnet (blind ausführbar)

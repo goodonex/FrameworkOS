@@ -1,3 +1,7 @@
+> **Gilt mit Einschränkungen:** drei Tabellen sind dokumentiert, aber nie migriert
+> worden — sie tragen unten je einen Warnhinweis. Offene Punkte stehen in
+> [`BACKLOG.md`](BACKLOG.md).
+
 # Brand OS — Data Model
 
 ## Stack
@@ -98,6 +102,7 @@ word_clusters text[]        -- Welche Word-Bank-Cluster dominant
 ```
 
 ### content_performance
+> ⚠️ **Geplant, nicht migriert** (geprüft 2026-08-06). Keine Migration in `supabase/migrations/` erstellt diese Tabelle. Performance-Daten laufen über `promo_performance` sowie `daily_metrics` (Migration 0046/0049). Vor Nutzung Migration schreiben oder Doku streichen.
 ```sql
 id            uuid PK
 content_id    uuid FK
@@ -141,7 +146,7 @@ source_campaign_id      uuid FK nullable
 source_funnel_id        uuid FK funnels nullable  -- Migration 0032
 lead_quality            text default 'unqualified'  -- unqualified | good | bad
 lead_value              numeric(10,2) nullable     -- geschätzter Deal-Wert EUR
-pipeline_stage          text  -- first_contact | conversation | proposal | deal | paused
+pipeline_stage          text  -- first_contact | conversation | follow_up | proposal | deal | paused (follow_up: Migration 0047)
 last_contact_at         timestamptz nullable
 next_follow_up_at       timestamptz nullable
 notes                   text
@@ -219,6 +224,7 @@ Migration **`0012_client_access.sql`**: `project_id`, RLS `deliver_projects_clie
 ## Intelligence Tables
 
 ### intelligence_patterns
+> ⚠️ **Geplant, nicht migriert** (geprüft 2026-08-06). Keine Migration erstellt diese Tabelle; das Intelligence-Modul wurde beim Cockpit-Rebuild (Phase 6) entfernt. Nur als Vision behalten oder streichen.
 ```sql
 id            uuid PK
 brand_id      uuid FK
@@ -232,6 +238,7 @@ created_at    timestamp
 ```
 
 ### focus_tasks
+> ⚠️ **Geplant, nicht migriert** (geprüft 2026-08-06). Keine Migration erstellt diese Tabelle. Task-Haltung läuft real über `foundation_tasks` (inkl. `source: brief_task`, Migration 0042). `CURRENT_FOCUS` im Context-Export unten wird derzeit nicht befüllt.
 ```sql
 id            uuid PK
 brand_id      uuid FK

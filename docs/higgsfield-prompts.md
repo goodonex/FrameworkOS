@@ -1,3 +1,6 @@
+> ⚠️ **HISTORISCH (Mai 2026).** Prompts für die Texturen der abgerissenen 3D-Welt.
+> Kein offener Punkt — Aufbewahrung nur zur Nachvollziehbarkeit der Assets.
+
 # Higgsfield — Texture Prompts (Visual Polish)
 
 Stand: `feat/visual-polish` · Assets unter `app/public/textures/`.

@@ -1,3 +1,7 @@
+> **Phasenprotokoll des Cockpit-Rebuilds (Juli 2026) — Geschichtsschreibung, keine
+> Aufgabenliste.** Bleibt die belastbarste Quelle dafür, *warum* etwas so gebaut wurde.
+> Was heute offen ist, steht in [`BACKLOG.md`](BACKLOG.md).
+
 # Rebuild-Notes — Cockpit-Umbau
 
 Protokoll je Phase gemäß [REBUILD-PLAN.md](REBUILD-PLAN.md).

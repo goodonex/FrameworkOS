@@ -1,3 +1,7 @@
+> **Umgesetzt als Phase 1** (siehe [`wargames/content-modul-mvp.md`](wargames/content-modul-mvp.md)).
+> Vom Briefing offen ist nur der geschlossene Kreis — als O9 in [`BACKLOG.md`](BACKLOG.md).
+> Gültig bleibt der Ideen-Vorrat für spätere Ausbaustufen.
+
 # Briefing: Content-Modul fürs Uriel-Cockpit
 
 Stand: 17.07.2026 · Autor: Fable (Denk-Session) · Zweck: Grundlage, aus der eine frische Session den **genauen** Umsetzungsplan baut. Das hier ist die **Idee + Anforderung**, nicht der Plan.

@@ -1,3 +1,8 @@
+> **Ausgeführt (M0 fertig)** — offene Punkte stehen in
+> [`../BACKLOG.md`](../BACKLOG.md). Gültig und **weiter bindend** bleibt die
+> Tabelle „Explizit NICHT anfassen": localStorage-Namespace `brand-os`,
+> `frameworkos.de` im Lead-Eingang, Supabase-Ref, Ablage-Wurzel `~/Kevin OS/`.
+
 # WARGAME — Rebrand: Framework OS / brand-os / Kevin OS → URIEL
 
 **Mission:** Alle sichtbaren Namen des Programms auf **Uriel** vereinheitlichen (Repo, UI, Doku, Vault, launchd, GitHub). Ausführung durch ein Executor-Modell (Sonnet) in eigener Session, Start-CWD: dieses Repo. Diese Blaupause ist blind ausführbar — keine Ermessensentscheidungen.

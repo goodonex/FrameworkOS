@@ -1,3 +1,7 @@
+> **Züge 1–8 sind gebaut** (Beleg in [`../BACKLOG.md`](../BACKLOG.md), §2).
+> Gültig bleiben die vier Gesetze, das Zielbild (Stufen 2–5) und die
+> Abbruchbedingungen — allen voran: keine Minuten- oder Kapazitätsrechnung.
+
 # Wargame — Vom Nachschlagewerk zum Arbeitswerkzeug
 
 **Erstellt:** 2026-07-29 · **Planer:** Opus 5 · **Executor:** Sonnet (blind ausführbar)

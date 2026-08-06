@@ -1,3 +1,8 @@
+> **Abgeschlossen (Phasen 0–7, Juli 2026) — offene Punkte stehen in
+> [`BACKLOG.md`](BACKLOG.md).** Gültig bleiben das Design-System (§4, verbindlich)
+> und die Regeln für ausführende Sessions (§11). Bestandsaufnahme (§2) und
+> v2-Backlog (§12) sind überholt: real sind Migrationen bis 0066.
+
 # REBUILD-PLAN — Uriel → Cockpit
 
 **Stand:** 2026-07-06 · erarbeitet mit Claude (Session „KPI-Tracking → Agentic OS")

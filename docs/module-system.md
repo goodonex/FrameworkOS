@@ -1,3 +1,7 @@
+> ⚠️ **HISTORISCH (Mai/Juni 2026).** Beschreibt die schwebenden Glas-Module über
+> der 3D-Welt — beides seit Phase 6 (07.07.2026) abgerissen, Glas ist im Cockpit
+> verboten (REBUILD-PLAN §4). Aktueller Stand: [`BACKLOG.md`](BACKLOG.md).
+
 # Module System — Floating Glass Windows
 
 Anker-Dokument für den Umbau der Modus-Darstellung: von monolithischer Section-Maske zu autonomen, fest positionierten Glas-Modulen über der weiterhin sichtbaren und klickbaren 3D-Welt.

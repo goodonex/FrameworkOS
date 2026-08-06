@@ -1,3 +1,7 @@
+> **Offene Punkte stehen nicht mehr hier, sondern in [`BACKLOG.md`](BACKLOG.md).**
+> Gültig bleibt das Leitprinzip Klick-Ökonomie; die vier Etappen sind abgearbeitet
+> und in Abschnitt 2 des Backlogs mit Beleg abgehakt.
+
 # Uriel — Ideen-Sammlung: nutzbarer · nützlicher · schöner · aufgeräumter
 
 Stand 30.07.2026, Branch `cockpit-rebuild`. Entstanden aus zehn parallelen

@@ -1,3 +1,8 @@
+> ⚠️ **HISTORISCH (Mai 2026, „Brand OS").** Beschreibt die dreischichtige
+> Three.js-Welt, die im Rebuild Phase 6 (07.07.2026) abgerissen wurde und nicht
+> zurückkommt. Nichts hier ist ein offener Punkt.
+> Aktueller Stand: [`BACKLOG.md`](BACKLOG.md) · [`../HANDOFF.md`](../HANDOFF.md).
+
 # Brand OS — World Rebuild Roadmap
 
 Anker-Dokument für den visuellen Rebuild der App zur dreischichtigen Welt mit Kamera-Navigation. Wird bei jeder weiteren Iteration als Referenz gelesen, bevor neue Welt-Features dazukommen.

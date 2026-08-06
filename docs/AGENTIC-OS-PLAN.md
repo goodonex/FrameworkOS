@@ -1,3 +1,7 @@
+> **Die Abnahmeliste unten ist vollständig erfüllt** — alle sechs Punkte sind
+> gebaut, nur nie abgehakt (Beleg je Punkt in [`BACKLOG.md`](BACKLOG.md), §2).
+> Gültig bleiben die OsNebula-Regeln und „bewusst NICHT übernommen".
+
 # Agentic OS v2 — Plan (aus 3 Video-Analysen, 2026-07-07)
 
 Quellen:

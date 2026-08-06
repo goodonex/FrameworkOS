@@ -1,3 +1,8 @@
+> ⚠️ **HISTORISCH (Mai 2026, „Brand OS").** Die Phasen 1–7 beschreiben die
+> Vor-Rebuild-App mit sechs Denk-Modi; Foundation, Discovery und Intelligence sind
+> seit Phase 6 (07.07.2026) gelöscht. Nichts hier ist ein offener Punkt.
+> Aktueller Stand: [`BACKLOG.md`](BACKLOG.md) · [`rebuild-notes.md`](rebuild-notes.md).
+
 # Brand OS — Bauphasen
 
 ## Phase 1 — Fundament & 3D Shell ✓ DONE

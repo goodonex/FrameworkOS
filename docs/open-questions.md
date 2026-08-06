@@ -1,3 +1,8 @@
+> ⚠️ **HISTORISCH (Mai/Juni 2026, „Brand OS“).** Die Fragen betreffen die
+> Three.js-Welt und die Denk-Modi, die im Rebuild Phase 6 gelöscht wurden.
+> Was davon heute noch offen ist (Role Guards, RLS-Policy-Review), steht in
+> [`BACKLOG.md`](BACKLOG.md); alles andere ist gegenstandslos.
+
 # Brand OS — Offene Produkt-/Tech-Fragen
 
 ## 3D-Hintergrund / Canvas

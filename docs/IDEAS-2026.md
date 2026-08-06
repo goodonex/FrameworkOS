@@ -1,3 +1,7 @@
+> **Offene Punkte stehen nicht mehr hier, sondern in [`BACKLOG.md`](BACKLOG.md).**
+> Gültig bleiben das Postmortem (§2) und die Referenzprojekte am Ende; die
+> Ideenliste §3 ist im Backlog dedupliziert und gegen den Code geprüft aufgelöst.
+
 # Uriel — Ideen-Sammlung & Roadmap-Kandidaten (Stand 19.07.2026)
 
 Anlass: Kevins Auftrag „einmal komplett schauen, was noch alles rein könnte" — als **letzte große Ideen-Sammlung dieses Jahr** in diese Richtung. Basis: vollständige Code-Analyse (Cockpit + Datenmodell + Runner), Vergleich mit ~25 Open-Source-Projekten (OpenClaw, Twenty, Khoj, n8n u. a.) und Trend-Recherche 2026/27 mit Primärquellen.
