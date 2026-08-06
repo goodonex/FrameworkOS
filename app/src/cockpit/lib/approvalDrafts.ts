@@ -74,13 +74,29 @@ export function parseDrafts(content: string): FollowupDraft[] {
   }
 }
 
-/** Wartende Kontakte für Follow-ups: Stage follow_up ODER fälliger next_follow_up_at. */
+/**
+ * Stufen, die überhaupt ein Kunden-/Deal-Follow-up auslösen dürfen (O2, 06.08.2026).
+ * `first_contact` fehlt bewusst: ein noch nicht angesprochener Kontakt gehört in den
+ * LinkedIn-Funnel (`linkedin_threads`), nicht in die Freigaben-Queue — sonst schickt
+ * diese Queue echte E-Mails an kalte Recherche-Leads. `paused` ist ohnehin still.
+ */
+const FOLLOWUP_STAGES: ReadonlySet<Contact['pipeline_stage']> = new Set([
+  'conversation',
+  'follow_up',
+  'proposal',
+  'deal',
+])
+
+/**
+ * Wartende Kontakte für Follow-ups: Stage follow_up ODER fälliger next_follow_up_at —
+ * beides nur innerhalb der Kunden-/Deal-Welt (siehe FOLLOWUP_STAGES).
+ */
 export function dueFollowupContacts(contacts: Contact[], max = 10): Contact[] {
   const now = new Date().toISOString()
   return contacts
     .filter(
       (c) =>
-        c.pipeline_stage !== 'paused' &&
+        FOLLOWUP_STAGES.has(c.pipeline_stage) &&
         (c.pipeline_stage === 'follow_up' ||
           (c.next_follow_up_at != null && c.next_follow_up_at <= now)),
     )

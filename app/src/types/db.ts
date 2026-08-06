@@ -332,6 +332,14 @@ export interface Contact {
   lead_value: number | null
   pipeline_stage: PipelineStage
   last_contact_at: string | null
+  /**
+   * O2 (06.08.2026) — Zuständigkeitsgrenze, festgeschrieben:
+   * `contacts.next_follow_up_at` trägt **Kunden- und Deal-Follow-ups**.
+   * Der LinkedIn-Funnel (wer im Postfach als Nächstes dran ist) läuft
+   * ausschließlich über `linkedin_threads` (`followup_stage`/`last_message_at`).
+   * Wer noch in `first_contact` steht, gehört dorthin und nicht hierher —
+   * `dueFollowupContacts` (cockpit/lib/approvalDrafts.ts) setzt das durch.
+   */
   next_follow_up_at: string | null
   notes: string
   call_notes: string
@@ -386,7 +394,17 @@ export interface LinkedinNachricht {
   ts: string | null
 }
 
-/** Siehe supabase/migrations/0058_linkedin_threads.sql + 0061_loom_status.sql. */
+/**
+ * Siehe supabase/migrations/0058_linkedin_threads.sql + 0061_loom_status.sql.
+ *
+ * O2 (06.08.2026) — Zuständigkeitsgrenze, festgeschrieben:
+ * `linkedin_threads` ist die **einzige** Wahrheit für den LinkedIn-Funnel —
+ * wer im Postfach als Nächstes dran ist, entscheidet `followup_stage` gegen
+ * `last_message_at`, nicht `contacts.next_follow_up_at`. Kunden- und
+ * Deal-Follow-ups liegen umgekehrt allein an `contacts`.
+ * Die beiden Mengen sind heute fast disjunkt (2 von 44 Kontakten haben einen
+ * Thread) — `contact_id` ist die Brücke, wenn ein Lead zum Deal wird.
+ */
 export interface LinkedinThread {
   id: string
   brand_id: string

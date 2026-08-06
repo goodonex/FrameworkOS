@@ -297,14 +297,37 @@ resurrect/enrich/Tombstones raus.
 *Herkunft: REBUILD-PLAN §12.5 (07.07.) · IDEAS-2026 §2.6 + §3.5 · IDEEN Abriss-Liste ·
 Session-Inventur. Vier Dokumente, ein Punkt, offen seit dem 07.07.*
 
-### O2 · Follow-up-Doppelwelt festschreiben — **S** · Entscheidung, kaum Code
-`linkedin_threads` (LinkedIn-Funnel) und `contacts.next_follow_up_at` (Kunden/Deals)
-beantworten dieselbe Frage unterschiedlich. Solange das nicht festgeschrieben ist,
-sagt keine Liste verbindlich die Wahrheit.
-**Vorschlag (aus den Docs, bestätigen oder korrigieren):** Threads = LinkedIn-Funnel,
-Contacts = Kunden- und Deal-Follow-ups. Danach je einen Kommentar an beide Quellen.
-**Abhängigkeit:** sollte vor O1 stehen — die Entscheidung bestimmt, was beim
-Aufräumen von `useContacts` überhaupt bleiben muss.
+### O2 · ~~Follow-up-Doppelwelt festschreiben~~ ✅ **entschieden und gebaut 06.08.2026**
+**Die Grenze, ab jetzt verbindlich:** `linkedin_threads` ist die einzige Wahrheit für
+den **LinkedIn-Funnel** (`followup_stage` gegen `last_message_at`).
+`contacts.next_follow_up_at` trägt **Kunden- und Deal-Follow-ups**. Kevin hat den
+Vorschlag am 06.08. bestätigt und die härtere Variante gewählt: nicht nur
+dokumentieren, sondern im Code durchsetzen.
+
+**Was der Befund vorher korrigiert hat:** Es ist **keine Dublettenwelt**. Namentlich
+überschneiden sich die 44 `contacts` und die 160 `linkedin_threads` in **2 Zeilen**.
+Die Zusammensetzung der 44 (Stand 06.08., alle Zeilen zuletzt am 10.06. angefasst):
+36 × `first_contact` / 40 × `not_contacted` — eine Hamburger Makler-Recherche-Liste,
+nie kontaktiert, `lead_source` bei 43 leer; daneben 3 × `deal`, 1 × `proposal`,
+4 × `conversation` und ein Testeintrag. Die 36 Recherche-Leads existieren **nur** in
+`contacts` — in der neuen Lesart sind sie heimatlos.
+
+**Was gebaut wurde**
+| Baustein | Beleg |
+|---|---|
+| `FOLLOWUP_STAGES` = conversation · follow_up · proposal · deal; `first_contact` fehlt bewusst | `cockpit/lib/approvalDrafts.ts` |
+| Kommentar an Quelle 1 (Kunden/Deals) | `types/db.ts` → `Contact.next_follow_up_at` |
+| Kommentar an Quelle 2 (Funnel) | `types/db.ts` → `interface LinkedinThread` |
+| Drift-Wache, 5 Fälle | `scripts/verify-entwuerfe.ts` Abschnitt 8 |
+
+**Wirkung auf die Freigaben-Queue:** `dueFollowupContacts` traf vorher 5 Kontakte
+(alle überfällig, 25.05.–01.07.), jetzt 4. Draußen ist „Franz & Köhler Immobilien" —
+der einzige `first_contact` mit E-Mail-Adresse und damit der einzige, an den die
+Queue tatsächlich eine kalte Mail hätte schicken können.
+
+**Bewusst nicht gemacht:** Die 36 Recherche-Leads bleiben unverändert in `contacts`
+liegen (Kevins Entscheidung 06.08.). Sie stören die Pipeline-Optik, nicht die Queue.
+Aufräumen wäre ein eigener Schritt mit Blick auf die Namen — kein Nebenbei-Löschen.
 *Herkunft: IDEEN „Das große Bild #2" + Abriss-Liste · Session-Inventur*
 
 ### O3 · Morgen-Push aufs Handy (Etappe A des Wargames) — **L**

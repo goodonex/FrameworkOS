@@ -10,10 +10,10 @@
  */
 // @ts-expect-error — .mjs ohne Typen; genau die Datei, die der Runner lädt.
 import { parseDraftsRoh } from '../runner/linkedin/entwuerfe.mjs'
-import { parseDrafts } from '../app/src/cockpit/lib/approvalDrafts'
+import { dueFollowupContacts, parseDrafts } from '../app/src/cockpit/lib/approvalDrafts'
 import { antwortPosten, followupPosten } from '../app/src/cockpit/lib/arbeitsmodusQuellen'
 import { entwurfStand } from '../app/src/cockpit/components/Arbeitsliste'
-import type { LinkedinThread } from '../app/src/types/db'
+import type { Contact, LinkedinThread } from '../app/src/types/db'
 
 const NOW = new Date('2026-08-03T09:00:00Z')
 const tageHer = (n: number) => new Date(NOW.getTime() - n * 24 * 60 * 60 * 1000).toISOString()
@@ -191,6 +191,60 @@ ${JSON.stringify({ drafts }, null, 2)}
   check('7e vor 3 Tagen', entwurfStand(tageHer(3), NOW), 'vor 3 Tagen')
   check('7f ohne Zeitstempel', entwurfStand(null, NOW), 'vorbereitet')
   check('7g kaputter Zeitstempel', entwurfStand('quatsch', NOW), 'vorbereitet')
+}
+
+// 8. O2-Grenze: Die Freigaben-Queue zieht nur Kunden/Deals, nie den LinkedIn-Funnel.
+//    Drift-Wache für die Entscheidung vom 06.08.2026 — fällt sie, verschickt die
+//    Queue wieder echte E-Mails an kalte first_contact-Leads.
+{
+  const kontakt = (over: Partial<Contact>): Contact =>
+    ({
+      id: `c-${over.name ?? 'x'}`,
+      brand_id: 'b1',
+      name: 'Kontakt',
+      email: 'a@b.de',
+      pipeline_stage: 'first_contact',
+      next_follow_up_at: null,
+      ...over,
+    }) as Contact
+
+  // `dueFollowupContacts` liest die echte Uhr — die Grenzen liegen deshalb
+  // bewusst weit weg vom Testdatum NOW, sonst kippt der Test mit dem Kalender.
+  const faellig = '2020-01-01T00:00:00.000Z'
+  const spaeter = '2099-01-01T00:00:00.000Z'
+  const namen = (cs: Contact[]) => dueFollowupContacts(cs).map((c) => c.name)
+
+  check(
+    '8 first_contact mit fälligem Datum bleibt draußen',
+    namen([kontakt({ name: 'Kalt', pipeline_stage: 'first_contact', next_follow_up_at: faellig })]),
+    [],
+  )
+  check(
+    '8b conversation/proposal/deal kommen durch',
+    namen([
+      kontakt({ name: 'Gespräch', pipeline_stage: 'conversation', next_follow_up_at: faellig }),
+      kontakt({ name: 'Angebot', pipeline_stage: 'proposal', next_follow_up_at: faellig }),
+      kontakt({ name: 'Kunde', pipeline_stage: 'deal', next_follow_up_at: faellig }),
+    ]),
+    ['Gespräch', 'Angebot', 'Kunde'],
+  )
+  check(
+    '8c Stage follow_up zählt auch ohne Datum',
+    namen([kontakt({ name: 'FU', pipeline_stage: 'follow_up' })]),
+    ['FU'],
+  )
+  check(
+    '8d paused bleibt still',
+    namen([kontakt({ name: 'Pause', pipeline_stage: 'paused', next_follow_up_at: faellig })]),
+    [],
+  )
+  check(
+    '8e Zukunfts-Datum ist nicht fällig',
+    namen([
+      kontakt({ name: 'Später', pipeline_stage: 'conversation', next_follow_up_at: spaeter }),
+    ]),
+    [],
+  )
 }
 
 console.log(`${pass} bestanden, ${fail} fehlgeschlagen`)
