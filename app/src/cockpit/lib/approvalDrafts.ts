@@ -75,6 +75,24 @@ export function parseDrafts(content: string): FollowupDraft[] {
 }
 
 /**
+ * Wer hinter einem Entwurf steht — quer über Runs hinweg (O5, 06.08.2026).
+ *
+ * Die Freigaben-Queue liest nicht mehr nur den jüngsten Run, damit ein
+ * unbearbeiteter Entwurf den nächsten Lauf überlebt. Dabei darf derselbe Lead
+ * nicht doppelt auf dem Tisch liegen: Der Agent baut ihn in jedem Lauf neu,
+ * solange das Follow-up offen ist. `thread_key` ist die stärkste Kennung,
+ * `contact_id` die zweite; der Name ist die letzte Rückfallebene für
+ * LinkedIn-Threads ohne CRM-Kontakt.
+ *
+ * Bewusst NICHT die Nachricht selbst: der Agent formuliert bei jedem Lauf neu,
+ * sonst stünde derselbe Mensch zweimal in der Liste.
+ */
+export function draftIdentitaet(d: FollowupDraft): string {
+  const kern = d.thread_key || d.contact_id || (d.name ?? '').trim().toLowerCase()
+  return `${d.channel}::${kern}`
+}
+
+/**
  * Stufen, die überhaupt ein Kunden-/Deal-Follow-up auslösen dürfen (O2, 06.08.2026).
  * `first_contact` fehlt bewusst: ein noch nicht angesprochener Kontakt gehört in den
  * LinkedIn-Funnel (`linkedin_threads`), nicht in die Freigaben-Queue — sonst schickt

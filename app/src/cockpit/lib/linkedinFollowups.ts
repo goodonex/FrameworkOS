@@ -128,7 +128,20 @@ export function markDonePatch(thread: LinkedinThread, now: Date = new Date()): M
 
   if (thread.followup_stage >= 3) return { ...entwurfWeg, status: 'archived' }
 
-  return { ...entwurfWeg, followup_stage: thread.followup_stage + 1 }
+  // O4 (06.08.2026): Der Zeitstempel muss mit. `isDue` rechnet die Frist der
+  // nächsten Stufe ab `last_message_at` — blieb der auf der alten Nachricht
+  // stehen, war die nächste Stufe oft sofort wieder fällig (Stufe 0→1: die
+  // Nachricht war 3+ Tage alt, Schwelle für Stufe 1 sind 7 Tage, die alten
+  // Tage zählten also mit). Der Sync zieht die echte Nachricht später nach;
+  // bis dahin ist „ab jetzt" die ehrlichere Annahme als „ab damals".
+  // `last_from` wird ausdrücklich gesetzt, weil dieser Zweig auch 'unknown'
+  // erwischt (Bucket „prüfen") — Kevin hat gerade geschrieben.
+  return {
+    ...entwurfWeg,
+    followup_stage: thread.followup_stage + 1,
+    last_from: 'me',
+    last_message_at: now.toISOString(),
+  }
 }
 
 export interface FollowupCoverage {

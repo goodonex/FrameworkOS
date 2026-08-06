@@ -372,19 +372,55 @@ erneut). Danach L1 (live), dann Kevins iPhone-Schritte.
 - Abbruchbedingung 2 („`db push` meldet Historie-Desync") ist **bereits eingetreten**.
 *Herkunft: morgen-workflow.md · IDEAS-2026 A2 (Telegram — verworfene Alternative, siehe §5)*
 
-### O4 · `last_message_at` wandert beim „Erledigt" nicht — **S**
-Ein Haken auf ein fälliges Follow-up erhöht `followup_stage`, verschiebt aber den
-Zeitstempel nicht (`useLinkedinThreads.ts:94` → `markDonePatch`). Die nächste Stufe
-feuert dadurch zu früh, bis der Sync die echte Nachricht nachzieht.
-**Abhängigkeit:** keine. Testskript `scripts/verify-linkedin-followups.ts` erweitern.
+### O4 · ~~`last_message_at` wandert beim „Erledigt" nicht~~ ✅ **erledigt 06.08.2026**
+`markDonePatch` (`cockpit/lib/linkedinFollowups.ts`) setzt im Stufen-Zweig jetzt
+`last_message_at` auf jetzt und `last_from` auf `me`.
+
+**Warum das ein echter Fehler war, kein Schönheitsfehler:** `isDue` rechnet die
+Frist der nächsten Stufe ab `last_message_at`. Blieb der auf der alten Nachricht
+stehen, zählten die bereits verstrichenen Tage doppelt — ein Thread mit 5 Tage
+alter Nachricht ging auf Stufe 1 (Schwelle 7 Tage) und war nach 2 weiteren Tagen
+wieder fällig statt nach 7. Der Antwort-Zweig machte es längst richtig (`:121`),
+nur der Stufen-Zweig nicht.
+
+`last_from` wird mitgesetzt, weil dieser Zweig auch `unknown` erwischt (Bucket
+„prüfen") — nach dem Haken hat Kevin geschrieben, das ist keine offene Frage mehr.
+
+**Neu geprüft:** `scripts/verify-linkedin-followups.ts` Abschnitt 14 —
+62 Fälle grün, darunter „nach 3 Tagen noch nicht fällig, nach 8 wieder".
 *Herkunft: Session-Inventur*
 
-### O5 · Entwürfe überleben den nächsten Run nicht — **S**
-`approvalDrafts.ts` bindet Entwürfe an einen lokalen Run; `approvalStatus.ts:9-14`
-hält das selbst fest und verweist auf den Runs-Spiegel als Nachfolgeschritt.
-**Der Runs-Spiegel ist inzwischen da** (Snapshot `runs`, 06.08.) — die Voraussetzung
-für die Persistenz ist damit erfüllt.
-**Abhängigkeit:** keine mehr.
+### O5 · ~~Entwürfe überleben den nächsten Run nicht~~ ✅ **erledigt 06.08.2026**
+`FreigabenArea` liest nicht mehr nur den jüngsten Lauf, sondern die **letzten
+fünf** Entwurfs-Runs über den Runs-Spiegel (der hält Liste *und* Inhalt der
+letzten 20 Läufe vor — `runner/index.mjs` → `pushRunsSnapshot`, gelesen über
+`runnerApi.fetchRun`, das auf der HTTPS-Domain ohnehin den Spiegel nimmt).
+
+**Was das löst:** Ein Entwurf, den Kevin nicht bearbeitet hat, verschwand, sobald
+der Agent erneut lief — er stand danach nirgends mehr, obwohl das Follow-up offen
+war. Jetzt bleibt er stehen, bis er abgehakt ist.
+
+**Die Falle dabei — Dubletten.** Der Agent baut den Entwurf für denselben Lead in
+jedem Lauf neu. Ohne Zusammenführung stünde derselbe Mensch fünfmal in der Liste.
+`draftIdentitaet` (`approvalDrafts.ts`) fasst zusammen über `thread_key` →
+`contact_id` → Name, **nicht** über den Nachrichtentext: der ändert sich bei jedem
+Lauf. Gelesen wird von neu nach alt, der jüngere Text gewinnt.
+
+| Detail | Regel |
+|---|---|
+| Abgeschlossene Karten älterer Läufe | fallen weg; nur der jüngste Lauf zeigt auch Erledigtes als Beleg |
+| Status-Persistenz | an den Run **der Karte** (`card.runId`), nicht an den jüngsten |
+| `sales_email_logs`-Abgleich | Fenster beginnt beim ältesten geladenen Run statt beim jüngsten |
+| `KEEP_RUNS` in `approvalStatus.ts` | 5 → 10, damit ein „erledigt" auf einem älteren Lauf keinen jüngeren aus dem Speicher drängt |
+
+**Bewusst nicht gemacht:** der Status wandert **nicht** in den Spiegel. Den
+schreibt der Runner und überschreibt ihn bei jedem Lauf — ein „erledigt" aus dem
+Browser wäre beim nächsten Push weg. Eine eigene Tabelle wäre richtig, kostet aber
+eine Migration und kollidiert mit der für O3 vorgesehenen 0067. Das gehört in
+dieselbe Runde wie der Morgen-Push, nicht davor.
+
+**Neu geprüft:** `scripts/verify-entwuerfe.ts` Abschnitt 9 (8 Fälle, u. a. „Cem
+überlebt den nächsten Run" und „Anna steht genau einmal da").
 *Herkunft: IDEEN „Konsistenz-Funde" · Session-Inventur*
 
 ### O6 · ~~`linkedin_sync` umgeht den Doppellauf-Guard~~ ✅ **geschlossen 06.08.2026**

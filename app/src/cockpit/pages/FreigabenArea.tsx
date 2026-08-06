@@ -10,6 +10,7 @@ import { useActiveBrand } from '../lib/activeBrand'
 import { useAuth } from '../../hooks/useAuth'
 import {
   buildFollowupInput,
+  draftIdentitaet,
   parseDrafts,
   type DraftChannel,
   type FollowupDraft,
@@ -35,6 +36,11 @@ interface Card extends FollowupDraft {
   key: number
   /** Stabile Identität über Reloads hinweg (approvalStatus.draftKey). */
   id: string
+  /**
+   * Run, aus dem dieser Entwurf stammt. O5: Die Queue liest mehrere Runs, der
+   * Status gehört an den Run, in dem der Entwurf steht — nicht an den jüngsten.
+   */
+  runId: string
   subject: string
   status: CardStatus
   error: string | null
@@ -81,7 +87,8 @@ export function FreigabenArea() {
     'Team'
 
   const [cards, setCards] = useState<Card[]>([])
-  const [loadedRunId, setLoadedRunId] = useState<string | null>(null)
+  /** Welche Run-Kombination gerade in `cards` steckt (Ids, verkettet). */
+  const [loadedKey, setLoadedKey] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
 
@@ -91,44 +98,72 @@ export function FreigabenArea() {
     return m
   }, [contacts.items])
 
-  const latestRun = useMemo(() => {
+  /**
+   * O5 (06.08.2026): nicht mehr nur der jüngste Run. Die Entwürfe leben im
+   * Run-Markdown; sobald der Agent erneut lief, war ein unbearbeiteter Entwurf
+   * aus dem Lauf davor weg — er stand nirgends mehr, obwohl das Follow-up offen
+   * war. Der Runs-Spiegel hält die letzten 20 Läufe samt Inhalt vor (runner
+   * `pushRunsSnapshot`, `runnerApi.fetchRun` liest ihn auf der HTTPS-Domain).
+   * Genau so viele Läufe wie `approvalStatus` Status vorhält (KEEP_RUNS = 5) —
+   * mehr wäre wertlos, weil dann kein „erledigt" mehr dazu existiert.
+   */
+  const RUNS_FUER_ENTWUERFE = 5
+  const draftRuns = useMemo(() => {
     return runs
       .filter((r) => DRAFT_AGENTS.has(r.agent) && r.status === 'done')
-      .sort((a, b) => String(b.started).localeCompare(String(a.started)))[0]
+      .sort((a, b) => String(b.started).localeCompare(String(a.started)))
+      .slice(0, RUNS_FUER_ENTWUERFE)
   }, [runs])
+
+  const latestRun = draftRuns[0]
+  const runKey = draftRuns.map((r) => r.id).join('|')
 
   const runningFollowup = runs.some((r) => DRAFT_AGENTS.has(r.agent) && r.status === 'running')
 
   useEffect(() => {
-    if (!latestRun || latestRun.id === loadedRunId) return
+    if (draftRuns.length === 0 || runKey === loadedKey) return
     let cancelled = false
     setLoading(true)
-    fetchRun(latestRun.id)
-      .then((detail) => {
+    // Ein unlesbarer Run darf die anderen nicht mitreißen (der Spiegel hält nur
+    // die letzten 20 — ältere Läufe fehlen dort schlicht).
+    Promise.all(draftRuns.map((r) => fetchRun(r.id).catch(() => null)))
+      .then((details) => {
         if (cancelled) return
-        const drafts = parseDrafts(detail.content)
-        // Abgeschlossene Karten aus dem letzten Besuch zurückholen — sonst stünde
-        // nach einem Reload alles wieder auf „pending" (Doppelversand-Risiko).
-        const gespeichert = loadRunStatuses(latestRun.id)
-        setCards(
-          drafts.map((d, i) => {
+        const gesehen = new Set<string>()
+        const naechste: Card[] = []
+        let key = 0
+        // Neueste zuerst: Steht derselbe Lead in zwei Läufen, gewinnt der
+        // jüngere Text — der ältere ist überholt, nicht zusätzlich.
+        for (const detail of details) {
+          if (!detail) continue
+          const gespeichert = loadRunStatuses(detail.id)
+          parseDrafts(detail.content).forEach((d, i) => {
+            const ident = draftIdentitaet(d)
+            if (gesehen.has(ident)) return
+            gesehen.add(ident)
             const id = draftKey(d, i)
-            return {
+            const status = (gespeichert[id] ?? 'pending') as CardStatus
+            // Abgeschlossenes aus älteren Läufen bleibt weg. Nur der jüngste Lauf
+            // zeigt auch erledigte Karten — als Beleg dessen, was heute rausging.
+            if (status !== 'pending' && detail.id !== latestRun?.id) return
+            naechste.push({
               ...d,
-              key: i,
+              key: key++,
               id,
+              runId: detail.id,
               subject: d.subject ?? '',
-              status: (gespeichert[id] ?? 'pending') as CardStatus,
+              status,
               error: null,
               confirming: false,
               alreadySent: null,
-            }
-          }),
-        )
-        setLoadedRunId(latestRun.id)
+            })
+          })
+        }
+        setCards(naechste)
+        setLoadedKey(runKey)
       })
       .catch(() => {
-        /* Runner offline / Run nicht lesbar → Karten bleiben leer */
+        /* Runner offline und kein Spiegel → Karten bleiben leer */
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -136,21 +171,25 @@ export function FreigabenArea() {
     return () => {
       cancelled = true
     }
-  }, [latestRun, loadedRunId])
+  }, [draftRuns, runKey, loadedKey, latestRun?.id])
 
   // Zweite Sicherung gegen Doppelversand, geräteunabhängig: was seit dem Run
   // tatsächlich rausging, steht in sales_email_logs (von der send-email-Function
   // geschrieben). Markiert die Karte nur mit einem Hinweis — nicht stillschweigend
   // als erledigt, sonst verschwände ein noch offener Entwurf ungesehen.
   useEffect(() => {
-    if (!supabase || !brandId || !loadedRunId || !latestRun) return
+    if (!supabase || !brandId || !loadedKey || draftRuns.length === 0) return
+    // O5: Die Karten stammen jetzt aus mehreren Läufen — das Fenster beginnt beim
+    // ÄLTESTEN geladenen Run, sonst bliebe ein Versand aus der Zwischenzeit
+    // unbemerkt und die alte Karte sähe weiter offen aus.
+    const ab = draftRuns[draftRuns.length - 1].started
     let cancelled = false
     void supabase
       .from('sales_email_logs')
       .select('contact_id, sent_at')
       .eq('brand_id', brandId)
       .eq('direction', 'outbound')
-      .gte('sent_at', latestRun.started)
+      .gte('sent_at', ab)
       .then(({ data, error }) => {
         if (cancelled || error || !data) return
         const letzte = new Map<string, string>()
@@ -170,17 +209,21 @@ export function FreigabenArea() {
     return () => {
       cancelled = true
     }
-  }, [brandId, loadedRunId, latestRun])
+  }, [brandId, loadedKey, draftRuns])
 
   const patch = (key: number, next: Partial<Card>) =>
     setCards((cs) => cs.map((c) => (c.key === key ? { ...c, ...next } : c)))
 
-  /** Status setzen UND festschreiben — der eigentliche Persistenz-Pfad. */
+  /**
+   * Status setzen UND festschreiben — der eigentliche Persistenz-Pfad.
+   * O5: an den Run der Karte, nicht an den jüngsten. Sonst landete ein
+   * „erledigt" auf einem Entwurf aus dem Lauf davor am falschen Schlüssel und
+   * die Karte käme beim nächsten Laden wieder hoch.
+   */
   const setStatus = (card: Card, status: CardStatus, next: Partial<Card> = {}) => {
     patch(card.key, { status, ...next })
-    if (!loadedRunId) return
-    if (isPersisted(status)) saveDraftStatus(loadedRunId, card.id, status)
-    else clearDraftStatus(loadedRunId, card.id)
+    if (isPersisted(status)) saveDraftStatus(card.runId, card.id, status)
+    else clearDraftStatus(card.runId, card.id)
   }
 
   const generate = async () => {

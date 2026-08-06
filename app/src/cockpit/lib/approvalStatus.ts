@@ -7,19 +7,31 @@ import type { FollowupDraft } from './approvalDrafts'
  * setzte jede Karte auf „pending" zurück — mit dem Risiko, dieselbe Follow-up-Mail
  * ein zweites Mal an einen Lead zu schicken.
  *
- * Bewusst localStorage statt Tabelle: die Entwürfe selbst sind bereits an einen
- * lokalen Runner-Run gebunden (approvalDrafts.ts, „v1 migrationsfrei"). Sobald
- * Runs in Supabase gespiegelt sind (docs/IDEEN-2026-07-30-nutzbarkeit.md, Top-7
- * Punkt 1), gehört der Status mit in den Spiegel. Gegen den geräteübergreifenden
- * Fall sichert bis dahin der sales_email_logs-Abgleich in FreigabenArea.
+ * **Stand nach O5 (06.08.2026).** Die Entwürfe hängen nicht mehr an einem
+ * einzelnen lokalen Run: `FreigabenArea` liest die letzten fünf Läufe über den
+ * Runs-Spiegel, damit ein unbearbeiteter Entwurf den nächsten Lauf überlebt.
+ * Der Status bleibt trotzdem hier und wandert NICHT in den Spiegel — der wird
+ * vom Runner geschrieben und bei jedem Lauf überschrieben; ein „erledigt" aus
+ * dem Browser wäre beim nächsten Push weg. Eine eigene Tabelle wäre die saubere
+ * Lösung, kostet aber eine Migration und kollidiert mit der für O3 geplanten
+ * 0067 — das gehört in dieselbe Runde wie der Morgen-Push, nicht davor.
+ * Gegen den geräteübergreifenden Fall sichert der sales_email_logs-Abgleich in
+ * FreigabenArea.
  */
 
 /** Status, die eine Karte endgültig abschließen — nur die werden gespeichert. */
 export type PersistedStatus = 'sent' | 'copied' | 'done' | 'rejected'
 
 const STORAGE_KEY = 'cockpit.freigaben.status.v1'
-/** Ältere Runs sind erledigt; ein paar bleiben für den Blick zurück. */
-const KEEP_RUNS = 5
+/**
+ * Ältere Runs sind erledigt; ein paar bleiben für den Blick zurück.
+ *
+ * O5: bewusst doppelt so viele, wie die Queue an Läufen liest (5). Aussortiert
+ * wird nach Reihenfolge des ersten Schreibens, nicht nach Alter des Runs — mit
+ * gleichem Wert könnte ein „erledigt" auf einem älteren, noch angezeigten Lauf
+ * einen jüngeren aus dem Speicher drängen, und die Karte käme wieder hoch.
+ */
+const KEEP_RUNS = 10
 
 type Store = Record<string, Record<string, PersistedStatus>>
 

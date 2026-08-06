@@ -260,6 +260,8 @@ check('11b knapp über Schwelle', isDue(makeThread({ followup_stage: 0, last_mes
     entwurf: null,
     entwurf_at: null,
     followup_stage: 1,
+    last_from: 'me',
+    last_message_at: NOW.toISOString(),
   })
 
   // Altlast (30+ Tage, nie nachgefasst) wird wiederbelebt, nicht archiviert.
@@ -282,6 +284,35 @@ check('11b knapp über Schwelle', isDue(makeThread({ followup_stage: 0, last_mes
     const patch = markDonePatch({ ...t, entwurf: 'Moin …', entwurf_at: dayAgo(1) }, NOW)
     check(`13l ${label}: Entwurf wird geloescht`, patch?.entwurf, null)
     check(`13l ${label}: Entwurfs-Zeitstempel weg`, patch?.entwurf_at, null)
+  }
+
+  // 14 (O4, 06.08.2026): Der Zeitstempel wandert beim „Erledigt" mit. Ohne das
+  // rechnete isDue die naechste Frist ab der ALTEN Nachricht — die verstrichenen
+  // Tage zaehlten doppelt und die naechste Stufe feuerte zu frueh.
+  {
+    // Der dokumentierte Fall: 5 Tage alte Nachricht, Stufe 0 -> 1. Schwelle fuer
+    // Stufe 1 sind 7 Tage. Vorher waren die 5 Tage schon "verbraucht", nach 2
+    // weiteren Tagen war der Thread wieder faellig statt nach 7.
+    const danachFaellig = { ...faellig, ...markDonePatch(faellig, NOW) }
+    check('14a Zeitstempel steht auf jetzt', danachFaellig.last_message_at, NOW.toISOString())
+    check('14b nicht sofort wieder faellig', isDue(danachFaellig, NOW), false)
+    const nachDreiTagen = new Date(NOW.getTime() + 3 * 24 * 60 * 60 * 1000)
+    check('14c nach 3 Tagen noch nicht faellig (Schwelle 7)', isDue(danachFaellig, nachDreiTagen), false)
+    const nachAchtTagen = new Date(NOW.getTime() + 8 * 24 * 60 * 60 * 1000)
+    check('14d nach 8 Tagen wieder faellig', isDue(danachFaellig, nachAchtTagen), true)
+
+    // Bucket „pruefen": last_from war 'unknown'. Kevin hat gerade geschrieben,
+    // also gehoert der Thread danach in die normale Warteschlange.
+    const unklar = makeThread({ last_from: 'unknown', last_message_at: dayAgo(9), followup_stage: 0, status: 'active' })
+    check('14e Ausgangslage ist der Bucket pruefen', bucketOf(unklar, NOW), 'pruefen')
+    const danachUnklar = { ...unklar, ...markDonePatch(unklar, NOW) }
+    check('14f last_from steht danach auf me', danachUnklar.last_from, 'me')
+    check('14g Thread wartet danach', bucketOf(danachUnklar, NOW), 'wartet')
+
+    // Altlast: 40 Tage alt. Nach dem Erledigt darf sie nicht sofort wieder als
+    // Altlast oder faellig hochkommen.
+    const danachVerwaist = { ...verwaist, ...markDonePatch(verwaist, NOW) }
+    check('14h Altlast wartet danach', bucketOf(danachVerwaist, NOW), 'wartet')
   }
 }
 

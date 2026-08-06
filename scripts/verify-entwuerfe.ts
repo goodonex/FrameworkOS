@@ -10,7 +10,12 @@
  */
 // @ts-expect-error — .mjs ohne Typen; genau die Datei, die der Runner lädt.
 import { parseDraftsRoh } from '../runner/linkedin/entwuerfe.mjs'
-import { dueFollowupContacts, parseDrafts } from '../app/src/cockpit/lib/approvalDrafts'
+import {
+  draftIdentitaet,
+  dueFollowupContacts,
+  parseDrafts,
+  type FollowupDraft,
+} from '../app/src/cockpit/lib/approvalDrafts'
 import { antwortPosten, followupPosten } from '../app/src/cockpit/lib/arbeitsmodusQuellen'
 import { entwurfStand } from '../app/src/cockpit/components/Arbeitsliste'
 import type { Contact, LinkedinThread } from '../app/src/types/db'
@@ -245,6 +250,72 @@ ${JSON.stringify({ drafts }, null, 2)}
     ]),
     [],
   )
+}
+
+// 9. O5-Identität: Derselbe Lead darf über mehrere Runs hinweg nur einmal auf
+//    dem Tisch liegen — der Agent baut seinen Entwurf in jedem Lauf neu.
+{
+  const d = (over: Partial<FollowupDraft>): FollowupDraft => ({
+    contact_id: '',
+    channel: 'linkedin',
+    message: 'Moin',
+    ...over,
+  })
+
+  check(
+    '9 gleicher thread_key, neuer Text = eine Identität',
+    draftIdentitaet(d({ thread_key: 'k1', message: 'Fassung A' })) ===
+      draftIdentitaet(d({ thread_key: 'k1', message: 'Fassung B' })),
+    true,
+  )
+  check(
+    '9b thread_key schlägt contact_id',
+    draftIdentitaet(d({ thread_key: 'k1', contact_id: 'c-1' })),
+    draftIdentitaet(d({ thread_key: 'k1', contact_id: 'c-2' })),
+  )
+  check(
+    '9c ohne thread_key zählt contact_id',
+    draftIdentitaet(d({ contact_id: 'c-1' })) === draftIdentitaet(d({ contact_id: 'c-2' })),
+    false,
+  )
+  check(
+    '9d ohne beides der Name, Groß/Klein egal',
+    draftIdentitaet(d({ name: 'Anna Meier' })),
+    draftIdentitaet(d({ name: '  anna meier  ' })),
+  )
+  check(
+    '9e derselbe Mensch auf zwei Kanälen bleibt getrennt',
+    draftIdentitaet(d({ contact_id: 'c-1', channel: 'email' })) ===
+      draftIdentitaet(d({ contact_id: 'c-1', channel: 'linkedin' })),
+    false,
+  )
+
+  // Der Ablauf der Queue in klein: zwei Läufe, der jüngere zuerst.
+  const jung = parseDrafts(
+    runMd([
+      { thread_key: 'k1', name: 'Anna', channel: 'linkedin', message: 'Neu für Anna' },
+      { thread_key: 'k2', name: 'Bert', channel: 'linkedin', message: 'Neu für Bert' },
+    ]),
+  )
+  const alt = parseDrafts(
+    runMd([
+      { thread_key: 'k1', name: 'Anna', channel: 'linkedin', message: 'Alt für Anna' },
+      { thread_key: 'k9', name: 'Cem', channel: 'linkedin', message: 'Cem wurde nie bearbeitet' },
+    ]),
+  )
+  const gesehen = new Set<string>()
+  const offen: string[] = []
+  for (const lauf of [jung, alt]) {
+    for (const entwurf of lauf) {
+      const ident = draftIdentitaet(entwurf)
+      if (gesehen.has(ident)) continue
+      gesehen.add(ident)
+      offen.push(entwurf.message)
+    }
+  }
+  check('9f Cem überlebt den nächsten Run', offen.includes('Cem wurde nie bearbeitet'), true)
+  check('9g Anna steht genau einmal da', offen.filter((m) => m.includes('Anna')).length, 1)
+  check('9h und zwar mit dem jüngeren Text', offen.includes('Neu für Anna'), true)
 }
 
 console.log(`${pass} bestanden, ${fail} fehlgeschlagen`)
