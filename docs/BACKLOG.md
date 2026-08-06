@@ -387,12 +387,21 @@ für die Persistenz ist damit erfüllt.
 **Abhängigkeit:** keine mehr.
 *Herkunft: IDEEN „Konsistenz-Funde" · Session-Inventur*
 
-### O6 · `linkedin_sync` umgeht den Doppellauf-Guard — **S** · Account-Risiko
-`fuehreJobAus` (`runner/index.mjs:1108`) prüft nur bei `kind === 'agent_run'`, ob
-schon etwas läuft (`:1123`). Der HTTP-Pfad hat den Guard (`:1531`), der Job-Pfad
-nicht. Zwei parallele Voyager-Läufe auf Kevins Konto sind der teuerste denkbare
-Fehler dieses Systems.
-**Abhängigkeit:** keine. Drei Zeilen.
+### O6 · ~~`linkedin_sync` umgeht den Doppellauf-Guard~~ ✅ **geschlossen 06.08.2026**
+Der Job-Pfad in `fuehreJobAus` (`runner/index.mjs`) prüft jetzt dasselbe Flag
+`linkedinSyncRunning` wie der HTTP-Pfad, setzt es und gibt es im `finally` wieder
+frei. Ein Auftrag aus `runner_jobs` und ein Klick im Cockpit können nicht mehr
+gleichzeitig durch die Voyager-API laufen.
+
+`finally` ist dabei kein Stil, sondern Pflicht: bliebe das Flag nach einem
+Abbruch stehen, wäre der Sync bis zum Neustart des Runners tot — ein stiller
+Ausfall des wichtigsten Vertriebskanals wäre schlimmer als der Doppellauf.
+
+**Drift-Wache:** `scripts/verify-runner-guards.ts`, 8 Prüfungen (u. a. dass der
+Guard *vor* `syncThreads` steht und beide Pfade dasselbe Flag benutzen).
+Strukturell, nicht laufend — der Runner startet beim Import einen Server und
+pollt Supabase, ein echter Aufruf von `fuehreJobAus` ist von außen nicht ohne
+Seiteneffekte möglich.
 *Herkunft: IDEEN Abriss-Liste („Runner")*
 
 ### O7 · Vernetzungsanfragen als Posten in „Jetzt dran" — **S** (nur Desktop)

@@ -1106,15 +1106,27 @@ async function spiegleErstnachrichten() {
 /** Führt genau einen Auftrag aus. Rückgabe landet als `result` am Auftrag. */
 async function fuehreJobAus(job) {
   if (job.kind === 'linkedin_sync') {
-    const synced = await syncThreads({})
-    const result = await upsertThreads(synced.threads, {})
-    return {
-      ...result,
-      partial: synced.partial,
-      skippedAds: synced.skippedAds,
-      skippedGroups: synced.skippedGroups,
-      skippedNonInbox: synced.skippedNonInbox,
-      elapsedMs: synced.elapsedMs,
+    // O6 (06.08.2026): derselbe Guard wie am HTTP-Pfad (POST /linkedin/sync,
+    // `:1531`). Ohne ihn konnten ein Auftrag aus `runner_jobs` und ein Klick im
+    // Cockpit gleichzeitig durch die Voyager-API laufen — zwei parallele Läufe
+    // auf Kevins LinkedIn-Konto sind der teuerste denkbare Fehler dieses
+    // Systems. `finally` ist Pflicht: bliebe das Flag nach einem Abbruch stehen,
+    // wäre der Sync bis zum Neustart des Runners tot.
+    if (linkedinSyncRunning) throw new Error('LinkedIn-Sync läuft bereits')
+    linkedinSyncRunning = true
+    try {
+      const synced = await syncThreads({})
+      const result = await upsertThreads(synced.threads, {})
+      return {
+        ...result,
+        partial: synced.partial,
+        skippedAds: synced.skippedAds,
+        skippedGroups: synced.skippedGroups,
+        skippedNonInbox: synced.skippedNonInbox,
+        elapsedMs: synced.elapsedMs,
+      }
+    } finally {
+      linkedinSyncRunning = false
     }
   }
   if (job.kind === 'agent_run') {
