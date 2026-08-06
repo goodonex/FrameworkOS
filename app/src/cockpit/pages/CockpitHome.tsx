@@ -26,12 +26,13 @@ import { buildFollowupInput } from '../lib/approvalDrafts'
 import { useDailyMetrics } from '../lib/useDailyMetrics'
 import { useOsMap } from '../lib/useOsMap'
 import { useRunnerData } from '../lib/useRunnerData'
+import { MOBILE_MAX_WIDTH } from '../../hooks/useViewport'
 
 /** Graph-Höhe: nur auf schmalen (Mobile) Viewports deckeln — am Desktop frei ziehbar. */
 function useGraphHeight(desired: number): number {
   const [narrow, setNarrow] = useState(false)
   useEffect(() => {
-    const check = () => setNarrow(window.innerWidth < 900)
+    const check = () => setNarrow(window.innerWidth <= MOBILE_MAX_WIDTH)
     check()
     window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)

@@ -4,6 +4,22 @@
  */
 import { useEffect, useState } from 'react'
 
+/**
+ * Die eine Mobil-Grenze des Cockpits (O10, 06.08.2026).
+ *
+ * Vorher schaltete `useViewport` bei 768, `NavRail` und `cockpit.css` bei 900 —
+ * zwischen 768 und 900 lagen zwei halbe Welten: Bottom-Bar da, `isMobile` aber
+ * false. Wer diesen Wert ändert, muss `cockpit.css` mitziehen; die dortigen
+ * `@media (max-width: 900px)` sind die einzigen Stellen, die ihn nicht
+ * importieren können.
+ *
+ * Inklusiv wie in CSS: `max-width: 900px` schließt 900 ein, `isMobile` also auch.
+ */
+export const MOBILE_MAX_WIDTH = 900
+
+/** Passende Media-Query-Zeichenkette, damit niemand die Zahl abtippt. */
+export const MOBILE_MEDIA_QUERY = `(max-width: ${MOBILE_MAX_WIDTH}px)`
+
 export interface Viewport {
   width: number
   height: number
@@ -21,8 +37,8 @@ function read(): Viewport {
   return {
     width: w,
     height: h,
-    isMobile: w < 768,
-    isTablet: w >= 768 && w < 1100,
+    isMobile: w <= MOBILE_MAX_WIDTH,
+    isTablet: w > MOBILE_MAX_WIDTH && w < 1100,
     isDesktop: w >= 1100,
   }
 }

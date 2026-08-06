@@ -365,10 +365,10 @@ Icons sind da — installierbar ja, Push ist Neubau.
 **Abhängigkeiten:** **L2 zwingend zuerst** (sonst fährt `db push` acht Altmigrationen
 erneut). Danach L1 (live), dann Kevins iPhone-Schritte.
 **Zwei Korrekturen an der Blaupause:**
-- Der Recon-Befund „Mobil-Grenze 900px vereinheitlicht (Etappe 2)" stimmt nur für
-  die NavRail (`NavRail.tsx:36-39`). `hooks/useViewport.ts:24` steht weiter auf
-  `w < 768` und speist `App.tsx`, `SalesDashboard.tsx`, `ContactPage.tsx`. Zug 6
-  (Desktop-Redirect) und Zug 7 (`isMobile`-Weiche) hängen an **768** — siehe O10.
+- Der Recon-Befund „Mobil-Grenze 900px vereinheitlicht (Etappe 2)" stimmte nur für
+  die NavRail. **Seit 06.08. gilt er:** `MOBILE_MAX_WIDTH = 900` in
+  `hooks/useViewport.ts`, importiert von NavRail und CockpitHome (O10). Zug 6
+  (Desktop-Redirect) und Zug 7 (`isMobile`-Weiche) hängen damit an **900**.
 - Abbruchbedingung 2 („`db push` meldet Historie-Desync") ist **bereits eingetreten**.
 *Herkunft: morgen-workflow.md · IDEAS-2026 A2 (Telegram — verworfene Alternative, siehe §5)*
 
@@ -421,12 +421,31 @@ Schreiber.
 **Danach (M):** Batch appendet seine 3 Posts.
 *Herkunft: IDEEN „Nützlicher" · content-modul-mvp.md „Phase 2" · Session-Inventur*
 
-### O10 · Ein Mobile-Breakpoint — **S**
-`hooks/useViewport.ts:24` = `w < 768`, `NavRail.tsx:36-39` und `cockpit.css` = 900.
-Dazwischen liegen zwei halbe Welten. Die NavRail wurde in Etappe 2 bewusst auf 900
-gezogen, `useViewport` nicht.
-**Abhängigkeit:** **vor O3** erledigen — Zug 6 und 7 des Morgen-Wargames verlassen
-sich auf `isMobile`.
+### O10 · ~~Ein Mobile-Breakpoint~~ ✅ **vereinheitlicht 06.08.2026**
+`MOBILE_MAX_WIDTH = 900` und `MOBILE_MEDIA_QUERY` stehen jetzt in
+`hooks/useViewport.ts` und werden importiert, statt abgetippt. Inklusiv wie in
+CSS: `isMobile` ist `w <= 900`, deckungsgleich mit `@media (max-width: 900px)`.
+
+| Stelle | vorher | jetzt |
+|---|---|---|
+| `useViewport.ts` | `w < 768`, `isTablet` ab 768 | `w <= MOBILE_MAX_WIDTH`, `isTablet` ab 901 |
+| `NavRail.tsx` | `matchMedia('(max-width: 900px)')` zweimal abgetippt | `MOBILE_MEDIA_QUERY` |
+| `CockpitHome.tsx` (Graph-Höhe) | `innerWidth < 900` | `<= MOBILE_MAX_WIDTH` |
+| `cockpit.css` | 3 × `max-width: 900px` | unverändert — der einzige Ort, der nicht importieren kann |
+
+**Konsumenten geprüft:** `App.tsx:157` hält nur den Listener (keine Wirkung).
+`SalesDashboard.tsx` zeigt zwischen 768 und 900 jetzt ebenfalls „Arbeitsmodus
+starten" im Fenster-Fuß und den Anfragen-Zähler als Vollbild — dieselbe Breite,
+in der die Bottom-Bar schon steht. `ContactPage.tsx` und `ContactOverviewPanel.tsx`
+gehen dort auf eine Spalte statt auf `380px + Rest`, was bei ~850 px eng war.
+`isTablet`/`isDesktop` sind nirgends in Gebrauch (geprüft).
+
+**Bewusst nicht angefasst:** `pages/portal/portal.css` schaltet bei 768. Das
+Kundenportal ist eine eigene Oberfläche mit eigenem Layout — die Cockpit-Grenze
+gilt dort nicht. Die Drift-Wache klammert es ausdrücklich aus.
+
+**Drift-Wache:** `scripts/verify-breakpoint.ts`, 8 Prüfungen — schlägt an, sobald
+irgendwo in `app/src` wieder eine Pixelzahl abgetippt wird.
 *Herkunft: IDEEN „Schöner"*
 
 ### O11 · Deliverable-Abnahme im Portal — **M**

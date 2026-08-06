@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useSocialUnread } from '../lib/socialApi'
+import { MOBILE_MEDIA_QUERY } from '../../hooks/useViewport'
 
 interface NavItem {
   to: string
@@ -31,15 +32,16 @@ const NACHSCHLAGEN: NavItem[] = [
 ]
 
 /**
- * Bottom-Bar oder Rail? Bewusst dieselbe Grenze wie in cockpit.css (900px) —
- * useViewport schaltet bei 768 und läge hier eine halbe Welt daneben.
+ * Bottom-Bar oder Rail? Eine Grenze für alle (O10): `MOBILE_MEDIA_QUERY` ist
+ * derselbe Wert, den `useViewport().isMobile` und die `@media`-Blöcke in
+ * cockpit.css benutzen. Bis zum 06.08. stand hier 900 und in useViewport 768.
  */
 function useBottomBar(): boolean {
   const [schmal, setSchmal] = useState(
-    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches,
+    () => typeof window !== 'undefined' && window.matchMedia(MOBILE_MEDIA_QUERY).matches,
   )
   useEffect(() => {
-    const mq = window.matchMedia('(max-width: 900px)')
+    const mq = window.matchMedia(MOBILE_MEDIA_QUERY)
     // Zusätzlich auf resize/orientationchange hören und jedes Mal neu abfragen:
     // das change-Event der MediaQuery kommt nicht überall verlässlich an
     // (u.a. bei Viewport-Umschaltung im Test), dann bliebe die Bar hängen.
