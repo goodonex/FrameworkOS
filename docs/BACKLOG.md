@@ -31,9 +31,11 @@ Alles hier steht zwischen dem heutigen Code und „läuft in Produktion".
 **Vier Etappen sind gebaut und committet, aber nichts davon ist live.**
 `main` hat keinen eigenen Commit — der Livegang ist ein Fast-Forward, kein Merge.
 
-### L1 · 12 Commits auf `main` ziehen und deployen — **S**
-`git log main..cockpit-rebuild` = 12 Commits (`100a163` … `b9fb090`), Etappe 1–4.
-`main` steht auf `f402c57` (nur Wargame-Docs). Fast-Forward möglich.
+### L1 · `main` per Fast-Forward nachziehen und deployen — **S**
+`git log main..cockpit-rebuild` = **13 Commits** (`100a163` … `a79ddca`): Etappe 1–4
+plus dieses Backlog. `main` steht auf `f402c57` (nur Wargame-Docs) und hat keinen
+eigenen Commit — Fast-Forward, kein Merge, kein Risiko.
+*(Die Zahl wächst mit jedem weiteren Commit — verbindlich ist `git log main..cockpit-rebuild`.)*
 **Vorher prüfen:** `netlify.toml` legt keinen Production-Branch fest — welcher
 Branch in der Netlify-UI als Production eingestellt ist, ist von hier nicht
 auslesbar (**ungeprüft**). In den Sessions vom 14.07. war es zeitweise
@@ -337,12 +339,11 @@ Pipeline/Listen/Call-Mode/Kontakt überhaupt bleibt (O13, letzte Zeile).
 *Herkunft: IDEEN „Schöner"*
 
 ### O15 · Hygiene — **S**
-- **Worktree `sharp-lehmann-9787a0` auflösen.** Acht uncommittete Änderungen; sechs
-  davon hat Etappe 1 identisch gemacht (drei `mock*`-Dateien, `URIEL_VOICES`,
-  Universe-Link in `NavRail.tsx` **und** die zugehörigen CSS-Regeln). Eigenen Wert
-  haben nur `HANDOFF.md` und vier Warnhinweise in `docs/data-model.md`. Beide sind
-  mit diesem Backlog übernommen → Worktree und Branch `claude/sharp-lehmann-9787a0`
-  können weg.
+- ~~Worktree `sharp-lehmann-9787a0` auflösen~~ ✅ **erledigt 06.08.2026.** Von den acht
+  uncommitteten Änderungen hatte Etappe 1 sechs identisch gemacht; die zwei mit
+  eigenem Wert (`HANDOFF.md`, vier Warnhinweise in `docs/data-model.md`) sind mit
+  diesem Backlog übernommen. Worktree und Branch `claude/sharp-lehmann-9787a0` sind
+  entfernt. *Rest: der leere Ordner `.claude/worktrees/` kann weg.*
 - **Duplikat-Ordner `cursor/` neben `.cursor/`** im Repo-Root — identischer Inhalt.
 - **Vault:** `02 Projekte/Uriel.md` ist ein Stub vom 09.06. („Aktuell bei Migration
   0039–0043"). `[[ai-os-setup]]` wird im Masterplan zweimal verlinkt, existiert aber
