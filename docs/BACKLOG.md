@@ -31,15 +31,22 @@ Alles hier steht zwischen dem heutigen Code und „läuft in Produktion".
 **Vier Etappen sind gebaut und committet, aber nichts davon ist live.**
 `main` hat keinen eigenen Commit — der Livegang ist ein Fast-Forward, kein Merge.
 
-### L1 · `main` per Fast-Forward nachziehen und deployen — **S**
-`git log main..cockpit-rebuild` = **13 Commits** (`100a163` … `a79ddca`): Etappe 1–4
-plus dieses Backlog. `main` steht auf `f402c57` (nur Wargame-Docs) und hat keinen
-eigenen Commit — Fast-Forward, kein Merge, kein Risiko.
-*(Die Zahl wächst mit jedem weiteren Commit — verbindlich ist `git log main..cockpit-rebuild`.)*
-**Vorher prüfen:** `netlify.toml` legt keinen Production-Branch fest — welcher
-Branch in der Netlify-UI als Production eingestellt ist, ist von hier nicht
-auslesbar (**ungeprüft**). In den Sessions vom 14.07. war es zeitweise
-`cockpit-rebuild`, ab 20.07. `main`.
+### L1 · Fast-Forward — **Etappen 1–4 sind live, der Rest hängt** (Stand 06.08. abends)
+`main` steht auf `b9fb090` (letzter Etappe-4-Commit) und ist gepusht — die vier
+Etappen laufen auf frameworkos.de. Ausgeliefert wird `index-CvTize-3.js`.
+
+**Noch nicht live: 5 Commits auf `cockpit-rebuild`** — `a79ddca` (Backlog + HANDOFF),
+`2a71d59`, `d62d5eb` (Backlog-Nachträge), `77d157c` (send-email-Fix), `9eac2df`
+(`log_metric`). Verbindlich ist immer `git log --oneline main..cockpit-rebuild`.
+
+**⚠ Drift, solange das offen ist:** Edge Functions deployen aus dem
+Arbeitsverzeichnis, nicht aus `main`. Die live laufende `send-email` **v20** enthält
+den Deep-Link-Fix aus `77d157c`, obwohl der Commit nicht auf `main` ist. Ein
+späterer `send-email`-Deploy **von `main` aus** würde den Fix stillschweigend
+zurückdrehen. Der nächste Fast-Forward löst das auf.
+
+**Vor dem nächsten Livegang:** einmal in der Netlify-UI prüfen, welcher Branch als
+Production eingestellt ist — `netlify.toml` legt ihn nicht fest (**ungeprüft**).
 *Herkunft: Session-Inventur, was-ansteht.html*
 
 ### L2 · ~~Migrations-Historie reparieren~~ ✅ **erledigt 06.08.2026**
