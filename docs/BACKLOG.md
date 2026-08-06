@@ -63,42 +63,86 @@ ausgeführt — exakt Abbruchbedingung 2 des Morgen-Wargames, scharf, bevor 0067
 Genau das war die Ursache — dieselbe Lehre stand schon nach dem 15.07. im Raum.
 *Am 06.08. gefunden; stand in keinem Dokument.*
 
-### L3 · `site_content_published` mit `security_invoker` — **S**
-`0052_site_content.sql:108` legt die View mit `create or replace view` an, **ohne**
-`security_invoker`. Damit läuft sie mit Owner-Rechten, die RLS auf `site_content`
-greift nicht. Der DB-Zustand ist ohne SQL-Zugang nicht prüfbar (**ungeprüft**,
-`db dump` scheitert an fehlendem Docker).
-**Entschärfend:** `site_content` hat **0 Zeilen** — es liegt nichts drin, was
-auslaufen könnte.
-Fix: `alter view public.site_content_published set (security_invoker = on);`
-Danach prüfen, ob eine Kundenseite noch lädt (ggf. `anon`-select-Policy nötig).
+### L3 · `security_invoker` auf `site_content_published` — **NICHT ausführen**, verschoben nach O13
+**Der Auftrag wäre ein Rückschritt gewesen — hier steht, warum.**
+
+`0052_site_content.sql:108-112` setzt `with (security_invoker = off)` **ausdrücklich
+und kommentiert**: „Öffentlicher Lesezugriff NUR auf Published-Werte über eine
+Definer-View — die Basistabelle bleibt für anon unsichtbar (keine Drafts, keine
+Labels)." Es ist also kein Versehen, sondern der Kern des Entwurfs.
+
+Was passiert wäre:
+1. Mit `security_invoker = on` läuft die View als Aufrufer. `site_content` hat
+   Policies für Owner und Portal-Client, **keine für `anon`** (`:29-66`) und auch
+   kein `grant`. Ergebnis: Für Website-Besucher liefert die View **nichts** —
+   unbemerkt, weil die Tabelle 0 Zeilen hat.
+2. Der naheliegende Ausgleich (`grant select` + `anon`-Policy auf `site_content`)
+   macht es **schlimmer**: eine RLS-Policy schränkt Zeilen ein, keine Spalten. Der
+   anon-Key steht im ausgelieferten Frontend-Bundle — jeder könnte dann
+   `value_draft`, `label`, `section` und `status` lesen. Genau das, was die
+   Definer-View heute verhindert.
+
+**Der echte Restpunkt** ist ein anderer und kleiner: Die Definer-View ist nicht nach
+Projekt gezogen — wer den anon-Key hat, liest die veröffentlichten Werte **aller**
+Projekte. Inhaltlich sind das Texte, die ohnehin öffentlich auf der Kundenwebsite
+stehen; es leckt vor allem die Projekt-UUIDs. Saubere Lösung wäre eine
+Security-Definer-**Funktion** mit `project_id`-Parameter statt einer offenen View —
+das ändert aber auch `app/src/lib/siteContentService.ts` und gehört damit zur
+CMS-Entscheidung, nicht in den Livegang.
+
+**Kein Livegang-Blocker:** `site_content` hat 0 Zeilen, keine Kundenseite liest die
+View. Der Punkt wandert zu O13 („Website-CMS schließen oder ausblenden").
+*Herkunft: Session-Inventur — die Meldung „Sicherheitslücke" beruht auf dem
+generischen Supabase-Linter-Hinweis zu Definer-Views, nicht auf diesem Fall.*
+
+### L4 · ~~Deep-Link in `send-email`~~ ✅ **erledigt 06.08.2026**
+`send-email/index.ts:157` zeigte auf `/brand/:slug/deliver/:id` — eine Route, die
+Etappe 4 abgerissen hat. Jetzt `/projekte/${project.id}` (deckt sich mit
+`legacyRouteMap.ts:20`). Function deployt (**Version 20**, 14:25 UTC).
+
+**Korrektur am ursprünglichen Befund:** `PUBLIC_APP_URL` **war bereits gesetzt** —
+per Digest-Abgleich verifiziert als `https://frameworkos.de`. Der genannte
+Vercel-Default hat also nie gegriffen; er ist außerdem nicht tot (antwortet 200).
+Beide Fallbacks (`PUBLIC_APP_URL`, `EMAIL_ASSETS_BASE_URL`) zeigen jetzt trotzdem
+auf die Live-Domain, damit niemand mehr an einem fremden Deploy hängt.
+**Nebenbefund mitgenommen:** Der Kommentar „frameworkos.de hat kein `/email/*`"
+(`:220`) stimmt nicht mehr — `https://frameworkos.de/email/herrmann-logo.png`
+liefert 200 `image/png`. Das Logo in Sales-Mails hängt damit nicht mehr an Vercel.
 *Herkunft: Session-Inventur*
 
-### L4 · Deep-Link in `send-email` zeigt in die abgerissene Brand-Welt — **S**
-`supabase/functions/send-email/index.ts:157`:
-`deepLink = ${publicAppUrl}/brand/${brand.slug}/deliver/${project.id}` — diese Route
-existiert seit Etappe 4 nicht mehr. Zusätzlich fällt `publicAppUrl` (`:53`) ohne
-gesetztes `PUBLIC_APP_URL` auf `https://app-ecru-chi-81.vercel.app` zurück, eine
-tote Domain; dasselbe bei `EMAIL_ASSETS_BASE_URL` (`:220`).
-Fix: Ziel auf `/projekte/:id`, `PUBLIC_APP_URL=https://frameworkos.de` als Secret
-setzen, Function deployen.
-*Herkunft: Session-Inventur*
+### L5 · ~~`invite-client` deployen~~ ✅ **erledigt 06.08.2026**
+Die Function war tatsächlich **nie deployt** — `supabase functions list` kannte sie
+nicht. Jetzt **Version 1**, 14:23 UTC. Alle vier benötigten Secrets sind gesetzt
+(`RESEND_API_KEY`, `RESEND_FROM_EMAIL`, `RESEND_FROM_NAME`, `PUBLIC_APP_URL`), die
+Implementierung ist vollständig (326 Zeilen, `generateLink type: 'recovery'` →
+`/portal/setup`). Damit funktioniert der Passwort-Login fürs Kundenportal.
+Sie tut nichts von allein — sie feuert nur auf einen Owner-JWT-Aufruf hin.
+*Neu — stand in keinem Plandokument, nur in einer Session vom 09.07.*
 
-### L5 · `invite-client` nie deployt — **S**
-Die Function existiert im Repo (`supabase/functions/invite-client/`), wurde laut
-Session „Agentic OS mobile optimization" (09.07.) nie deployt; das nötige
-`PUBLIC_APP_URL`-Secret hängt am selben Punkt wie L4. Ohne sie gibt es keinen
-Passwort-Login fürs Kundenportal.
-Ob sie heute deployt ist, ist von hier nicht prüfbar (**ungeprüft** — braucht
-`supabase functions list`).
-*Neu — steht in keinem Plandokument, nur in einer Session vom 09.07.*
+### L5b · Drei weitere Functions sind nicht deployt — **Entscheidung nötig**
+Beim Prüfen von L5 aufgefallen: Von 15 Functions im Repo sind **11 live**. Es fehlen
+neben `invite-client` (jetzt behoben) noch drei:
 
-### L6 · `ANTHROPIC_API_KEY` in den Edge-Secrets prüfen — **S**
-`rebuild-notes.md:158` (07.07.): 401 „invalid x-api-key" — betrifft **alle**
-KI-Functions (`uriel`, `brand-assistant`, `discovery-agent`). Seither nirgends
-bestätigt, dass ein gültiger Key gesetzt wurde. **Ungeprüft.**
-Ein Testaufruf gegen den Chat oder das Dock klärt es in zwei Minuten.
-*Herkunft: rebuild-notes v1.1, worktree-HANDOFF*
+| Function | Wofür | Einschätzung |
+|---|---|---|
+| **`email-inbound`** | Lead-Eingang `leads+slug@frameworkos.de` — der Regex, den der Rebrand ausdrücklich nicht anfassen durfte | **Der wichtigste.** Ob ein Resend-Inbound-Webhook überhaupt darauf zeigt, ist von hier nicht prüfbar (**ungeprüft**). Wenn ja, fallen eingehende Lead-Mails ins Leere. |
+| `discovery-agent` | Markt-/Wettbewerbs-Analyse der alten Discovery-Welt | Deren UI ist in Phase 6 gelöscht — vermutlich bewusst tot |
+| `discovery-feed-refresh` | Cron für denselben Feed | dito |
+
+Nicht mitdeployt, weil es über L5 hinausgeht und `email-inbound` am Lead-Eingang
+hängt: erst klären, ob ein Webhook darauf zeigt, dann deployen oder streichen.
+
+### L6 · `ANTHROPIC_API_KEY` — **gesetzt, letzte Bestätigung 19.07.**
+`supabase secrets list`: `ANTHROPIC_API_KEY` ist gesetzt. `ANTHROPIC_MODEL` ist per
+Digest-Abgleich als `claude-sonnet-5` verifiziert — also kein totes Modell mehr (der
+Fehler vom 07.07. war `claude-sonnet-4-20250514`).
+**Kette der Belege:** Der ungültige Key wurde am 07.07. per CLI neu gesetzt
+(`rebuild-notes.md`), `brand-assistant` danach neu deployt (07.07. 10:43 UTC), und
+am 19./20.07. hat Uriel im Dock live geantwortet — das geht nur mit gültigem Key.
+**Grenze der Prüfung:** Ein Aufruf *heute* braucht ein User-JWT; `uriel` und
+`brand-assistant` prüfen `auth.getUser()`, der Service-Role-Key hilft dort nicht.
+Ohne Session bleibt es **ungeprüft für heute** — nicht geraten. Der belastbare Test
+dauert zehn Sekunden: eingeloggt eine Frage ins Uriel-Dock tippen.
 
 ### L7 · RLS-Drift bei `project_messages` — **erst reproduzieren**, dann S
 Die Session-Inventur meldet „Migrationsdatei und DB sind auseinandergelaufen,
@@ -336,7 +380,7 @@ Jeder Punkt einzeln bestätigt, keiner dringend, jeder kommt sonst zurück.
 | Nav-Icons ☑ ⚙ rendern auf iOS als bunte Emoji | `NavRail.tsx:20/29` |
 | Beziehungs-Reminder „Still geworden" | kein `last_contact_at` in `cockpit/` |
 | Call-Mode auf den echten Funnel stellen oder streichen | `SalesArea.tsx:18/58` — Sub-Tab existiert weiter |
-| Website-CMS: keine Kundenseite liest `site_content_published` (`site_content` = **0 Zeilen**) | siehe L3 |
+| Website-CMS entscheiden: keine Kundenseite liest `site_content_published`, `site_content` = **0 Zeilen** — dabei auch die Projekt-Scopierung der Definer-View lösen (Funktion mit `project_id` statt offener View, siehe L3) | `0052_site_content.sql:108-112`, `lib/siteContentService.ts` |
 
 ### O14 · Sales-Subtabs restylen — **L** · nach der Call-Mode-Entscheidung
 `pages/sales/SalesMode.tsx`: 2.504 Zeilen, **55** Glass-Treffer — die letzte große

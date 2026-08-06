@@ -49,8 +49,11 @@ Deno.serve(async (req) => {
   const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
   const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const PUBLIC_API_BASE = Deno.env.get('PUBLIC_API_BASE') ?? SUPABASE_URL
+  // Fallback ist die Live-Domain. Die frühere Vercel-Adresse ist tot — als
+  // Notnagel hätte sie stumme Links erzeugt. Gesetzt ist der Wert ohnehin
+  // (Secret `PUBLIC_APP_URL`), der Fallback greift nur, wenn jemand ihn löscht.
   const PUBLIC_APP_URL = (
-    Deno.env.get('PUBLIC_APP_URL') ?? 'https://app-ecru-chi-81.vercel.app'
+    Deno.env.get('PUBLIC_APP_URL') ?? 'https://frameworkos.de'
   ).replace(/\/$/, '')
 
   const auth = req.headers.get('authorization') ?? ''
@@ -154,7 +157,9 @@ async function handleProjectMessage(
     const { data: ownerUser } = await supabase.auth.admin.getUserById(brand.user_id)
     toEmail = ownerUser?.user?.email ?? ''
     subject = `Neue Nachricht von ${message.sender_name ?? project.client_name ?? 'Kunde'} — ${project.name}`
-    deepLink = `${publicAppUrl}/brand/${brand.slug}/deliver/${project.id}`
+    // Cockpit-Route. Die alte Brand-Welt `/brand/:slug/deliver/:id` wurde in
+    // Etappe 4 abgerissen — der Link lief bis hierher ins Leere.
+    deepLink = `${publicAppUrl}/projekte/${project.id}`
   } else {
     toEmail = project.client_email ?? ''
     subject = `Neue Nachricht zu „${project.name}"`
@@ -215,9 +220,14 @@ async function clientOwnsProject(
   return data?.project_id === projectId
 }
 
-/** Öffentliche Asset-URL — unabhängig von PUBLIC_APP_URL (frameworkos.de hat kein /email/*). */
+/**
+ * Öffentliche Asset-URL für Mail-Bilder (Logo). Der Kommentar „frameworkos.de hat
+ * kein /email/*" stimmt nicht mehr: die Dateien liegen in `app/public/email/` und
+ * werden von Netlify ausgeliefert (06.08.2026 geprüft, 200 image/png). Damit fällt
+ * die Abhängigkeit von der alten Vercel-Adresse weg.
+ */
 const EMAIL_ASSETS_BASE = (
-  Deno.env.get('EMAIL_ASSETS_BASE_URL') ?? 'https://app-ecru-chi-81.vercel.app'
+  Deno.env.get('EMAIL_ASSETS_BASE_URL') ?? 'https://frameworkos.de'
 ).replace(/\/$/, '')
 
 const BRAND_EMAIL: Record<string, { fromName: string; logoPath: string }> = {
