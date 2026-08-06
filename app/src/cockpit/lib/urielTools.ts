@@ -5,6 +5,8 @@
  * eingeloggte Supabase-Session brauchen. Beide Seiten leben im Repo und werden
  * zusammen reviewt.
  */
+import { METRIC_FIELDS, METRIK_LABEL } from './metrikFelder'
+
 export interface UrielTool {
   name: string
   description: string
@@ -14,6 +16,9 @@ export interface UrielTool {
     required?: string[]
   }
 }
+
+/** „li_anfragen = Vernetzungsanfragen (LinkedIn) · …" — die Feldkarte für Uriel. */
+const FELD_KARTE = METRIC_FIELDS.map((f) => `${f} = ${METRIK_LABEL[f]}`).join(' · ')
 
 export const URIEL_TOOLS: UrielTool[] = [
   // ---- Gedächtnis (Client persistiert lokal) ----
@@ -27,6 +32,38 @@ export const URIEL_TOOLS: UrielTool[] = [
         fact: { type: 'string', description: 'Der zu merkende Fakt, ein knapper Satz.' },
       },
       required: ['fact'],
+    },
+  },
+  // ---- Tracking schreiben (Client führt aus, über useDailyMetrics) ----
+  {
+    name: 'log_metric',
+    description:
+      'Trägt Kevins Tages-Tracking in daily_metrics ein — das einzige Werkzeug, das Zahlen SCHREIBT. ' +
+      'Nutze es, wenn Kevin sagt, was er getan hat („trag 30 Vernetzungsanfragen ein", „ich hab heute 5 Looms gemacht", ' +
+      '„gestern 12 Follow-ups"). Der Wert wird ADDIERT, nicht überschrieben — steht für den Tag schon etwas, kommt es dazu. ' +
+      'Zum Korrigieren einen negativen Wert schicken. Nur EIN Feld je Aufruf; für mehrere Angaben mehrfach aufrufen. ' +
+      `Feldkarte: ${FELD_KARTE}. ` +
+      'Umsatz kann dieses Werkzeug NICHT — der wird gesetzt, nicht addiert; dafür auf /tracking verweisen. ' +
+      'Nenne in deiner Antwort den zurückgegebenen Tages- und Wochenstand, damit Kevin einen Vertipper sofort sieht.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        feld: {
+          type: 'string',
+          enum: [...METRIC_FIELDS],
+          description: 'Das Metrik-Feld. Nur exakt diese Namen — nichts erfinden oder ableiten.',
+        },
+        wert: {
+          type: 'integer',
+          description: 'Wie viel dazukommt. Negativ zum Korrigieren (z.B. -5). 0 ist nicht erlaubt.',
+        },
+        datum: {
+          type: 'string',
+          description:
+            'Optional, Format YYYY-MM-DD. Ohne Angabe: heute. Nur Vergangenheit bis 45 Tage zurück; die Zukunft lehnt das Werkzeug ab.',
+        },
+      },
+      required: ['feld', 'wert'],
     },
   },
   // ---- UI-Steuerung (Client führt aus) ----

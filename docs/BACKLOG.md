@@ -209,6 +209,42 @@ beanstandete Export `URIEL_VOICES` ist bereits entfernt (`urielVoiceSettings.ts:
 (`App.tsx:169`: `{isCockpit ? null : <Background />}`) — die GPU-Kosten im Cockpit
 sind weg.
 
+### Uriel schreibt Tracking — `log_metric` (06.08.2026)
+Bis dahin schrieb von zehn Werkzeugen nur `remember`; auf „trag 30
+Vernetzungsanfragen ein" antwortete Uriel, er könne das nicht — obwohl Feld und
+Upsert längst existierten.
+
+| Baustein | Beleg |
+|---|---|
+| Feldkarte als Blatt-Modul (19 Felder + eindeutige Labels, ohne React) | `cockpit/lib/metrikFelder.ts` |
+| Werkzeug-Schema, Enum direkt aus `METRIC_FIELDS` | `cockpit/lib/urielTools.ts` |
+| Ausführung analog zu `remember`, über `bumpOn` | `cockpit/components/UrielDock.tsx`, `case 'log_metric'` |
+| Reine Prüf-/Rechenlogik | `metrikFelder.ts` → `pruefeBuchung`, `berechneStand` |
+| 25 Fälle grün | `scripts/verify-log-metric.ts` |
+
+**Verhalten:** addiert statt zu überschreiben · negativer Wert korrigiert ·
+optionales `datum` (nur Vergangenheit, max. 45 Tage zurück = Ladefenster) ·
+Antwort nennt Tages- **und** Wochenstand („Vernetzungsanfragen (LinkedIn): heute
+30, Woche 84"), damit ein Vertipper sofort auffällt.
+
+**Zwei Fallen, die dabei entschärft wurden:**
+- Der neue Stand wird in `berechneStand` gerechnet, **nicht** aus dem Hook gelesen.
+  `bumpOn` schreibt optimistisch und gebündelt — der React-State im Executor-Closure
+  ist noch der alte, Uriel hätte den Stand von *vorher* zurückgemeldet. Genau die
+  Zahl, die den Vertipper aufdecken soll.
+- Die Null-Klammer aus `bumpOn` (`Math.max(0, …)`) ist gespiegelt, sonst meldet
+  Uriel bei einer Überkorrektur eine negative Zahl, die nie in der DB landet. Der
+  Wochenstand zieht deshalb nur die *echte* Änderung ab.
+
+**`METRIC_FIELDS` gegen die Prod-DB geprüft (06.08.):** alle 19 Felder existieren
+als Spalte, und `daily_metrics` hat keine zählbare Spalte ohne Eintrag in
+`METRIC_FIELDS`. Die vier Legacy-Sammelfelder sind mit 0066 gefallen — Code und
+Schema sind deckungsgleich.
+
+**Bewusst ausgelassen:** `umsatz`. Er wird gesetzt, nicht hochgezählt
+(`setUmsatz`), ein „+500" wäre bei Geld mehrdeutig. Uriel verweist dafür auf
+`/tracking` — siehe O13.
+
 ### Aus dem Masterplan
 | Meilenstein | Stand | Beleg |
 |---|---|---|
@@ -379,6 +415,7 @@ Jeder Punkt einzeln bestätigt, keiner dringend, jeder kommt sonst zurück.
 | Ads-Dashboard zeigt vier leere KPI-Kacheln statt Review-Fortschritt | `AdsArea.tsx:123-126` (alle „—") |
 | Nav-Icons ☑ ⚙ rendern auf iOS als bunte Emoji | `NavRail.tsx:20/29` |
 | Beziehungs-Reminder „Still geworden" | kein `last_contact_at` in `cockpit/` |
+| Umsatz per Uriel eintragen — `log_metric` kann nur zählen, nicht setzen; braucht ein eigenes `set_revenue` mit Setz-Semantik | `metrikFelder.ts` (umsatz bewusst ausgelassen), `useDailyMetrics.setUmsatzOn` |
 | Call-Mode auf den echten Funnel stellen oder streichen | `SalesArea.tsx:18/58` — Sub-Tab existiert weiter |
 | Website-CMS entscheiden: keine Kundenseite liest `site_content_published`, `site_content` = **0 Zeilen** — dabei auch die Projekt-Scopierung der Definer-View lösen (Funktion mit `project_id` statt offener View, siehe L3) | `0052_site_content.sql:108-112`, `lib/siteContentService.ts` |
 

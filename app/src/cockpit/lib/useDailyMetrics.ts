@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { supabase } from '../../lib/supabase'
 import { useActiveBrand } from './activeBrand'
+import type { MetricField } from './metrikFelder'
 import { toIsoDate, weekRowsOf } from './metricsDates'
 
 /**
@@ -42,28 +43,11 @@ export interface DailyMetricsRow {
   note?: string | null
 }
 
-export const METRIC_FIELDS = [
-  'li_anfragen',
-  'li_nachrichten',
-  'inmails',
-  'looms',
-  'ig_anfragen',
-  'ig_nachrichten',
-  'cold_calls',
-  'li_followups',
-  'ig_followups',
-  'call_followups',
-  'antworten_li',
-  'antworten_inmail',
-  'antworten_ig',
-  'quali_termine',
-  'sales_calls',
-  'termine_li',
-  'termine_ig',
-  'termine_call',
-  'abschluesse',
-] as const
-export type MetricField = (typeof METRIC_FIELDS)[number]
+// Feldnamen + Beschriftungen liegen in metrikFelder.ts (Blatt-Modul ohne React),
+// damit urielTools.ts und scripts/verify-*.ts sie ohne den Hook laden können.
+// Re-Export hält alle bestehenden Import-Pfade gültig.
+export { METRIC_FIELDS, METRIK_LABEL, istMetrikFeld } from './metrikFelder'
+export type { MetricField } from './metrikFelder'
 
 export function emptyRow(datum: string): DailyMetricsRow {
   return {

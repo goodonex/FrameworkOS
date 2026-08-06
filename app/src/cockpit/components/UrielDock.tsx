@@ -6,6 +6,8 @@ import { useContacts } from '../../hooks/useContacts'
 import { useUrielBus } from '../../store/urielBus'
 import { useActiveBrand } from '../lib/activeBrand'
 import { useDailyMetrics } from '../lib/useDailyMetrics'
+import { METRIC_FIELDS, METRIK_LABEL, berechneStand, pruefeBuchung } from '../lib/metrikFelder'
+import { mondayOf, toIsoDate } from '../lib/metricsDates'
 import {
   anfragenSum,
   nachrichtenSum,
@@ -169,6 +171,66 @@ export function UrielDock() {
           const fact = String(input.fact ?? '').trim()
           if (fact) setMemory(addMemory(fact))
           return { ok: true, summary: fact ? `gemerkt: ${fact}` : 'nichts zu merken', data: { done: true } }
+        }
+        case 'log_metric': {
+          // Das einzige schreibende Werkzeug am Tracking. Drei Regeln:
+          // (1) Feldname kommt aus METRIC_FIELDS — nichts Erfundenes durchlassen.
+          // (2) Addieren, nie überschreiben (bumpOn) — Uriel kennt den Tagesstand
+          //     nicht und würde sonst stillschweigend Gezähltes wegwerfen.
+          // (3) Der neue Stand wird HIER gerechnet, nicht aus `metrics` gelesen:
+          //     bumpOn ist optimistisch + gebündelt, der Hook-State in diesem
+          //     Closure ist noch der alte. Kevin bekommt sonst den Stand von vorher
+          //     zurück — und genau der soll den Vertipper aufdecken.
+          if (metrics.tableMissing) {
+            return { ok: false, summary: 'Tracking-Tabelle fehlt', data: { error: 'table_missing' } }
+          }
+          const heute = toIsoDate(new Date())
+          const geprueft = pruefeBuchung({
+            feld: input.feld,
+            wert: input.wert,
+            datum: input.datum,
+            heute,
+            windowStart: metrics.windowStart,
+          })
+          if (!geprueft.ok) {
+            return {
+              ok: false,
+              summary: geprueft.text,
+              data:
+                geprueft.fehler === 'unknown_field'
+                  ? { error: geprueft.fehler, erlaubt: [...METRIC_FIELDS] }
+                  : { error: geprueft.fehler },
+            }
+          }
+
+          const { feld, datum, wert } = geprueft
+          const stand = berechneStand({
+            vorher: metrics.rowFor(datum)[feld] ?? 0,
+            wert,
+            wochenstandVorher: sumField(metrics.weekRows, feld),
+            inDieserWoche:
+              toIsoDate(mondayOf(new Date(`${datum}T12:00:00`))) === toIsoDate(mondayOf(new Date())),
+          })
+          metrics.bumpOn(datum, feld, wert)
+
+          const label = METRIK_LABEL[feld]
+          const tagWort = datum === heute ? 'heute' : datum
+          return {
+            ok: true,
+            summary: `${label}: ${tagWort} ${stand.tagesstand}, Woche ${stand.wochenstand}`,
+            data: {
+              feld,
+              label,
+              datum,
+              veraendert_um: wert,
+              vorher: stand.vorher,
+              tagesstand: stand.tagesstand,
+              wochenstand: stand.wochenstand,
+              hinweis: stand.begrenzt
+                ? 'Auf 0 begrenzt — es war weniger eingetragen, als abgezogen werden sollte.'
+                : undefined,
+            },
+          }
         }
         case 'set_graph_view': {
           const view = input.view as ViewMode
