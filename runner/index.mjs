@@ -10,7 +10,7 @@
 import { spawn } from 'node:child_process'
 import { createServer } from 'node:http'
 import { mkdir, readdir, readFile, realpath, stat, writeFile } from 'node:fs/promises'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 import { syncThreads } from './linkedin/sync.mjs'
@@ -49,7 +49,14 @@ const PORT = Number(process.env.RUNNER_PORT ?? 4711)
 const VAULT = resolve(process.env.VAULT_PATH ?? join(homedir(), 'Second Brain'))
 const RUNS_DIR = join(VAULT, 'System', 'Runs')
 const QUEUE_DIR = join(VAULT, 'System', 'Queue')
-const TIMEOUT_MS = 10 * 60 * 1000 // 10 Minuten (Plan §6)
+/**
+ * Zehn Minuten — bewusst unveraendert (O17, Entscheidung Kevin 07.08.2026).
+ * Der Timeout war nie die Ursache der abgebrochenen Morgen-Laeufe: wach
+ * braucht ein Morgenbrief 23 bis 33 Sekunden. Ursache war der schlafende Mac,
+ * dagegen hilft `caffeinate` (siehe CAFFEINATE_BIN), nicht eine groessere Zahl.
+ * Ueberschreibbar nur fuer Tests.
+ */
+const TIMEOUT_MS = Number(process.env.RUN_TIMEOUT_MS ?? 10 * 60 * 1000)
 /**
  * O17: Wie oft die Mitschrift eines laufenden Agenten auf Platte geht.
  * Gedrosselt, weil ein Lauf hunderte Ereignisse erzeugt und die Run-Dateien im
@@ -57,6 +64,60 @@ const TIMEOUT_MS = 10 * 60 * 1000 // 10 Minuten (Plan §6)
  * ein Sync-Sturm für nichts.
  */
 const LIVE_SCHREIB_MS = Number(process.env.LIVE_SCHREIB_MS ?? 5_000)
+/**
+ * O17 Schritt 3: Zeit zwischen SIGTERM an die Prozessgruppe und SIGKILL.
+ * `claude` raeumt beim Beenden auf (Sitzung schreiben, Kindprozesse einsammeln)
+ * — wer sofort mit SIGKILL kommt, hinterlaesst Leichen. Wer nie nachlegt,
+ * wartet ewig: genau das war der Zustand bis zum 07.08.
+ */
+const KILL_KARENZ_MS = Number(process.env.KILL_KARENZ_MS ?? 15_000)
+/**
+ * O17 Schritt 2, am `pmset -g log` belegt: Der Mac schlief **zwei Sekunden**
+ * nach dem Start eines Morgen-Agenten wieder ein (DarkWake aus Deep Idle, dann
+ * sofort `Entering Sleep`). Der Agent bekam so rund zwei Sekunden Rechenzeit je
+ * Weck-Zyklus; die Timeout-Wanduhr lief im Schlaf weiter, SIGTERM und `close`
+ * wurden erst beim naechsten DarkWake abgearbeitet — daher „Laufzeiten" von
+ * 10,9 bis 17,8 Minuten, die in Wahrheit Abstaende zwischen zwei Aufwachern
+ * waren. Wach braucht derselbe Lauf 23 bis 33 Sekunden.
+ *
+ * `-i` verhindert Idle-Schlaf, `-s` den System-Schlaf (greift am Netzteil).
+ * Die Zusicherung endet automatisch mit dem Prozess — kein Aufraeumen noetig,
+ * und ein abgestuerzter Runner haelt den Mac nicht ewig wach.
+ */
+const CAFFEINATE_BIN = '/usr/bin/caffeinate'
+
+/**
+ * Beendet den ganzen Prozessbaum eines Laufs (O17 Schritt 3).
+ *
+ * `proc.kill()` trifft nur das direkte Kind. `claude` startet aber Enkel, und
+ * die halten die stdout-Pipe offen — node feuert `close` erst, wenn der letzte
+ * Halter geht. Im Test am 07.08. kamen so 75 Sekunden zwischen Kill und
+ * Abschluss zusammen; in Kevins Nacht-Laeufen Minuten. Das negative PID
+ * adressiert die Prozessgruppe (moeglich durch `detached: true` beim Spawn).
+ */
+function beendeBaum(proc, id, karenzMs = KILL_KARENZ_MS) {
+  const pid = proc?.pid
+  if (!pid) return
+  const sende = (sig) => {
+    try {
+      process.kill(-pid, sig) // ganze Gruppe
+    } catch {
+      try {
+        proc.kill(sig) // Gruppe schon weg → wenigstens das direkte Kind
+      } catch {
+        /* bereits tot */
+      }
+    }
+  }
+  sende('SIGTERM')
+  const nachlegen = setTimeout(() => {
+    if (proc.exitCode === null && proc.signalCode === null) {
+      console.warn(`[runner] ${id}: reagiert nicht auf SIGTERM — SIGKILL an die Prozessgruppe`)
+      sende('SIGKILL')
+    }
+  }, karenzMs)
+  nachlegen.unref?.()
+}
 
 // OS-Map-Snapshot → Supabase, damit die HTTPS-Live-Domain (frameworkos.de) den
 // Graphen zeigt, ohne dass der lokale Runner erreichbar ist. Der Runner spiegelt
@@ -458,15 +519,23 @@ async function startRun(agent, input) {
   // `stream-json --verbose` kommt eine Zeile JSON je Ereignis, die wir laufend
   // mitschreiben. Der Endtext steht im `result`-Ereignis; die Run-Datei sieht
   // bei Erfolg unverändert aus (die Freigaben-Queue liest den ```json-Block).
-  const proc = spawn(
-    process.env.CLAUDE_BIN ?? 'claude',
-    ['-p', prompt, '--output-format', 'stream-json', '--verbose', ...cfg.extraArgs],
-    {
-      cwd: cfg.cwd,
-      env: { ...process.env, PATH },
-      stdio: ['ignore', 'pipe', 'pipe'],
-    },
-  )
+  const claudeBin = process.env.CLAUDE_BIN ?? 'claude'
+  const claudeArgs = ['-p', prompt, '--output-format', 'stream-json', '--verbose', ...cfg.extraArgs]
+  // O17 Schritt 2: unter `caffeinate` starten, damit der Mac den Lauf nicht
+  // verschlaeft. Kein macOS (oder Binary fehlt) → unveraendert direkt starten.
+  const mitCaffeinate = existsSync(CAFFEINATE_BIN)
+  const [befehl, argumente] = mitCaffeinate
+    ? [CAFFEINATE_BIN, ['-i', '-s', claudeBin, ...claudeArgs]]
+    : [claudeBin, claudeArgs]
+
+  const proc = spawn(befehl, argumente, {
+    cwd: cfg.cwd,
+    env: { ...process.env, PATH },
+    stdio: ['ignore', 'pipe', 'pipe'],
+    // O17 Schritt 3: eigene Prozessgruppe, damit `beendeBaum` den ganzen Baum
+    // treffen kann statt nur caffeinate bzw. claude selbst.
+    detached: true,
+  })
 
   const lauf = neuerLauf(Date.now())
   let puffer = ''
@@ -505,7 +574,8 @@ async function startRun(agent, input) {
   }
 
   const timeout = setTimeout(() => {
-    proc.kill('SIGTERM')
+    console.warn(`[runner] ${id}: ${Math.round(TIMEOUT_MS / 60000)} Minuten ueberschritten — beende den Prozessbaum`)
+    beendeBaum(proc, id)
   }, TIMEOUT_MS)
 
   running.set(id, { id, agent, startedAt, proc, lauf })
@@ -546,10 +616,15 @@ async function startRun(agent, input) {
         if (agent === 'linkedin-antwort-entwuerfe') await entwuerfeAnThreads(id, ergebnis)
       } else {
         // O17: Statt „kein Output" steht hier jetzt, wie weit der Lauf kam.
-        const grund =
-          code === 143
-            ? `# Run abgebrochen (Exit 143 — SIGTERM nach ${Math.round(TIMEOUT_MS / 60000)} Minuten)`
-            : `# Run fehlgeschlagen (Exit ${code})`
+        // 143 = 128+SIGTERM, 137 = 128+SIGKILL, null = per Signal beendet.
+        const abgebrochen = code === 143 || code === 137 || code === null
+        const limit =
+          TIMEOUT_MS >= 60_000
+            ? `${Math.round(TIMEOUT_MS / 60_000)} Minuten`
+            : `${Math.round(TIMEOUT_MS / 1000)} Sekunden`
+        const grund = abgebrochen
+          ? `# Run abgebrochen (Exit ${code} — Zeitlimit ${limit})`
+          : `# Run fehlgeschlagen (Exit ${code})`
         const err = [
           grund,
           '',

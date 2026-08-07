@@ -63,5 +63,41 @@ check('4 genau eine Deklaration', (runner.match(/let linkedinSyncRunning/g) ?? [
 // 5. Der Agenten-Pfad behält seinen eigenen Guard (der war nie das Problem).
 check('5 agent_run prüft weiterhin auf laufende Agenten', jobPfad.includes('läuft bereits`'), true)
 
+// ---- O17 (07.08.2026): Der Lauf darf weder verschlafen noch haengen ----
+
+// 6. Unter caffeinate starten. Belegt am pmset-Log: der Mac schlief zwei
+//    Sekunden nach dem Start eines Morgen-Agenten wieder ein.
+check('6 caffeinate-Binary bekannt', runner.includes("const CAFFEINATE_BIN = '/usr/bin/caffeinate'"), true)
+check('6b Idle- UND System-Schlaf verhindert', /\['-i', '-s', claudeBin/.test(runner), true)
+check('6c Fallback ohne macOS', /mitCaffeinate\s*\?/.test(runner), true)
+
+// 7. Eigene Prozessgruppe — sonst trifft der Kill nur caffeinate.
+{
+  const spawnBlock = rumpf(runner, 'const proc = spawn(befehl, argumente')
+  check('7 detached beim Spawn', spawnBlock.includes('detached: true'), true)
+}
+
+// 8. Abbruch: erst SIGTERM an die Gruppe, dann SIGKILL. Ohne das Nachlegen
+//    haengt der Lauf am Enkelprozess, der die stdout-Pipe offen haelt
+//    (im Test 75 Sekunden, in den Nacht-Laeufen Minuten).
+{
+  const baum = rumpf(runner, 'function beendeBaum(proc, id')
+  check('8 gefunden', baum.length > 0, true)
+  check('8b negative PID = ganze Gruppe', baum.includes('process.kill(-pid, sig)'), true)
+  check('8c erst SIGTERM', baum.indexOf("sende('SIGTERM')") > -1, true)
+  check('8d dann SIGKILL', baum.indexOf("sende('SIGKILL')") > baum.indexOf("sende('SIGTERM')"), true)
+  check('8e Rueckfall auf das direkte Kind', baum.includes('proc.kill(sig)'), true)
+  check('8f Zeitlimit ruft beendeBaum, nicht proc.kill', /TIMEOUT_MS\)/.test(runner) && runner.includes('beendeBaum(proc, id)'), true)
+}
+
+// 9. Mitschrift: stream-json statt text — sonst ist jeder Abbruch wieder blind.
+check('9 stream-json', runner.includes("'--output-format', 'stream-json', '--verbose'"), true)
+check('9b kein text-Format mehr', runner.includes("'--output-format', 'text'"), false)
+check('9c Endtext kommt aus dem result-Ereignis', runner.includes('lauf.ergebnis'), true)
+
+// 10. Der Timeout bleibt bei zehn Minuten (Entscheidung Kevin 07.08.) — die
+//     Ursache war der Schlaf, nicht die Zahl.
+check('10 Vorgabe zehn Minuten', runner.includes('?? 10 * 60 * 1000'), true)
+
 console.log(`${pass} bestanden, ${fail} fehlgeschlagen`)
 if (fail > 0) process.exit(1)
