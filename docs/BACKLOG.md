@@ -2,6 +2,12 @@
 
 **Stand:** 2026-08-06, abends · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
 
+**Runde vom 07.08.** (O17 + O3): Die Morgen-Agenten laufen wieder — die Ursache
+war der schlafende Mac, nicht der Timeout. Darauf aufbauend der Morgen-Push:
+Etappen A und B des Wargames sind gebaut, Migration 0067 ist eingespielt, die
+Edge Function deployt. **Nicht live** — der Fast-Forward und die iPhone-Schritte
+stehen aus (siehe O3). Erledigt: O17, O3, O7.
+
 **Runde vom Abend des 06.08.** (Vorbereitung der Mobile-Session): O1, O2, O4, O5,
 O6, O10, O13 (drei Punkte), O15 erledigt · L5b, O9 (erste Handlung) und O12
 entschieden. Alles committet, nichts davon live. Nicht angefasst und weiter offen:
@@ -394,22 +400,51 @@ liegen (Kevins Entscheidung 06.08.). Sie stören die Pipeline-Optik, nicht die Q
 Aufräumen wäre ein eigener Schritt mit Blick auf die Namen — kein Nebenbei-Löschen.
 *Herkunft: IDEEN „Das große Bild #2" + Abriss-Liste · Session-Inventur*
 
-### O3 · Morgen-Push aufs Handy (Etappe A des Wargames) — **L**
-Neun Züge, blind ausführbar: Service Worker (nur Push, kein Cache), Migration 0067
-(`push_subscriptions`, `push_log`, pg_cron), Edge Function `morgen-push`,
-Client-Aktivierung, Route `/morgen`, `modus=arbeit`.
-**Verifizierter Stand:** `push_subscriptions` und `push_log` existieren **nicht**
-(PGRST205), kein Service Worker im Repo, kein Push-Code. `site.webmanifest` und
-Icons sind da — installierbar ja, Push ist Neubau.
-**Abhängigkeiten:** **L2 zwingend zuerst** (sonst fährt `db push` acht Altmigrationen
-erneut). Danach L1 (live), dann Kevins iPhone-Schritte.
-**Zwei Korrekturen an der Blaupause:**
-- Der Recon-Befund „Mobil-Grenze 900px vereinheitlicht (Etappe 2)" stimmte nur für
-  die NavRail. **Seit 06.08. gilt er:** `MOBILE_MAX_WIDTH = 900` in
-  `hooks/useViewport.ts`, importiert von NavRail und CockpitHome (O10). Zug 6
-  (Desktop-Redirect) und Zug 7 (`isMobile`-Weiche) hängen damit an **900**.
-- Abbruchbedingung 2 („`db push` meldet Historie-Desync") ist **bereits eingetreten**.
-*Herkunft: morgen-workflow.md · IDEAS-2026 A2 (Telegram — verworfene Alternative, siehe §5)*
+### O3 · ~~Morgen-Push aufs Handy~~ ✅ **gebaut 07.08.2026** · *Rest: Kevins iPhone*
+Etappen A und B des Wargames (Züge 1–9) sind gebaut und geprüft. Der Push kann
+erst ankommen, wenn der Code live ist und Kevin sein iPhone einmal einrichtet —
+siehe „Was noch fehlt".
+
+| Zug | Was | Beleg |
+|---|---|---|
+| 1 | Service Worker `app/public/sw.js` — **nur Push, kein Cache** (kein `fetch`-Handler, kein Cache-API-Aufruf, bewusst kein vite-plugin-pwa) | Im Browser: eine Registrierung, Zustand `activated`, **Cache Storage leer** |
+| 2 | Migration 0067: `push_subscriptions` (unique `endpoint`), `push_log` (`datum` als PK = die Sperre gegen den zweiten Push), zwei Cron-Zeilen 5:00/6:00 UTC | `migration list` 0067 in Local *und* Remote; `cron.job` zeigt beide, aktiv |
+| 3 | VAPID-Paar + `CRON_KEY` als Supabase-Secrets, `project_url`/`cron_key` im Vault, `VITE_VAPID_PUBLIC_KEY` in Netlify und `.env.local` | `supabase secrets list`, `select name from vault.secrets` |
+| 4 | Edge Function `morgen-push` (`verify_jwt = false`, Zugang per `x-cron-key` oder User-JWT + `test:true`) | deployt; ohne Key **401**, mit Key außerhalb der Stunde `{"skipped":"falsche-stunde"}`, mit `test:true` voller Durchlauf |
+| 5 | `pushClient.ts` + `Benachrichtigungen.tsx` auf `/morgen` und im Mehr-Sheet | `requestPermission` nur im onClick-Pfad; im iPhone-Safari statt eines toten Knopfes der Satz „Teilen → Zum Home-Bildschirm" |
+| 6 | Route `/morgen` — Vollbild am Handy, Desktop leitet auf `/cockpit` um | bei 390×664 vollständig sichtbar, „Loslegen" tippbar; bei 1280 px Umleitung |
+| 7 | `?modus=arbeit` öffnet am Handy direkt den Arbeitsmodus | Klick auf „Loslegen" → Dialog „Arbeitsmodus", Posten 1/2 |
+| 8 | Anfragen-Posten (= **O7**), nur Desktop, genau eine Aktion | siehe O7 |
+| 9 | „Loom aufnehmen" am Loom-Posten, echter Link statt `window.open` | im Aktionsblock |
+
+**RECON-1 vorab entschieden:** `jsr:@negrel/webpush` läuft in Deno — lokal gegen
+einen Fake-Push-Dienst geprüft, die Anfrage trägt `Authorization: vapid t=<ES256-JWT>`
+und `Content-Encoding: aes128gcm`. **Route B (Netlify Scheduled Function) wird
+nicht gebraucht.**
+
+**D5 in freier Wildbahn:** Der Probe-Push wählte am 07.08. von selbst die
+Variante „N Posten warten — MacBook aufklappen", weil die Nacht-Analyse
+tatsächlich ausgefallen war (O17). Genau dafür wurde die zweite Stufe gebaut.
+
+**Bewusst nicht gebaut:** `/dev/morgen-vorschau`. Der Zweck der Dev-Vorschau ist,
+die Seite ohne Session sehen zu können — mit Kevins Login war die echte Seite
+prüfbar, und eine zweite Fassung mit Fixtures wäre ab dem ersten Umbau falsch.
+
+**Was noch fehlt (nur Kevin):**
+1. **Live schalten** — Fast-Forward auf `main` + Netlify-Deploy. Ohne das gibt es
+   auf dem iPhone nichts zu abonnieren. (Der neue `VITE_VAPID_PUBLIC_KEY` ist
+   schon in Netlify gesetzt, greift aber erst mit dem nächsten Deploy.)
+2. **iPhone:** Safari → frameworkos.de → Teilen → **Zum Home-Bildschirm** (liegt
+   Uriel schon dort: einmal löschen und neu hinzufügen, sonst bleibt der alte
+   Service Worker drin) → App öffnen → einloggen → `/morgen` →
+   „Benachrichtigungen aktivieren" → **Erlauben** → **Probe-Push** antippen.
+3. Ab dem nächsten Werktag 7:00 der echte Push. Kommt keiner:
+   `select * from cron.job_run_details order by start_time desc limit 5` und
+   `select * from push_log` sagen, welche Stufe geschwiegen hat.
+4. **Selbstwecker** (aus O17): `sudo pmset repeat wakeorpoweron MTWRF 05:50:00`
+   — ohne ihn schläft der Mac durch und der Push meldet die „MacBook
+   aufklappen"-Variante.
+*Herkunft: morgen-workflow.md · IDEAS-2026 A2 (Telegram — verworfen, siehe §5)*
 
 ### O4 · ~~`last_message_at` wandert beim „Erledigt" nicht~~ ✅ **erledigt 06.08.2026**
 `markDonePatch` (`cockpit/lib/linkedinFollowups.ts`) setzt im Stufen-Zweig jetzt
@@ -479,14 +514,29 @@ pollt Supabase, ein echter Aufruf von `fuehreJobAus` ist von außen nicht ohne
 Seiteneffekte möglich.
 *Herkunft: IDEEN Abriss-Liste („Runner")*
 
-### O7 · Vernetzungsanfragen als Posten in „Jetzt dran" — **S** (nur Desktop)
-Die Spur `anfrage` ist in `prioritaet.ts` definiert (Rang 7), aber
-`arbeitsmodusQuellen.ts` liefert keine Posten — tote Bahn. Der Zähler existiert als
-Kachel (`SalesDashboard.tsx:476-486`), nicht als Posten.
-**Gefährlichste Stelle:** Der Posten darf **nie** durch `erledigePosten` laufen,
-sonst zählt `li_anfragen` doppelt. Er hat genau eine Aktion („Zähler öffnen").
-**Abhängigkeit:** keine. Sinnvoll gemeinsam mit O3 (Etappe B des Wargames).
-*Herkunft: IDEEN „Anfragen-Ritual" · morgen-workflow Zug 8. Identisch.*
+### O7 · ~~Vernetzungsanfragen als Posten in „Jetzt dran"~~ ✅ **gebaut 07.08.2026**
+Der Posten entsteht **synthetisch im Dashboard**, nicht in `arbeitsmodusQuellen`
+— seine Quelle ist `daily_metrics.li_anfragen`, es gibt keine Zeile zum
+Abhaken. Sichtbar nur am Desktop (D6) und nur, solange das Tagesziel offen ist;
+er verschwindet von selbst, wenn der Zähler es sagt.
+
+**Die gefährlichste Stelle, mit drei Sperren statt einer.** `metrikFeldFuer('anfrage')`
+ist `li_anfragen` — liefe der Posten durch `erledigePosten`, zählte `bump()` oben
+auf den Zähler, und seit dem 06.08. schreibt `log_metric` auf dieselbe Spalte.
+Deshalb:
+1. `Posten.nurZaehler` als Marker,
+2. `erledigePosten` bricht bei diesem Marker **vor allem anderen** ab — kein
+   `bump`, keine Dauer; als erste Zeile, nicht als Sonderfall im `switch`,
+3. `oeffneArbeitsmodus` filtert solche Posten heraus, damit **kein Aufrufer** es
+   vergessen kann (im Vollbild gibt es nur „Erledigt").
+
+In der Liste hat er genau eine Aktion: **Zähler öffnen**.
+
+**Geprüft:** `scripts/verify-arbeitsmodus-tracking.ts` 23/23 — inklusive
+Gegenprobe, dass derselbe Posten *ohne* Marker sehr wohl zählen würde (sonst
+bewiese der Test nur, dass gerade nichts passiert). Im laufenden Cockpit bei
+1280 px: „Vernetzungsanfragen: noch 30 von 30", aufgeklappt ein einziger Knopf.
+*Herkunft: IDEEN „Anfragen-Ritual" · morgen-workflow Zug 8*
 
 ### O8 · Ads-Review-Durchgang — **S** · hoch für die anstehende Arbeit
 20 Reichentrog-Ads stehen auf „review", `cockpit/components/ads/AdDetailPanel.tsx`
@@ -588,6 +638,7 @@ Jeder Punkt einzeln bestätigt, keiner dringend, jeder kommt sonst zurück.
 | Ads-Dashboard zeigt vier leere KPI-Kacheln statt Review-Fortschritt | `AdsArea.tsx:123-126` (alle „—") |
 | ~~Nav-Icons ☑ ⚙ rendern auf iOS als bunte Emoji~~ ✅ 06.08. — beide tragen jetzt U+FE0E (Variation Selector-15, Text-Variante), dazu `font-variant-emoji: text` auf `.ck-nav-icon`. Bewusst kein Zeichentausch: alle anderen Icons sind Geometric Shapes, ein fremdes Zeichen hätte Tofu riskiert. **Nicht von hier prüfbar** — braucht einen Blick auf echtem iOS | `NavRail.tsx`, `styles/cockpit.css` |
 | Beziehungs-Reminder „Still geworden" | kein `last_contact_at` in `cockpit/` |
+| **Neu 07.08.:** Kundenarbeit-Posten zeigen „Seit **Infinity** Tagen keine Bewegung" — eine Division ohne Datum. Im Arbeitsmodus gesehen, Posten „Reichentrog & Kollegen GmbH" | `cockpit/lib/kundenarbeit.ts` (Tage-Berechnung ohne Fallback) |
 | Umsatz per Uriel eintragen — `log_metric` kann nur zählen, nicht setzen; braucht ein eigenes `set_revenue` mit Setz-Semantik | `metrikFelder.ts` (umsatz bewusst ausgelassen), `useDailyMetrics.setUmsatzOn` |
 | Call-Mode auf den echten Funnel stellen oder streichen | `SalesArea.tsx:18/58` — Sub-Tab existiert weiter |
 | Website-CMS entscheiden: keine Kundenseite liest `site_content_published`, `site_content` = **0 Zeilen** — dabei auch die Projekt-Scopierung der Definer-View lösen (Funktion mit `project_id` statt offener View, siehe L3) | `0052_site_content.sql:108-112`, `lib/siteContentService.ts` |
