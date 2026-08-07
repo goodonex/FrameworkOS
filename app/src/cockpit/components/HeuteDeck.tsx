@@ -10,6 +10,8 @@ import { KACHEL_JE_SPUR, SPUR_LABEL } from '../lib/spurAnzeige'
 import { tagesansage } from '../lib/tagesansage'
 import { CALENDAR_ICAL_KEY, useCalendarFeed } from '../lib/useCalendarFeed'
 import { useKundenPosteingang } from '../lib/useKundenPosteingang'
+import { useRunnerData } from '../lib/useRunnerData'
+import { agentenBefund } from '../lib/agentenGesundheit'
 
 const COLLAPSE_KEY = 'ck.heute.collapsed'
 const TOP = 5
@@ -50,6 +52,10 @@ export function HeuteDeck({ slug }: { slug: string | undefined }) {
     }
   })
   const cal = useCalendarFeed(icalUrl || null)
+
+  // O17: Der Zustand der Nacht-Routinen — sichtbar, ohne dass jemand zusehen musste.
+  const { runs } = useRunnerData()
+  const befund = useMemo(() => agentenBefund(runs), [runs])
 
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSE_KEY) === '1')
   const toggleCollapsed = useCallback(() => {
@@ -124,6 +130,37 @@ export function HeuteDeck({ slug }: { slug: string | undefined }) {
           {collapsed ? '▸' : '▾'}
         </span>
       </button>
+
+      {/* O17 Schritt 4: Ein nachts gescheiterter Agent wurde bisher nirgends
+          gemeldet — der RunWatcher toastet nur, was er live umkippen sieht.
+          Diese Zeile steht auch dann, wenn Kevin erst mittags aufmacht, und
+          bleibt bewusst AUSSERHALB des Zuklapp-Bereichs. */}
+      {befund.meldung ? (
+        <button
+          type="button"
+          onClick={() => navigate('/agenten')}
+          style={{
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '7px 14px',
+            background: 'transparent',
+            border: 'none',
+            borderTop: '1px solid var(--ck-border)',
+            borderBottom: collapsed ? 'none' : '1px solid var(--ck-border)',
+            cursor: 'pointer',
+            textAlign: 'left',
+            fontSize: 12,
+            color: 'var(--ck-danger)',
+          }}
+        >
+          <span aria-hidden>⚠</span>
+          <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {befund.meldung} — ansehen
+          </span>
+        </button>
+      ) : null}
 
       {collapsed ? null : (
         <>

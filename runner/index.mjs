@@ -19,6 +19,7 @@ import { ladeErstnachrichten } from './linkedin/erstnachrichten.mjs'
 import { baueAntwortInput, holeAntwortThreads } from './linkedin/antwortThreads.mjs'
 import { parseDraftsRoh, schreibeEntwuerfe } from './linkedin/entwuerfe.mjs'
 import { neuerLauf, nimmBrocken, protokollText } from './agentStream.mjs'
+import { bewerteTagesLaeufe, darfRoutineStarten } from './routineGuard.mjs'
 
 // ---------- Lokale .env (nur für Secrets wie den Supabase-Key; gitignored) ----------
 // Minimaler Parser (zero-dependency). Prozess-Env hat Vorrang vor der Datei.
@@ -372,6 +373,48 @@ function parseRun(name, raw) {
   const body = m ? raw.slice(m[0].length) : raw
   const preview = body.trim().split('\n').slice(0, 3).join(' ').slice(0, 160)
   return { id: name.replace(/\.md$/, ''), ...meta, preview }
+}
+
+/**
+ * Wie oft eine Routine an einem Tag hoechstens versucht wird (O17 Schritt 4).
+ * Zwei: einmal regulaer, einmal Nachschlag. Ohne Deckel wuerde der 5-Minuten-Tick
+ * einen dauerhaft scheiternden Agenten den ganzen Tag alle fuenf Minuten neu
+ * starten — Tokens verbrannt, Run-Ordner zugemuellt.
+ */
+const MAX_VERSUCHE_PRO_TAG = Number(process.env.MAX_VERSUCHE_PRO_TAG ?? 2)
+
+/**
+ * Was ein Agent heute schon getan hat — nach **Status**, nicht nach Dateiname.
+ *
+ * O17 Schritt 4: Der alte Guard prüfte nur, ob eine Datei mit heutigem Datum und
+ * dem Agentennamen existiert. Ein Fehlschlag um 6:00 zählte damit als „heute
+ * schon gelaufen" — der Fehler deckte sich selbst zu, und der Morgenbrief blieb
+ * bis zum nächsten Tag aus. Jetzt entscheidet der Status in der Frontmatter.
+ */
+async function tagesLaufStand(agent, heute) {
+  const namen = (await readdir(RUNS_DIR)).filter(
+    (n) => n.endsWith('.md') && n.startsWith(heute) && n.includes(agent),
+  )
+  const metas = []
+  for (const name of namen) {
+    const raw = await readFile(join(RUNS_DIR, name), 'utf8')
+    metas.push(parseRun(name, raw))
+  }
+  return bewerteTagesLaeufe(metas, agent)
+}
+
+/**
+ * Darf die Routine jetzt starten? Fasst die drei Bedingungen zusammen, die
+ * vorher in jeder `maybe*`-Funktion einzeln (und ungleich) standen.
+ */
+async function routineFaellig(agent, heute) {
+  const { erfolg, fehlschlaege } = await tagesLaufStand(agent, heute)
+  return darfRoutineStarten({
+    erfolg,
+    fehlschlaege,
+    laeuft: [...running.values()].some((r) => r.agent === agent),
+    maxVersuche: MAX_VERSUCHE_PRO_TAG,
+  })
 }
 
 /**
@@ -1927,13 +1970,11 @@ async function maybeMorgenbrief() {
     const wochentag = jetzt.getDay() // 0 = Sonntag, 6 = Samstag
     if (wochentag === 0 || wochentag === 6) return
     if (jetzt.getHours() < MORGENBRIEF_AB_STUNDE) return
-    // Läuft er gerade noch, darf der nächste Tick keinen zweiten starten —
-    // die Run-Datei entsteht ja erst am Ende.
-    if ([...running.values()].some((r) => r.agent === 'morgenbrief')) return
+    // O17: Nach Status statt nach Dateiname — ein Fehlschlag um 7:00 darf nicht
+    // als „heute schon gelaufen" zählen. Der laufende Agent ist mitgeprüft.
     const heute = nowStamp().slice(0, 10)
-    const names = await readdir(RUNS_DIR)
-    if (names.some((n) => n.startsWith(heute) && n.includes('morgenbrief'))) return
-    console.log('[runner] morgenbrief startet (erster Werktags-Lauf heute)…')
+    if (!(await routineFaellig('morgenbrief', heute))) return
+    console.log('[runner] morgenbrief startet (kein erfolgreicher Lauf heute)…')
     await startRun('morgenbrief', {})
   } catch (e) {
     console.error('[runner] morgenbrief übersprungen:', e?.message ?? e)
@@ -1958,10 +1999,8 @@ async function maybeAntwortEntwuerfe() {
     const wochentag = jetzt.getDay()
     if (wochentag === 0 || wochentag === 6) return
     if (jetzt.getHours() < ENTWUERFE_AB_STUNDE) return
-    if ([...running.values()].some((r) => r.agent === 'linkedin-antwort-entwuerfe')) return
     const heute = nowStamp().slice(0, 10)
-    const names = await readdir(RUNS_DIR)
-    if (names.some((n) => n.startsWith(heute) && n.includes('linkedin-antwort-entwuerfe'))) return
+    if (!(await routineFaellig('linkedin-antwort-entwuerfe', heute))) return
 
     // Keine wartenden Leads → kein Lauf. Ein leerer Entwurfs-Run wäre nur eine
     // Zeile Rauschen in der Freigaben-Queue.
@@ -1982,9 +2021,9 @@ async function maybeAntwortEntwuerfe() {
 async function maybeDream() {
   try {
     const today = nowStamp().slice(0, 10)
-    const names = await readdir(RUNS_DIR)
-    if (names.some((n) => n.startsWith(today) && n.includes('dream-check'))) return
+    if (!(await routineFaellig('dream-check', today))) return
 
+    const names = await readdir(RUNS_DIR)
     const recentRuns = names
       .filter((n) => n.endsWith('.md'))
       .sort()
