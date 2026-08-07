@@ -592,31 +592,46 @@ Jeder Punkt einzeln bestätigt, keiner dringend, jeder kommt sonst zurück.
 | Call-Mode auf den echten Funnel stellen oder streichen | `SalesArea.tsx:18/58` — Sub-Tab existiert weiter |
 | Website-CMS entscheiden: keine Kundenseite liest `site_content_published`, `site_content` = **0 Zeilen** — dabei auch die Projekt-Scopierung der Definer-View lösen (Funktion mit `project_id` statt offener View, siehe L3) | `0052_site_content.sql:108-112`, `lib/siteContentService.ts` |
 
-### O17 · Die Morgen-Agenten laufen ins Timeout — **M** · *neu, 07.08.2026*
-Am eingeloggten Cockpit gefunden, stand in keinem Dokument: Von den letzten
-20 Läufen sind **8 mit Fehler** abgebrochen, und es trifft ausgerechnet die
-Routinen, die morgens von allein laufen sollen.
+### O17 · ~~Die Morgen-Agenten laufen ins Timeout~~ ✅ **behoben 07.08.2026**
+**Der Befund war ein anderer als der Verdacht.** Nicht der Agent, nicht die
+Denktiefe, nicht der Timeout: **der Mac schlief zwei Sekunden nach dem Start
+wieder ein.** `pmset -g log`, neben die Run-Zeiten gelegt (04.08.):
 
-| Agent | Läufe (letzte 20) | Ergebnis |
+| Uhrzeit | Ereignis |
+|---|---|
+| 06:09:36 | DarkWake aus Deep Idle |
+| **06:09:38** | Run `linkedin-antwort-entwuerfe` startet — und im selben Moment `Entering Sleep` |
+| 06:26:06 | nächster DarkWake |
+| **06:26:07** | Run wird als fehlgeschlagen verbucht |
+
+Alle neun Fehl-Läufe zwischen dem 03. und 07.08. liegen so: Start auf einem
+DarkWake, „Ende" auf dem nächsten. Der Mac fährt nachts einen Zyklus
+„DarkWake für zwei Sekunden, dann zurück in den Schlaf", etwa alle 16 Minuten.
+Der Agent bekam rund **zwei Sekunden Rechenzeit je Zyklus**; die Timeout-Wanduhr
+lief im Schlaf weiter, SIGTERM und `close` wurden erst beim nächsten DarkWake
+abgearbeitet. **Die 10,9 bis 17,8 Minuten sind keine Laufzeiten, sondern
+Abstände zwischen zwei Aufwachern.**
+*Gegenprobe:* derselbe `dream-check` am 07.08. mittags bei wachem Mac —
+**23 Sekunden**. Morgenbrief am 31.07. abends — **33 Sekunden**. Der Skill ist
+54 Zeilen und liest eine Datei.
+
+**Vier Schritte, in dieser Reihenfolge gebaut**
+
+| # | Was | Beleg |
 |---|---|---|
-| `morgenbrief` | 4 × Fehler, 1 × fertig | „Run fehlgeschlagen (Exit 143)", **kein Output** |
-| `linkedin-antwort-entwuerfe` | 3 × Fehler, 1 × fertig | dito |
-| `dream-check` | 1 × Fehler, 7 × fertig | dito |
+| 1 | **Teilausgabe.** `--output-format text` schweigt bis zum Schluss — ein Abbruch hinterließ „kein Output". Jetzt `stream-json --verbose`, `runner/agentStream.mjs` baut ein Protokoll mit Zeitmarken (Werkzeuge samt Argument, gedachte Zeichen, Kennzahlen). Erfolgreiche Läufe sehen unverändert aus (nur der Endtext aus dem `result`-Ereignis — die Freigaben-Queue liest den ```json-Block daraus). | `scripts/verify-agent-stream.ts`, 39 Fälle |
+| 2 | **Wachhalten.** Lauf startet unter `caffeinate -i -s`; die Zusicherung endet mit dem Prozess. **Timeout bleibt bei zehn Minuten** (Entscheidung Kevin 07.08.) — eine größere Zahl hätte den Fehlschlag nur später kommen lassen. | `CAFFEINATE_BIN` in `runner/index.mjs` |
+| 3 | **Prozessbaum.** `proc.kill()` traf nur das direkte Kind, während ein Enkel die stdout-Pipe offen hielt — deshalb kam `close` Minuten zu spät. Jetzt `detached: true` (eigene Prozessgruppe) und `beendeBaum()`: SIGTERM an die Gruppe, nach 15 s Karenz SIGKILL. | im Test: Run-Datei exakt zum Limit statt 75 s später |
+| 4 | **Guard + Sichtbarkeit.** Der Tages-Guard prüfte nur den Dateinamen — ein Fehlschlag galt als „heute schon gelaufen" und deckte sich selbst zu. Jetzt entscheidet der **Status**, mit zwei Versuchen je Tag als Deckel. Dazu eine Zeile im Heute-Deck: gescheiterte Routinen von heute stehen sichtbar da (der `RunWatcher` toastet nur, was er live umkippen sieht). | `runner/routineGuard.mjs`, `cockpit/lib/agentenGesundheit.ts`, `scripts/verify-routine-guard.ts`, 30 Fälle |
 
-**Ursache belegt:** Exit 143 = 128 + SIGTERM. `runner/index.mjs:51` setzt
-`TIMEOUT_MS = 10 * 60 * 1000`, `:446-448` schickt danach `proc.kill('SIGTERM')`.
-Die Agenten brauchen also länger als zehn Minuten und werden mitten im Lauf
-abgeschossen — ohne Teilergebnis, weil der Output erst am Ende geschrieben wird.
-
-**Was das praktisch heißt:** Kevins Morgenbrief ist an den meisten Tagen seit
-mindestens dem 04.08. nicht entstanden, und die Antwort-Entwürfe ebenso wenig.
-Beides fiel nicht auf, weil ein fehlgeschlagener Run nur im Agenten-Hub steht.
-
-**Drei Wege, Entscheidung nötig:** Timeout hochsetzen (billig, verschiebt das
-Problem) · den Agenten kürzen, damit er in zehn Minuten fertig ist (Prompt/Umfang)
-· Teilausgabe mitschreiben, damit ein Abbruch wenigstens etwas hinterlässt.
-**Hängt mit O3 zusammen:** Ein Morgen-Push, der einen Brief schickt, der gar nicht
-entsteht, wäre wertlos — das gehört vor O3 geklärt.
+**Offen für Kevin — sonst greift Punkt 2 ins Leere:**
+1. **Runner neu starten**, damit der Dienst den neuen Code lädt:
+   `launchctl kickstart -k gui/$(id -u)/de.uriel.runner`
+2. **Selbstwecker setzen** (braucht das Passwort, deshalb nicht von hier):
+   `sudo pmset repeat wakeorpoweron MTWRF 05:50:00`
+   Ohne ihn wacht der Mac werktags nicht von selbst auf — `caffeinate` hält ihn
+   nur wach, sobald ein Lauf begonnen hat. `pmset -g sched` zeigt den Stand
+   vorher; `pmset repeat` überschreibt bestehende Wiederhol-Zeitpläne.
 *Gefunden am 07.08. gegen das laufende System; in keinem Plandokument.*
 
 ### O14 · Sales-Subtabs restylen — **L** · nach der Call-Mode-Entscheidung
