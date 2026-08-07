@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.brand-assistant]
 verify_jwt = true
+
+[functions.morgen-push]
+verify_jwt = false
