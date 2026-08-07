@@ -18,6 +18,7 @@ import { upsertThreads } from './linkedin/upsert.mjs'
 import { ladeErstnachrichten } from './linkedin/erstnachrichten.mjs'
 import { baueAntwortInput, holeAntwortThreads } from './linkedin/antwortThreads.mjs'
 import { parseDraftsRoh, schreibeEntwuerfe } from './linkedin/entwuerfe.mjs'
+import { neuerLauf, nimmBrocken, protokollText } from './agentStream.mjs'
 
 // ---------- Lokale .env (nur für Secrets wie den Supabase-Key; gitignored) ----------
 // Minimaler Parser (zero-dependency). Prozess-Env hat Vorrang vor der Datei.
@@ -49,6 +50,13 @@ const VAULT = resolve(process.env.VAULT_PATH ?? join(homedir(), 'Second Brain'))
 const RUNS_DIR = join(VAULT, 'System', 'Runs')
 const QUEUE_DIR = join(VAULT, 'System', 'Queue')
 const TIMEOUT_MS = 10 * 60 * 1000 // 10 Minuten (Plan §6)
+/**
+ * O17: Wie oft die Mitschrift eines laufenden Agenten auf Platte geht.
+ * Gedrosselt, weil ein Lauf hunderte Ereignisse erzeugt und die Run-Dateien im
+ * iCloud-synchronisierten Vault liegen — jede Zeile einzeln zu schreiben wäre
+ * ein Sync-Sturm für nichts.
+ */
+const LIVE_SCHREIB_MS = Number(process.env.LIVE_SCHREIB_MS ?? 5_000)
 
 // OS-Map-Snapshot → Supabase, damit die HTTPS-Live-Domain (frameworkos.de) den
 // Graphen zeigt, ohne dass der lokale Runner erreichbar ist. Der Runner spiegelt
@@ -235,7 +243,12 @@ function agentConfig(agent) {
 }
 
 // ---------- Zustand ----------
-/** @type {Map<string, {id:string, agent:string, startedAt:string, proc:import('node:child_process').ChildProcess}>} */
+/**
+ * O17: Der Eintrag traegt jetzt die **Mitschrift** des Laufs (`lauf`). Daran
+ * haengt zweierlei — die Run-Liste zeigt einem laufenden Agenten beim Arbeiten
+ * zu, und ein Abbruch hinterlaesst ein Protokoll statt „kein Output".
+ * @type {Map<string, {id:string, agent:string, startedAt:string, proc:import('node:child_process').ChildProcess, lauf:ReturnType<typeof neuerLauf>}>}
+ */
 const running = new Map()
 let linkedinSyncRunning = false
 
@@ -270,7 +283,9 @@ async function writeRunFile(id, agent, status, startedAt, content) {
     `agent: ${agent}`,
     `status: ${status}`,
     `started: ${startedAt}`,
-    `finished: ${new Date().toISOString()}`,
+    // O17: Zwischenstände eines laufenden Agenten haben kein Ende — ein
+    // Zeitstempel dort läse sich wie ein fertiger Lauf.
+    `finished: ${status === 'running' ? '' : new Date().toISOString()}`,
     '---',
     '',
   ].join('\n')
@@ -311,6 +326,12 @@ async function runsListe(limit, mitInhalt = false) {
     .slice(0, limit)
   const runs = []
   for (const name of names) {
+    const eintragId = name.replace(/\.md$/, '')
+    // O17: Ein laufender Agent hat jetzt AUCH eine Datei (die Mitschrift). Ohne
+    // diese Zeile stünde er zweimal in der Liste — einmal aus `running`, einmal
+    // aus der Datei, mit identischer id. Die Speicher-Fassung gewinnt, sie ist
+    // aktueller als der letzte Schreib-Tick.
+    if (running.has(eintragId)) continue
     const raw = await readFile(join(RUNS_DIR, name), 'utf8')
     const eintrag = parseRun(name, raw)
     if (mitInhalt) {
@@ -318,14 +339,17 @@ async function runsListe(limit, mitInhalt = false) {
     }
     runs.push(eintrag)
   }
-  const aktiv = [...running.values()].map(({ id, agent, startedAt }) => ({
+  const aktiv = [...running.values()].map(({ id, agent, startedAt, lauf }) => ({
     id,
     agent,
     status: 'running',
     started: startedAt,
     finished: '',
-    preview: 'läuft…',
-    ...(mitInhalt ? { content: '' } : {}),
+    // O17: Die Vorschau zeigt den letzten Schritt statt eines ewigen „läuft…".
+    preview: lauf?.zeilen?.length ? lauf.zeilen[lauf.zeilen.length - 1].slice(0, 160) : 'läuft…',
+    ...(mitInhalt
+      ? { content: lauf ? protokollText(lauf, { titel: 'Läuft' }).slice(0, RUN_CONTENT_MAX) : '' }
+      : {}),
   }))
   return [...aktiv, ...runs]
 }
@@ -428,9 +452,15 @@ async function startRun(agent, input) {
   ]
   const PATH = [process.env.PATH ?? '', ...extraBins].filter(Boolean).join(':')
 
+  // O17 (07.08.2026): `--output-format text` schweigt bis zum Schluss und gibt
+  // dann alles auf einmal aus. Ein abgebrochener Lauf hinterlässt damit exakt
+  // nichts — neun Run-Dateien seit dem 03.08. sagen „kein Output". Mit
+  // `stream-json --verbose` kommt eine Zeile JSON je Ereignis, die wir laufend
+  // mitschreiben. Der Endtext steht im `result`-Ereignis; die Run-Datei sieht
+  // bei Erfolg unverändert aus (die Freigaben-Queue liest den ```json-Block).
   const proc = spawn(
     process.env.CLAUDE_BIN ?? 'claude',
-    ['-p', prompt, '--output-format', 'text', ...cfg.extraArgs],
+    ['-p', prompt, '--output-format', 'stream-json', '--verbose', ...cfg.extraArgs],
     {
       cwd: cfg.cwd,
       env: { ...process.env, PATH },
@@ -438,22 +468,54 @@ async function startRun(agent, input) {
     },
   )
 
-  let stdout = ''
+  const lauf = neuerLauf(Date.now())
+  let puffer = ''
   let stderr = ''
-  proc.stdout.on('data', (c) => (stdout += c))
+  proc.stdout.on('data', (c) => {
+    puffer = nimmBrocken(lauf, puffer, c, Date.now())
+    planeLiveSchreiben()
+  })
   proc.stderr.on('data', (c) => (stderr += c))
+
+  /**
+   * Mitschrift regelmäßig auf Platte, damit auch ein harter Abbruch des
+   * Runners (Neustart, Absturz, `kill -9`) Spuren hinterlässt. Gedrosselt:
+   * ein Agenten-Lauf erzeugt hunderte Ereignisse, und die Datei liegt im
+   * iCloud-synchronisierten Vault.
+   */
+  let liveTimer = null
+  let liveLaeuft = false
+  const schreibeLive = async () => {
+    if (liveLaeuft) return
+    liveLaeuft = true
+    try {
+      await writeRunFile(id, agent, 'running', startedAt, protokollText(lauf, { titel: 'Läuft' }) + '\n')
+    } catch {
+      /* Mitschrift ist Diagnose, kein Selbstzweck — ein Schreibfehler darf den Lauf nicht kippen */
+    } finally {
+      liveLaeuft = false
+    }
+  }
+  function planeLiveSchreiben() {
+    if (liveTimer) return
+    liveTimer = setTimeout(() => {
+      liveTimer = null
+      void schreibeLive()
+    }, LIVE_SCHREIB_MS)
+  }
 
   const timeout = setTimeout(() => {
     proc.kill('SIGTERM')
   }, TIMEOUT_MS)
 
-  running.set(id, { id, agent, startedAt, proc })
+  running.set(id, { id, agent, startedAt, proc, lauf })
 
   // spawn-Fehler (z.B. claude nicht im PATH) dürfen den Runner NICHT crashen —
   // ohne diesen Handler wirft der ChildProcess ein unhandled 'error' Event
   // (beobachtet: ENOENT-Crash-Loop unter launchd am 08.07.).
   proc.on('error', async (e) => {
     clearTimeout(timeout)
+    if (liveTimer) clearTimeout(liveTimer)
     running.delete(id)
     try {
       await writeRunFile(
@@ -472,18 +534,27 @@ async function startRun(agent, input) {
 
   proc.on('close', async (code) => {
     clearTimeout(timeout)
+    if (liveTimer) clearTimeout(liveTimer)
+    if (puffer.trim()) nimmBrocken(lauf, puffer, '\n', Date.now())
     running.delete(id)
+    const ergebnis = (lauf.ergebnis ?? '').trim()
     try {
-      if (code === 0 && stdout.trim()) {
-        await writeRunFile(id, agent, 'done', startedAt, stdout.trim() + '\n')
-        if (agent === 'linkedin-antwort-entwuerfe') await entwuerfeAnThreads(id, stdout)
+      if (code === 0 && ergebnis) {
+        // Unverändertes Format: der Endtext, sonst nichts. Die Mitschrift ist
+        // Diagnose für den Fehlerfall und hat im gelungenen Lauf nichts verloren.
+        await writeRunFile(id, agent, 'done', startedAt, ergebnis + '\n')
+        if (agent === 'linkedin-antwort-entwuerfe') await entwuerfeAnThreads(id, ergebnis)
       } else {
+        // O17: Statt „kein Output" steht hier jetzt, wie weit der Lauf kam.
+        const grund =
+          code === 143
+            ? `# Run abgebrochen (Exit 143 — SIGTERM nach ${Math.round(TIMEOUT_MS / 60000)} Minuten)`
+            : `# Run fehlgeschlagen (Exit ${code})`
         const err = [
-          `# Run fehlgeschlagen (Exit ${code})`,
+          grund,
           '',
-          '```',
-          (stderr || stdout || 'kein Output').slice(-3000),
-          '```',
+          protokollText(lauf, { titel: 'Mitschrift bis zum Abbruch' }),
+          ...(stderr.trim() ? ['', '**stderr**', '', '```', stderr.trim().slice(-2000), '```'] : []),
         ].join('\n')
         await writeRunFile(id, agent, 'error', startedAt, err + '\n')
       }
