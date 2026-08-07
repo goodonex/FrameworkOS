@@ -526,16 +526,33 @@ export function SalesDashboard() {
   // die Kachel nach jedem Schließen wieder.
   const [suchParams, setSuchParams] = useSearchParams()
   const kachelParam = suchParams.get('kachel')
+  const modusParam = suchParams.get('modus')
   useEffect(() => {
-    if (!kachelParam) return
-    if (kacheln.some((k) => k.id === kachelParam)) setOffenKachelId(kachelParam)
+    if (!kachelParam && !modusParam) return
+
+    // O3 Zug 7: `?modus=arbeit` kommt vom „Loslegen" auf /morgen. Am Handy
+    // öffnet es direkt den Arbeitsmodus statt des Kachel-Fensters — der Weg vom
+    // Push zum ersten Posten soll zwei Tipps lang sein, nicht drei.
+    //
+    // Der Effekt darf NICHT feuern, solange die Posten noch laden: sonst stünde
+    // „Alles abgearbeitet" vor einer Liste, die gleich kommt. Dann lieber den
+    // Parameter stehen lassen und beim nächsten Durchlauf erneut prüfen.
+    if (modusParam === 'arbeit' && isMobile) {
+      if (geordnet.length === 0) return
+      oeffneArbeitsmodus('alle', geordnet)
+    } else if (kachelParam && kacheln.some((k) => k.id === kachelParam)) {
+      setOffenKachelId(kachelParam)
+    }
+
     const next = new URLSearchParams(suchParams)
     next.delete('kachel')
+    next.delete('modus')
     setSuchParams(next, { replace: true })
     // kacheln wird bei jedem Render neu gebaut — die Abhängigkeit ist bewusst
-    // nur der Parameter, sonst liefe der Effekt endlos.
+    // nur der Parameter (plus das, was über „noch nicht geladen" entscheidet),
+    // sonst liefe der Effekt endlos.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kachelParam])
+  }, [kachelParam, modusParam, isMobile, geordnet.length])
 
   const oeffneKachel = useCallback(
     (id: string) => {

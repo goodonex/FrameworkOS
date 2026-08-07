@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useSocialUnread } from '../lib/socialApi'
 import { MOBILE_MEDIA_QUERY } from '../../hooks/useViewport'
+import { Benachrichtigungen } from './Benachrichtigungen'
 
 interface NavItem {
   to: string
@@ -180,6 +181,13 @@ function MehrSheet({ onClose, badgeFuer }: { onClose: () => void; badgeFuer: (to
             </button>
           )
         })}
+
+        {/* O3, Zug 5: Der Schalter fuer Benachrichtigungen gehoert dorthin, wo
+            man ihn sucht, wenn der Morgen-Push mal ausbleibt — und nicht nur
+            auf /morgen, das man ohne Push gar nicht erst aufmacht. */}
+        <div style={{ borderTop: '1px solid var(--ck-border)', marginTop: 8, paddingTop: 10 }}>
+          <Benachrichtigungen kompakt />
+        </div>
       </div>
     </div>
   )

@@ -23,6 +23,7 @@ import { LegacyBrandRedirect, LegacyDeliverRedirect } from './cockpit/lib/Legacy
 import { OnboardingPublicPage } from './pages/onboarding/OnboardingPublicPage'
 import { CockpitShell } from './cockpit/CockpitShell'
 import { CockpitHome } from './cockpit/pages/CockpitHome'
+import { MorgenArea } from './cockpit/pages/MorgenArea'
 import { SalesArea } from './cockpit/pages/SalesArea'
 import { ProjekteArea } from './cockpit/pages/ProjekteArea'
 import { TrackingArea } from './cockpit/pages/TrackingArea'
@@ -219,6 +220,9 @@ function App() {
               {/* Neue Cockpit-Shell (REBUILD-PLAN §5) */}
               <Route element={<CockpitShell />}>
                 <Route path="/cockpit" element={<CockpitHome />} />
+                {/* O3: Ziel des Morgen-Push. Am Desktop leitet die Seite selbst
+                    auf /cockpit um — Vollbild ist ein Handy-Konzept. */}
+                <Route path="/morgen" element={<MorgenArea />} />
                 <Route path="/aufgaben" element={<AufgabenArea />} />
                 <Route path="/termine" element={<TermineArea />} />
                 <Route path="/freigaben" element={<FreigabenArea />} />
