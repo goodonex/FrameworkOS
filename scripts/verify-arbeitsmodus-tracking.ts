@@ -116,5 +116,31 @@ check('1h kunde_liegt -> keins', metrikFeldFuer('kunde_liegt'), null)
   check('6c bump looms +1', aufrufe[1], { feld: 'looms', delta: 1 })
 }
 
+// ---- 7. O7 / Wargame Zug 8: die Doppelzaehl-Probe ----
+// Der Anfragen-Posten teilt sich das Metrikfeld mit dem Zaehler. Liefe er durch
+// erledigePosten, zaehlte bump('li_anfragen') oben drauf — und seit dem 06.08.
+// schreibt log_metric auf dieselbe Spalte, der Fehler waere doppelt teuer.
+{
+  const { deps, aufrufe } = makeDeps()
+  const zaehlerPosten = makePosten({
+    id: 'anfrage:tagesziel',
+    spur: 'anfrage',
+    name: 'Vernetzungsanfragen: noch 30 von 30',
+    nurZaehler: true,
+  })
+  await erledigePosten({ posten: zaehlerPosten, sekunden: 42 }, deps)
+  check('7a Erinnerungs-Posten loest GAR NICHTS aus', aufrufe, [])
+
+  // Gegenprobe: ohne den Marker zaehlt derselbe Posten sehr wohl. Der Test
+  // haelt damit fest, dass die Sperre die Ursache ist und nicht ein Zufall.
+  const zweite = makeDeps()
+  await erledigePosten(
+    { posten: makePosten({ id: 'anfrage:x', spur: 'anfrage' }), sekunden: 5 },
+    zweite.deps,
+  )
+  check('7b ohne Marker: bump li_anfragen', zweite.aufrufe[0], { feld: 'li_anfragen', delta: 1 })
+  check('7c Metrikfeld unveraendert', metrikFeldFuer('anfrage'), 'li_anfragen')
+}
+
 console.log(`${pass}/${pass + fail} Fälle korrekt`)
 if (fail > 0) process.exit(1)

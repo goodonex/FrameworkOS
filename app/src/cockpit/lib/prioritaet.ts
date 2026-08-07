@@ -60,6 +60,15 @@ export interface Posten {
   starred?: boolean
   /** Vorbereitete Nachricht, die hier nur noch kopiert werden muss */
   entwurf?: PostenEntwurf
+  /**
+   * Erinnerungs-Posten ohne eigene Zeile in einer Tabelle (O7 / Wargame Zug 8):
+   * Die Wahrheit steht woanders — beim Anfragen-Posten im Zaehler. Solche
+   * Posten haben GENAU EINE Aktion und duerfen **nie** durch `erledigePosten`
+   * laufen: `metrikFeldFuer('anfrage')` ist `li_anfragen`, ein Haken wuerde
+   * also oben drauf zaehlen. Sie verschwinden von selbst, wenn die Quelle es
+   * sagt.
+   */
+  nurZaehler?: true
 }
 
 /** Rohquellen je Spur — fehlt eine (Tabelle nicht migriert), fehlt nur diese Spur. */

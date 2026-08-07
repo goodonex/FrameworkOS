@@ -15,7 +15,7 @@ import { zeilenId } from '../lib/arbeitsmodusQuellen'
 import { erledigePosten } from '../lib/arbeitsmodusTracking'
 import { bucketOf } from '../lib/linkedinFollowups'
 import { funnelKpis, sumField } from '../lib/metricsAggregate'
-import { tagesstand, type Posten, type Spur } from '../lib/prioritaet'
+import { RANGFOLGE, tagesstand, type Posten, type Spur } from '../lib/prioritaet'
 import { tagesansage } from '../lib/tagesansage'
 import { postRun } from '../lib/runnerApi'
 import { fetchSalesLibrary, salesFileUrl, type SalesLibrary } from '../lib/salesLibraryApi'
@@ -222,12 +222,55 @@ export function SalesDashboard() {
   const funnel = useMemo(() => funnelKpis(metrics.monthRows, monthRevenue), [metrics.monthRows, monthRevenue])
   const tag = useMemo(() => tagesstand(metrics.today), [metrics.today])
 
+  /**
+   * O7 / Wargame Zug 8 — der Anfragen-Posten. Er hat keine Zeile in einer
+   * Tabelle: die Quelle ist `daily_metrics.li_anfragen`, deshalb entsteht er
+   * hier synthetisch statt in `arbeitsmodusQuellen`.
+   *
+   * Nur am Desktop (D6: „Vernetzungsanfragen machen nur am Laptop Sinn") und
+   * nur, solange das Tagesziel offen ist — er verschwindet von selbst, wenn der
+   * Zaehler es sagt. `nurZaehler` sperrt ihn gegen `erledigePosten`.
+   */
+  const anfragenPosten = useMemo<Posten | null>(() => {
+    if (isMobile) return null
+    if (tag.anfragenHeute >= tag.anfragenLimit) return null
+    const offen = tag.anfragenLimit - tag.anfragenHeute
+    return {
+      id: 'anfrage:tagesziel',
+      spur: 'anfrage',
+      name: `Vernetzungsanfragen: noch ${offen} von ${tag.anfragenLimit}`,
+      text: 'Auf LinkedIn senden, hier mitzaehlen. Der Zaehler ist die Wahrheit — dieser Posten verschwindet von selbst.',
+      timestamp: null,
+      nurZaehler: true,
+    }
+  }, [isMobile, tag.anfragenHeute, tag.anfragenLimit])
+
+  /**
+   * „Jetzt dran" mit dem Erinnerungs-Posten an seinem Rang. Der Arbeitsmodus
+   * bekommt bewusst `geordnet` OHNE ihn (siehe oeffneArbeitsmodus).
+   */
+  const geordnetMitAnfrage = useMemo(() => {
+    if (!anfragenPosten) return geordnet
+    // `geordnet` ist bereits nach RANGFOLGE sortiert — der Posten wird an
+    // seinem Rang eingeschoben, statt die Liste neu zu sortieren. `ordnePosten`
+    // erwartet Quellen je Spur, keine flache Liste.
+    const rang = (spur: Spur) => RANGFOLGE.indexOf(spur)
+    const i = geordnet.findIndex((p) => rang(p.spur) > rang('anfrage'))
+    return i === -1
+      ? [...geordnet, anfragenPosten]
+      : [...geordnet.slice(0, i), anfragenPosten, ...geordnet.slice(i)]
+  }, [geordnet, anfragenPosten])
+
   // Vollbild-Arbeitsmodus ist ein Handy-Werkzeug — am Desktop passiert die
   // Arbeit in der Liste im Kachel-Fenster.
   const oeffneArbeitsmodus = useCallback((spur: Spur | 'alle', liste: Posten[]) => {
-    if (liste.length === 0) return
+    // O7/D6: Erinnerungs-Posten gehoeren nie in den Vollbild-Arbeitsmodus —
+    // dort gibt es nur „Erledigt", und genau das darf dieser Posten nicht.
+    // Gefiltert wird hier, damit KEIN Aufrufer es vergessen kann.
+    const echte = liste.filter((p) => !p.nurZaehler)
+    if (echte.length === 0) return
     setOffenKachelId(null)
-    setArbeitsmodus({ spur, posten: [...liste] })
+    setArbeitsmodus({ spur, posten: echte })
   }, [])
 
   const schreibeDauer = useCallback(
@@ -391,6 +434,8 @@ export function SalesDashboard() {
       <Arbeitsliste
         posten={posten}
         onErledigt={onArbeitsmodusErledigt}
+        // O7: die einzige Aktion des Anfragen-Postens — kein Haken, kein Kopieren.
+        onZaehler={() => setOffenKachelId('vernetzungsanfragen')}
         loom={loomAktionen}
         projektLink={projektLink}
         onNavigiere={navigiere}
@@ -412,11 +457,11 @@ export function SalesDashboard() {
     {
       id: 'jetzt-dran',
       titel: 'Jetzt dran',
-      kennzahl: geordnet.length ? `${geordnet.length} offen` : 'Alles abgearbeitet',
+      kennzahl: geordnetMitAnfrage.length ? `${geordnetMitAnfrage.length} offen` : 'Alles abgearbeitet',
       // Kevins Morgen-Frage, aus seinen eigenen Messdaten (arbeits_dauern):
       // „12 offen · ≈ 1 h 40 · um 13:25 durch".
       unterzeile: geordnet.length ? tagesansage(geordnet, dauern, jetzt) : undefined,
-      inhalt: liste(geordnet),
+      inhalt: liste(geordnetMitAnfrage),
       fensterAktion: mobilArbeitsmodus('alle', geordnet),
     },
     {

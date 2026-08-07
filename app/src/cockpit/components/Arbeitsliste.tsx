@@ -36,6 +36,8 @@ export interface LoomSkriptAktionen {
 interface ArbeitslisteProps {
   posten: Posten[]
   onErledigt: (ergebnis: ArbeitsmodusErgebnis) => void
+  /** O7: einzige Aktion eines Erinnerungs-Postens (`nurZaehler`). */
+  onZaehler?: (posten: Posten) => void
   loom?: LoomSkriptAktionen
   /** Route zum Projekt einer Kundenaufgabe (Spur `kundenaufgabe`), sonst null */
   projektLink?: (p: Posten) => string | null
@@ -69,7 +71,7 @@ export function entwurfStand(erstelltAm: string | null, jetzt: Date = new Date()
   return `vor ${tage} Tagen`
 }
 
-export function Arbeitsliste({ posten, onErledigt, loom, projektLink, onNavigiere }: ArbeitslisteProps) {
+export function Arbeitsliste({ posten, onErledigt, onZaehler, loom, projektLink, onNavigiere }: ArbeitslisteProps) {
   const [offenId, setOffenId] = useState<string | null>(null)
   const [offenSeit, setOffenSeit] = useState(0)
   const [erledigt, setErledigt] = useState<Set<string>>(new Set())
@@ -310,6 +312,23 @@ export function Arbeitsliste({ posten, onErledigt, loom, projektLink, onNavigier
                       </button>
                     )
                   ) : null}
+                  {/* O3 Zug 9: Aufnehmen ist der Schritt zwischen „Skript da"
+                      und „Haken" — bisher fehlte er ganz. Bewusst ein echter
+                      Link statt window.open: aus einem async-Kontext heraus
+                      schluckt der Popup-Blocker das Fenster. Kein loom://,
+                      das ist nicht verlaesslich; die Desktop-App faengt die
+                      URL selbst ab, wenn sie installiert ist. */}
+                  {p.spur === 'loom' ? (
+                    <a
+                      className="ck-btn"
+                      style={{ minHeight: 40, display: 'inline-flex', alignItems: 'center' }}
+                      href="https://www.loom.com/record"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Loom aufnehmen ↗
+                    </a>
+                  ) : null}
                   {projekt && onNavigiere ? (
                     <button
                       type="button"
@@ -320,15 +339,28 @@ export function Arbeitsliste({ posten, onErledigt, loom, projektLink, onNavigier
                       Ins Projekt
                     </button>
                   ) : null}
-                  <button
-                    type="button"
-                    className="ck-btn"
-                    style={{ minHeight: 40 }}
-                    disabled={istErledigt}
-                    onClick={() => hake(p)}
-                  >
-                    {istErledigt ? '✓ Erledigt' : 'Erledigt'}
-                  </button>
+                  {/* O7: Erinnerungs-Posten bekommen GENAU EINE Aktion und
+                      keinen Haken — die Wahrheit ist der Zaehler. */}
+                  {p.nurZaehler ? (
+                    <button
+                      type="button"
+                      className="ck-btn ck-btn--primary"
+                      style={{ minHeight: 40 }}
+                      onClick={() => onZaehler?.(p)}
+                    >
+                      Zaehler oeffnen
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="ck-btn"
+                      style={{ minHeight: 40 }}
+                      disabled={istErledigt}
+                      onClick={() => hake(p)}
+                    >
+                      {istErledigt ? '✓ Erledigt' : 'Erledigt'}
+                    </button>
+                  )}
                 </div>
                 {p.spur === 'loom' && loom?.fehler ? (
                   <span style={{ fontSize: 12, color: 'var(--ck-warn)' }}>{loom.fehler}</span>

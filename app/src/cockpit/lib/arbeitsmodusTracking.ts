@@ -57,6 +57,12 @@ export async function erledigePosten(
   { posten, sekunden }: ArbeitsmodusErgebnis,
   deps: ArbeitsmodusTrackingDeps,
 ): Promise<void> {
+  // O7: Reine Erinnerungs-Posten haben keine Zeile zum Abhaken und keinen
+  // eigenen Zaehler — ihr Metrikfeld wird woanders hochgezaehlt. Ohne diese
+  // Sperre wuerde `bump(metrikFeldFuer(spur))` unten doppelt zaehlen. Der
+  // Guard steht bewusst VOR allem anderen, nicht als Sonderfall im switch.
+  if (posten.nurZaehler) return
+
   const rowId = zeilenId(posten.id)
 
   switch (posten.spur) {
