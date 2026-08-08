@@ -13,6 +13,7 @@ import { CALENDAR_ICAL_KEY, useCalendarFeed } from '../lib/useCalendarFeed'
 import { useDailyMetrics } from '../lib/useDailyMetrics'
 import { useRunnerData } from '../lib/useRunnerData'
 import { Benachrichtigungen } from '../components/Benachrichtigungen'
+import { BefundZeile } from '../components/home/BefundZeile'
 
 /**
  * `/morgen` — was der Tipp auf die Benachrichtigung öffnet (O3, Zug 6).
@@ -128,29 +129,10 @@ export function MorgenArea() {
       <p style={{ margin: 0, fontSize: 13.5, color: 'var(--ck-text-2)', lineHeight: 1.55 }}>{ansage}</p>
 
       {/* O17: Wenn die Nacht-Analyse gescheitert ist, gehört das an den Anfang
-          des Morgens — nicht in ein Protokoll, das niemand aufmacht. */}
-      {befund.meldung ? (
-        <button
-          type="button"
-          onClick={() => navigate('/agenten')}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '9px 11px',
-            borderRadius: 'var(--ck-radius)',
-            border: '1px solid var(--ck-danger)',
-            background: 'transparent',
-            color: 'var(--ck-danger)',
-            fontSize: 12,
-            textAlign: 'left',
-            cursor: 'pointer',
-          }}
-        >
-          <span aria-hidden>⚠</span>
-          <span>{befund.meldung} — ansehen</span>
-        </button>
-      ) : null}
+          des Morgens — nicht in ein Protokoll, das niemand aufmacht.
+          O18, Zug 2: dieselbe Zeile steht jetzt auch auf dem Homescreen —
+          eine Komponente, damit sie nicht auseinanderläuft. */}
+      <BefundZeile meldung={befund.meldung} onOeffnen={() => navigate('/agenten')} />
 
       <section>
         {zeile('Posten offen', String(geordnet.length), true)}
