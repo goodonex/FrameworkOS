@@ -112,15 +112,21 @@ export function UrielHome() {
     posten.erstnachrichten.loading
 
   /**
-   * Badges nur aus Quellen, die diese Seite ohnehin geladen hat (D5):
-   * `/freigaben` zeigt die Entwürfe, die auch im Heute-Widget stehen,
-   * `/content` die ungesehenen Wochen. `useSocialUnread` teilt sich seit Zug 4
-   * einen Ladelauf mit der NavRail — sonst liefe der 60-Sekunden-Takt doppelt.
-   * Kundenpost- und Termin-Badges bleiben draußen: die bräuchten neue Ladepfade.
+   * Badges nur aus Quellen, die diese Seite ohnehin geladen hat (D5).
+   * `useSocialUnread` teilt sich seit Zug 4 einen Ladelauf mit der NavRail —
+   * sonst liefe der 60-Sekunden-Takt doppelt.
+   *
+   * **Kein Badge an `/freigaben`**, obwohl D5 einen vorsah. Die Gegenprobe der
+   * Blaupause (Verifikation 5: Badge == Karten auf der Seite) ging nicht auf:
+   * `entwuerfeOffen(geordnet)` zählt Posten der Posten-Engine mit frischem
+   * Entwurf (20), `/freigaben` zählt offene Karten der Agenten-Warteschlange
+   * (24) — zwei verschiedene Mengen. Gleichziehen ginge nur, indem die Home
+   * die Freigaben-Karten selbst lädt; das ist genau der Nachlade-Pfad, den
+   * Gesetz 4 verbietet. Eine Zahl, die neben der Seite steht, die sie meint,
+   * ist schlimmer als keine — die Zahl steht eine Zeile höher im Heute-Widget.
    */
   const socialUnread = useSocialUnread()
-  const badgeFuer = (path: string) =>
-    path === '/content' ? socialUnread : path === '/freigaben' ? entwuerfe : 0
+  const badgeFuer = (path: string) => (path === '/content' ? socialUnread : 0)
 
   return (
     <div
