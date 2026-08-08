@@ -635,7 +635,12 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
     left: 0;
     right: 0;
     bottom: calc(58px + env(safe-area-inset-bottom));
-    z-index: 60;
+    /* O18, Zug 5: über die beiden FABs (60/61) und das Uriel-Panel (62), unter
+       Toast (70) und Palette (80). Vorher lag das Sheet mit 60 unter ihnen —
+       bei vier Zeilen fiel das nicht auf, seit die Bibliothek ein volles Grid
+       trägt, standen Chat- und Uriel-Knopf mitten auf dem Benachrichtigungs-
+       Text. Ein Sheet mit aria-modal gehört ohnehin über die Schwebeknöpfe. */
+    z-index: 63;
     display: flex;
     align-items: flex-end;
     background: color-mix(in srgb, #000 45%, transparent);
@@ -649,6 +654,11 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
     flex-direction: column;
     gap: 4px;
     padding: 12px max(10px, env(safe-area-inset-left)) 12px max(10px, env(safe-area-inset-right));
+    /* O18, Zug 5: Seit die Bibliothek alle Bereiche zeigt, kann das Grid
+       höher werden als der Platz über der Bar. Dann scrollt das Grid im
+       Sheet — der Benachrichtigungs-Schalter darunter bleibt tippbar. */
+    max-height: 100%;
+    overflow: hidden;
   }
   /* Im Sheet ist Platz — dort steht das Label wieder neben dem Zeichen,
      linksbündig (die Bar-Regel oben zentriert). */

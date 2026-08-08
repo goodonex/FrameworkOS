@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { Badge, BadgeText } from './Badge'
-import { bereichIcon } from '../lib/bereiche'
+import { AppGrid } from './home/AppGrid'
+import { PALETTEN_BEREICHE, bereichIcon } from '../lib/bereiche'
 import { useSocialUnread } from '../lib/socialApi'
 import { MOBILE_MEDIA_QUERY } from '../../hooks/useViewport'
 import { Benachrichtigungen } from './Benachrichtigungen'
@@ -98,7 +99,14 @@ function NavEintrag({ item, badge }: { item: NavItem; badge: number }) {
   )
 }
 
-/** Bottom-Sheet hinter „Mehr" — ein Tipp öffnet, ein Tipp wählt, fertig. */
+/**
+ * Die Bibliothek hinter „Mehr" (O18, Zug 5) — ein Tipp öffnet, ein Tipp wählt.
+ *
+ * Bis dahin standen hier vier Zeilen (nur NACHSCHLAGEN). Jetzt liegt hier
+ * **alles, was man machen kann**: dasselbe Kachel-Grid wie auf dem Homescreen,
+ * aber vollständig — auch die vier Bereiche, die schon in der Bar stehen. Das
+ * ist der Unterschied zwischen einem Rest-Menü und einer Bibliothek.
+ */
 function MehrSheet({ onClose, badgeFuer }: { onClose: () => void; badgeFuer: (to: string) => number }) {
   const navigate = useNavigate()
   const loc = useLocation()
@@ -121,41 +129,30 @@ function MehrSheet({ onClose, badgeFuer }: { onClose: () => void; badgeFuer: (to
         className="ck-mehr-sheet"
         role="dialog"
         aria-modal="true"
-        aria-label="Weitere Bereiche"
+        aria-label="Bibliothek"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="ck-label" style={{ padding: '2px 4px 8px' }}>
-          Weitere Bereiche
+          Bibliothek
         </div>
-        {NACHSCHLAGEN.map((item) => {
-          const badge = badgeFuer(item.to)
-          return (
-            <button
-              key={item.to}
-              type="button"
-              className={`ck-nav-item${istAktiv(item, loc.pathname) ? ' active' : ''}`}
-              style={{ width: '100%', minHeight: 48, background: 'none' }}
-              onClick={() => {
-                navigate(item.to)
-                onClose()
-              }}
-            >
-              <span aria-hidden className="ck-nav-icon" style={{ position: 'relative' }}>
-                {item.icon}
-                <Badge anzahl={badge} />
-              </span>
-              <span className="ck-nav-label">
-                {item.label}
-                <BadgeText anzahl={badge} />
-              </span>
-            </button>
-          )
-        })}
+        {/* Wächst die Registry, scrollt das Grid — der Schalter darunter bleibt
+            erreichbar, statt unter den unteren Bildschirmrand zu rutschen. */}
+        <div style={{ overflowY: 'auto', minHeight: 0 }}>
+          <AppGrid
+            bereiche={PALETTEN_BEREICHE}
+            badgeFuer={badgeFuer}
+            istAktiv={(path) => istAktiv({ to: path, label: '', icon: '' }, loc.pathname)}
+            onWaehle={(path) => {
+              navigate(path)
+              onClose()
+            }}
+          />
+        </div>
 
         {/* O3, Zug 5: Der Schalter fuer Benachrichtigungen gehoert dorthin, wo
             man ihn sucht, wenn der Morgen-Push mal ausbleibt — und nicht nur
             auf /morgen, das man ohne Push gar nicht erst aufmacht. */}
-        <div style={{ borderTop: '1px solid var(--ck-border)', marginTop: 8, paddingTop: 10 }}>
+        <div style={{ borderTop: '1px solid var(--ck-border)', marginTop: 10, paddingTop: 10, flexShrink: 0 }}>
           <Benachrichtigungen kompakt />
         </div>
       </div>
