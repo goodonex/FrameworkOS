@@ -725,6 +725,40 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
      Wischen nicht, was eine mitwachsende Bahn zwangsläufig täte. */
   .ck-widget-stack > * > * { flex: 1; }
 
+  /* O18 v2 (f): Wisch-Bahn je Listen-Zeile. Wieder nativ mit Snap statt eigener
+     Gesten-Erkennung — `overscroll-behavior-x: contain` hält die Geste in der
+     Zeile, damit ein Wisch nicht die Seite oder die iOS-Zurück-Geste auslöst. */
+  .ck-zeile-wisch {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .ck-root .ck-zeile-wisch::-webkit-scrollbar { display: none; }
+  .ck-zeile-inhalt {
+    flex: 0 0 100%;
+    min-width: 0;
+    scroll-snap-align: center;
+    scroll-snap-stop: always;
+  }
+  .ck-zeile-aktion {
+    flex: 0 0 92px;
+    scroll-snap-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 48px;
+    background: var(--ck-panel-2);
+    border: none;
+    border-radius: 8px;
+    margin: 2px;
+    font: inherit;
+    font-size: 11px;
+    cursor: pointer;
+  }
+
   .ck-cmdk-backdrop { padding-top: 8vh; }
   .ck-cmdk { max-height: 78vh; }
   /* O18, Zug 6: Am Handy ist die Palette ueber den ⌕-Knopf des Homescreens

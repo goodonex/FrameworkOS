@@ -40,6 +40,12 @@ interface ArbeitslisteProps {
   onErledigt: (ergebnis: ArbeitsmodusErgebnis) => void
   /** O7: einzige Aktion eines Erinnerungs-Postens (`nurZaehler`). */
   onZaehler?: (posten: Posten) => void
+  /**
+   * v2 (f): „→ morgen" hinter dem Wischen. Welche Posten sich verschieben
+   * lassen, weiß der Aufrufer — die Liste soll keine Spur-Kenntnis bekommen.
+   * Wo `moeglich` false sagt, erscheint die Aktion gar nicht erst.
+   */
+  morgen?: { moeglich: (posten: Posten) => boolean; verschiebe: (posten: Posten) => void }
   loom?: LoomSkriptAktionen
   /** Route zum Projekt einer Kundenaufgabe (Spur `kundenaufgabe`), sonst null */
   projektLink?: (p: Posten) => string | null
@@ -73,7 +79,7 @@ export function entwurfStand(erstelltAm: string | null, jetzt: Date = new Date()
   return `vor ${tage} Tagen`
 }
 
-export function Arbeitsliste({ posten, onErledigt, onZaehler, loom, projektLink, onNavigiere }: ArbeitslisteProps) {
+export function Arbeitsliste({ posten, onErledigt, onZaehler, morgen, loom, projektLink, onNavigiere }: ArbeitslisteProps) {
   // Nur die eingeklappte Zeile hat zwei Fassungen (O18, Zug 7). Alles darunter —
   // Text, Entwurf, Kopieren, Skript, Loom, Ins Projekt — ist auf beiden Seiten
   // dieselbe Ansicht; eine zweite Komponente hätte hier zwei Wahrheiten erzeugt.
@@ -140,6 +146,7 @@ export function Arbeitsliste({ posten, onErledigt, onZaehler, loom, projektLink,
                 titel={p.name}
                 erledigt={istErledigt}
                 onHaken={p.nurZaehler ? undefined : () => hake(p)}
+                onMorgen={morgen && !p.nurZaehler && morgen.moeglich(p) ? () => morgen.verschiebe(p) : undefined}
                 hakenLabel={`${p.name} als erledigt abhaken`}
                 onTitel={() => toggle(p.id)}
                 ausgeklappt={istOffen}

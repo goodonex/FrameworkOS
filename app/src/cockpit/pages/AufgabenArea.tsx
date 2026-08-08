@@ -38,6 +38,7 @@ function TaskLine({
   contactName,
   mobil,
   onToggle,
+  onMorgen,
   onRemove,
   onOpenContact,
 }: {
@@ -46,6 +47,8 @@ function TaskLine({
   /** O18, Zug 7: am Handy die Erinnerungen-Grammatik, am Rechner die Tabellenzeile. */
   mobil: boolean
   onToggle: (id: string) => void
+  /** v2 (f): „→ morgen" hinter dem Wischen — setzt nur `due_at`, sonst nichts. */
+  onMorgen: (task: Task) => void
   onRemove: (id: string) => void
   onOpenContact?: (id: string) => void
 }) {
@@ -62,6 +65,7 @@ function TaskLine({
           // Exakt der bestehende Pfad — `tasks.toggle` schreibt den Status,
           // kein neues Feld, keine zweite Erledigt-Logik.
           onHaken={() => onToggle(task.id)}
+          onMorgen={done ? undefined : () => onMorgen(task)}
           hakenLabel={done ? `${task.title} wieder öffnen` : `${task.title} erledigt markieren`}
           onTitel={task.contact_id && contactName ? () => onOpenContact?.(task.contact_id as string) : undefined}
           meta={
@@ -212,6 +216,18 @@ export function AufgabenArea() {
     return m
   }, [contacts.items])
 
+  /**
+   * v2 (f): Eine Aufgabe um einen Tag verschieben. Nutzt denselben
+   * `tasks.update`-Pfad wie jede andere Änderung und setzt genau ein Feld —
+   * 09:00 ist dieselbe Uhrzeit, die das Anlegen unten vergibt.
+   */
+  const aufMorgen = (task: Task) => {
+    const morgen = new Date()
+    morgen.setDate(morgen.getDate() + 1)
+    morgen.setHours(9, 0, 0, 0)
+    tasks.update(task.id, { due_at: morgen.toISOString() })
+  }
+
   const submit = () => {
     const t = title.trim()
     if (!t || !slug) return
@@ -324,6 +340,7 @@ export function AufgabenArea() {
                 mobil={mobil}
                 contactName={t.contact_id ? contactMap.get(t.contact_id) : undefined}
                 onToggle={tasks.toggle}
+                onMorgen={aufMorgen}
                 onRemove={tasks.remove}
                 onOpenContact={(id) => navigate(`/sales/${id}`)}
               />
@@ -361,6 +378,7 @@ export function AufgabenArea() {
                     mobil={mobil}
                     contactName={t.contact_id ? contactMap.get(t.contact_id) : undefined}
                     onToggle={tasks.toggle}
+                    onMorgen={aufMorgen}
                     onRemove={tasks.remove}
                     onOpenContact={(id) => navigate(`/sales/${id}`)}
                   />

@@ -448,12 +448,33 @@ export function SalesDashboard() {
         onErledigt={onArbeitsmodusErledigt}
         // O7: die einzige Aktion des Anfragen-Postens — kein Haken, kein Kopieren.
         onZaehler={() => setOffenKachelId('vernetzungsanfragen')}
+        morgen={morgenAktion}
         loom={loomAktionen}
         projektLink={projektLink}
         onNavigiere={navigiere}
       />
     ),
     [onArbeitsmodusErledigt, loomAktionen, projektLink, navigiere],
+  )
+
+  /**
+   * v2 (f): „→ morgen" hinter dem Wischen. Es gibt genau einen bestehenden
+   * Verschiebe-Pfad, und der gilt für LinkedIn-Threads: `snooze` setzt
+   * `snoozed_until` (dieselbe Stelle und dieselbe Tagesdistanz wie
+   * LinkedinArea.tsx:347). Posten anderer Spuren haben keinen — dort erscheint
+   * die Aktion gar nicht erst, statt einen zweiten Verschiebe-Begriff zu
+   * erfinden.
+   */
+  const morgenAktion = useMemo(
+    () => ({
+      moeglich: (p: Posten) => p.id.startsWith('thread:'),
+      verschiebe: (p: Posten) => {
+        const threadId = p.id.slice('thread:'.length)
+        if (!threadId) return
+        void linkedinThreads.snooze(threadId, new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString())
+      },
+    }),
+    [linkedinThreads],
   )
 
   /** Am Handy: „Arbeitsmodus starten" im Fenster-Fuß — am Desktop bewusst nicht. */

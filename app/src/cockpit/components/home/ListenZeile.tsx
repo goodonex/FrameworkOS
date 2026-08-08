@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 
 /**
  * Die Zeilen-Grammatik der iOS-Erinnerungen für Uriels mobile Listen
@@ -70,6 +70,83 @@ export function KreisHaken({
   )
 }
 
+/**
+ * Wisch-Gesten auf der Zeile (O18 v2 f).
+ *
+ * **Nativ gescrollt, nicht selbst erkannt** — dieselbe Entscheidung wie beim
+ * Widget-Stack: ob ein Zug waagerecht oder senkrecht gemeint war, beantwortet
+ * der Browser zuverlässiger als jede Heuristik. Das war die Bedingung, unter
+ * der die Blaupause diesen Punkt überhaupt zugelassen hat.
+ *
+ * **Bewusst kein Auslösen durch das Wischen selbst.** Das Wischen legt die
+ * Aktion frei, der Tipp darauf führt sie aus. „→ morgen" verschiebt einen Lead
+ * um einen Tag und es gibt kein Zurück; ein Fehlwisch wäre still und teuer.
+ * Der Haken kostet ohnehin nur einen Tipp auf den Kreis — die Geste muss ihn
+ * nicht schneller machen, sie macht nur „morgen" überhaupt erst erreichbar.
+ */
+function WischBahn({
+  onMorgen,
+  onHaken,
+  erledigt,
+  children,
+}: {
+  onMorgen?: () => void
+  onHaken?: () => void
+  erledigt: boolean
+  children: ReactNode
+}) {
+  const bahn = useRef<HTMLDivElement | null>(null)
+
+  // Die Zeile liegt in der Mitte; links und rechts wartet je eine Aktion.
+  useEffect(() => {
+    const el = bahn.current
+    if (!el) return
+    const links = el.firstElementChild as HTMLElement | null
+    if (links?.dataset.aktion === 'morgen') el.scrollLeft = links.offsetWidth
+  }, [onMorgen])
+
+  const zurueck = () => {
+    const el = bahn.current
+    if (!el) return
+    const links = el.firstElementChild as HTMLElement | null
+    el.scrollTo({ left: links?.dataset.aktion === 'morgen' ? links.offsetWidth : 0, behavior: 'smooth' })
+  }
+
+  return (
+    <div ref={bahn} className="ck-zeile-wisch">
+      {onMorgen ? (
+        <button
+          type="button"
+          data-aktion="morgen"
+          className="ck-zeile-aktion"
+          style={{ color: 'var(--ck-warn)' }}
+          onClick={() => {
+            onMorgen()
+            zurueck()
+          }}
+        >
+          → morgen
+        </button>
+      ) : null}
+      <div className="ck-zeile-inhalt">{children}</div>
+      {onHaken && !erledigt ? (
+        <button
+          type="button"
+          data-aktion="haken"
+          className="ck-zeile-aktion"
+          style={{ color: 'var(--ck-accent)' }}
+          onClick={() => {
+            onHaken()
+            zurueck()
+          }}
+        >
+          Erledigt
+        </button>
+      ) : null}
+    </div>
+  )
+}
+
 export function ListenZeile({
   titel,
   meta,
@@ -77,6 +154,7 @@ export function ListenZeile({
   onHaken,
   hakenLabel,
   onTitel,
+  onMorgen,
   ausgeklappt,
   aktion,
 }: {
@@ -89,6 +167,8 @@ export function ListenZeile({
   hakenLabel?: string
   /** Tipp auf den Titel (in der Arbeitsliste: auf-/zuklappen). */
   onTitel?: () => void
+  /** „→ morgen" hinter dem Wischen. Nur wo ein echter Verschiebe-Pfad existiert. */
+  onMorgen?: () => void
   ausgeklappt?: boolean
   /** Die EINE Aktion rechts — Kopieren, Skript, Zähler. */
   aktion?: ReactNode
@@ -126,7 +206,7 @@ export function ListenZeile({
     </>
   )
 
-  return (
+  const zeile = (
     <div style={{ display: 'flex', alignItems: 'center', gap: 4, minHeight: 48 }}>
       <KreisHaken erledigt={erledigt} onHaken={onHaken} label={hakenLabel ?? `${titel} abhaken`} />
       {onTitel ? (
@@ -154,5 +234,14 @@ export function ListenZeile({
       )}
       {aktion ? <span style={{ flexShrink: 0, display: 'flex', gap: 6 }}>{aktion}</span> : null}
     </div>
+  )
+
+  // Ohne Wisch-Aktion bleibt die Zeile eine gewöhnliche Zeile — kein
+  // Scroll-Container, wo es nichts zu wischen gibt.
+  if (!onMorgen && !onHaken) return zeile
+  return (
+    <WischBahn onMorgen={onMorgen} onHaken={onHaken} erledigt={erledigt}>
+      {zeile}
+    </WischBahn>
   )
 }
