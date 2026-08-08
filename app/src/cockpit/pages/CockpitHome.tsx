@@ -26,7 +26,8 @@ import { buildFollowupInput } from '../lib/approvalDrafts'
 import { useDailyMetrics } from '../lib/useDailyMetrics'
 import { useOsMap } from '../lib/useOsMap'
 import { useRunnerData } from '../lib/useRunnerData'
-import { MOBILE_MAX_WIDTH } from '../../hooks/useViewport'
+import { MOBILE_MAX_WIDTH, useIsMobile } from '../../hooks/useViewport'
+import { UrielHome } from './UrielHome'
 
 /** Graph-Höhe: nur auf schmalen (Mobile) Viewports deckeln — am Desktop frei ziehbar. */
 function useGraphHeight(desired: number): number {
@@ -155,11 +156,28 @@ function RowDivider({
 }
 
 /**
+ * Die Weiche vor allen Datenpfaden (O18, Zug 3).
+ *
+ * Am Handy zeigt `/cockpit` den Homescreen, am Rechner die Kachel-Home. Der
+ * Zweig steht bewusst hier oben und nicht als `return` mitten in
+ * `CockpitHomeDesktop`: so wird die Desktop-Home mobil gar nicht erst montiert
+ * und lädt dort auch nichts (OS-Map, Kontakte fürs Graph-Layout, Monatsziel).
+ * Umgekehrt ändert sich am Desktop nichts — dieselbe Komponente wie vorher,
+ * nur eine Ebene tiefer (Gesetz 3: Desktop bleibt, wie er ist).
+ *
+ * Die Grenze kommt aus `useIsMobile` (`MOBILE_MAX_WIDTH`, O10) — nicht abgetippt.
+ */
+export function CockpitHome() {
+  const isMobile = useIsMobile()
+  return isMobile ? <UrielHome /> : <CockpitHomeDesktop />
+}
+
+/**
  * Cockpit-Home (vereinfacht Juli 2026) — Hauptfläche ist der Agentic-OS-Graph
  * (OsNebula). Links schlanke Spalte: Ziel-Karte, Quick-Track, Vitals.
  * Unter dem Graph das Agenten-Panel (Deck + Dream + letzte Runs).
  */
-export function CockpitHome() {
+function CockpitHomeDesktop() {
   const navigate = useNavigate()
   const { activeBrand, error: brandError, loading: brandLoading } = useActiveBrand()
   const metrics = useDailyMetrics()

@@ -51,9 +51,18 @@ export function useViewport(): Viewport {
       if (raf !== null) cancelAnimationFrame(raf)
       raf = requestAnimationFrame(() => setVp(read()))
     }
+    // Zusätzlich auf die MediaQuery hören — dieselbe Härtung, die `NavRail`
+    // schon hat: beim Umschalten des Viewports (Vorschau-Pane, DevTools-
+    // Gerätemodus) feuert `change` der Query, aber nicht immer `resize`. Ohne
+    // diesen Listener stand beim Prüfen von O18 die Bottom-Bar schon mobil,
+    // während `isMobile` noch false meldete — die Home zeigte den Desktop-
+    // Stapel in einer Handy-Breite.
+    const mq = window.matchMedia(MOBILE_MEDIA_QUERY)
+    mq.addEventListener('change', onResize)
     window.addEventListener('resize', onResize, { passive: true })
     window.addEventListener('orientationchange', onResize, { passive: true })
     return () => {
+      mq.removeEventListener('change', onResize)
       window.removeEventListener('resize', onResize)
       window.removeEventListener('orientationchange', onResize)
       if (raf !== null) cancelAnimationFrame(raf)
