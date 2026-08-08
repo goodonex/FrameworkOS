@@ -699,6 +699,11 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
 
   .ck-cmdk-backdrop { padding-top: 8vh; }
   .ck-cmdk { max-height: 78vh; }
+  /* O18, Zug 6: Am Handy ist die Palette ueber den ⌕-Knopf des Homescreens
+     zum ersten Mal erreichbar — Cmd+K hat kein Telefon. Unter 16px zoomt iOS
+     beim Fokussieren die ganze Seite hinein und kommt nicht von selbst zurueck;
+     die Desktop-Groesse (14px) bleibt davon unberuehrt. */
+  .ck-cmdk-input { font-size: 16px; }
 }
 
 /* ============================================================
