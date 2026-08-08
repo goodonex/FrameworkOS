@@ -2,11 +2,12 @@
 
 **Stand:** 2026-08-09 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
 
-**Runde vom 09.08.** (Umsetzung): Der **Mobile Homescreen steht** — Züge 0–7 der
-Blaupause gebaut (zehn Code-Commits auf `cockpit-rebuild`, dazu die Doku),
-alle 20 verify-Skripte grün,
-Desktop nachweislich unverändert. Drei Abweichungen von der Blaupause und zwei
-ältere Fehler, die dabei auffielen, stehen bei **O18**. **Nicht live.** Erledigt: O18.
+**Runde vom 09.08.** (Umsetzung): Der **Mobile Homescreen steht und ist live** —
+Züge 0–7 der Blaupause gebaut (zehn Code-Commits, dazu die Doku), alle 20
+verify-Skripte grün, Desktop nachweislich unverändert, Fast-Forward erfolgt
+(L1). Drei Abweichungen von der Blaupause und zwei ältere Fehler, die dabei
+auffielen, stehen bei **O18**. Offen ist dort nur noch die Notch-Abnahme am
+Geraet. Erledigt: O18.
 
 **Runde vom 07.08.** (O17 + O3): Die Morgen-Agenten laufen wieder — die Ursache
 war der schlafende Mac, nicht der Timeout. Darauf aufbauend der Morgen-Push:
@@ -60,19 +61,22 @@ Web Speech entfernt wurde) und O13 (Drawer `rgb(11,14,16)`, Fehler `rgb(229,72,7
 ## 1 — Livegang
 
 Alles hier steht zwischen dem heutigen Code und „läuft in Produktion".
-**Etappen 1–4 sind seit dem 06.08. live**, die Commits des Mobile Homescreens noch nicht (L1).
+**Etappen 1–4 sind seit dem 06.08. live, der Mobile Homescreen seit dem 09.08.** (L1).
 `main` hat keinen eigenen Commit — der Livegang bleibt ein Fast-Forward, kein Merge.
 Was in diesem Abschnitt abgehakt ist, ist wirklich in Produktion; die Edge Functions
 (L4, L5) deployen unabhängig vom Frontend und sind es bereits.
 
-### L1 · Fast-Forward — **der Mobile Homescreen haengt** (Stand 09.08.)
-Wie viele Commits es sind, sagt `git log --oneline origin/main..HEAD` — eine
-Zahl hier waere ab dem naechsten Commit falsch (es ist die O18-Runde). Am 08.08. war
-der Stand kurzzeitig 0 — main == cockpit-rebuild, Netlify lieferte
-`index-DAnoKYfk.js`. Seit der Homescreen-Runde ist der Branch wieder voraus:
-Livegang ist weiter ein reiner Fast-Forward, und er bleibt Kevins Wort.
-Der Text darunter beschreibt den Zwischenstand vom 06.08. und bleibt als
-Historie stehen.
+### L1 · ~~Fast-Forward~~ ✅ **Mobile Homescreen ist live (09.08.)**
+Kevin hat fast-forwarded: `main` == `cockpit-rebuild` == `bf4d50d`,
+`git rev-list --count origin/main..cockpit-rebuild` = 0. Netlify liefert
+`index-DjbHPMcW.js`; der Bundle enthaelt nachweislich den neuen Code (per
+`curl` auf die Datei gegen die Zeichenketten "Suchen und springen",
+"Bibliothek", "Termine heute — Kalender oeffnen" geprueft, je 1 Treffer).
+Der Hash weicht von einem lokalen `npm run build` ab — normal, Netlify inlined
+seine eigenen `VITE_*`-Werte.
+Was jetzt live ist: Zuege 0–7 aus O18 **plus** der Morgen-Push aus O3, der seit
+dem 07.08. mitfuhr. Der Text darunter beschreibt den Zwischenstand vom 06.08.
+und bleibt als Historie stehen.
 `main` steht auf `de60288` und ist gepusht — der Fast-Forward aus dem
 vorherigen Stand dieses Dokuments **ist erfolgt**. Netlify hat neu gebaut:
 ausgeliefert wird `index-BjbadBHB.js` (vorher `index-CvTize-3.js`, geprueft per
@@ -737,10 +741,10 @@ Pipeline/Listen/Call-Mode/Kontakt überhaupt bleibt (O13, letzte Zeile).
   Zeilen) und den Skill `linkedin-leads` — **vor dem Bauen prüfen, ob überhaupt
   noch etwas fehlt.** **S** für die Prüfung.
 
-### O18 · ~~Mobile Homescreen~~ ✅ **gebaut 09.08.2026** · *Rest: live schalten + ein iPhone-Screenshot*
+### O18 · ~~Mobile Homescreen~~ ✅ **gebaut und live seit 09.08.2026** · *Rest: iPhone-Screenshot als Notch-Abnahme*
 Züge 0–7 der Blaupause (`docs/wargames/mobile-homescreen.md`) sind umgesetzt und
-liegen auf `cockpit-rebuild` (`git log --oneline origin/main..HEAD`).
-**Nicht live** — der Fast-Forward ist Kevins Wort.
+seit dem 09.08. live (L1). Kevins erster Eindruck am Geraet: „scheint zu
+funktionieren".
 
 **Was steht:**
 - **Zug 0 · Notch-Fix** (eigener Commit, unabhängig vom Rest):
@@ -796,10 +800,11 @@ liest (es fehlen `month_goals`, `os_map_snapshot`, `project_messages`,
    auch auf „nichts lädt mehr". Der Fehler war älter als O18 (der Knopf auf
    `/morgen` ruft dieselbe URL).
 
-**Was noch fehlt (nur Kevin):** live schalten (Fast-Forward auf `main`) und ein
-iPhone-Screenshot als Abnahme für Zug 0 — `env(safe-area-inset-top)` ist am
-Desktop nicht prüfbar. Gegenprobe dabei: Arbeitsmodus und Anfragen-Zähler
-dürfen oben **nicht doppelt** Luft haben.
+**Was noch fehlt (nur Kevin):** ein iPhone-Screenshot der installierten App als
+Abnahme für Zug 0 — `env(safe-area-inset-top)` ist am Desktop nicht prüfbar,
+und die Live-Schaltung beweist nur, dass der Code draußen ist, nicht dass die
+Kopfzeile unter der Aussparung sitzt. Gegenprobe dabei: Arbeitsmodus und
+Anfragen-Zähler dürfen oben **nicht doppelt** Luft haben.
 
 **Nicht gebaut (v2, bewusst):** Long-Press Quick Actions, Agenten als Icons,
 Widget-Stack, Personalisierung/Jiggle, Kontext-Reihenfolge nach Tageszeit,
