@@ -190,7 +190,19 @@ export function SalesDashboard() {
   const metrics = useDailyMetrics()
   // Posten-Verdrahtung liegt seit Etappe 3 im gemeinsamen Hook — das Heute-Deck
   // liest exakt dieselbe Rangfolge.
-  const { geordnet, quellen, liegend, jetzt, tasks, linkedinThreads, erstnachrichten } = usePosten(slug)
+  const posten = usePosten(slug)
+  const { geordnet, quellen, liegend, jetzt, tasks, linkedinThreads, erstnachrichten } = posten
+  /**
+   * Laden noch Quellen? Dann ist `geordnet` nur ein Zwischenstand (O18).
+   * Wichtig fuer `?modus=arbeit` unten — sonst startet der Arbeitsmodus mit den
+   * zwei Posten, die zufaellig zuerst da waren, und die restlichen 200 fehlen.
+   */
+  const postenLaedt =
+    posten.contacts.loading ||
+    posten.tasks.loading ||
+    posten.projekte.loading ||
+    posten.linkedinThreads.loading ||
+    posten.erstnachrichten.loading
   const dauern = useArbeitsDauern(slug)
   const { runner, runs, refresh: refreshRuns } = useRunnerData()
 
@@ -583,7 +595,10 @@ export function SalesDashboard() {
     // „Alles abgearbeitet" vor einer Liste, die gleich kommt. Dann lieber den
     // Parameter stehen lassen und beim nächsten Durchlauf erneut prüfen.
     if (modusParam === 'arbeit' && isMobile) {
-      if (geordnet.length === 0) return
+      // O18: nicht nur "nicht leer", sondern "fertig geladen". Die Quellen
+      // kommen nacheinander an; bei 209 Postens stand sonst "1 / 2" im
+      // Arbeitsmodus, weil der Effekt nach der ersten Antwort feuerte.
+      if (postenLaedt || geordnet.length === 0) return
       oeffneArbeitsmodus('alle', geordnet)
     } else if (kachelParam && kacheln.some((k) => k.id === kachelParam)) {
       setOffenKachelId(kachelParam)
@@ -597,7 +612,7 @@ export function SalesDashboard() {
     // nur der Parameter (plus das, was über „noch nicht geladen" entscheidet),
     // sonst liefe der Effekt endlos.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kachelParam, modusParam, isMobile, geordnet.length])
+  }, [kachelParam, modusParam, isMobile, geordnet.length, postenLaedt])
 
   const oeffneKachel = useCallback(
     (id: string) => {
