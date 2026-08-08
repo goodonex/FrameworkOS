@@ -6,8 +6,8 @@
 Züge 0–7 der Blaupause gebaut (zehn Code-Commits, dazu die Doku), alle 20
 verify-Skripte grün, Desktop nachweislich unverändert, Fast-Forward erfolgt
 (L1). Drei Abweichungen von der Blaupause und zwei ältere Fehler, die dabei
-auffielen, stehen bei **O18**. Offen ist dort nur noch die Notch-Abnahme am
-Geraet. Erledigt: O18.
+auffielen, stehen bei **O18** — dort ist nichts mehr offen, die Notch-Abnahme
+am Geraet hat Kevin gegeben. Erledigt: O18.
 
 **Runde vom 07.08.** (O17 + O3): Die Morgen-Agenten laufen wieder — die Ursache
 war der schlafende Mac, nicht der Timeout. Darauf aufbauend der Morgen-Push:
@@ -741,7 +741,7 @@ Pipeline/Listen/Call-Mode/Kontakt überhaupt bleibt (O13, letzte Zeile).
   Zeilen) und den Skill `linkedin-leads` — **vor dem Bauen prüfen, ob überhaupt
   noch etwas fehlt.** **S** für die Prüfung.
 
-### O18 · ~~Mobile Homescreen~~ ✅ **gebaut und live seit 09.08.2026** · *Rest: iPhone-Screenshot als Notch-Abnahme*
+### O18 · ~~Mobile Homescreen~~ ✅ **fertig, live und abgenommen (09.08.2026)**
 Züge 0–7 der Blaupause (`docs/wargames/mobile-homescreen.md`) sind umgesetzt und
 seit dem 09.08. live (L1). Kevins erster Eindruck am Geraet: „scheint zu
 funktionieren".
@@ -800,11 +800,10 @@ liest (es fehlen `month_goals`, `os_map_snapshot`, `project_messages`,
    auch auf „nichts lädt mehr". Der Fehler war älter als O18 (der Knopf auf
    `/morgen` ruft dieselbe URL).
 
-**Was noch fehlt (nur Kevin):** ein iPhone-Screenshot der installierten App als
-Abnahme für Zug 0 — `env(safe-area-inset-top)` ist am Desktop nicht prüfbar,
-und die Live-Schaltung beweist nur, dass der Code draußen ist, nicht dass die
-Kopfzeile unter der Aussparung sitzt. Gegenprobe dabei: Arbeitsmodus und
-Anfragen-Zähler dürfen oben **nicht doppelt** Luft haben.
+**Nichts offen.** Die letzte Abnahme, die nur am Gerät möglich war, hat Kevin
+am 09.08. gegeben: die Kopfzeile sitzt in der installierten App unter der
+Aussparung (Zug 0). Damit ist auch der einzige Punkt erledigt, den kein
+Desktop-Browser prüfen kann — `env(safe-area-inset-top)` ist dort immer 0.
 
 **Nicht gebaut (v2, bewusst):** Long-Press Quick Actions, Agenten als Icons,
 Widget-Stack, Personalisierung/Jiggle, Kontext-Reihenfolge nach Tageszeit,
