@@ -57,6 +57,22 @@ function gruss(d: Date): string {
 /** Alle Bereiche außer dem, auf dem man gerade steht. */
 const APPS = PALETTEN_BEREICHE.filter((b) => b.path !== '/cockpit')
 
+/**
+ * Schnell-Aktionen hinter dem Halten (v2 a).
+ *
+ * Bewusst nur dort, wo eine Route wirklich in EINE Arbeit springt — ein
+ * Halte-Menü, das nur „Bereich öffnen" anbietet, ist ein leerer Umweg. Alle
+ * drei Ziele sind Parameter, die `SalesDashboard` schon auswertet
+ * (`?kachel=…`, `?modus=arbeit`); es entsteht keine neue Route.
+ */
+const SCHNELL_AKTIONEN: Record<string, Array<{ label: string; route: string }>> = {
+  '/sales': [
+    { label: 'Arbeitsmodus starten', route: '/sales?kachel=jetzt-dran&modus=arbeit' },
+    { label: 'Antworten', route: '/sales?kachel=antworten' },
+    { label: 'Anfragen-Zähler', route: '/sales?kachel=vernetzungsanfragen' },
+  ],
+}
+
 export function UrielHome() {
   const navigate = useNavigate()
   const { openPalette } = useCommandPalette()
@@ -177,7 +193,12 @@ export function UrielHome() {
 
       {/* Die Apps. `/cockpit` fehlt bewusst — man ist schon da. Reihenfolge =
           Registry-Reihenfolge, also Warteschlange vorn. */}
-      <AppGrid bereiche={APPS} badgeFuer={badgeFuer} onWaehle={(p) => navigate(p)} />
+      <AppGrid
+        bereiche={APPS}
+        badgeFuer={badgeFuer}
+        schnellAktionen={(p) => SCHNELL_AKTIONEN[p] ?? []}
+        onWaehle={(p) => navigate(p)}
+      />
     </div>
   )
 }
