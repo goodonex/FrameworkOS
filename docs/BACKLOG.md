@@ -8,6 +8,9 @@ Etappen A und B des Wargames sind gebaut, Migration 0067 ist eingespielt, die
 Edge Function deployt. **Nicht live** — der Fast-Forward und die iPhone-Schritte
 stehen aus (siehe O3). Erledigt: O17, O3, O7.
 
+**Runde vom 08.08.** (Planung, kein Code): Mobile Homescreen geplant — **O18**,
+Blaupause `docs/wargames/mobile-homescreen.md` (Widget-first, blind ausführbar).
+
 **Runde vom Abend des 06.08.** (Vorbereitung der Mobile-Session): O1, O2, O4, O5,
 O6, O10, O13 (drei Punkte), O15 erledigt · L5b, O9 (erste Handlung) und O12
 entschieden. Alles committet, nichts davon live. Nicht angefasst und weiter offen:
@@ -56,7 +59,10 @@ Alles hier steht zwischen dem heutigen Code und „läuft in Produktion".
 Was in diesem Abschnitt abgehakt ist, ist wirklich in Produktion; die Edge Functions
 (L4, L5) deployen unabhängig vom Frontend und sind es bereits.
 
-### L1 · Fast-Forward — **die fuenf Commits sind live, sechs neue haengen** (Stand 06.08. spaetabends)
+### L1 · ~~Fast-Forward~~ ✅ **alles live (verifiziert 08.08. abends)**
+`git log origin/main..HEAD` = **0** — main == cockpit-rebuild, Netlify liefert
+`index-DAnoKYfk.js`. Der Text darunter beschreibt den Zwischenstand vom 06.08.
+und bleibt als Historie stehen.
 `main` steht auf `de60288` und ist gepusht — der Fast-Forward aus dem
 vorherigen Stand dieses Dokuments **ist erfolgt**. Netlify hat neu gebaut:
 ausgeliefert wird `index-BjbadBHB.js` (vorher `index-CvTize-3.js`, geprueft per
@@ -400,7 +406,7 @@ liegen (Kevins Entscheidung 06.08.). Sie stören die Pipeline-Optik, nicht die Q
 Aufräumen wäre ein eigener Schritt mit Blick auf die Namen — kein Nebenbei-Löschen.
 *Herkunft: IDEEN „Das große Bild #2" + Abriss-Liste · Session-Inventur*
 
-### O3 · ~~Morgen-Push aufs Handy~~ ✅ **gebaut 07.08.2026** · *Rest: Kevins iPhone*
+### O3 · ~~Morgen-Push aufs Handy~~ ✅ **gebaut 07.08. · live + eingerichtet 08.08.2026**
 Etappen A und B des Wargames (Züge 1–9) sind gebaut und geprüft. Der Push kann
 erst ankommen, wenn der Code live ist und Kevin sein iPhone einmal einrichtet —
 siehe „Was noch fehlt".
@@ -430,20 +436,24 @@ tatsächlich ausgefallen war (O17). Genau dafür wurde die zweite Stufe gebaut.
 die Seite ohne Session sehen zu können — mit Kevins Login war die echte Seite
 prüfbar, und eine zweite Fassung mit Fixtures wäre ab dem ersten Umbau falsch.
 
-**Was noch fehlt (nur Kevin):**
-1. **Live schalten** — Fast-Forward auf `main` + Netlify-Deploy. Ohne das gibt es
-   auf dem iPhone nichts zu abonnieren. (Der neue `VITE_VAPID_PUBLIC_KEY` ist
-   schon in Netlify gesetzt, greift aber erst mit dem nächsten Deploy.)
-2. **iPhone:** Safari → frameworkos.de → Teilen → **Zum Home-Bildschirm** (liegt
-   Uriel schon dort: einmal löschen und neu hinzufügen, sonst bleibt der alte
-   Service Worker drin) → App öffnen → einloggen → `/morgen` →
-   „Benachrichtigungen aktivieren" → **Erlauben** → **Probe-Push** antippen.
-3. Ab dem nächsten Werktag 7:00 der echte Push. Kommt keiner:
-   `select * from cron.job_run_details order by start_time desc limit 5` und
-   `select * from push_log` sagen, welche Stufe geschwiegen hat.
-4. **Selbstwecker** (aus O17): `sudo pmset repeat wakeorpoweron MTWRF 05:50:00`
-   — ohne ihn schläft der Mac durch und der Push meldet die „MacBook
-   aufklappen"-Variante.
+**✅ Aktivierung komplett — 08.08. abends gegen das laufende System verifiziert:**
+1. **Live:** `git log origin/main..HEAD` = 0 (main == cockpit-rebuild), Netlify
+   liefert `index-DAnoKYfk.js`; `/sw.js` kommt als `application/javascript` mit
+   dem Push-only-Worker (per `curl` gegen frameworkos.de geprüft).
+2. **Push-Abo:** genau 1 Zeile in `push_subscriptions` (angelegt 08.08.
+   20:47 UTC). `push_log` ist leer — planmäßig: seit dem Abo gab es noch keinen
+   7-Uhr-Werktags-Lauf.
+3. **Selbstwecker steht:** `pmset -g sched` → „wakepoweron at 5:58AM weekdays
+   only" (5:58 statt 5:50 — reicht, liegt vor den 6:00-Routinen).
+4. **Runner läuft mit neuem Code:** Prozessstart 07.08. 17:30, der
+   caffeinate-Commit `f1d270a` war 15:20 — Kickstart ist erfolgt.
+
+**Erster echter Push: Montag ~7:00** (Cron Mo–Fr + Wecker werktags — dass am
+Wochenende nichts kommt, ist kein Fehler). Kommt Montag keiner:
+`select * from cron.job_run_details order by start_time desc limit 5` und
+`select * from push_log` sagen, welche Stufe geschwiegen hat. Sollte das eine
+Abo vom Mac-Test stammen statt vom iPhone: am iPhone `/morgen` →
+„Benachrichtigungen aktivieren" (Upsert auf `endpoint`, zweites Gerät ist ok).
 *Herkunft: morgen-workflow.md · IDEAS-2026 A2 (Telegram — verworfen, siehe §5)*
 
 ### O4 · ~~`last_message_at` wandert beim „Erledigt" nicht~~ ✅ **erledigt 06.08.2026**
@@ -716,6 +726,24 @@ Pipeline/Listen/Call-Mode/Kontakt überhaupt bleibt (O13, letzte Zeile).
   (täglicher Export). Weitgehend überholt durch `linkedin_erstnachrichten` (91
   Zeilen) und den Skill `linkedin-leads` — **vor dem Bauen prüfen, ob überhaupt
   noch etwas fehlt.** **S** für die Prüfung.
+
+### O18 · Mobile Homescreen — **M** · geplant 08.08., Blaupause fertig
+Uriel am Handy wie ein OS: Widgets zuerst (Heute/Loslegen, Termine, Vitals,
+Agenten-Befund), darunter App-Icons mit Badges, „Mehr"-Sheet wird Bibliothek,
+Suche über die CommandPalette. Desktop bleibt unangetastet; `/morgen` bleibt
+die Push-Landung. **Befund, der den Umbau trägt:** `CockpitHome.tsx` hat keine
+isMobile-Verzweigung — das Handy bekommt heute den Desktop-Stapel untereinander
+(`:312-339`). Dazu ist `/linkedin` in keiner Nav-Liste erreichbar (nur Palette).
+Bauplan mit Zügen 0–7, Verifikation und Abbruchbedingungen:
+`docs/wargames/mobile-homescreen.md`. **Abends dazugekommen:** Zug 0 =
+Notch-Fix (Sofort-Fix: `viewport-fit=cover` + `black-translucent` in
+`index.html:5/27`, aber kein `safe-area-inset-top` an der Shell — Kopfzeile
+liegt in der installierten App unter der Uhr) und Zug 7 = Erinnerungen-
+Listen-Grammatik (D7: Optik über der Posten-Engine, Leads werden keine
+To-dos, jede Zeile behält ihre eine Aktion). v2-Ausbau (Long-Press,
+Agenten-Icons, Widget-Stack, Personalisierung, Wisch-Gesten) steht dort
+bewusst hinter dem Alltagstest.
+*Herkunft: Session 08.08. (Kevins OS-Idee) · IDEEN Leitprinzip Klick-Ökonomie*
 
 ---
 
