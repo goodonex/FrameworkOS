@@ -5,6 +5,7 @@ import { useContentPieces } from '../../hooks/useContentPieces'
 import { entwuerfeOffen, usePosten } from '../../hooks/usePosten'
 import { useBookings } from '../../hooks/useSalesPro'
 import { useCommandPalette } from '../../lib/commandPaletteContext'
+import { AgentenKacheln } from '../components/home/AgentenKacheln'
 import { AppGrid } from '../components/home/AppGrid'
 import { BefundZeile } from '../components/home/BefundZeile'
 import { HeuteWidget } from '../components/home/HeuteWidget'
@@ -199,6 +200,11 @@ export function UrielHome() {
         schnellAktionen={(p) => SCHNELL_AKTIONEN[p] ?? []}
         onWaehle={(p) => navigate(p)}
       />
+
+      {/* v2 (b): Lief die Nacht durch? Die Antwort gehört auf den Homescreen,
+          nicht hinter einen Bereichswechsel. Dieselben Runs, aus denen oben
+          schon die Warnzeile kommt. */}
+      <AgentenKacheln runs={runs} befund={befund} jetzt={jetzt} onOeffnen={() => navigate('/agenten')} />
     </div>
   )
 }
