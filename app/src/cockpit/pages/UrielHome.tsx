@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useArbeitsDauern } from '../../hooks/useArbeitsDauern'
 import { useContentPieces } from '../../hooks/useContentPieces'
@@ -17,6 +17,7 @@ import { agentenBefund } from '../lib/agentenGesundheit'
 import { PALETTEN_BEREICHE } from '../lib/bereiche'
 import { weekVitals } from '../lib/metricsAggregate'
 import { useSocialUnread } from '../lib/socialApi'
+import { KACHEL_REIHENFOLGE, ordneNach, useUiSetting, verschiebeVor } from '../lib/uiSettings'
 import { tagesansage } from '../lib/tagesansage'
 import { eventsByDate, termineAmTag, ymd, type CalEvent } from '../lib/termineEvents'
 import { CALENDAR_ICAL_KEY, useCalendarFeed } from '../lib/useCalendarFeed'
@@ -146,6 +147,15 @@ export function UrielHome() {
   const socialUnread = useSocialUnread()
   const badgeFuer = (path: string) => (path === '/content' ? socialUnread : 0)
 
+  /**
+   * Eigene Kachel-Reihenfolge (v2 d). Liegt in Supabase (0068), damit sie das
+   * Neu-Hinzufügen der PWA überlebt; localStorage ist nur der Zwischenspeicher,
+   * damit die Kacheln beim Öffnen nicht sichtbar umspringen.
+   */
+  const { wert: reihenfolge, setzen: setReihenfolge } = useUiSetting<string[]>(KACHEL_REIHENFOLGE, [])
+  const [anordnen, setAnordnen] = useState(false)
+  const sortierteApps = useMemo(() => ordneNach(APPS, reihenfolge), [reihenfolge])
+
   return (
     <div
       style={{
@@ -213,12 +223,31 @@ export function UrielHome() {
 
       {/* Die Apps. `/cockpit` fehlt bewusst — man ist schon da. Reihenfolge =
           Registry-Reihenfolge, also Warteschlange vorn. */}
-      <AppGrid
-        bereiche={APPS}
-        badgeFuer={badgeFuer}
-        schnellAktionen={(p) => SCHNELL_AKTIONEN[p] ?? []}
-        onWaehle={(p) => navigate(p)}
-      />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+          <span className="ck-label" style={{ paddingLeft: 2, color: anordnen ? 'var(--ck-warn)' : undefined }}>
+            {anordnen ? 'Kachel antippen, dann Ziel antippen' : 'Apps'}
+          </span>
+          <button
+            type="button"
+            className="ck-btn"
+            onClick={() => setAnordnen((a) => !a)}
+            style={{ fontSize: 10, minHeight: 32, padding: '0 12px' }}
+          >
+            {anordnen ? 'Fertig' : 'Anordnen'}
+          </button>
+        </div>
+        <AppGrid
+          bereiche={sortierteApps}
+          badgeFuer={badgeFuer}
+          schnellAktionen={(p) => SCHNELL_AKTIONEN[p] ?? []}
+          anordnen={anordnen}
+          onVerschieben={(was, vor) =>
+            setReihenfolge(verschiebeVor(sortierteApps.map((b) => b.path), was, vor))
+          }
+          onWaehle={(p) => navigate(p)}
+        />
+      </div>
 
       {/* v2 (b): Lief die Nacht durch? Die Antwort gehört auf den Homescreen,
           nicht hinter einen Bereichswechsel. Dieselben Runs, aus denen oben

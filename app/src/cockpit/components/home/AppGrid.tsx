@@ -33,6 +33,8 @@ export function AppGrid({
   onWaehle,
   istAktiv,
   schnellAktionen,
+  anordnen = false,
+  onVerschieben,
   spalten = 4,
 }: {
   bereiche: BereichMitIcon[]
@@ -41,9 +43,13 @@ export function AppGrid({
   istAktiv?: (path: string) => boolean
   /** Aktionen hinter dem Halten. Ohne Rückgabe bleibt die Kachel ein einfacher Tipp. */
   schnellAktionen?: (path: string) => SchnellAktion[]
+  /** Anordnen-Modus (v2 d): tippen nimmt auf, zweites Tippen setzt ab. */
+  anordnen?: boolean
+  onVerschieben?: (was: string, vor: string) => void
   spalten?: number
 }) {
   const [gehalten, setGehalten] = useState<BereichMitIcon | null>(null)
+  const [aufgenommen, setAufgenommen] = useState<string | null>(null)
   const timer = useRef<number | null>(null)
   const start = useRef<{ x: number; y: number } | null>(null)
   // Nach einem Halten folgt trotzdem ein Klick — der darf nicht zusätzlich
@@ -109,13 +115,28 @@ export function AppGrid({
             key={b.path}
             type="button"
             onClick={() => {
+              // Anordnen-Modus: erster Tipp nimmt auf, zweiter setzt davor ab.
+              // Bewusst kein Ziehen — ein Ziehen im Anordnen-Modus kämpft mit
+              // dem Scrollen der Seite, und zwei Tipps schaffen jede Strecke,
+              // während Pfeiltasten für Kachel 10 neun Tipps brauchen.
+              if (anordnen) {
+                if (aufgenommen === null) setAufgenommen(b.path)
+                else if (aufgenommen === b.path) setAufgenommen(null)
+                else {
+                  onVerschieben?.(aufgenommen, b.path)
+                  setAufgenommen(null)
+                }
+                return
+              }
               if (hatGehalten.current) {
                 hatGehalten.current = false
                 return
               }
               onWaehle(b.path)
             }}
-            onPointerDown={(e) => beginne(b, e.clientX, e.clientY)}
+            onPointerDown={(e) => {
+              if (!anordnen) beginne(b, e.clientX, e.clientY)
+            }}
             onPointerMove={(e) => bewegt(e.clientX, e.clientY)}
             onPointerUp={stoppe}
             onPointerCancel={stoppe}
@@ -140,8 +161,10 @@ export function AppGrid({
               gap: 6,
               padding: '8px 2px',
               borderRadius: 12,
-              border: `1px solid ${aktiv ? 'var(--ck-accent)' : 'var(--ck-border)'}`,
-              background: 'var(--ck-panel)',
+              border: `1px solid ${
+                aufgenommen === b.path ? 'var(--ck-warn)' : aktiv ? 'var(--ck-accent)' : 'var(--ck-border)'
+              }`,
+              background: aufgenommen === b.path ? 'var(--ck-warn-dim)' : 'var(--ck-panel)',
               color: aktiv ? 'var(--ck-accent)' : 'var(--ck-text-1)',
               font: 'inherit',
               cursor: 'pointer',
