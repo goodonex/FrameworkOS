@@ -2,8 +2,10 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useContacts } from '../../hooks/useContacts'
 import { useTaskBuckets, useTasks } from '../../hooks/useTasks'
+import { useIsMobile } from '../../hooks/useViewport'
 import type { Task, TaskPriority, TaskSource } from '../../types/db'
 import { HeuteTabs } from '../components/HeuteTabs'
+import { ListenZeile } from '../components/home/ListenZeile'
 import { useActiveBrand } from '../lib/activeBrand'
 
 const SOURCE_LABEL: Record<TaskSource, string> = {
@@ -34,18 +36,62 @@ function dueLabel(due_at: string | null): string {
 function TaskLine({
   task,
   contactName,
+  mobil,
   onToggle,
   onRemove,
   onOpenContact,
 }: {
   task: Task
   contactName?: string
+  /** O18, Zug 7: am Handy die Erinnerungen-Grammatik, am Rechner die Tabellenzeile. */
+  mobil: boolean
   onToggle: (id: string) => void
   onRemove: (id: string) => void
   onOpenContact?: (id: string) => void
 }) {
   const done = task.status === 'done' || task.status === 'cancelled'
   const src = SOURCE_LABEL[task.source]
+
+  if (mobil) {
+    const faellig = dueLabel(task.due_at)
+    return (
+      <div style={{ padding: '2px 8px 2px 0', borderBottom: '1px solid var(--ck-border)' }}>
+        <ListenZeile
+          titel={task.title}
+          erledigt={done}
+          // Exakt der bestehende Pfad — `tasks.toggle` schreibt den Status,
+          // kein neues Feld, keine zweite Erledigt-Logik.
+          onHaken={() => onToggle(task.id)}
+          hakenLabel={done ? `${task.title} wieder öffnen` : `${task.title} erledigt markieren`}
+          onTitel={task.contact_id && contactName ? () => onOpenContact?.(task.contact_id as string) : undefined}
+          meta={
+            [src || null, contactName ? `→ ${contactName}` : null, faellig || null]
+              .filter(Boolean)
+              .join(' · ') || undefined
+          }
+          aktion={
+            <button
+              type="button"
+              onClick={() => onRemove(task.id)}
+              aria-label={`${task.title} löschen`}
+              style={{
+                minWidth: 44,
+                minHeight: 44,
+                fontSize: 15,
+                color: 'var(--ck-text-3)',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              ×
+            </button>
+          }
+        />
+      </div>
+    )
+  }
+
   return (
     <div
       style={{
@@ -150,6 +196,7 @@ export function AufgabenArea() {
   const navigate = useNavigate()
   const { activeBrand } = useActiveBrand()
   const slug = activeBrand?.slug
+  const mobil = useIsMobile()
   const tasks = useTasks(slug)
   const contacts = useContacts(slug)
   const buckets = useTaskBuckets(tasks.items)
@@ -274,6 +321,7 @@ export function AufgabenArea() {
               <TaskLine
                 key={t.id}
                 task={t}
+                mobil={mobil}
                 contactName={t.contact_id ? contactMap.get(t.contact_id) : undefined}
                 onToggle={tasks.toggle}
                 onRemove={tasks.remove}
@@ -310,6 +358,7 @@ export function AufgabenArea() {
                   <TaskLine
                     key={t.id}
                     task={t}
+                    mobil={mobil}
                     contactName={t.contact_id ? contactMap.get(t.contact_id) : undefined}
                     onToggle={tasks.toggle}
                     onRemove={tasks.remove}

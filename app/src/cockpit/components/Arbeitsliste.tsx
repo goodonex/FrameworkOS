@@ -1,6 +1,8 @@
 import { useCallback, useState } from 'react'
+import { useIsMobile } from '../../hooks/useViewport'
 import type { Posten } from '../lib/prioritaet'
 import type { ArbeitsmodusErgebnis } from './Arbeitsmodus'
+import { ListenZeile } from './home/ListenZeile'
 
 /**
  * Aufklappbare Arbeitsliste für das Kachel-Fenster (Desktop-Arbeitsfluss):
@@ -72,6 +74,10 @@ export function entwurfStand(erstelltAm: string | null, jetzt: Date = new Date()
 }
 
 export function Arbeitsliste({ posten, onErledigt, onZaehler, loom, projektLink, onNavigiere }: ArbeitslisteProps) {
+  // Nur die eingeklappte Zeile hat zwei Fassungen (O18, Zug 7). Alles darunter —
+  // Text, Entwurf, Kopieren, Skript, Loom, Ins Projekt — ist auf beiden Seiten
+  // dieselbe Ansicht; eine zweite Komponente hätte hier zwei Wahrheiten erzeugt.
+  const mobil = useIsMobile()
   const [offenId, setOffenId] = useState<string | null>(null)
   const [offenSeit, setOffenSeit] = useState(0)
   const [erledigt, setErledigt] = useState<Set<string>>(new Set())
@@ -122,6 +128,63 @@ export function Arbeitsliste({ posten, onErledigt, onZaehler, loom, projektLink,
         const projekt = p.spur === 'kundenaufgabe' ? (projektLink?.(p) ?? null) : null
         return (
           <div key={p.id} style={{ borderBottom: '1px solid var(--ck-border)' }}>
+            {mobil ? (
+              /* O18, Zug 7 (D7): Am Handy die Erinnerungen-Grammatik — Kreis
+                 links, Titel, Meta klein, rechts die EINE Aktion. Der Kreis
+                 ruft `hake(p)`, also exakt denselben Pfad wie der ✓-Knopf am
+                 Desktop; `nurZaehler`-Posten bekommen keinen (O7). Der
+                 Aufklapp-Bereich darunter ist derselbe wie am Rechner —
+                 Kopieren, Entwurf, Skript, Loom, Ins Projekt bleiben alle
+                 dort, wo sie waren. */
+              <ListenZeile
+                titel={p.name}
+                erledigt={istErledigt}
+                onHaken={p.nurZaehler ? undefined : () => hake(p)}
+                hakenLabel={`${p.name} als erledigt abhaken`}
+                onTitel={() => toggle(p.id)}
+                ausgeklappt={istOffen}
+                meta={
+                  [
+                    p.firma && p.firma !== p.name ? p.firma : null,
+                    p.spur === 'loom' && skriptUrl ? 'Skript da' : null,
+                    p.entwurf ? (p.entwurf.veraltet ? 'Entwurf veraltet' : 'Entwurf da') : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ') || undefined
+                }
+                aktion={
+                  p.nurZaehler ? (
+                    <button
+                      type="button"
+                      className="ck-btn"
+                      style={{ minHeight: 40, fontSize: 11 }}
+                      onClick={() => onZaehler?.(p)}
+                    >
+                      Zaehler
+                    </button>
+                  ) : kopierbar ? (
+                    <button
+                      type="button"
+                      className="ck-btn"
+                      style={{ minHeight: 40, fontSize: 11, color: 'var(--ck-accent)' }}
+                      onClick={() => void kopiere(p)}
+                    >
+                      {kopiertId === p.id ? '✓' : 'Kopieren'}
+                    </button>
+                  ) : p.spur === 'loom' && skriptUrl ? (
+                    <a
+                      className="ck-btn"
+                      style={{ minHeight: 40, fontSize: 11, display: 'inline-flex', alignItems: 'center' }}
+                      href={skriptUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Skript ↗
+                    </a>
+                  ) : null
+                }
+              />
+            ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <button
                 type="button"
@@ -200,6 +263,7 @@ export function Arbeitsliste({ posten, onErledigt, onZaehler, loom, projektLink,
                 ✓
               </button>
             </div>
+            )}
 
             {istOffen ? (
               <div style={{ padding: '0 2px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
