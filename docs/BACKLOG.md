@@ -3,7 +3,7 @@
 **Stand:** 2026-08-09 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
 
 **Runde vom 09.08.** (Umsetzung): Der **Mobile Homescreen steht** — Züge 0–7 der
-Blaupause gebaut, zwölf Commits auf `cockpit-rebuild` (zehn Code, zwei Doku),
+Blaupause gebaut (zehn Code-Commits auf `cockpit-rebuild`, dazu die Doku),
 alle 20 verify-Skripte grün,
 Desktop nachweislich unverändert. Drei Abweichungen von der Blaupause und zwei
 ältere Fehler, die dabei auffielen, stehen bei **O18**. **Nicht live.** Erledigt: O18.
@@ -60,13 +60,14 @@ Web Speech entfernt wurde) und O13 (Drawer `rgb(11,14,16)`, Fehler `rgb(229,72,7
 ## 1 — Livegang
 
 Alles hier steht zwischen dem heutigen Code und „läuft in Produktion".
-**Etappen 1–4 sind seit dem 06.08. live**, die zwölf Commits des Mobile Homescreens noch nicht (L1).
+**Etappen 1–4 sind seit dem 06.08. live**, die Commits des Mobile Homescreens noch nicht (L1).
 `main` hat keinen eigenen Commit — der Livegang bleibt ein Fast-Forward, kein Merge.
 Was in diesem Abschnitt abgehakt ist, ist wirklich in Produktion; die Edge Functions
 (L4, L5) deployen unabhängig vom Frontend und sind es bereits.
 
-### L1 · Fast-Forward — **zwoelf Commits haengen** (Stand 09.08.)
-`git log origin/main..HEAD` = **12** (der Mobile Homescreen, O18). Am 08.08. war
+### L1 · Fast-Forward — **der Mobile Homescreen haengt** (Stand 09.08.)
+Wie viele Commits es sind, sagt `git log --oneline origin/main..HEAD` — eine
+Zahl hier waere ab dem naechsten Commit falsch (es ist die O18-Runde). Am 08.08. war
 der Stand kurzzeitig 0 — main == cockpit-rebuild, Netlify lieferte
 `index-DAnoKYfk.js`. Seit der Homescreen-Runde ist der Branch wieder voraus:
 Livegang ist weiter ein reiner Fast-Forward, und er bleibt Kevins Wort.
@@ -738,7 +739,7 @@ Pipeline/Listen/Call-Mode/Kontakt überhaupt bleibt (O13, letzte Zeile).
 
 ### O18 · ~~Mobile Homescreen~~ ✅ **gebaut 09.08.2026** · *Rest: live schalten + ein iPhone-Screenshot*
 Züge 0–7 der Blaupause (`docs/wargames/mobile-homescreen.md`) sind umgesetzt und
-liegen als zwölf Commits auf `cockpit-rebuild` (`git log origin/main..HEAD`).
+liegen auf `cockpit-rebuild` (`git log --oneline origin/main..HEAD`).
 **Nicht live** — der Fast-Forward ist Kevins Wort.
 
 **Was steht:**
