@@ -66,7 +66,13 @@ Alles hier steht zwischen dem heutigen Code und „läuft in Produktion".
 Was in diesem Abschnitt abgehakt ist, ist wirklich in Produktion; die Edge Functions
 (L4, L5) deployen unabhängig vom Frontend und sind es bereits.
 
-### L1 · ~~Fast-Forward~~ ✅ **Mobile Homescreen ist live (09.08.)**
+### L1 · Fast-Forward — **v2-Ausbau haengt** (Stand 09.08. nachts)
+Der Homescreen selbst ist live (unten). Danach kam die v2-Runde dazu: sie liegt
+auf `main`, ist aber **nicht gepusht** — `git log --oneline origin/main..main`
+sagt, was genau. Migration 0068 ist dagegen schon auf der Live-DB (additiv, die
+Tabelle steht ungenutzt herum, bis der Code nachkommt).
+
+### ~~Fast-Forward Homescreen~~ ✅ **live seit 09.08.**
 Kevin hat fast-forwarded: `main` == `cockpit-rebuild` == `bf4d50d`,
 `git rev-list --count origin/main..cockpit-rebuild` = 0. Netlify liefert
 `index-DjbHPMcW.js`; der Bundle enthaelt nachweislich den neuen Code (per
@@ -741,7 +747,7 @@ Pipeline/Listen/Call-Mode/Kontakt überhaupt bleibt (O13, letzte Zeile).
   Zeilen) und den Skill `linkedin-leads` — **vor dem Bauen prüfen, ob überhaupt
   noch etwas fehlt.** **S** für die Prüfung.
 
-### O18 · ~~Mobile Homescreen~~ ✅ **fertig, live und abgenommen (09.08.2026)**
+### O18 · ~~Mobile Homescreen + v2-Ausbau~~ ✅ **fertig und abgenommen (09.08.2026)** · *v2 noch nicht live*
 Züge 0–7 der Blaupause (`docs/wargames/mobile-homescreen.md`) sind umgesetzt und
 seit dem 09.08. live (L1). Kevins erster Eindruck am Geraet: „scheint zu
 funktionieren".
@@ -805,10 +811,46 @@ am 09.08. gegeben: die Kopfzeile sitzt in der installierten App unter der
 Aussparung (Zug 0). Damit ist auch der einzige Punkt erledigt, den kein
 Desktop-Browser prüfen kann — `env(safe-area-inset-top)` ist dort immer 0.
 
-**Nicht gebaut (v2, bewusst):** Long-Press Quick Actions, Agenten als Icons,
-Widget-Stack, Personalisierung/Jiggle, Kontext-Reihenfolge nach Tageszeit,
-Wisch-Gesten auf den Zeilen. Stehen im Ausbau-Teil der Blaupause hinter dem
-Alltagstest.
+**v2 komplett nachgezogen (09.08., Kevins Freigabe „nacheinander, f als letztes"):**
+- **(a) Schnell-Aktionen** — Halten auf einer Kachel öffnet ein Blatt.
+  Sales: Arbeitsmodus / Antworten / Anfragen-Zähler, alle über bestehende
+  `?kachel=…`-Routen (`components/home/AppGrid.tsx`). Bewusst nur Sales: ein
+  Halte-Menü, das nur „Bereich öffnen" anbietet, ist ein leerer Umweg.
+- **(b) Agenten-Kacheln** — Morgenbrief / Entwürfe / Dream mit ihrem Zustand
+  von heute (`components/home/AgentenKacheln.tsx`), aus `runs` + `agentenBefund`,
+  die die Home ohnehin hält. „ruht" am Wochenende, weil zwei der drei Routinen
+  werktags laufen. `scripts/verify-agenten-kacheln.ts`, 11 Fälle.
+- **(c) Widget-Stack** — Heute / Termine / Woche nebeneinander statt gestapelt
+  (`components/home/WidgetStack.tsx`, `.ck-widget-stack` in cockpit.css).
+  Heute bleibt Seite 1, sonst läge „Loslegen" hinter einem Wisch. Seither
+  stehen Widgets **und** Icons ohne Scrollen im Bild.
+- **(d) Eigene Reihenfolge** — „Anordnen": Kachel antippen, Ziel antippen.
+  **Migration 0068** legt `ui_settings` an (Schlüssel/Wert je Nutzer, RLS auf
+  `auth.uid()`), auf Kevins Entscheidung Supabase statt localStorage: die PWA
+  löschen und neu hinzufügen ist hier ein dokumentierter Schritt (O3), rein
+  lokal wäre die Anordnung dabei jedes Mal weg.
+- **(e) Reihenfolge nach Tageszeit** — morgens Freigaben/Sales/LinkedIn,
+  tagsüber Sales/Termine/Projekte, abends Tracking/Content/Projekte
+  (`lib/kachelReihenfolge.ts`). Greift **nur, solange nichts selbst angeordnet
+  ist**; ein einziges „Anordnen" friert sie für immer ein. Ein Grid, das sich
+  unter der eigenen Hand weiterbewegt, kostet mehr, als die Sortierung bringt.
+  `scripts/verify-kachel-reihenfolge.ts`, 32 Fälle — die Drift-Robustheit ist
+  der Punkt: ein neuer Bereich muss hinten landen statt zu fehlen.
+- **(f) Wischen auf den Zeilen** — links „→ morgen", rechts „Erledigt"
+  (`components/home/ListenZeile.tsx`, `.ck-zeile-wisch`). Nativ mit
+  scroll-snap, `overscroll-behavior-x: contain` gegen die iOS-Zurück-Geste.
+  **Abweichung:** die Blaupause wollte das Wischen selbst als Aktion; hier legt
+  es die Aktion frei und der Tipp führt sie aus — „→ morgen" verschiebt einen
+  Lead ohne Zurück, ein Fehlwisch wäre still und teuer. Verschoben wird über
+  bestehende Pfade: `snooze` bei LinkedIn-Posten, `due_at` bei Aufgaben; wo es
+  keinen gibt, erscheint die Aktion nicht.
+
+Desktop nach der ganzen Runde erneut gegengeprüft: `/cockpit` mit Graph und
+Heute-Deck, `/aufgaben` als Tabellenzeile, keine Wisch-Bahn, kein Widget-Stack.
+Alle 22 verify-Skripte grün.
+
+**Offen aus dem Ausbau:** echte iOS-Homescreen-Widgets (brauchen einen nativen
+Wrapper — verworfen, §5) und der Edge-Swipe-Pager (verworfen in D3).
 *Herkunft: Session 08.08. (Kevins OS-Idee) · IDEEN Leitprinzip Klick-Ökonomie*
 
 ---
