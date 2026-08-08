@@ -1,6 +1,11 @@
 # Uriel — Backlog (die eine Quelle der Wahrheit)
 
-**Stand:** 2026-08-06, abends · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
+**Stand:** 2026-08-09 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
+
+**Runde vom 09.08.** (Umsetzung): Der **Mobile Homescreen steht** — Züge 0–7 der
+Blaupause gebaut, zehn Commits auf `cockpit-rebuild`, alle 20 verify-Skripte grün,
+Desktop nachweislich unverändert. Drei Abweichungen von der Blaupause und zwei
+ältere Fehler, die dabei auffielen, stehen bei **O18**. **Nicht live.** Erledigt: O18.
 
 **Runde vom 07.08.** (O17 + O3): Die Morgen-Agenten laufen wieder — die Ursache
 war der schlafende Mac, nicht der Timeout. Darauf aufbauend der Morgen-Push:
@@ -54,15 +59,18 @@ Web Speech entfernt wurde) und O13 (Drawer `rgb(11,14,16)`, Fehler `rgb(229,72,7
 ## 1 — Livegang
 
 Alles hier steht zwischen dem heutigen Code und „läuft in Produktion".
-**Etappen 1–4 sind seit dem 06.08. live**, fünf jüngere Commits noch nicht (L1).
+**Etappen 1–4 sind seit dem 06.08. live**, die zehn Commits des Mobile Homescreens noch nicht (L1).
 `main` hat keinen eigenen Commit — der Livegang bleibt ein Fast-Forward, kein Merge.
 Was in diesem Abschnitt abgehakt ist, ist wirklich in Produktion; die Edge Functions
 (L4, L5) deployen unabhängig vom Frontend und sind es bereits.
 
-### L1 · ~~Fast-Forward~~ ✅ **alles live (verifiziert 08.08. abends)**
-`git log origin/main..HEAD` = **0** — main == cockpit-rebuild, Netlify liefert
-`index-DAnoKYfk.js`. Der Text darunter beschreibt den Zwischenstand vom 06.08.
-und bleibt als Historie stehen.
+### L1 · Fast-Forward — **zehn Commits haengen** (Stand 09.08.)
+`git log origin/main..HEAD` = **10** (der Mobile Homescreen, O18). Am 08.08. war
+der Stand kurzzeitig 0 — main == cockpit-rebuild, Netlify lieferte
+`index-DAnoKYfk.js`. Seit der Homescreen-Runde ist der Branch wieder voraus:
+Livegang ist weiter ein reiner Fast-Forward, und er bleibt Kevins Wort.
+Der Text darunter beschreibt den Zwischenstand vom 06.08. und bleibt als
+Historie stehen.
 `main` steht auf `de60288` und ist gepusht — der Fast-Forward aus dem
 vorherigen Stand dieses Dokuments **ist erfolgt**. Netlify hat neu gebaut:
 ausgeliefert wird `index-BjbadBHB.js` (vorher `index-CvTize-3.js`, geprueft per
@@ -727,22 +735,74 @@ Pipeline/Listen/Call-Mode/Kontakt überhaupt bleibt (O13, letzte Zeile).
   Zeilen) und den Skill `linkedin-leads` — **vor dem Bauen prüfen, ob überhaupt
   noch etwas fehlt.** **S** für die Prüfung.
 
-### O18 · Mobile Homescreen — **M** · geplant 08.08., Blaupause fertig
-Uriel am Handy wie ein OS: Widgets zuerst (Heute/Loslegen, Termine, Vitals,
-Agenten-Befund), darunter App-Icons mit Badges, „Mehr"-Sheet wird Bibliothek,
-Suche über die CommandPalette. Desktop bleibt unangetastet; `/morgen` bleibt
-die Push-Landung. **Befund, der den Umbau trägt:** `CockpitHome.tsx` hat keine
-isMobile-Verzweigung — das Handy bekommt heute den Desktop-Stapel untereinander
-(`:312-339`). Dazu ist `/linkedin` in keiner Nav-Liste erreichbar (nur Palette).
-Bauplan mit Zügen 0–7, Verifikation und Abbruchbedingungen:
-`docs/wargames/mobile-homescreen.md`. **Abends dazugekommen:** Zug 0 =
-Notch-Fix (Sofort-Fix: `viewport-fit=cover` + `black-translucent` in
-`index.html:5/27`, aber kein `safe-area-inset-top` an der Shell — Kopfzeile
-liegt in der installierten App unter der Uhr) und Zug 7 = Erinnerungen-
-Listen-Grammatik (D7: Optik über der Posten-Engine, Leads werden keine
-To-dos, jede Zeile behält ihre eine Aktion). v2-Ausbau (Long-Press,
-Agenten-Icons, Widget-Stack, Personalisierung, Wisch-Gesten) steht dort
-bewusst hinter dem Alltagstest.
+### O18 · ~~Mobile Homescreen~~ ✅ **gebaut 09.08.2026** · *Rest: live schalten + ein iPhone-Screenshot*
+Züge 0–7 der Blaupause (`docs/wargames/mobile-homescreen.md`) sind umgesetzt und
+liegen als zehn Commits auf `cockpit-rebuild` (`git log origin/main..HEAD`).
+**Nicht live** — der Fast-Forward ist Kevins Wort.
+
+**Was steht:**
+- **Zug 0 · Notch-Fix** (eigener Commit, unabhängig vom Rest):
+  `padding-top: env(safe-area-inset-top)` an `.ck-statusbar` im Mobil-Block
+  (`app/src/styles/cockpit.css:591`). Die Statusleiste ist der oberste
+  gerenderte Rand der Shell (`CockpitShell.tsx:31`), alle Bereiche erben.
+  Am Desktop gemessen: `env()` = 0, Padding bleibt 8 px.
+- **Zug 1 · Icons zentral:** Feld `icon` je Bereich in
+  `cockpit/lib/bereiche.ts:39-53` + `bereichIcon(path)`; `NavRail.tsx:29-46`
+  zieht daraus. Neu vergeben: `/termine` ◷, `/freigaben` ◫, `/linkedin` ▣.
+  Codepoints per Skript geprüft (☑/⚙ tragen U+FE0E, Rest Geometric Shapes).
+- **Zug 2 · Widgets:** `cockpit/components/home/` mit `HeuteWidget`,
+  `TermineWidget`, `VitalsWidget`, `BefundZeile`. Ohne eigene Hooks — Props
+  vom Eltern-Container. `MorgenArea.tsx:135` nutzt jetzt `BefundZeile`.
+- **Zug 3 · UrielHome** (`cockpit/pages/UrielHome.tsx`); `CockpitHome.tsx:170-173`
+  ist nur noch die Weiche, der bisherige Rumpf heißt `CockpitHomeDesktop`.
+- **Zug 4 · App-Grid** (`components/home/AppGrid.tsx`), 10 Kacheln, LinkedIn
+  erstmals ohne Umweg erreichbar. `Badge` aus NavRail nach
+  `components/Badge.tsx` gezogen. `useSocialUnread` (`lib/socialApi.ts:117-180`)
+  hat jetzt EINEN Kanal je Brand für alle Aufrufer.
+- **Zug 5 · Bibliothek:** `MehrSheet` zeigt alle 11 Bereiche als Grid
+  (`NavRail.tsx:110-161`), Benachrichtigungs-Schalter bleibt darunter.
+- **Zug 6 · Suche:** ⌕ im Kopf öffnet die CommandPalette;
+  `.ck-cmdk-input` mobil 16 px gegen iOS-Auto-Zoom (`cockpit.css:706`).
+- **Zug 7 · Erinnerungen-Grammatik** (`components/home/ListenZeile.tsx`),
+  mobil in `Arbeitsliste.tsx:131` und `AufgabenArea.tsx:55`. Der Kreis ruft
+  ausschließlich die bestehenden Erledigt-Pfade.
+
+**Verifikation 1–8 der Blaupause, gefahren:** `npx tsc -b` + `npm run build`
+grün · **alle 20 verify-Skripte** grün (u. a. `verify-breakpoint` 8/8,
+`verify-arbeitsmodus-tracking` 23/23) · Screenshots 390×664 (Homescreen, Apps,
+Bibliothek, Palette, Arbeitsmodus, Aufgaben, `/morgen`) und 1280 px · Desktop
+vorher/nachher deckungsgleich · Klick-Messung: Öffnen → „Loslegen" →
+Arbeitsmodus „1 / 209" = 2 Interaktionen · Netzwerk-Zählung gemessen: mobil
+113 Anfragen, Desktop 153, mobil KEINE Tabelle, die der Desktop nicht auch
+liest (es fehlen `month_goals`, `os_map_snapshot`, `project_messages`,
+`site_content`, `runner:/agents`, `runner:/os/map`).
+
+**Drei Abweichungen von der Blaupause — mit Grund:**
+1. **Kein `/freigaben`-Badge** (D5 sah einen vor). Gegenprobe fiel durch: das
+   Icon zeigte 20 (`entwuerfeOffen(geordnet)`), die Seite „24 offen"
+   (`FreigabenArea.tsx:297`, offene Karten der Agenten-Warteschlange). Zwei
+   verschiedene Mengen; gleichziehen ginge nur mit einem neuen Ladepfad auf der
+   Home (Gesetz 4). Der Content-Badge bleibt.
+2. **`useViewport` hörte nur auf `resize`/`orientationchange`** — beim
+   Umschalten der Breite feuerte die MediaQuery, aber kein resize, und die Home
+   blieb auf dem Desktop-Zweig, während die Bottom-Bar schon mobil war. Jetzt
+   zusätzlich matchMedia-Listener (`hooks/useViewport.ts:60-61`), wie NavRail
+   ihn seit O10 hat.
+3. **`?modus=arbeit` startete zu früh:** der Effekt in `SalesDashboard.tsx:601`
+   wartete nur auf „`geordnet` nicht leer". Die fünf Quellen kommen nacheinander
+   an — der Arbeitsmodus öffnete mit „1 / 2" statt „1 / 209". Er wartet jetzt
+   auch auf „nichts lädt mehr". Der Fehler war älter als O18 (der Knopf auf
+   `/morgen` ruft dieselbe URL).
+
+**Was noch fehlt (nur Kevin):** live schalten (Fast-Forward auf `main`) und ein
+iPhone-Screenshot als Abnahme für Zug 0 — `env(safe-area-inset-top)` ist am
+Desktop nicht prüfbar. Gegenprobe dabei: Arbeitsmodus und Anfragen-Zähler
+dürfen oben **nicht doppelt** Luft haben.
+
+**Nicht gebaut (v2, bewusst):** Long-Press Quick Actions, Agenten als Icons,
+Widget-Stack, Personalisierung/Jiggle, Kontext-Reihenfolge nach Tageszeit,
+Wisch-Gesten auf den Zeilen. Stehen im Ausbau-Teil der Blaupause hinter dem
+Alltagstest.
 *Herkunft: Session 08.08. (Kevins OS-Idee) · IDEEN Leitprinzip Klick-Ökonomie*
 
 ---
