@@ -11,6 +11,7 @@ import { BefundZeile } from '../components/home/BefundZeile'
 import { HeuteWidget } from '../components/home/HeuteWidget'
 import { TermineWidget } from '../components/home/TermineWidget'
 import { VitalsWidget } from '../components/home/VitalsWidget'
+import { WidgetStack } from '../components/home/WidgetStack'
 import { useActiveBrand } from '../lib/activeBrand'
 import { agentenBefund } from '../lib/agentenGesundheit'
 import { PALETTEN_BEREICHE } from '../lib/bereiche'
@@ -180,17 +181,35 @@ export function UrielHome() {
 
       <BefundZeile meldung={befund.meldung} onOeffnen={() => navigate('/agenten')} />
 
-      <HeuteWidget
-        ansage={ansage}
-        offen={geordnet.length}
-        entwuerfe={entwuerfe}
-        laedt={laedt}
-        onLoslegen={() => navigate('/sales?kachel=jetzt-dran&modus=arbeit')}
+      {/* v2 (c): nebeneinander statt gestapelt — Heute bleibt Seite 1, damit
+          „Loslegen" nicht hinter einem Wisch liegt. */}
+      <WidgetStack
+        seiten={[
+          {
+            id: 'heute',
+            label: 'Heute',
+            inhalt: (
+              <HeuteWidget
+                ansage={ansage}
+                offen={geordnet.length}
+                entwuerfe={entwuerfe}
+                laedt={laedt}
+                onLoslegen={() => navigate('/sales?kachel=jetzt-dran&modus=arbeit')}
+              />
+            ),
+          },
+          {
+            id: 'termine',
+            label: 'Termine heute',
+            inhalt: <TermineWidget termine={termine} onOeffnen={() => navigate('/termine')} />,
+          },
+          {
+            id: 'woche',
+            label: 'Woche',
+            inhalt: <VitalsWidget vitals={vitals} onOeffnen={() => navigate('/tracking')} />,
+          },
+        ]}
       />
-
-      <TermineWidget termine={termine} onOeffnen={() => navigate('/termine')} />
-
-      <VitalsWidget vitals={vitals} onOeffnen={() => navigate('/tracking')} />
 
       {/* Die Apps. `/cockpit` fehlt bewusst — man ist schon da. Reihenfolge =
           Registry-Reihenfolge, also Warteschlange vorn. */}

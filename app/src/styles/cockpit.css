@@ -697,6 +697,34 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
     align-items: stretch;
   }
 
+  /* O18 v2 (c): Widget-Stack. Gescrollt wird nativ mit Snap — der Browser
+     entscheidet, ob ein Zug waagerecht oder senkrecht gemeint war, und diese
+     Entscheidung ist von Hand nicht zuverlässig nachzubauen. Die Bahn ist
+     bewusst ohne sichtbare Leiste; die Punkte darunter sagen, wo man ist. */
+  .ck-widget-stack {
+    display: flex;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    /* Waagerecht wischen wir selbst, senkrecht scrollt die Seite weiter. */
+    touch-action: pan-x pan-y;
+  }
+  .ck-root .ck-widget-stack::-webkit-scrollbar { display: none; }
+  .ck-widget-stack > * {
+    flex: 0 0 100%;
+    min-width: 0;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    display: flex;
+    flex-direction: column;
+  }
+  /* Alle Seiten sind so hoch wie die höchste (Woche). Die Karte füllt die Bahn,
+     statt eine Lücke bis zu den Punkten zu lassen — und die Höhe springt beim
+     Wischen nicht, was eine mitwachsende Bahn zwangsläufig täte. */
+  .ck-widget-stack > * > * { flex: 1; }
+
   .ck-cmdk-backdrop { padding-top: 8vh; }
   .ck-cmdk { max-height: 78vh; }
   /* O18, Zug 6: Am Handy ist die Palette ueber den ⌕-Knopf des Homescreens
