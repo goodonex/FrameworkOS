@@ -581,7 +581,14 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
   .ck-counter-btn { min-height: 36px; min-width: 36px; }
   .ck-select { min-height: 40px; max-width: 34vw; }
 
-  .ck-statusbar { padding: 8px 12px; gap: 8px; }
+  /* Zug 0 (O18): Die installierte App zeichnet wegen `viewport-fit=cover` +
+     `black-translucent` (index.html:5/27) bis unter die Notch. Bottom/Left/Right
+     sind unten versorgt, oben fehlte die Safe-Area komplett — die Kopfzeile lag
+     unter der Uhr. Der Fix sitzt an der Statusleiste, weil sie der OBERSTE
+     gerenderte Rand der Shell ist (CockpitShell.tsx:31, vor `.ck-main`): ein
+     Ort, alle Bereiche erben. Ihr Hintergrund (--ck-bg) füllt den Notch-Streifen.
+     Am Desktop und im Safari-Tab ist env() = 0 → pixelgleich wie vorher. */
+  .ck-statusbar { padding: calc(8px + env(safe-area-inset-top)) 12px 8px; gap: 8px; }
   .ck-wordmark { font-size: 11px; letter-spacing: 0.16em; }
   .ck-status-brand-tag { display: none; }
   .ck-status-words { display: none; }
