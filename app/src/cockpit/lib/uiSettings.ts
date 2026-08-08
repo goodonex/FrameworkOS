@@ -94,35 +94,3 @@ export function useUiSetting<T>(schluessel: string, standard: T): UiSetting<T> {
 
   return { wert, setzen, geladen }
 }
-
-/** Der eine Schlüssel, den v2 (d) benutzt. */
-export const KACHEL_REIHENFOLGE = 'home.kachelReihenfolge'
-
-/**
- * Gespeicherte Reihenfolge auf die tatsächlich vorhandenen Bereiche anwenden.
- *
- * Robust gegen beide Richtungen von Drift: ein Bereich, der aus der Registry
- * verschwindet, fällt raus; ein neuer, den die gespeicherte Liste nicht kennt,
- * landet hinten statt zu fehlen. Ohne das würde eine alte Anordnung neue
- * Bereiche unsichtbar machen — der Fehler, den man erst Wochen später merkt.
- */
-export function ordneNach<T extends { path: string }>(bereiche: T[], reihenfolge: string[]): T[] {
-  const rang = new Map(reihenfolge.map((p, i) => [p, i]))
-  return [...bereiche].sort((a, b) => {
-    const ra = rang.get(a.path)
-    const rb = rang.get(b.path)
-    if (ra == null && rb == null) return 0
-    if (ra == null) return 1
-    if (rb == null) return -1
-    return ra - rb
-  })
-}
-
-/** Einen Bereich vor einen anderen setzen (Ergebnis der Tipp-Tipp-Geste). */
-export function verschiebeVor(reihenfolge: string[], was: string, vor: string): string[] {
-  if (was === vor) return reihenfolge
-  const ohne = reihenfolge.filter((p) => p !== was)
-  const i = ohne.indexOf(vor)
-  if (i === -1) return [...ohne, was]
-  return [...ohne.slice(0, i), was, ...ohne.slice(i)]
-}

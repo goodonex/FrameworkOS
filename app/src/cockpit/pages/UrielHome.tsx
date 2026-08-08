@@ -17,7 +17,13 @@ import { agentenBefund } from '../lib/agentenGesundheit'
 import { PALETTEN_BEREICHE } from '../lib/bereiche'
 import { weekVitals } from '../lib/metricsAggregate'
 import { useSocialUnread } from '../lib/socialApi'
-import { KACHEL_REIHENFOLGE, ordneNach, useUiSetting, verschiebeVor } from '../lib/uiSettings'
+import {
+  KACHEL_REIHENFOLGE,
+  kontextReihenfolge,
+  ordneNach,
+  verschiebeVor,
+} from '../lib/kachelReihenfolge'
+import { useUiSetting } from '../lib/uiSettings'
 import { tagesansage } from '../lib/tagesansage'
 import { eventsByDate, termineAmTag, ymd, type CalEvent } from '../lib/termineEvents'
 import { CALENDAR_ICAL_KEY, useCalendarFeed } from '../lib/useCalendarFeed'
@@ -154,7 +160,16 @@ export function UrielHome() {
    */
   const { wert: reihenfolge, setzen: setReihenfolge } = useUiSetting<string[]>(KACHEL_REIHENFOLGE, [])
   const [anordnen, setAnordnen] = useState(false)
-  const sortierteApps = useMemo(() => ordneNach(APPS, reihenfolge), [reihenfolge])
+  /**
+   * v2 (e): Solange nichts selbst angeordnet ist, entscheidet die Tageszeit über
+   * die ersten drei Kacheln. Sobald Kevin einmal anordnet, gilt seine Liste —
+   * eine Oberfläche, die sich unter der eigenen Anordnung weiterbewegt, wäre
+   * kein Dienst, sondern ein Ärgernis.
+   */
+  const sortierteApps = useMemo(
+    () => ordneNach(APPS, reihenfolge.length > 0 ? reihenfolge : kontextReihenfolge(jetzt.getHours())),
+    [reihenfolge, jetzt],
+  )
 
   return (
     <div
@@ -231,7 +246,14 @@ export function UrielHome() {
           <button
             type="button"
             className="ck-btn"
-            onClick={() => setAnordnen((a) => !a)}
+            onClick={() => {
+              // Beim Einsteigen die gerade sichtbare Reihenfolge festschreiben —
+              // sonst verschöbe der erste Griff gegen eine leere Liste und die
+              // Tageszeit-Sortierung würde die eigene Wahl gleich wieder
+              // überstimmen.
+              if (!anordnen && reihenfolge.length === 0) setReihenfolge(sortierteApps.map((b) => b.path))
+              setAnordnen((a) => !a)
+            }}
             style={{ fontSize: 10, minHeight: 32, padding: '0 12px' }}
           >
             {anordnen ? 'Fertig' : 'Anordnen'}
