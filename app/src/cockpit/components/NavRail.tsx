@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { Badge, BadgeText } from './Badge'
 import { bereichIcon } from '../lib/bereiche'
 import { useSocialUnread } from '../lib/socialApi'
 import { MOBILE_MEDIA_QUERY } from '../../hooks/useViewport'
@@ -74,45 +75,6 @@ function useBottomBar(): boolean {
 function istAktiv(item: NavItem, pathname: string): boolean {
   const pfade = item.paths ?? [item.to]
   return pfade.some((p) => pathname === p || pathname.startsWith(`${p}/`))
-}
-
-function Badge({ anzahl }: { anzahl: number }) {
-  if (anzahl <= 0) return null
-  return (
-    <span
-      aria-hidden
-      style={{
-        position: 'absolute',
-        top: -3,
-        right: -6,
-        minWidth: 14,
-        height: 14,
-        padding: '0 3px',
-        borderRadius: 99,
-        background: 'var(--ck-accent)',
-        color: '#fff',
-        fontSize: 9,
-        fontWeight: 700,
-        lineHeight: '14px',
-        textAlign: 'center',
-      }}
-    >
-      {anzahl}
-    </span>
-  )
-}
-
-/** Nur fürs Vorlese-Programm — der Badge selbst ist aria-hidden. */
-function BadgeText({ anzahl }: { anzahl: number }) {
-  if (anzahl <= 0) return null
-  return (
-    <span
-      style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap' }}
-    >
-      {' '}
-      ({anzahl} neu)
-    </span>
-  )
 }
 
 function NavEintrag({ item, badge }: { item: NavItem; badge: number }) {

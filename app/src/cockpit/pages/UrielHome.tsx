@@ -5,13 +5,16 @@ import { useContentPieces } from '../../hooks/useContentPieces'
 import { entwuerfeOffen, usePosten } from '../../hooks/usePosten'
 import { useBookings } from '../../hooks/useSalesPro'
 import { useCommandPalette } from '../../lib/commandPaletteContext'
+import { AppGrid } from '../components/home/AppGrid'
 import { BefundZeile } from '../components/home/BefundZeile'
 import { HeuteWidget } from '../components/home/HeuteWidget'
 import { TermineWidget } from '../components/home/TermineWidget'
 import { VitalsWidget } from '../components/home/VitalsWidget'
 import { useActiveBrand } from '../lib/activeBrand'
 import { agentenBefund } from '../lib/agentenGesundheit'
+import { PALETTEN_BEREICHE } from '../lib/bereiche'
 import { weekVitals } from '../lib/metricsAggregate'
+import { useSocialUnread } from '../lib/socialApi'
 import { tagesansage } from '../lib/tagesansage'
 import { eventsByDate, termineAmTag, ymd, type CalEvent } from '../lib/termineEvents'
 import { CALENDAR_ICAL_KEY, useCalendarFeed } from '../lib/useCalendarFeed'
@@ -50,6 +53,9 @@ function gruss(d: Date): string {
   if (h < 18) return 'Guten Tag'
   return 'Guten Abend'
 }
+
+/** Alle Bereiche außer dem, auf dem man gerade steht. */
+const APPS = PALETTEN_BEREICHE.filter((b) => b.path !== '/cockpit')
 
 export function UrielHome() {
   const navigate = useNavigate()
@@ -105,6 +111,17 @@ export function UrielHome() {
     posten.linkedinThreads.loading ||
     posten.erstnachrichten.loading
 
+  /**
+   * Badges nur aus Quellen, die diese Seite ohnehin geladen hat (D5):
+   * `/freigaben` zeigt die Entwürfe, die auch im Heute-Widget stehen,
+   * `/content` die ungesehenen Wochen. `useSocialUnread` teilt sich seit Zug 4
+   * einen Ladelauf mit der NavRail — sonst liefe der 60-Sekunden-Takt doppelt.
+   * Kundenpost- und Termin-Badges bleiben draußen: die bräuchten neue Ladepfade.
+   */
+  const socialUnread = useSocialUnread()
+  const badgeFuer = (path: string) =>
+    path === '/content' ? socialUnread : path === '/freigaben' ? entwuerfe : 0
+
   return (
     <div
       style={{
@@ -151,6 +168,10 @@ export function UrielHome() {
       <TermineWidget termine={termine} onOeffnen={() => navigate('/termine')} />
 
       <VitalsWidget vitals={vitals} onOeffnen={() => navigate('/tracking')} />
+
+      {/* Die Apps. `/cockpit` fehlt bewusst — man ist schon da. Reihenfolge =
+          Registry-Reihenfolge, also Warteschlange vorn. */}
+      <AppGrid bereiche={APPS} badgeFuer={badgeFuer} onWaehle={(p) => navigate(p)} />
     </div>
   )
 }

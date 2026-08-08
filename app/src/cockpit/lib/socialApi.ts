@@ -113,6 +113,51 @@ export async function syncSocialBatchesFromRunner(brandSlug: string): Promise<nu
 }
 
 /**
+ * Ein Ladelauf je Brand, egal wie viele Stellen die Zahl anzeigen (O18, Zug 4).
+ *
+ * Der Hook holte pro Aufrufer alle 60 Sekunden Runner-Spiegel und Supabase-Liste.
+ * Solange nur die NavRail ihn rief, war das eine Abfrage — mit dem App-Grid des
+ * Homescreens wären es zwei parallele geworden, und der Homescreen hätte genau
+ * die Nachlade-Signatur bekommen, die Gesetz 4 der Blaupause verbietet. Deshalb
+ * teilen sich jetzt alle Aufrufer einen Kanal; der letzte, der geht, räumt auf.
+ */
+interface UnreadKanal {
+  count: number
+  hoerer: Set<(n: number) => void>
+  stop: () => void
+}
+
+const unreadKanaele = new Map<string, UnreadKanal>()
+
+function unreadKanal(brandSlug: string): UnreadKanal {
+  const vorhanden = unreadKanaele.get(brandSlug)
+  if (vorhanden) return vorhanden
+
+  const kanal: UnreadKanal = { count: 0, hoerer: new Set(), stop: () => {} }
+  const setze = (n: number) => {
+    kanal.count = n
+    for (const h of kanal.hoerer) h(n)
+  }
+  const load = async () => {
+    await syncSocialBatchesFromRunner(brandSlug) // no-op wenn Runner offline
+    const list = await loadSocialBatchList(brandSlug)
+    const seen = getSeenWeeks()
+    setze(list.filter((w) => !seen.has(w.week)).length)
+  }
+  void load().catch(() => setze(0))
+  const onSeen = () => void load().catch(() => {})
+  window.addEventListener(SEEN_EVENT, onSeen)
+  const iv = window.setInterval(() => void load().catch(() => {}), 60_000)
+  kanal.stop = () => {
+    window.removeEventListener(SEEN_EVENT, onSeen)
+    window.clearInterval(iv)
+    unreadKanaele.delete(brandSlug)
+  }
+  unreadKanaele.set(brandSlug, kanal)
+  return kanal
+}
+
+/**
  * Anzahl noch nicht gesichteter Wochen — für den Nav-Badge („Meldung oben").
  * Quelle ist Supabase (funktioniert live/mobil); ist der Runner lokal erreichbar,
  * wird vorher gespiegelt, sodass neue Batches sofort auftauchen.
@@ -120,26 +165,14 @@ export async function syncSocialBatchesFromRunner(brandSlug: string): Promise<nu
 export function useSocialUnread(): number {
   const brand = useActiveBrandOptional()
   const brandSlug = brand?.activeSlug ?? 'herrmann'
-  const [count, setCount] = useState(0)
+  const [count, setCount] = useState(() => unreadKanaele.get(brandSlug)?.count ?? 0)
   useEffect(() => {
-    let alive = true
-    const load = async () => {
-      await syncSocialBatchesFromRunner(brandSlug) // no-op wenn Runner offline
-      const list = await loadSocialBatchList(brandSlug)
-      if (!alive) return
-      const seen = getSeenWeeks()
-      setCount(list.filter((w) => !seen.has(w.week)).length)
-    }
-    void load().catch(() => {
-      if (alive) setCount(0)
-    })
-    const onSeen = () => void load().catch(() => {})
-    window.addEventListener(SEEN_EVENT, onSeen)
-    const iv = window.setInterval(() => void load().catch(() => {}), 60_000)
+    const kanal = unreadKanal(brandSlug)
+    setCount(kanal.count)
+    kanal.hoerer.add(setCount)
     return () => {
-      alive = false
-      window.removeEventListener(SEEN_EVENT, onSeen)
-      clearInterval(iv)
+      kanal.hoerer.delete(setCount)
+      if (kanal.hoerer.size === 0) kanal.stop()
     }
   }, [brandSlug])
   return count
