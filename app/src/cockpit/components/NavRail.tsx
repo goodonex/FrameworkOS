@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { bereichIcon } from '../lib/bereiche'
 import { useSocialUnread } from '../lib/socialApi'
 import { MOBILE_MEDIA_QUERY } from '../../hooks/useViewport'
 import { Benachrichtigungen } from './Benachrichtigungen'
@@ -16,23 +17,30 @@ interface NavItem {
  * die vier Bereiche, in denen Kevin morgens arbeitet, stehen am Daumen —
  * Ads/Content/Agenten/Tracking sind Nachschlagen und liegen mobil hinter „Mehr".
  * Am Desktop ist Platz, dort steht weiter alles untereinander.
+ *
+ * O18, Zug 1: Hier stehen nur noch **Auswahl, Reihenfolge und Beschriftung**.
+ * Die Zeichen kommen aus der Bereichs-Registry (`bereiche.ts`) — dort steht
+ * auch die O13-Regel gegen bunte Emoji auf iOS. Sonst hätte das App-Grid des
+ * Homescreens seine eigenen Icons, und die zweite Bereichs-Wahrheit, die
+ * Etappe 4 gerade zugenäht hat, wäre zurück.
  */
 const ARBEIT: NavItem[] = [
-  { to: '/cockpit', label: 'Cockpit', icon: '◉' },
-  // „Heute" fasst die täglichen Operativ-Bereiche zusammen (Sub-Tabs: HeuteTabs).
+  { to: '/cockpit', label: 'Cockpit', icon: bereichIcon('/cockpit') },
+  // „Heute" fasst die täglichen Operativ-Bereiche zusammen (Sub-Tabs: HeuteTabs) —
+  // deshalb hier ein anderes Label als in der Registry, aber dasselbe Zeichen.
   // O13: '\uFE0E' (Variation Selector-15) erzwingt die Text-Variante. Ohne ihn
   // rendert iOS ☑ und ⚙ als buntes Emoji — die einzigen zwei Zeichen der Leiste
   // mit Emoji-Default; alle anderen sind Geometric Shapes ohne Emoji-Form.
-  { to: '/aufgaben', label: 'Heute', icon: '\u2611\uFE0E', paths: ['/aufgaben', '/termine', '/freigaben'] },
-  { to: '/sales', label: 'Sales', icon: '▤' },
-  { to: '/projekte', label: 'Projekte', icon: '◈' },
+  { to: '/aufgaben', label: 'Heute', icon: bereichIcon('/aufgaben'), paths: ['/aufgaben', '/termine', '/freigaben'] },
+  { to: '/sales', label: 'Sales', icon: bereichIcon('/sales') },
+  { to: '/projekte', label: 'Projekte', icon: bereichIcon('/projekte') },
 ]
 
 const NACHSCHLAGEN: NavItem[] = [
-  { to: '/ads', label: 'Ads', icon: '◨' },
-  { to: '/content', label: 'Content', icon: '◐' },
-  { to: '/agenten', label: 'Agenten', icon: '\u2699\uFE0E' },
-  { to: '/tracking', label: 'Tracking', icon: '▦' },
+  { to: '/ads', label: 'Ads', icon: bereichIcon('/ads') },
+  { to: '/content', label: 'Content', icon: bereichIcon('/content') },
+  { to: '/agenten', label: 'Agenten', icon: bereichIcon('/agenten') },
+  { to: '/tracking', label: 'Tracking', icon: bereichIcon('/tracking') },
 ]
 
 /**
