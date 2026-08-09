@@ -39,6 +39,16 @@ const STATUS_LABEL: Record<RunSummary['status'], string> = {
   error: 'Fehler',
 }
 
+/**
+ * Agenten, die ohne Lead-Daten (name, website) gar nichts bauen können — ihr
+ * Prompt im Runner-Katalog beginnt mit „für den Lead aus den Eingabedaten".
+ * `postRun(agent.id)` schickte bisher keinen Input mit: der Start hier war ein
+ * Leerlauf mit anschließendem Fehl-Run. Ids gegen `AGENT_CATALOG`
+ * (runner/index.mjs) abgeglichen, nicht geraten.
+ */
+const BRAUCHT_POSTEN = new Set(['loom-skript', 'followup-pdf', 'lead-research'])
+const POSTEN_HINWEIS = 'Braucht einen Posten — aus dem Arbeitsmodus starten.'
+
 export function AgentsArea() {
   const [agents, setAgents] = useState<AgentInfo[] | null>(null)
   const [runs, setRuns] = useState<RunSummary[]>([])
@@ -117,6 +127,7 @@ export function AgentsArea() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12, marginBottom: 20 }}>
         {agents.map((a) => {
           const isBusy = busy.has(a.id) || a.running
+          const brauchtPosten = BRAUCHT_POSTEN.has(a.id)
           return (
             <div key={a.id} className="ck-panel" style={{ padding: '13px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -139,12 +150,18 @@ export function AgentsArea() {
               <p className="ck-label" style={{ margin: 0, lineHeight: 1.45, minHeight: 34 }}>{a.description}</p>
               <button
                 className="ck-btn ck-btn--primary"
-                style={{ fontSize: 12, alignSelf: 'flex-start' }}
-                disabled={isBusy}
+                style={{ fontSize: 12, alignSelf: 'flex-start', opacity: brauchtPosten ? 0.45 : 1 }}
+                disabled={isBusy || brauchtPosten}
+                title={brauchtPosten ? POSTEN_HINWEIS : undefined}
                 onClick={() => void run(a)}
               >
                 {isBusy ? 'läuft…' : 'Ausführen'}
               </button>
+              {brauchtPosten ? (
+                <span className="ck-label" style={{ color: 'var(--ck-text-3)', lineHeight: 1.4 }}>
+                  {POSTEN_HINWEIS}
+                </span>
+              ) : null}
             </div>
           )
         })}
