@@ -70,10 +70,15 @@ function RequireClientPortalGate({
 /**
  * Preview: ?preview=true — lädt Projekt aus localStorage (Entwicklung, kein Login).
  * Kunden-Ansicht: ?als=kunde — Owner sieht das Portal wie der Kunde (Banner).
+ *
+ * D10 (O13): Der Preview-Parameter gilt nur noch im Dev-Build. In Produktion
+ * war er ein Auth-Bypass, der an einem localStorage-Eintrag hing — als
+ * Entwicklungswerkzeug wertvoll, live nur Risiko ohne Gegenwert. Auf der
+ * Live-Domain läuft `?preview=true` jetzt ins normale Login-Gate.
  */
 export function PortalRoute({ crm = false }: { crm?: boolean }) {
   const [searchParams] = useSearchParams()
-  const preview = searchParams.get('preview') === 'true'
+  const preview = import.meta.env.DEV && searchParams.get('preview') === 'true'
   const ownerView = searchParams.get('als') === 'kunde'
 
   if (preview) {
