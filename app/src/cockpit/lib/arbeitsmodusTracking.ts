@@ -33,6 +33,28 @@ export function metrikFeldFuer(spur: Spur): MetricField | null {
   }
 }
 
+/** Jede Spur genau einmal — die Quelle für AUTO_METRIK_FELDER. */
+const ALLE_SPUREN = [
+  'erstnachricht',
+  'followup',
+  'loom',
+  'anfrage',
+  'inmail',
+  'antwort',
+  'kundenaufgabe',
+  'kunde_liegt',
+] as const satisfies readonly Spur[]
+
+/**
+ * Die Felder, die beim Abhaken im Arbeitsmodus von selbst mitzählen — abgeleitet
+ * aus `metrikFeldFuer`, nicht abgetippt: ein neues Spur/Feld-Paar landet damit
+ * automatisch hier. Trägt den „auto"-Chip in /tracking, damit Kevin nicht von
+ * Hand nachzählt, was der Arbeitsmodus schon gezählt hat.
+ */
+export const AUTO_METRIK_FELDER: ReadonlySet<MetricField> = new Set(
+  ALLE_SPUREN.map(metrikFeldFuer).filter((f): f is MetricField => f !== null),
+)
+
 export interface ArbeitsmodusTrackingDeps {
   bump: (field: MetricField, delta: number) => void
   erstnachrichtGesendet: (id: string) => Promise<void> | void

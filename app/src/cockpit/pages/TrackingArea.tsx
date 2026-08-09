@@ -6,6 +6,7 @@ import { channelRates, funnelKpis, sumField, termineAttribution, weekVitals } fr
 import type { MetricField } from '../lib/useDailyMetrics'
 import { toIsoDate, useDailyMetrics } from '../lib/useDailyMetrics'
 import { formatEuro } from '../lib/goals'
+import { AUTO_METRIK_FELDER } from '../lib/arbeitsmodusTracking'
 
 /** Aktivitäten-Eingabe, gruppiert nach Plattform (Kevins realer Akquise-Tag). */
 type InputGroup = { title: string; fields: Array<{ field: MetricField; label: string }> }
@@ -58,10 +59,13 @@ function Stepper({
   label,
   value,
   onBump,
+  auto = false,
 }: {
   label: string
   value: number
   onBump: (delta: number) => void
+  /** Feld, das der Arbeitsmodus beim Abhaken selbst hochzählt (O13). */
+  auto?: boolean
 }) {
   return (
     <div
@@ -81,13 +85,31 @@ function Stepper({
         style={{
           fontSize: 10.5,
           minWidth: 0,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 5,
           overflow: 'hidden',
-          textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
         }}
         title={label}
       >
-        {label}
+        <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
+        {auto ? (
+          <span
+            style={{
+              flexShrink: 0,
+              fontSize: 8.5,
+              lineHeight: 1.6,
+              padding: '0 5px',
+              borderRadius: 99,
+              border: '1px solid var(--ck-border)',
+              color: 'var(--ck-text-3)',
+            }}
+            title="zählt beim Abhaken im Arbeitsmodus mit"
+          >
+            auto
+          </span>
+        ) : null}
       </span>
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
         <button className="ck-btn ck-counter-btn" style={{ padding: '2px 9px' }} onClick={() => onBump(-1)} aria-label={`${label} minus 1`}>
@@ -311,6 +333,7 @@ export function TrackingArea() {
                   <Stepper
                     key={f.field}
                     label={f.label}
+                    auto={AUTO_METRIK_FELDER.has(f.field)}
                     value={row[f.field]}
                     onBump={(d) => metrics.bumpOn(selectedDate, f.field, d)}
                   />
@@ -324,6 +347,7 @@ export function TrackingArea() {
               <Stepper
                 key={f.field}
                 label={f.label}
+                auto={AUTO_METRIK_FELDER.has(f.field)}
                 value={row[f.field]}
                 onBump={(d) => metrics.bumpOn(selectedDate, f.field, d)}
               />
@@ -335,6 +359,7 @@ export function TrackingArea() {
               <Stepper
                 key={f.field}
                 label={f.label}
+                auto={AUTO_METRIK_FELDER.has(f.field)}
                 value={row[f.field]}
                 onBump={(d) => metrics.bumpOn(selectedDate, f.field, d)}
               />
