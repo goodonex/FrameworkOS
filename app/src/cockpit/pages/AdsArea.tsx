@@ -95,6 +95,21 @@ function AdsDashboard() {
 
   const totals = useMemo(() => sumMetrics(rows.map((r) => r.metrics)), [rows])
 
+  /**
+   * Solange keine Meta-Zahlen da sind, standen hier vier Striche. Der Review
+   * hat aber sehr wohl einen Stand — der zählt aus denselben Zeilen wie die
+   * Tabelle darunter, damit Kachel und Tabelle nie auseinandergehen.
+   * Statuswerte aus `AdStatus` (adsApi.ts:25), nicht geraten.
+   */
+  const reviewStand = useMemo(
+    () => ({
+      gesamt: rows.length,
+      freigegeben: rows.filter((r) => r.status === 'approved' || r.status === 'live').length,
+      inReview: rows.filter((r) => r.status === 'review').length,
+    }),
+    [rows],
+  )
+
   if (error) {
     return <RunnerHinweis error={error} was="Die Ads-Auswertung" />
   }
@@ -120,16 +135,28 @@ function AdsDashboard() {
 
       {/* KPI-Kacheln */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 16 }}>
-        <Kpi label="Ad-Spend" value={totals.hasData ? EUR.format(totals.spend) : '—'} />
-        <Kpi label="Leads" value={totals.hasData ? NUM.format(totals.leads) : '—'} />
-        <Kpi label="Ø CPL" value={totals.cpl != null ? EUR2.format(totals.cpl) : '—'} accent />
-        <Kpi label="Ø CTR" value={totals.ctr != null ? `${totals.ctr.toFixed(2).replace('.', ',')} %` : '—'} />
+        {totals.hasData ? (
+          <>
+            <Kpi label="Ad-Spend" value={totals.hasData ? EUR.format(totals.spend) : '—'} />
+            <Kpi label="Leads" value={totals.hasData ? NUM.format(totals.leads) : '—'} />
+            <Kpi label="Ø CPL" value={totals.cpl != null ? EUR2.format(totals.cpl) : '—'} accent />
+            <Kpi label="Ø CTR" value={totals.ctr != null ? `${totals.ctr.toFixed(2).replace('.', ',')} %` : '—'} />
+          </>
+        ) : (
+          <>
+            <Kpi label="Ads gesamt" value={NUM.format(reviewStand.gesamt)} />
+            <Kpi label="Freigegeben" value={NUM.format(reviewStand.freigegeben)} accent />
+            <Kpi label="In Review" value={NUM.format(reviewStand.inReview)} />
+            <Kpi label="Kunden" value={NUM.format(entries.length)} />
+          </>
+        )}
       </div>
 
       {!totals.hasData ? (
         <div className="ck-panel" style={{ padding: '10px 14px', marginBottom: 16, fontSize: 12.5, color: 'var(--ck-text-2)' }}>
-          Sobald die Kampagnen laufen, kommen hier die Meta-Zahlen rein (Spend, Leads, CPL, CTR) — pro
-          Ad ins Manifest gepflegt oder per Claude eingetragen. Die Tabelle zeigt sie dann automatisch.
+          Solange keine Kampagne läuft, zeigen die Kacheln den Review-Stand. Sobald die Meta-Zahlen da
+          sind (Spend, Leads, CPL, CTR — pro Ad ins Manifest gepflegt oder per Claude eingetragen),
+          treten sie an ihre Stelle, und die Tabelle zeigt sie automatisch mit.
         </div>
       ) : null}
 
