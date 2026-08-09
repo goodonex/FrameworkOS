@@ -173,6 +173,8 @@ export function normalizeDeliverProject(
     stage_durations: parseStageDurations(input.stage_durations),
     deleted_at:
       typeof input.deleted_at === 'string' && input.deleted_at ? input.deleted_at : null,
+    created_at:
+      typeof input.created_at === 'string' && input.created_at ? input.created_at : null,
     updated_at: input.updated_at ?? now,
   }
 }
@@ -326,6 +328,8 @@ export function rowRecordToDeliverProject(
       stage_durations: parseStageDurations(row.stage_durations),
       deleted_at:
         typeof row.deleted_at === 'string' && row.deleted_at ? row.deleted_at : null,
+      created_at:
+        typeof row.created_at === 'string' && row.created_at ? row.created_at : null,
       updated_at: (row.updated_at as string) ?? new Date().toISOString(),
     },
     owner,

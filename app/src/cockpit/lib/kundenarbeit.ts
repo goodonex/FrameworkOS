@@ -26,6 +26,27 @@ function isOffen(task: Task): boolean {
   return task.status === 'open' || task.status === 'in_progress'
 }
 
+/**
+ * Wie lange liegt ein Projekt wirklich? (D1, docs/wargames/technik-fundament.md)
+ *
+ * Stufe 1: das Minimum der **endlichen** Anker — ein fehlendes Datum darf den
+ * echten Wert nicht überstimmen. Stufe 2: fehlen beide, zählt das Projektalter
+ * seit Anlage; `created_at` wird bewusst NIE ins Minimum gemischt, sonst würde
+ * jedes junge Projekt „liegend". Stufe 3: ist auch das unbekannt, gibt es keine
+ * ehrliche Zahl — `null`, und der Aufrufer lässt das Projekt aus der Liste,
+ * statt „Seit Infinity Tagen" zu drucken.
+ */
+export function liegtSeitTagen(
+  stageAlter: number,
+  aufgabeAlter: number,
+  projektAlter: number,
+): number | null {
+  const endliche = [stageAlter, aufgabeAlter].filter((n) => Number.isFinite(n))
+  if (endliche.length > 0) return Math.floor(Math.min(...endliche))
+  if (Number.isFinite(projektAlter)) return Math.floor(projektAlter)
+  return null
+}
+
 /** Rang 1 — offene Aufgaben MIT project_id (die Quelle, die Kevins Gesetz trägt). */
 export function kundenaufgabenPosten(
   tasks: Task[],
@@ -87,7 +108,9 @@ export function liegendeProjekte(
     const stageAlter = ageDays(kontakt?.stage_changed_at, heute)
     const aufgabeAlter = ageDays(letzteErledigungByProjekt.get(projekt.id) ?? null, heute)
     if (stageAlter > LIEGT_AB_TAGEN && aufgabeAlter > LIEGT_AB_TAGEN) {
-      out.push({ projekt, kontakt, tage: Math.floor(Math.min(stageAlter, aufgabeAlter)) })
+      const tage = liegtSeitTagen(stageAlter, aufgabeAlter, ageDays(projekt.created_at, heute))
+      if (tage === null) continue
+      out.push({ projekt, kontakt, tage })
     }
   }
   return out.sort((a, b) => b.tage - a.tage)

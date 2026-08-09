@@ -2,7 +2,12 @@
  * Verifikation für Wargame Zug 6 (docs/wargames/sales-arbeitsmodus.md).
  * Reine Funktionen, keine DB — Start: npx tsx scripts/verify-kundenarbeit.ts
  */
-import { kundeLiegtPosten, kundenaufgabenPosten, liegendeProjekte } from '../app/src/cockpit/lib/kundenarbeit'
+import {
+  kundeLiegtPosten,
+  kundenaufgabenPosten,
+  liegendeProjekte,
+  liegtSeitTagen,
+} from '../app/src/cockpit/lib/kundenarbeit'
 import type { Contact, DeliverProject, Task } from '../app/src/types/db'
 
 const NOW = new Date('2026-07-29T12:00:00Z')
@@ -53,6 +58,7 @@ function makeProject(overrides: Partial<DeliverProject>): DeliverProject {
       execute: '',
     },
     deleted_at: null,
+    created_at: null,
     updated_at: dayAgo(1),
     ...overrides,
   }
@@ -188,6 +194,43 @@ function check(label: string, actual: unknown, expected: unknown) {
   check('8a ein posten', posten.length, 1)
   check('8b spur kunde_liegt', posten[0]?.spur, 'kunde_liegt')
   check('8c text enthaelt alter', posten[0]?.text.includes('21 Tagen'), true)
+}
+
+// 9. Beide Anker fehlen → created_at zählt (D1 Stufe 2), kein „Infinity" im Text.
+{
+  const projekte = [
+    makeProject({ id: 'p1', name: 'Reichentrog', client_contact_id: null, created_at: dayAgo(40) }),
+  ]
+  const liegend = liegendeProjekte(projekte, [], [], NOW)
+  check('9a projekt bleibt in der liste', liegend.length, 1)
+  check('9b alter kommt aus created_at', liegend[0]?.tage, 40)
+  const posten = kundeLiegtPosten(projekte, [], [], NOW)
+  check('9c text nennt 40 tage', posten[0]?.text.includes('40 Tagen'), true)
+  check('9d text ohne Infinity', posten[0]?.text.includes('Infinity'), false)
+}
+
+// 10. Nur ein Anker fehlt → der andere zählt; created_at darf ihn NICHT überstimmen.
+{
+  const projekte = [makeProject({ id: 'p1', client_contact_id: 'c1', created_at: dayAgo(400) })]
+  const kontakte = [makeContact({ id: 'c1', stage_changed_at: dayAgo(20) })]
+  const liegend = liegendeProjekte(projekte, [], kontakte, NOW)
+  check('10a stage-alter gewinnt gegen created_at', liegend[0]?.tage, 20)
+
+  // Spiegelbild: Stage fehlt, erledigte Aufgabe ist der einzige endliche Anker.
+  const projekte2 = [makeProject({ id: 'p2', client_contact_id: null, created_at: dayAgo(400) })]
+  const tasks2 = [makeTask({ id: 't9', project_id: 'p2', status: 'done', completed_at: dayAgo(30) })]
+  const liegend2 = liegendeProjekte(projekte2, tasks2, [], NOW)
+  check('10b aufgaben-alter gewinnt gegen created_at', liegend2[0]?.tage, 30)
+}
+
+// 11. Kein einziger Anker → kein ehrlicher Wert, Projekt fällt raus (statt „Infinity").
+{
+  const projekte = [makeProject({ id: 'p1', client_contact_id: null, created_at: null })]
+  const liegend = liegendeProjekte(projekte, [], [], NOW)
+  check('11a projekt ohne jeden anker faellt raus', liegend.length, 0)
+  const posten = kundeLiegtPosten(projekte, [], [], NOW)
+  check('11b kein posten ohne anker', posten.length, 0)
+  check('11c direkt: liegtSeitTagen ohne anker', liegtSeitTagen(Infinity, Infinity, Infinity), null)
 }
 
 console.log(`${pass}/${pass + fail} Fälle korrekt`)

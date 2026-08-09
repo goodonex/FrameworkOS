@@ -654,6 +654,12 @@ export interface DeliverProject {
   booking_url: string
   stage_durations: DeliverStageDurations
   deleted_at: string | null
+  /**
+   * Anlagedatum — letzter Anker für `liegtSeitTagen` (kundenarbeit.ts, D1).
+   * Die Tabelle `deliver_projects` (0008) hat diese Spalte **nicht**; das Feld ist
+   * deshalb heute überall `null` und füllt sich von selbst, sobald sie nachgezogen wird.
+   */
+  created_at: string | null
   updated_at: string
 }
 
