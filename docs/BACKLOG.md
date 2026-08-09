@@ -2,6 +2,12 @@
 
 **Stand:** 2026-08-09 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
 
+**Runde vom 09.08., zweiter Teil** (Planung, kein Code): Phase-1-Blaupause
+**Technik-Fundament** fertig — `docs/wargames/technik-fundament.md` (Züge 0–12,
+D1–D10, blind ausführbar; deckt O8, O9, O11, L3/L6/L7 und den belegten
+O13-Kleinkram; O14 wandert bewusst in die Ästhetik-Phase). Danach folgt Phase 2
+„haptisch geil" mit eigenem Wargame.
+
 **Runde vom 09.08.** (Umsetzung): Der **Mobile Homescreen steht und ist live** —
 Züge 0–7 der Blaupause gebaut (zehn Code-Commits, dazu die Doku), alle 20
 verify-Skripte grün, Desktop nachweislich unverändert, Fast-Forward erfolgt
