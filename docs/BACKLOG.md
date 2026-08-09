@@ -2,6 +2,17 @@
 
 **Stand:** 2026-08-09 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
 
+**Runde vom 09.08., dritter Teil** (Umsetzung Technik-Fundament): Die
+Phase-1-Blaupause ist gefahren — Züge 0–12, **16 Commits** auf `cockpit-rebuild`,
+**nicht live** (der Fast-Forward bleibt Kevins Wort). `npx tsc -b` +
+`npm run build` grün, **24 verify-Skripte grün** (22 vorher; neu
+`verify-abnahme` und `verify-ical-rrule`, dazu `verify-kundenarbeit` 13 → 22
+Fälle und `verify-linkedin-followups` 59 → 73). Migration **0069** ist gepusht;
+der Trockenlauf wollte genau diese eine Nummer. Erledigt: **O8, O9, O11, L3,
+L7** und neun O13-Zeilen. **Offen geblieben: L6** — der belastbare Test braucht
+eine eingeloggte Session. Vier Recon-Korrekturen und ein neuer Befund stehen
+jeweils bei ihrem Punkt.
+
 **Runde vom 09.08., zweiter Teil** (Planung, kein Code): Phase-1-Blaupause
 **Technik-Fundament** fertig — `docs/wargames/technik-fundament.md` (Züge 0–12,
 D1–D10, blind ausführbar; deckt O8, O9, O11, L3/L6/L7 und den belegten
@@ -129,7 +140,26 @@ ausgeführt — exakt Abbruchbedingung 2 des Morgen-Wargames, scharf, bevor 0067
 Genau das war die Ursache — dieselbe Lehre stand schon nach dem 15.07. im Raum.
 *Am 06.08. gefunden; stand in keinem Dokument.*
 
-### L3 · `security_invoker` auf `site_content_published` — **NICHT ausführen**, verschoben nach O13
+### L3 · ~~`security_invoker` auf `site_content_published`~~ ✅ **geschlossen 09.08.2026 (Migration 0069)**
+
+**Entscheidung D7 der Phase-1-Blaupause: die Lücke wird zugemacht, nicht umgebaut.**
+`supabase/migrations/0069_site_content_published_invoker.sql` setzt
+`security_invoker = on`. Gepusht per `db push`; der Trockenlauf zeigte
+ausschließlich 0069, `supabase migration list --linked` danach `0069 | 0069 | 0069`.
+
+Die View verliert damit ihren anon-Nutzen — das ist hier folgenlos und wurde vor
+dem Push geprüft: `site_content` hat 0 Zeilen, keine Kundenseite liest die View,
+`frameworkos.de` antwortet 200 und `/portal` ebenfalls 200. Mit dem anon-Key
+liefert die View vorher wie nachher eine leere Liste.
+
+**Was NICHT gelöst ist** (unverändert Kevins Entscheidung, Zug 12): die
+Projekt-Scopierung. Ein öffentlicher Lesezugriff bräuchte eine
+Security-Definer-**Funktion** mit `project_id`-Parameter statt einer offenen
+View — das ändert auch `lib/siteContentService.ts` und gehört zur
+CMS-Entscheidung.
+
+<details><summary>Der ursprüngliche Befund (warum der Auftrag zunächst gestoppt wurde)</summary>
+
 **Der Auftrag wäre ein Rückschritt gewesen — hier steht, warum.**
 
 `0052_site_content.sql:108-112` setzt `with (security_invoker = off)` **ausdrücklich
@@ -160,6 +190,7 @@ CMS-Entscheidung, nicht in den Livegang.
 View. Der Punkt wandert zu O13 („Website-CMS schließen oder ausblenden").
 *Herkunft: Session-Inventur — die Meldung „Sicherheitslücke" beruht auf dem
 generischen Supabase-Linter-Hinweis zu Definer-Views, nicht auf diesem Fall.*
+</details>
 
 ### L4 · ~~Deep-Link in `send-email`~~ ✅ **erledigt 06.08.2026**
 `send-email/index.ts:157` zeigte auf `/brand/:slug/deliver/:id` — eine Route, die
@@ -205,7 +236,16 @@ Adresse zeigt. Falls ja, fielen die Mails schon vorher ins Leere (die Function w
 nie deployt) — das Streichen verliert also nichts. Wer das sauber abschliessen
 will, loescht den Webhook im Resend-Dashboard.
 
-### L6 · `ANTHROPIC_API_KEY` — **gesetzt, letzte Bestätigung 19.07.**
+### L6 · `ANTHROPIC_API_KEY` — **weiter offen** (09.08. erneut nicht abschließend prüfbar)
+
+**Stand 09.08.:** `supabase secrets list` zeigt `ANTHROPIC_API_KEY` und
+`ANTHROPIC_MODEL` als gesetzt (mit Digest). Mehr ist von hier aus nicht zu
+holen: der belastbare Test ist eine Uriel-Nachricht aus einer **eingeloggten**
+Session, und Anmelden gehört Kevin, nicht dem Agenten. **Der Zehn-Sekunden-Test
+steht weiter aus** — eingeloggt eine Frage ins Uriel-Dock tippen.
+
+<details><summary>Beleglage von 06.08. (unverändert gültig)</summary>
+
 `supabase secrets list`: `ANTHROPIC_API_KEY` ist gesetzt. `ANTHROPIC_MODEL` ist per
 Digest-Abgleich als `claude-sonnet-5` verifiziert — also kein totes Modell mehr (der
 Fehler vom 07.07. war `claude-sonnet-4-20250514`).
@@ -216,14 +256,23 @@ am 19./20.07. hat Uriel im Dock live geantwortet — das geht nur mit gültigem 
 `brand-assistant` prüfen `auth.getUser()`, der Service-Role-Key hilft dort nicht.
 Ohne Session bleibt es **ungeprüft für heute** — nicht geraten. Der belastbare Test
 dauert zehn Sekunden: eingeloggt eine Frage ins Uriel-Dock tippen.
+</details>
 
-### L7 · RLS-Drift bei `project_messages` — **erst reproduzieren**, dann S
-Die Session-Inventur meldet „Migrationsdatei und DB sind auseinandergelaufen,
-`deleted_at` wird abgelehnt". Am Lesepfad ist das nicht reproduzierbar:
-`select deleted_at from project_messages` liefert **200**, die Spalte existiert seit
-`0038_deliver_messaging_portal.sql:47`. Welcher Pfad (Insert? Update? Policy?)
-abgelehnt wurde, geht aus keinem Dokument hervor. **Ungeprüft — nicht raten.**
-Fällt ohnehin erst auf, wenn das Löschen von Nachrichten verdrahtet wird.
+### L7 · ~~RLS-Drift bei `project_messages`~~ ✅ **Fehlalarm, geschlossen 09.08.2026**
+
+Am 09.08. gegen die Live-DB geprüft, **beide** Pfade — nicht nur der Lesepfad,
+an dem die Meldung schon vorher nicht reproduzierbar war:
+
+| Probe | Ergebnis |
+|---|---|
+| `GET /rest/v1/project_messages?select=id,deleted_at&limit=1` | HTTP 200, `[{"id":"ebfd8e78-…","deleted_at":null}]` |
+| `PATCH /rest/v1/project_messages?id=eq.00000000-0000-0000-0000-000000000000` mit `{"deleted_at":null}` | HTTP 200, `[]` |
+
+Der Filter der zweiten Probe trifft absichtlich keine Zeile: sie beweist, dass
+die Spalte auch **schreibend** akzeptiert wird, ohne Daten anzufassen. Die
+Spalte existiert wie in `0038_deliver_messaging_portal.sql:47` definiert. Keine
+Migration nötig. Welcher Pfad damals abgelehnt haben soll, geht aus keinem
+Dokument hervor — der Punkt wird als unbelegt geschlossen, nicht als behoben.
 *Herkunft: Session-Inventur*
 
 ### L8 · ~~Morgen-Workflow-Blaupause committen~~ ✅ **erledigt 06.08.2026**
@@ -576,13 +625,32 @@ bewiese der Test nur, dass gerade nichts passiert). Im laufenden Cockpit bei
 1280 px: „Vernetzungsanfragen: noch 30 von 30", aufgeklappt ein einziger Knopf.
 *Herkunft: IDEEN „Anfragen-Ritual" · morgen-workflow Zug 8*
 
-### O8 · Ads-Review-Durchgang — **S** · hoch für die anstehende Arbeit
-20 Reichentrog-Ads stehen auf „review", `cockpit/components/ads/AdDetailPanel.tsx`
-hat kein Vor/Zurück (kein `onPrev`/`onNext` im File). Nötig: Pfeiltasten +
-„Ad 7/20, 3 freigegeben".
+### O8 · ~~Ads-Review-Durchgang~~ ✅ **gebaut 09.08.2026**
+`AdDetailPanel.tsx:20-31` (neue Props `onPrev`/`onNext`/`position`), Kopfzeile
+mit „Ad 7/20 · 3 freigegeben" und den Knöpfen ‹ › ab `:100`; Pfeiltasten in
+`:57-76`. Verdrahtet in `AdsArea.tsx:238-245` (Index + `springe`), Panel mit
+`key={openAd.id}` bei `:388`.
+
+Zwei Fallen bewusst zugemacht: der Tastatur-Handler ignoriert Events aus
+`input`/`textarea`/`select`/contenteditable (`AdDetailPanel.tsx:33-38`), sonst
+blättert das Tippen einer Anmerkung die Ads um; das `key` erzwingt einen
+Remount, sonst landet der Notiz-Entwurf von Ad 7 an Ad 8. Kein Wrap-Around —
+am Listenende sind die Knöpfe aus.
+
+„Freigegeben" = `approved` **oder** `live`, aus `AdStatus` (`adsApi.ts:25`)
+abgelesen. **Am Bildschirm noch nicht gegengeprüft** — `/ads` liegt hinter dem
+Login (siehe Kopf der Runde).
 *Herkunft: IDEEN „Nutzbarer"*
 
-### O9 · Content-Manifest schliessen — **M** · *Testpost erledigt, Rest offen*
+### O8b · ~~Ads-KPI-Kacheln waren leer~~ ✅ **gebaut 09.08.2026**
+Solange keine Meta-Zahlen da sind, zeigen die vier Kacheln jetzt den
+Review-Stand statt vier Striche: „Ads gesamt", „Freigegeben", „In Review",
+„Kunden" (`AdsArea.tsx:96-110` + `:135-149`). Gezählt wird aus **denselben**
+Zeilen wie die Tabelle darunter (`rows`, nicht `allRows`) — sonst gehen Kachel
+und Tabelle auseinander, sobald der „Nur aktive"-Filter greift. Der
+`hasData`-Fall ist unverändert.
+
+### O9 · ~~Content-Manifest schliessen~~ ✅ **fertig 09.08.2026**
 Der `weekly-content`-Agent baut Wochen-HTMLs, schreibt aber nie ins Manifest — sein
 Prompt nennt nur `WEEKLY.md`, `backlog.md`, `log.md` (`runner/index.mjs:127-130`).
 Dazu: „Als gepostet markieren" wird gerendert, hat aber keinen Schreiber.
@@ -594,9 +662,38 @@ nie auf Instagram stand. Ihn auf `posted` zu setzen haette eine Falschmeldung in
 Content-Historie geschrieben. `content.json` hat jetzt `posts: []`; die Slide-Datei
 `weekly/2026-W29/posts/post-01-fuenf-sekunden-test.html` bleibt liegen.
 
-**Offen (M):** Der Batch muss seine 3 Posts anhaengen, und „Als gepostet markieren"
-braucht einen Schreiber. Bis dahin ist das Manifest leer — was ehrlicher ist als ein
-einzelner ueberfaelliger Testeintrag, aber noch kein Content-Modul.
+**✅ Rest gebaut 09.08.2026** (D5: schreiben darf nur der Runner, `content.json`
+liegt im Vault):
+
+| Teil | Beleg |
+|---|---|
+| Der Batch hängt seine Posts an | Prompt des `weekly-content`-Agenten, `runner/index.mjs:195-206` — je Post `{id,title,status:'scheduled',channel,format,week,slides,caption,done}`, bestehende Einträge ausdrücklich unangetastet |
+| Schreiber für „Als gepostet markieren" | neuer Endpoint `POST /content/posted` `{brand, postId\|week}`, `runner/index.mjs:1977-2043` |
+| Knopf in der App | Post-Ebene `ContentDetailPanel.tsx:104-121`, Wochen-Ebene `SocialArea.tsx:229-246`; nur aktiv bei `runnerDirekt()`, sonst disabled mit „am Rechner markieren" |
+| Client-Seite | `contentApi.markiereGepostet` (`contentApi.ts:130-140`), `useContentManifest.markierePostGepostet` |
+
+Der Endpoint ist bewusst eigen und winzig statt des PUT-Wegs: die App schickt
+nie ein ganzes Manifest und kann den Rest der Datei damit gar nicht
+überschreiben. Er validiert die Form, schreibt `.bak`, dann temp + `rename`
+(nie eine halbe Datei), lehnt mit **409** ab, solange `weekly-content` läuft,
+und legt bei fehlender Datei ein leeres Manifest an, statt 500 zu werfen.
+
+**Am laufenden Runner geprüft** (mit Wegwerf-Daten, Original danach
+byte-gleich wiederhergestellt): Einzelpost → `getroffen:1`, ganze Woche →
+`getroffen:1`, zweiter Aufruf → `getroffen:0`, eine fremde Woche unberührt,
+`.bak` angelegt. Fehlerfälle: unbekannte Brand → 400, weder `week` noch
+`postId` → 400.
+
+**Zwei Recon-Korrekturen zur Blaupause:**
+1. `/content/manifest` war **nicht** read-only — das PUT mit 409-Guard gab es
+   schon (`runner/index.mjs:1925-1945`).
+2. **Neuer Befund:** Das Wochen-Badge „gepostet" hing an
+   `social_batches.posted`, und diese Spalte hat **keinen Schreiber** —
+   `saveSocialBatch` setzt sie nie, sonst niemand. Das Badge konnte also nie
+   wahr werden. Es liest jetzt den `content.json`-Stand (Woche gepostet = alle
+   ihre Posts gepostet, `SocialArea.tsx:30-46`), also die vorhandene Wahrheit
+   statt einer zweiten. Die Spalte bleibt unbeschrieben liegen.
+
 *Herkunft: IDEEN „Nuetzlicher" · content-modul-mvp.md „Phase 2" · Session-Inventur*
 
 ### O10 · ~~Ein Mobile-Breakpoint~~ ✅ **vereinheitlicht 06.08.2026**
@@ -626,12 +723,40 @@ gilt dort nicht. Die Drift-Wache klammert es ausdrücklich aus.
 irgendwo in `app/src` wieder eine Pixelzahl abgetippt wird.
 *Herkunft: IDEEN „Schöner"*
 
-### O11 · Deliverable-Abnahme im Portal — **M**
-„Freigeben / Änderungswunsch" pro Deliverable existiert nicht (kein Treffer in
-`components/portal/`, `pages/portal/`). Zusammen mit dem bereits gebauten
-Posteingang ist das die kürzeste Strecke zu „Kunden benutzen das Portal echt".
-**Randbedingung:** CoLective und Reichentrog ruhen — der Nutzen fällt erst mit dem
-nächsten Kunden an. Deshalb hier und nicht weiter oben.
+### O11 · ~~Deliverable-Abnahme im Portal~~ ✅ **gebaut 09.08.2026** (D6)
+
+Freigabe und Änderungswunsch sind strukturierte `project_messages` mit
+`sender_role='client'` und einem Präfix im Body — **kein neues Schema, keine
+neue Tabelle, keine zweite Statuswahrheit.** Der Kunde erzeugt ein Ereignis;
+den Deliverable-Status ändert weiterhin nur der Owner.
+
+| Teil | Beleg |
+|---|---|
+| Präfix bauen/lesen, Titel auflösen | `app/src/lib/abnahme.ts` (neu) — `[freigabe:<id>]`, `[aenderung:<id>] <Text>` |
+| Kunden-Aktionen an fertigen Karten | `PortalDeliverableCard.tsx:120-186`, Kette `PortalShell.tsx:41-55` → `PortalPhaseContent` → Branding-/Website-View |
+| Sendepfad | der **bestehende** `useProjectMessages.send` als `client` — im Vorschau-Modus wird bewusst nichts verschickt |
+| Owner sieht es als Badge | `KundenPosteingang.tsx:171-174` + `:229-247`, `ProjectMessagesPanel.tsx:66-69` + `:92-108`; Präfix wird aus dem Fließtext genommen |
+| Prüfung | `scripts/verify-abnahme.ts`, 19 Fälle — u. a. fremde Präfixe und Text mit eckigen Klammern bleiben normale Nachrichten |
+
+**RLS: keine Migration nötig.** `0038_deliver_messaging_portal.sql:128-140`
+hat `project_messages_client_insert` mit `sender_role='client'` für das dem
+Kunden zugeordnete Projekt — genau der Pfad, den die Abnahme benutzt. Die
+Abbruchbedingung „bestehende Policies müssten geändert werden" ist nie
+eingetreten.
+
+Titel kommen aus der stabilen Katalog-Id `dlv-<type>`, damit sie auch im
+Posteingang über alle Projekte auflösbar sind, wo das Projekt gar nicht geladen
+ist. Eigene Positionen (zufällige Id) heißen dort schlicht „Position".
+
+**Am Bildschirm belegt** (DEV-Portal-Preview, 390×664 und 1280): beide Aktionen,
+der Textfeld-Zweig und die Quittung „✓ Freigabe ist raus". Dabei aufgefallen und
+gefixt: im zweispaltigen Karten-Grid am Handy passten die Knöpfe nicht
+nebeneinander — unter 520 px stehen sie jetzt untereinander (`portal.css`).
+**Nicht belegt:** die erzeugte `project_messages`-Zeile in der echten DB — dafür
+braucht es eine eingeloggte Kunden-Session.
+
+**Randbedingung unverändert:** CoLective und Reichentrog ruhen — der Nutzen
+fällt erst mit dem nächsten Kunden an.
 *Herkunft: IDEEN „Nützlicher"*
 
 ### O12 · ~~M2 zu Ende bringen: Sprache auch am Handy~~ ✅ **entschieden 06.08.2026**
@@ -651,35 +776,67 @@ Morgen-Flow, in den die Sprache hineingehoerte. Der Bauweg bleibt der aus dem
 Masterplan: Recorder → Edge Function → Text.
 *Herkunft: Masterplan M2 (Formulierung dort war falsch, siehe §2)*
 
-### O13 · Kleinkram, gegen den Code geprüft — je **S**
+### O13 · Kleinkram — **am 09.08. abgeräumt bis auf fünf Entscheidungen**
 Jeder Punkt einzeln bestätigt, keiner dringend, jeder kommt sonst zurück.
+
+**Stand nach der Technik-Fundament-Runde:** Von 24 Zeilen sind **19 erledigt**
+(vier davon schon vor dem 09.08.). Was offen bleibt, ist kein Bauauftrag mehr,
+sondern eine Entscheidung von Kevin: Pitch-Modus, Beziehungs-Reminder,
+`set_revenue`, Call-Mode, Website-CMS. Sie stehen am Ende dieser Runde als
+Entscheidungsblock.
 
 | Was | Beleg |
 |---|---|
-| Doppelte Zielverwaltung: `SalesGoalsDrawer` konkurriert mit dem neuen Monatsziel | `SalesMode.tsx:2470`, `hooks/useSalesPro.ts:747` |
-| InMail-Credits hart im Code | `cockpit/lib/prioritaet.ts:99` (`INMAIL_CREDITS_STAND = 150`) |
-| `useBrands`-Seed schreibt bei jedem Aufruf | `hooks/useBrands.ts:171/187/226/237` |
+| ~~Doppelte Zielverwaltung: `SalesGoalsDrawer` konkurriert mit dem Monatsziel~~ ✅ 09.08. — Knopf „◎ Ziele", State, Mount und Import raus; an der Stelle steht der Hinweis „Monatsziel: Cockpit-Startseite". Sonst nichts an der Datei angefasst (fällt in Phase 2 / O14). Die Drawer-Komponente bleibt liegen | `SalesMode.tsx:2065-2076` |
+| ~~InMail-Credits hart im Code~~ ✅ 09.08. (D8) — Wert lebt in `ui_settings` (0068, Schlüssel `sales.inmailCredits`), editierbar im Kachel-Fenster; `INMAIL_CREDITS_STAND` bleibt Standard, `tagesstand()` nahm ihn ohnehin als Parameter | `components/InmailPanel.tsx` (neu), `SalesDashboard.tsx:238-244` |
+| ~~`useBrands`-Seed schreibt bei jedem Aufruf~~ ✅ 09.08. — **Ursache gefunden:** „keine Brands" und „nicht nachgesehen" sahen im State gleich aus (`brands.length === 0` bei `loading === false`). Genau dort landet `reload()` nach einem transienten Auth-Lock-Fehler (viele Tabs) und nach jedem anderen Lesefehler; der Seed hielt das für eine leere DB. `ladErfolgRef` + `error === null` als zusätzliche Bedingung. **Live-Gegenprobe der Konsole steht aus** (Login) | `hooks/useBrands.ts:231`, `:274`, `:296`, `:328` |
 | ~~`.ck-heute-grid` ohne `display: grid`~~ ✅ 06.08. — `display: grid` + `gap` ergänzt. Befund präzisiert: die Klasse wird von **keiner** Komponente benutzt (HeuteDeck v2 rendert eine Liste), sie war also nicht „inline nachgepatcht", sondern eine stille Nulloperation. Bleibt korrekt stehen für den Mobile-Umbau | `styles/cockpit.css` |
-| `entwurfMoeglich` hart auf `true` | `cockpit/pages/LinkedinArea.tsx:459` und `:470` |
+| ~~`entwurfMoeglich` hart auf `true`~~ ✅ 09.08. — an allen vier Stellen `!isOffline`. **Abweichung von der Blaupause:** gegatet wird auf ONLINE, nicht auf `runnerDirekt()` — beide Wege brauchen einen lebenden Runner, aber der Auftrags-Weg über `runner_jobs` (0059) ist der bewusst gebaute Handy-Pfad und darf nicht gesperrt werden. Der Tooltip sagt jetzt „Der Runner ist offline" statt „Nur lokal möglich" | `LinkedinArea.tsx:599/611/624/636`, Tooltip `:129-133` |
 | ~~Run-Drawer fällt auf Weiß zurück~~ ✅ 06.08. — `--ck-bg-1` (Alias auf `--ck-panel`, zieht im Hell-Modus automatisch mit) und `--ck-danger` (#e5484d dunkel / #b42318 hell) definiert, die `var(--x, fallback)`-Krücken in AgentsArea entfernt. **Im laufenden Build gemessen:** Drawer `rgb(11,14,16)` statt Weiß, Fehlerfarbe `rgb(229,72,77)`; im Hell-Modus `#ffffff` / `#b42318` | `styles/cockpit.css`, `cockpit/pages/AgentsArea.tsx` |
-| Agenten mit Pflicht-Input blind startbar (`loom-skript`, `followup-pdf` ohne Name/Website) | `cockpit/pages/AgentsArea.tsx:74` (`postRun(agent.id)` ohne Input) |
-| Vault-Queue wächst unbegrenzt, `queued: []` hart | `runner/index.mjs:50`, `:407-412`, `:1755`; `:1191`, `:1460` |
+| ~~Agenten mit Pflicht-Input blind startbar~~ ✅ 09.08. — `loom-skript`, `followup-pdf`, `lead-research` sind deaktiviert, mit Hinweis „Braucht einen Posten — aus dem Arbeitsmodus starten" an Karte und Tooltip. Ids gegen `AGENT_CATALOG` abgeglichen | `AgentsArea.tsx:42-51`, `:150-163` |
+| ~~Vault-Queue wächst unbegrenzt~~ ✅ 09.08. — beim Runner-Boot fliegt raus, was älter als 14 Tage ist (nur Dateien), mit Log-Zeile. **Gemessen nach kickstart: 66 → 28 Dateien**, älteste verbliebene vom 28.07. `queued: []` bleibt hart, jetzt mit ehrlichem Kommentar an beiden Stellen: eine echte Warteschlange gibt es nicht, Aufträge laufen über `runner_jobs` (0059) | `runner/index.mjs:2039-2067` |
 | Pitch-Modus hängt am Namens-Suffix | `lib/projectAreas.ts` → `isPitchProject`, `components/portal/PortalShell.tsx:33` |
-| `?preview=true` lädt Projekte aus localStorage | `pages/portal/PortalRoute.tsx:71-76` |
-| `unread` wird für Threads gesynct, aber nie angezeigt | Spalte in 0058; kein Treffer in `cockpit/` |
-| Snooze ohne Weg zurück — der `ruht`-Bucket ist unsichtbar | `linkedinFollowups.ts:61-62`, `LinkedinArea.tsx:346` (nur setzen) |
-| Erstnachrichten: „Kopieren & Profil öffnen" als **ein** Griff | `components/ErstnachrichtenListe.tsx` — nur Website-Link (`:47`) |
-| „Loom aufnehmen"-Link am Loom-Posten | `Arbeitsliste.tsx` — nur „Skript öffnen/generieren" (`:289-308`) |
-| `markLoomVerschickt` wird von `/linkedin` nicht genutzt | nur `SalesDashboard.tsx:259` |
-| iCal-Serientermine verschwinden ab Woche 2 (kein RRULE) | kein `RRULE` in `cockpit/lib/icalParse.ts` |
-| Auto-getrackte Felder nicht als „auto" gekennzeichnet | kein Badge in `TrackingArea.tsx` |
-| Ads-Dashboard zeigt vier leere KPI-Kacheln statt Review-Fortschritt | `AdsArea.tsx:123-126` (alle „—") |
+| ~~`?preview=true` lädt Projekte aus localStorage~~ ✅ 09.08. (D10) — nur noch im Dev-Build. **Belegt:** die Zeichenkette `preview=true` kommt im Produktions-Bundle nicht mehr vor (`grep -c` auf `dist/assets/*.js` = 0), der Bypass ist wegoptimiert | `pages/portal/PortalRoute.tsx:80` |
+| ~~`unread` wird gesynct, aber nie angezeigt~~ ✅ 09.08. (D3) — Punkt an der Thread-Zeile und in der Prüfen-Liste, Muster wie der `isNew`-Punkt in SocialArea. Bewusst **nur Anzeige, kein Zurückschreiben**: die Spalte gehört dem Voyager-Sync | `LinkedinArea.tsx:66-82`, `:648-654` |
+| ~~Snooze ohne Weg zurück~~ ✅ 09.08. (D2) — einklappbare Liste „Ruht (n)" mit Knopf „Aufwecken" (Zeilen ≥ 44 px). Filter ist `istWeckbar` = gesnoozt **und nicht** terminal, NICHT `bucketOf === 'ruht'` — dort liegen auch archivierte/gewonnene/verlorene Threads. `wake(id)` geht über den bestehenden `applyPatch` | `linkedinFollowups.ts:57-66`, `useLinkedinThreads.ts:107`, `LinkedinArea.tsx:167-256` |
+| ~~Erstnachrichten: ein Griff~~ ✅ 09.08. (D4) — ein `<a>`, das beim Klick kopiert **und** die Seite im neuen Tab öffnet; kopiert wird ohne `await` vor der Navigation (sonst schluckt der Popup-Blocker den Tab, Lehre aus O3 Zug 9). **Abweichung von D4:** `linkedin_erstnachrichten` (0060) führt gar kein Profil-Feld, nur `website` — Ziel und Beschriftung sagen deshalb „Website", nicht „Profil" | `ErstnachrichtenListe.tsx:25-50`, `:73-99` |
+| ~~„Loom aufnehmen"-Link am Loom-Posten~~ ✅ **war schon gebaut** (O3 Zug 9) — am 09.08. nachgeprüft: `href="https://www.loom.com/record"`, Beschriftung „Loom aufnehmen ↗". Der Backlog-Eintrag war veraltet, nicht der Code | `Arbeitsliste.tsx:396-400` |
+| ~~`markLoomVerschickt` wird von `/linkedin` nicht genutzt~~ ✅ 09.08. — Knopf „Loom verschickt ✓" an jeder Thread-Zeile mit Stern, solange `loom_status` weder `verschickt` noch `entfaellt` ist. Schreibt **nur** den Thread-Status, kein Metrikfeld (Gesetz 4) | `LinkedinArea.tsx:58-61`, `:134-144` |
+| ~~iCal-Serientermine verschwinden ab Woche 2~~ ✅ 09.08. (D9) — `expandRRule` deckt `FREQ=DAILY\|WEEKLY\|MONTHLY`, `INTERVAL`, `BYDAY`, `COUNT`, `UNTIL`, `EXDATE`. Unbekannte Regel-Teile lassen die **ganze** Regel durchfallen (der Termin bleibt sichtbar einzeln), statt still falsch zu rechnen. Kappe 300 Instanzen, Fenster −31/+366 Tage, Rechnung in Ortszeit auf Tagesbasis. **Zwei echte Fehler fanden die neuen Tests:** der 31. rutschte auf den 3. März, und `BYSETPOS` wurde ignoriert statt abgelehnt | `icalParse.ts:66-283`, `scripts/verify-ical-rrule.ts` (27 Fälle) |
+| ~~Auto-getrackte Felder nicht gekennzeichnet~~ ✅ 09.08. — „auto"-Chip mit Titel „zählt beim Abhaken im Arbeitsmodus mit". `AUTO_METRIK_FELDER` wird aus `metrikFeldFuer` **abgeleitet**, nicht abgetippt — ein neues Spur/Feld-Paar landet von allein im Set | `arbeitsmodusTracking.ts:36-57`, `TrackingArea.tsx:57-110` |
+| ~~Ads-Dashboard zeigt vier leere KPI-Kacheln~~ ✅ 09.08. — siehe **O8b** |
 | ~~Nav-Icons ☑ ⚙ rendern auf iOS als bunte Emoji~~ ✅ 06.08. — beide tragen jetzt U+FE0E (Variation Selector-15, Text-Variante), dazu `font-variant-emoji: text` auf `.ck-nav-icon`. Bewusst kein Zeichentausch: alle anderen Icons sind Geometric Shapes, ein fremdes Zeichen hätte Tofu riskiert. **Nicht von hier prüfbar** — braucht einen Blick auf echtem iOS | `NavRail.tsx`, `styles/cockpit.css` |
 | Beziehungs-Reminder „Still geworden" | kein `last_contact_at` in `cockpit/` |
-| **Neu 07.08.:** Kundenarbeit-Posten zeigen „Seit **Infinity** Tagen keine Bewegung" — eine Division ohne Datum. Im Arbeitsmodus gesehen, Posten „Reichentrog & Kollegen GmbH" | `cockpit/lib/kundenarbeit.ts` (Tage-Berechnung ohne Fallback) |
+| ~~„Seit **Infinity** Tagen keine Bewegung"~~ ✅ 09.08. (D1) — `liegtSeitTagen()` staffelt: Minimum der **endlichen** Anker, sonst Projektalter, sonst gar keine Zahl (dann fällt das Projekt aus der Liste). `created_at` wird nie ins Minimum gemischt. **Neuer Befund mit Folge:** `deliver_projects` (0008) hat **keine** `created_at`-Spalte — Stufe 2 greift heute nie, Projekte ohne beide Anker verschwinden aus „liegt" statt eine Zahl zu zeigen. Siehe Entscheidungsblock | `kundenarbeit.ts:36-57`, `:105-119`; `verify-kundenarbeit.ts` 13 → 22 Fälle |
 | Umsatz per Uriel eintragen — `log_metric` kann nur zählen, nicht setzen; braucht ein eigenes `set_revenue` mit Setz-Semantik | `metrikFelder.ts` (umsatz bewusst ausgelassen), `useDailyMetrics.setUmsatzOn` |
 | Call-Mode auf den echten Funnel stellen oder streichen | `SalesArea.tsx:18/58` — Sub-Tab existiert weiter |
-| Website-CMS entscheiden: keine Kundenseite liest `site_content_published`, `site_content` = **0 Zeilen** — dabei auch die Projekt-Scopierung der Definer-View lösen (Funktion mit `project_id` statt offener View, siehe L3) | `0052_site_content.sql:108-112`, `lib/siteContentService.ts` |
+| **Offen (Entscheidung):** Website-CMS — keine Kundenseite liest `site_content_published`, `site_content` = **0 Zeilen**. Die Lücke selbst ist seit 09.08. zu (L3 / Migration 0069); offen bleibt, ob das CMS belebt wird (dann Security-Definer-**Funktion** mit `project_id` statt offener View) oder Tabelle + View in Phase 2 fallen | `0069_site_content_published_invoker.sql`, `lib/siteContentService.ts` |
+
+### O13b · Entscheidungsblock — **wartet auf Kevin, nichts davon gebaut**
+
+Aus der Technik-Fundament-Runde (09.08.). Alles bewusst liegen gelassen: das
+sind Geschmacks- und Geld-Fragen, keine Bau-Aufträge. Je eine Empfehlung, damit
+die Antwort ein Satz sein kann.
+
+| Frage | Empfehlung |
+|---|---|
+| **Call-Mode** auf den echten Funnel stellen oder streichen? | **Streichen.** Der Arbeitsmodus deckt den Fall; der Sub-Tab ist ein zweiter Ort für dieselbe Arbeit. |
+| **Website-CMS**: `site_content` beleben (scoped Security-Definer-Funktion statt offener View) oder Tabelle + View in Phase 2 abreißen? | **Abreißen**, solange keine Kundenseite Inhalte von dort zieht. 0 Zeilen, null Leser — beleben lohnt erst mit dem ersten Kunden, der es wirklich will. |
+| **Umsatz per Uriel**: eigenes `set_revenue`-Werkzeug mit Setz-Semantik bauen? | **Ja, aber klein.** `log_metric` kann nur zählen; Umsatz ist ein Stand, kein Zähler. Ein eigenes Werkzeug ist ehrlicher, als `umsatz` in die Zähl-Logik zu zwingen. |
+| **Pitch-Modus**: weiter am Namens-Suffix „— Pitch" oder eigenes Feld? | **Eigenes Feld**, sobald der Pitch-Modus bleibt. Ein Suffix im Kundennamen ist eine Statuswahrheit im Anzeigetext — der nächste Tippfehler kippt den Modus. |
+| **Beziehungs-Reminder „still geworden"**: überhaupt bauen? | **Nein, nicht jetzt.** Er bräuchte `last_contact_at` als neue Wahrheit neben der Follow-up-Leiter, die genau diesen Zweck schon erfüllt. |
+
+**Nachtrag aus Zug 1, keine der fünf, aber entscheidungsbedürftig:**
+`deliver_projects` hat **keine** `created_at`-Spalte. D1 sah sie als letzten
+Anker für „liegt seit X Tagen" vor; heute greift stattdessen die
+Notfall-Stufe — ein Projekt ohne Stufenwechsel **und** ohne erledigte Aufgabe
+fällt aus der Liste, statt eine erfundene Zahl zu zeigen. Genau das war der
+Fall „Reichentrog & Kollegen GmbH", der die Infinity-Meldung ausgelöst hat: der
+Posten ist damit weg statt falsch. Eine additive Migration
+(`add column created_at timestamptz default now()`) würde die Stufe scharf
+schalten, aber Bestandszeilen bekämen „heute" als Anlagedatum — also „Seit 0
+Tagen keine Bewegung". Deshalb bewusst **nicht** gemacht; wenn der Posten
+zurück soll, ist der ehrliche Weg ein Backfill aus einer echten Quelle.
 
 ### O17 · ~~Die Morgen-Agenten laufen ins Timeout~~ ✅ **behoben 07.08.2026**
 **Der Befund war ein anderer als der Verdacht.** Nicht der Agent, nicht die
