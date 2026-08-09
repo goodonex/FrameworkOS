@@ -232,7 +232,15 @@ function KundePage() {
   const kunde = useMemo(() => kunden?.find((k) => k.slug === slug), [kunden, slug])
   const { manifest, loading, error, toggleCheck, addNote, setStatus } = useAdManifest(slug)
 
-  const openAd = manifest?.ads.find((a) => a.id === adId)
+  const ads = useMemo(() => manifest?.ads ?? [], [manifest])
+  const openAd = ads.find((a) => a.id === adId)
+  // Review hat ein Ende — kein Wrap-Around, am Rand sind die Knöpfe aus.
+  const offenerIndex = openAd ? ads.findIndex((a) => a.id === openAd.id) : -1
+  const springe = (ziel: number) => navigate(`/ads/${slug}/${ads[ziel].id}`)
+  // „Freigegeben" = approved ODER live: was schon läuft, ist erst recht durch.
+  // Werte aus AdStatus (adsApi.ts:25) abgelesen, nicht geraten.
+  const freigegeben = ads.filter((a) => a.status === 'approved' || a.status === 'live').length
+
   const statusCounts = useMemo(() => {
     const counts = new Map<string, number>()
     for (const ad of manifest?.ads ?? []) counts.set(ad.status, (counts.get(ad.status) ?? 0) + 1)
@@ -311,12 +319,18 @@ function KundePage() {
 
       {openAd ? (
         <AdDetailPanel
+          /* Remount je Ad: sonst überlebt der Notiz-Entwurf den Wechsel und
+             landet an der falschen Ad. */
+          key={openAd.id}
           kunde={kunde}
           ad={openAd}
           onClose={() => navigate(`/ads/${kunde.slug}`)}
           onToggleCheck={toggleCheck}
           onAddNote={addNote}
           onSetStatus={setStatus}
+          onPrev={offenerIndex > 0 ? () => springe(offenerIndex - 1) : undefined}
+          onNext={offenerIndex >= 0 && offenerIndex < ads.length - 1 ? () => springe(offenerIndex + 1) : undefined}
+          position={offenerIndex >= 0 ? { index: offenerIndex, gesamt: ads.length, freigegeben } : undefined}
         />
       ) : null}
     </div>

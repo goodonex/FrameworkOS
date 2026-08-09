@@ -3,6 +3,13 @@ import type { Ad, AdStatus, ChecklistItem, Kunde } from '../../lib/adsApi'
 import { AD_STATUS_LABEL, AD_STATUS_ORDER, seedReview } from '../../lib/adsApi'
 import { AdPreview } from './AdPreview'
 
+/** Wo im Durchgang stehen wir (O8) — 0-basierter Index, Anzeige ist 1-basiert. */
+export interface AdPosition {
+  index: number
+  gesamt: number
+  freigegeben: number
+}
+
 interface Props {
   kunde: Kunde
   ad: Ad
@@ -10,10 +17,31 @@ interface Props {
   onToggleCheck: (adId: string, v: number, kind: 'design' | 'copy', itemId: string) => void
   onAddNote: (adId: string, v: number, text: string) => void
   onSetStatus: (adId: string, status: AdStatus) => void
+  /** Blättern im Review — fehlt, wenn es keinen Vorgänger/Nachfolger gibt. */
+  onPrev?: () => void
+  onNext?: () => void
+  position?: AdPosition
+}
+
+/** Tippen in ein Feld darf nicht durch die Ads blättern. */
+function tipptGerade(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  const tag = target.tagName
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable
 }
 
 /** Review-Panel als overlay-right: Version wählen, Preview, Copy, Checklisten, Notizen. */
-export function AdDetailPanel({ kunde, ad, onClose, onToggleCheck, onAddNote, onSetStatus }: Props) {
+export function AdDetailPanel({
+  kunde,
+  ad,
+  onClose,
+  onToggleCheck,
+  onAddNote,
+  onSetStatus,
+  onPrev,
+  onNext,
+  position,
+}: Props) {
   const versions = ad.versions
   const [v, setV] = useState(versions[versions.length - 1]?.v ?? 1)
   const version = useMemo(
@@ -24,11 +52,23 @@ export function AdDetailPanel({ kunde, ad, onClose, onToggleCheck, onAddNote, on
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') {
+        onClose()
+        return
+      }
+      // Sonst springt das Tippen einer Anmerkung die Ads um.
+      if (tipptGerade(e.target)) return
+      if (e.key === 'ArrowLeft' && onPrev) {
+        e.preventDefault()
+        onPrev()
+      } else if (e.key === 'ArrowRight' && onNext) {
+        e.preventDefault()
+        onNext()
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [onClose, onPrev, onNext])
 
   if (!version) return null
   const review = version.review ?? seedReview()
@@ -70,9 +110,40 @@ export function AdDetailPanel({ kunde, ad, onClose, onToggleCheck, onAddNote, on
               </div>
             ) : null}
           </div>
-          <button className="ck-btn" onClick={onClose} style={{ flexShrink: 0 }}>
-            Schließen
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            {position ? (
+              <span className="ck-label" style={{ whiteSpace: 'nowrap' }}>
+                Ad {position.index + 1}/{position.gesamt} · {position.freigegeben} freigegeben
+              </span>
+            ) : null}
+            {onPrev || onNext ? (
+              <>
+                <button
+                  className="ck-btn"
+                  onClick={onPrev}
+                  disabled={!onPrev}
+                  title="Vorherige Ad (←)"
+                  aria-label="Vorherige Ad"
+                  style={{ opacity: onPrev ? 1 : 0.4 }}
+                >
+                  ‹
+                </button>
+                <button
+                  className="ck-btn"
+                  onClick={onNext}
+                  disabled={!onNext}
+                  title="Nächste Ad (→)"
+                  aria-label="Nächste Ad"
+                  style={{ opacity: onNext ? 1 : 0.4 }}
+                >
+                  ›
+                </button>
+              </>
+            ) : null}
+            <button className="ck-btn" onClick={onClose}>
+              Schließen
+            </button>
+          </div>
         </div>
 
         {/* Version + Status */}
