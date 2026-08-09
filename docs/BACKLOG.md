@@ -66,11 +66,13 @@ Alles hier steht zwischen dem heutigen Code und „läuft in Produktion".
 Was in diesem Abschnitt abgehakt ist, ist wirklich in Produktion; die Edge Functions
 (L4, L5) deployen unabhängig vom Frontend und sind es bereits.
 
-### L1 · Fast-Forward — **v2-Ausbau haengt** (Stand 09.08. nachts)
-Der Homescreen selbst ist live (unten). Danach kam die v2-Runde dazu: sie liegt
-auf `main`, ist aber **nicht gepusht** — `git log --oneline origin/main..main`
-sagt, was genau. Migration 0068 ist dagegen schon auf der Live-DB (additiv, die
-Tabelle steht ungenutzt herum, bis der Code nachkommt).
+### L1 · ~~Fast-Forward~~ ✅ **alles live, auch der v2-Ausbau (09.08.)**
+`git log --oneline origin/main..main` = leer. Netlify liefert
+`index-DXkj1tps.js`; im ausgelieferten Bundle sind alle sieben v2-Marken
+nachweisbar („Nacht-Routinen", `ck-widget-stack`, „Anordnen", „→ morgen",
+„Schnell-Aktionen", `ui_settings`, `kachelReihenfolge`) — es ist wirklich der
+neue Code, nicht nur ein neuer Hash. Migration 0068 war schon vorher
+eingespielt, die Tabelle wird jetzt auch benutzt.
 
 ### ~~Fast-Forward Homescreen~~ ✅ **live seit 09.08.**
 Kevin hat fast-forwarded: `main` == `cockpit-rebuild` == `bf4d50d`,
@@ -747,7 +749,7 @@ Pipeline/Listen/Call-Mode/Kontakt überhaupt bleibt (O13, letzte Zeile).
   Zeilen) und den Skill `linkedin-leads` — **vor dem Bauen prüfen, ob überhaupt
   noch etwas fehlt.** **S** für die Prüfung.
 
-### O18 · ~~Mobile Homescreen + v2-Ausbau~~ ✅ **fertig und abgenommen (09.08.2026)** · *v2 noch nicht live*
+### O18 · ~~Mobile Homescreen + v2-Ausbau~~ ✅ **fertig, live und abgenommen (09.08.2026)**
 Züge 0–7 der Blaupause (`docs/wargames/mobile-homescreen.md`) sind umgesetzt und
 seit dem 09.08. live (L1). Kevins erster Eindruck am Geraet: „scheint zu
 funktionieren".
