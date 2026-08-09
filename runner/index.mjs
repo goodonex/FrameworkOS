@@ -1397,6 +1397,9 @@ async function pushHeartbeat() {
         id: 'global',
         last_seen: now,
         running: [...running.values()].map(({ id, agent, startedAt }) => ({ id, agent, startedAt })),
+        // Hart leer, und das ist ehrlich: eine Warteschlange gibt es hier nicht.
+        // Auftraege vom Handy laufen ueber `runner_jobs` (0059); `System/Queue`
+        // ist seit dem nur noch Debug-Protokoll (siehe raeumeQueue).
         queued: [],
         updated_at: now,
       }),
@@ -1666,6 +1669,7 @@ const server = createServer(async (req, res) => {
         alive: true,
         vault: VAULT,
         running: [...running.values()].map(({ id, agent, startedAt }) => ({ id, agent, startedAt })),
+        // Siehe Heartbeat: keine echte Warteschlange, `System/Queue` ist Protokoll.
         queued: [],
       })
     }
@@ -2035,6 +2039,38 @@ const server = createServer(async (req, res) => {
 
 await mkdir(RUNS_DIR, { recursive: true })
 await mkdir(QUEUE_DIR, { recursive: true })
+
+/**
+ * Queue-Deckel (O13). `System/Queue` ist seit Migration 0059 nur noch ein
+ * Debug-Protokoll — Aufträge vom Handy laufen über `runner_jobs`. Geschrieben
+ * wurde hier trotzdem bei jedem Lauf, geleert nie. Beim Boot fliegt raus, was
+ * älter als 14 Tage ist; nur Dateien, Ordner bleiben unangetastet.
+ */
+const QUEUE_MAX_ALTER_MS = 14 * 24 * 60 * 60 * 1000
+
+async function raeumeQueue() {
+  try {
+    const jetzt = Date.now()
+    let geloescht = 0
+    for (const name of await readdir(QUEUE_DIR)) {
+      const pfad = join(QUEUE_DIR, name)
+      try {
+        const s = await stat(pfad)
+        if (!s.isFile()) continue
+        if (jetzt - s.mtimeMs <= QUEUE_MAX_ALTER_MS) continue
+        await unlink(pfad)
+        geloescht++
+      } catch {
+        /* Einzelne Datei überspringen — Aufräumen darf den Boot nie aufhalten. */
+      }
+    }
+    if (geloescht > 0) console.log(`[queue] ${geloescht} Datei(en) älter als 14 Tage gelöscht`)
+  } catch (e) {
+    console.warn('[queue] Aufräumen übersprungen:', e?.message ?? e)
+  }
+}
+
+void raeumeQueue()
 
 /**
  * Morgenbrief als Routine statt Knopf (Ideen-Sammlung, Etappe 2): werktags ab
