@@ -3,7 +3,7 @@
 **Stand:** 2026-08-09 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
 
 **Runde vom 09.08., dritter Teil** (Umsetzung Technik-Fundament): Die
-Phase-1-Blaupause ist gefahren — Züge 0–12, **16 Commits** auf `cockpit-rebuild`,
+Phase-1-Blaupause ist gefahren — Züge 0–12, **21 Code-/Doku-Commits** auf `cockpit-rebuild`,
 **nicht live** (der Fast-Forward bleibt Kevins Wort). `npx tsc -b` +
 `npm run build` grün, **24 verify-Skripte grün** (22 vorher; neu
 `verify-abnahme` und `verify-ical-rrule`, dazu `verify-kundenarbeit` 13 → 22
