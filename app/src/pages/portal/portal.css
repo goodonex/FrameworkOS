@@ -333,7 +333,17 @@
 
 .portal-deliverable-abnahme__row .portal-btn {
   min-height: 44px;
+  /* Kein nowrap: in der schmalen Karten-Spalte am Handy würde die Beschriftung
+     sonst aus der Karte laufen. Zwei Zeilen sind hier das kleinere Übel. */
   flex: 1 1 auto;
+}
+
+/* Am Handy stehen zwei Karten nebeneinander — nebeneinander passen die beiden
+   Knöpfe dort nicht, ohne dass die Beschriftung umbricht. Dann untereinander. */
+@media (max-width: 520px) {
+  .portal-deliverable-abnahme__row {
+    flex-direction: column;
+  }
 }
 
 .portal-deliverable-abnahme__input {
