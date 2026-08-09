@@ -1,9 +1,20 @@
-import { createContext, useCallback, useContext, useMemo, useState } from 'react'
+import { createContext, useContext, useMemo } from 'react'
 import type { ReactNode } from 'react'
 import { useBrands } from '../../hooks/useBrands'
 import type { Brand } from '../../types/db'
 
-const STORAGE_KEY = 'cockpit.activeBrandSlug'
+/**
+ * **Eine Brand, fest verdrahtet (09.08.2026).** Das Cockpit hatte oben einen
+ * Umschalter über fünf Brands — ein Rest aus der Brand-OS-Zeit. Real gibt es
+ * nur noch HERRMANN & CO.: Wertavio ist ein Produkt darunter, CoLective ist
+ * beendet, der Rest war nie mehr als ein Seed.
+ *
+ * Die Tabelle `brands` und der Kontext bleiben, weil jede Datenabfrage über
+ * `brand_id` scopet — nur die *Auswahl* ist weg. Damit kann niemand mehr auf
+ * einer leeren Brand landen und sich wundern, warum das Cockpit leer ist.
+ * Der frühere localStorage-Schlüssel `cockpit.activeBrandSlug` wird bewusst
+ * nicht mehr gelesen; ein alter Eintrag darf den Slug nicht mehr kapern.
+ */
 const DEFAULT_SLUG = 'herrmann'
 
 interface ActiveBrandContextValue {
@@ -13,30 +24,14 @@ interface ActiveBrandContextValue {
   error: string | null
   activeSlug: string
   activeBrand: Brand | null
-  setActiveSlug: (slug: string) => void
 }
 
 const ActiveBrandContext = createContext<ActiveBrandContextValue | null>(null)
 
-/** Cockpit-weiter Brand-Kontext. Persistiert die Auswahl in localStorage. */
+/** Cockpit-weiter Brand-Kontext — fest auf HERRMANN & CO. */
 export function ActiveBrandProvider({ children }: { children: ReactNode }) {
   const { brands, loading, error } = useBrands()
-  const [activeSlug, setActiveSlugState] = useState<string>(() => {
-    try {
-      return localStorage.getItem(STORAGE_KEY) ?? DEFAULT_SLUG
-    } catch {
-      return DEFAULT_SLUG
-    }
-  })
-
-  const setActiveSlug = useCallback((slug: string) => {
-    setActiveSlugState(slug)
-    try {
-      localStorage.setItem(STORAGE_KEY, slug)
-    } catch {
-      /* localStorage nicht verfügbar — Auswahl gilt nur für die Session */
-    }
-  }, [])
+  const activeSlug = DEFAULT_SLUG
 
   const activeBrand = useMemo(
     () => brands.find((b) => b.slug === activeSlug) ?? brands[0] ?? null,
@@ -44,8 +39,8 @@ export function ActiveBrandProvider({ children }: { children: ReactNode }) {
   )
 
   const value = useMemo(
-    () => ({ brands, loading, error, activeSlug, activeBrand, setActiveSlug }),
-    [brands, loading, error, activeSlug, activeBrand, setActiveSlug],
+    () => ({ brands, loading, error, activeSlug, activeBrand }),
+    [brands, loading, error, activeSlug, activeBrand],
   )
 
   return <ActiveBrandContext.Provider value={value}>{children}</ActiveBrandContext.Provider>
@@ -64,18 +59,5 @@ export function useActiveBrandOptional(): ActiveBrandContextValue | null {
 
 /** Letzter Fallback ohne Context (z.B. Redirect-Komponenten außerhalb des Providers). */
 export function readStoredBrandSlug(): string {
-  try {
-    return localStorage.getItem(STORAGE_KEY) ?? DEFAULT_SLUG
-  } catch {
-    return DEFAULT_SLUG
-  }
-}
-
-/** Aktive Brand von außen setzen (Redirects alte Welt → Cockpit übernehmen den Slug). */
-export function storeBrandSlug(slug: string) {
-  try {
-    localStorage.setItem(STORAGE_KEY, slug)
-  } catch {
-    /* ohne localStorage kein Persist — unkritisch */
-  }
+  return DEFAULT_SLUG
 }

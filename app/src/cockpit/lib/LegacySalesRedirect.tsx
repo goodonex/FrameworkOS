@@ -1,16 +1,12 @@
-import { Navigate, useLocation, useParams } from 'react-router-dom'
-import { storeBrandSlug } from './activeBrand'
+import { Navigate, useLocation } from 'react-router-dom'
 
 /**
  * Brücke alte Welt → Cockpit (Phase 4): /brand/:slug/sales/* → /sales/*.
- * Übernimmt den Slug aus der URL als aktive Cockpit-Brand, damit interne
- * Links aus SalesMode (die weiter auf /brand/… zeigen) korrekt landen.
+ * Der Slug aus der URL wird seit dem 09.08.2026 verworfen — es gibt nur noch
+ * eine Brand (siehe activeBrand.tsx), also gibt es auch nichts umzuschalten.
  */
 export function LegacySalesRedirect() {
-  const { slug } = useParams<{ slug: string }>()
   const location = useLocation()
-
-  if (slug) storeBrandSlug(slug)
 
   const marker = '/sales'
   const idx = location.pathname.indexOf(marker)

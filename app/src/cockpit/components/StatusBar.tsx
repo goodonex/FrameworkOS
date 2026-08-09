@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { useUiTheme } from '../../hooks/useUiTheme'
 import { useUrielBus } from '../../store/urielBus'
-import { useActiveBrand } from '../lib/activeBrand'
 import { useRunnerStatus } from '../lib/useRunnerStatus'
 
 function Clock() {
@@ -58,7 +57,6 @@ function StatusWord({ label, state }: { label: string; state: 'on' | 'off' | 'pu
 
 export function StatusBar() {
   const { user } = useAuth()
-  const { brands, activeSlug, setActiveSlug } = useActiveBrand()
   const runner = useRunnerStatus()
   const { isPlainLight, togglePlainLight } = useUiTheme()
   const urielOpen = useUrielBus((s) => s.open)
@@ -91,7 +89,8 @@ export function StatusBar() {
         />
       </div>
 
-      {/* Brand-Switcher + Uhr */}
+      {/* Externe Tools + Uhr. Der Brand-Umschalter ist am 09.08.2026 entfallen —
+          es gibt nur noch HERRMANN & CO. (siehe activeBrand.tsx). */}
       <div className="ck-status-right">
         <span className="ck-status-links" aria-label="Externe Tools">
           {LAUNCH_LINKS.map((l) => (
@@ -108,18 +107,6 @@ export function StatusBar() {
             </a>
           ))}
         </span>
-        <select
-          className="ck-select"
-          value={activeSlug}
-          onChange={(e) => setActiveSlug(e.target.value)}
-          aria-label="Aktive Brand"
-        >
-          {brands.map((b) => (
-            <option key={b.slug} value={b.slug}>
-              {b.name}
-            </option>
-          ))}
-        </select>
         <button
           type="button"
           className="ck-btn"

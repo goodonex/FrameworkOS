@@ -105,16 +105,6 @@ export const URIEL_TOOLS: UrielTool[] = [
     },
   },
   {
-    name: 'set_active_brand',
-    description:
-      'Wechselt die aktive Brand im Cockpit (per Slug, z.B. "herrmann"). Nur nutzen, wenn Kevin ausdrücklich die Brand wechseln will.',
-    input_schema: {
-      type: 'object',
-      properties: { slug: { type: 'string' } },
-      required: ['slug'],
-    },
-  },
-  {
     name: 'open_contact',
     description:
       'Öffnet einen konkreten CRM-Kontakt (per contact_id, wie von search_contacts geliefert). Führt zur Kontakt-Detailansicht.',

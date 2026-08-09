@@ -124,7 +124,7 @@ export function UrielDock() {
 
   const navigate = useNavigate()
   const location = useLocation()
-  const { activeBrand, activeSlug, brands, setActiveSlug } = useActiveBrand()
+  const { activeBrand, activeSlug, brands } = useActiveBrand()
   const metrics = useDailyMetrics()
   const contacts = useContacts(activeSlug)
   const monatsziel = useMonthGoal(activeBrand?.id, monthKeyOf())
@@ -251,19 +251,6 @@ export function UrielDock() {
           navigate(path)
           return { ok: true, summary: `Navigiert → ${area}`, data: { done: true } }
         }
-        case 'set_active_brand': {
-          const slug = String(input.slug ?? '')
-          const brand = brands.find((b) => b.slug === slug)
-          if (!brand) {
-            return {
-              ok: false,
-              summary: `Brand „${slug}" nicht gefunden`,
-              data: { available: brands.map((b) => b.slug) },
-            }
-          }
-          setActiveSlug(slug)
-          return { ok: true, summary: `Brand → ${brand.name}`, data: { done: true } }
-        }
         case 'open_contact': {
           const id = String(input.contact_id ?? '')
           if (!id) return { ok: false, summary: 'Keine contact_id', data: { error: 'missing_id' } }
@@ -337,7 +324,7 @@ export function UrielDock() {
           return { ok: false, summary: `Unbekanntes Werkzeug: ${name}`, data: { error: 'unknown_tool' } }
       }
     },
-    [ensureCockpit, requestGraph, navigate, brands, setActiveSlug, metrics, contacts, activeBrand, activeSlug],
+    [ensureCockpit, requestGraph, navigate, brands, metrics, contacts, activeBrand, activeSlug],
   )
 
   const send = useCallback(

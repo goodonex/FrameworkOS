@@ -1,5 +1,4 @@
-import { Navigate, useLocation, useParams } from 'react-router-dom'
-import { storeBrandSlug } from './activeBrand'
+import { Navigate, useLocation } from 'react-router-dom'
 import { deliverRedirectZiel } from './legacyRouteMap'
 
 /**
@@ -19,19 +18,13 @@ import { deliverRedirectZiel } from './legacyRouteMap'
 
 /** `/brand/:slug/deliver/*` → Projekte-Bereich (Detail, wenn eine ID dranhängt). */
 export function LegacyDeliverRedirect() {
-  const { slug } = useParams<{ slug: string }>()
   const location = useLocation()
-
-  if (slug) storeBrandSlug(slug)
 
   return <Navigate to={`${deliverRedirectZiel(location.pathname)}${location.search}`} replace />
 }
 
 /** Alles übrige unter `/brand/:slug` → Cockpit-Home. */
 export function LegacyBrandRedirect() {
-  const { slug } = useParams<{ slug: string }>()
-
-  if (slug) storeBrandSlug(slug)
-
+  // Der Slug wird bewusst ignoriert — es gibt nur noch eine Brand.
   return <Navigate to="/cockpit" replace />
 }
