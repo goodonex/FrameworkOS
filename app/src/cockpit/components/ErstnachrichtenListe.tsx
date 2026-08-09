@@ -22,16 +22,30 @@ function LeadKarte({
 }) {
   const [kopiert, setKopiert] = useState(false)
 
-  const kopieren = async () => {
+  /**
+   * D4: kopieren OHNE `await` vor der Navigation. `window.open`/ein Link-Klick
+   * nach einem `await` gilt dem Browser nicht mehr als Nutzergeste — der
+   * Popup-Blocker schluckt ihn (Lehre aus O3 Zug 9, dort an der Loom-Stelle
+   * dokumentiert). Der Aufruf selbst ist synchron, nur sein Promise ist es nicht.
+   */
+  const kopieren = () => {
     try {
-      await navigator.clipboard.writeText(lead.nachricht)
-      setKopiert(true)
-      onKopiert()
-      window.setTimeout(() => setKopiert(false), 2000)
+      void navigator.clipboard.writeText(lead.nachricht).catch(() => undefined)
     } catch {
       /* Zwischenablage gesperrt — Text steht sichtbar da und lässt sich markieren */
+      return
     }
+    setKopiert(true)
+    onKopiert()
+    window.setTimeout(() => setKopiert(false), 2000)
   }
+
+  // RECON: `linkedin_erstnachrichten` (0060) führt kein Profil-Feld, nur
+  // `website`. Deshalb heißt der Knopf auch „Website" und nicht „Profil" —
+  // sobald es ein Profil-Feld gibt, kommt es hier davor.
+  const ziel = lead.website
+    ? `https://${lead.website.replace(/^https?:\/\//, '').split(' ')[0]}`
+    : null
 
   return (
     <section className="ck-panel" style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -43,15 +57,9 @@ function LeadKarte({
           ) : null}
         </div>
         {lead.website ? (
-          <a
-            href={`https://${lead.website.replace(/^https?:\/\//, '').split(' ')[0]}`}
-            target="_blank"
-            rel="noreferrer"
-            className="ck-label"
-            style={{ color: 'var(--ck-accent)', textDecoration: 'none', flexShrink: 0 }}
-          >
-            {lead.website.split(' ')[0]} ↗
-          </a>
+          <span className="ck-label" style={{ color: 'var(--ck-text-3)', flexShrink: 0 }}>
+            {lead.website.split(' ')[0]}
+          </span>
         ) : null}
       </div>
 
@@ -70,14 +78,35 @@ function LeadKarte({
       </div>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <button
-          type="button"
-          className="ck-btn ck-btn--primary"
-          style={{ fontSize: 11, minHeight: 40, paddingInline: 16 }}
-          onClick={() => void kopieren()}
-        >
-          {kopiert ? '✓ kopiert' : 'Nachricht kopieren'}
-        </button>
+        {ziel ? (
+          <a
+            href={ziel}
+            target="_blank"
+            rel="noreferrer"
+            className="ck-btn ck-btn--primary"
+            style={{
+              fontSize: 11,
+              minHeight: 40,
+              paddingInline: 16,
+              textDecoration: 'none',
+              display: 'inline-flex',
+              alignItems: 'center',
+            }}
+            title="Kopiert die Nachricht und öffnet die Website im neuen Tab"
+            onClick={kopieren}
+          >
+            {kopiert ? '✓ kopiert' : 'Kopieren + Website ↗'}
+          </a>
+        ) : (
+          <button
+            type="button"
+            className="ck-btn ck-btn--primary"
+            style={{ fontSize: 11, minHeight: 40, paddingInline: 16 }}
+            onClick={kopieren}
+          >
+            {kopiert ? '✓ kopiert' : 'Nachricht kopieren'}
+          </button>
+        )}
         <button
           type="button"
           className="ck-btn"
