@@ -4,6 +4,7 @@ import {
   deliverablesForArea,
 } from '../../lib/deliverableCatalog'
 import type { DeliverProject } from '../../types/db'
+import type { AbnahmeArt } from '../../lib/abnahme'
 import { PortalDeliverableCard } from './PortalDeliverableCard'
 
 interface PortalBrandingViewProps {
@@ -11,12 +12,15 @@ interface PortalBrandingViewProps {
   accentColor: string
   /** Client-Portal: nur fertige Deliverables anzeigen */
   clientReadyOnly?: boolean
+  /** O11: nur im Kundenportal gesetzt — reicht die Abnahme an den Sendepfad durch. */
+  onAbnahme?: (deliverableId: string, art: AbnahmeArt, text: string) => Promise<boolean>
 }
 
 export function PortalBrandingView({
   project,
   accentColor,
   clientReadyOnly = false,
+  onAbnahme,
 }: PortalBrandingViewProps) {
   const allItems = deliverablesForArea(project.deliverables, 'branding')
   const items = clientReadyOnly ? allItems.filter((d) => d.status === 'fertig') : allItems
@@ -54,6 +58,7 @@ export function PortalBrandingView({
             item={item}
             clientStage={project.client_stage}
             accentColor={accentColor}
+            onAbnahme={onAbnahme ? (art, text) => onAbnahme(item.id, art, text) : undefined}
           />
         ))}
       </div>

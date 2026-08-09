@@ -4,18 +4,22 @@ import {
 } from '../../lib/deliverableCatalog'
 import { getDeliverableUrl } from '../../lib/portalNavigation'
 import type { DeliverProject } from '../../types/db'
+import type { AbnahmeArt } from '../../lib/abnahme'
 import { PortalDeliverableCard } from './PortalDeliverableCard'
 
 interface PortalWebsiteViewProps {
   project: DeliverProject
   accentColor: string
   clientReadyOnly?: boolean
+  /** O11: nur im Kundenportal gesetzt — reicht die Abnahme an den Sendepfad durch. */
+  onAbnahme?: (deliverableId: string, art: AbnahmeArt, text: string) => Promise<boolean>
 }
 
 export function PortalWebsiteView({
   project,
   accentColor,
   clientReadyOnly = false,
+  onAbnahme,
 }: PortalWebsiteViewProps) {
   const allItems = deliverablesForArea(project.deliverables, 'website')
   const items = clientReadyOnly ? allItems.filter((d) => d.status === 'fertig') : allItems
@@ -74,6 +78,7 @@ export function PortalWebsiteView({
             item={item}
             clientStage={project.client_stage}
             accentColor={accentColor}
+            onAbnahme={onAbnahme ? (art, text) => onAbnahme(item.id, art, text) : undefined}
           />
         ))}
       </div>

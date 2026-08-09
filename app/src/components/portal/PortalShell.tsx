@@ -12,6 +12,7 @@ import { PortalPhaseContent } from './PortalPhaseContent'
 import { PortalWebsiteEditor } from './PortalWebsiteEditor'
 import { PortalPhaseMessageButton } from './PortalPhaseMessageButton'
 import { useProjectMessages } from '../../hooks/useProjectMessages'
+import { baueAbnahme, type AbnahmeArt } from '../../lib/abnahme'
 
 interface PortalShellProps {
   project: DeliverProject
@@ -34,9 +35,22 @@ export function PortalShell({
   const dashboardPhases: PhaseKey[] | undefined = pitchMode ? ['website'] : undefined
   const { leads } = usePortalLeads(project.id)
   const { outcomes, loading: outcomesLoading } = useProjectOutcomes(undefined, project.id)
-  const { unreadCount } = useProjectMessages(project.id, 'client', senderName)
+  const { unreadCount, send } = useProjectMessages(project.id, 'client', senderName)
 
   const leadCount = leads.length
+
+  /**
+   * O11 / D6: Freigabe und Änderungswunsch gehen über den BESTEHENDEN
+   * Sendepfad als `sender_role='client'` — kein neues Schema, keine neue
+   * Tabelle, keine zweite Statuswahrheit. Der Präfix macht die Nachricht
+   * maschinenlesbar (siehe lib/abnahme.ts); im Vorschau-Modus wird nichts
+   * verschickt, sonst legt ein Klick im Preview echte Zeilen an.
+   */
+  const meldeAbnahme = async (deliverableId: string, art: AbnahmeArt, text: string) => {
+    if (preview) return true
+    const res = await send(baueAbnahme(art, deliverableId, text))
+    return res.ok
+  }
 
   const renderPhaseContent = (phase: PhaseKey) => (
     <PortalPhaseContent
@@ -44,6 +58,7 @@ export function PortalShell({
       project={project}
       accentColor={accentColor}
       leadCount={leadCount}
+      onAbnahme={meldeAbnahme}
     />
   )
 

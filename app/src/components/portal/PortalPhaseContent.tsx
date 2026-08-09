@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { deliverablesForArea } from '../../lib/deliverableCatalog'
 import { getPhaseState, type PhaseKey } from '../../lib/phaseMapping'
 import type { DeliverProject } from '../../types/db'
+import type { AbnahmeArt } from '../../lib/abnahme'
 import { PortalBrandingView } from '../portal/PortalBrandingView'
 import { PortalLeadDashboard } from '../portal/PortalLeadDashboard'
 import { PortalLeadGenDashboard } from '../portal/PortalLeadGenDashboard'
@@ -12,6 +13,8 @@ interface PortalPhaseContentProps {
   project: DeliverProject
   accentColor: string
   leadCount: number
+  /** O11: nur im Kundenportal gesetzt — Freigabe/Änderungswunsch als Nachricht. */
+  onAbnahme?: (deliverableId: string, art: AbnahmeArt, text: string) => Promise<boolean>
 }
 
 export function PortalPhaseContent({
@@ -19,15 +22,30 @@ export function PortalPhaseContent({
   project,
   accentColor,
   leadCount,
+  onAbnahme,
 }: PortalPhaseContentProps) {
   const state = getPhaseState(phase, project.client_stage)
   if (state !== 'active') return null
 
   switch (phase) {
     case 'branding':
-      return <PortalBrandingView project={project} accentColor={accentColor} clientReadyOnly />
+      return (
+        <PortalBrandingView
+          project={project}
+          accentColor={accentColor}
+          clientReadyOnly
+          onAbnahme={onAbnahme}
+        />
+      )
     case 'website':
-      return <PortalWebsiteView project={project} accentColor={accentColor} clientReadyOnly />
+      return (
+        <PortalWebsiteView
+          project={project}
+          accentColor={accentColor}
+          clientReadyOnly
+          onAbnahme={onAbnahme}
+        />
+      )
     case 'leadgen':
       return (
         <PortalLeadGenDashboard

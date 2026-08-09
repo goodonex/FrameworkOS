@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { AutoSizeTextarea } from '../AutoSizeTextarea'
 import { CollapsibleSection } from '../CollapsibleSection'
 import { useProjectMessages } from '../../hooks/useProjectMessages'
+import { ABNAHME_LABEL, abnahmeTitel, leseAbnahme } from '../../lib/abnahme'
 
 interface ProjectMessagesPanelProps {
   projectId: string
@@ -62,6 +63,9 @@ export function ProjectMessagesPanel({ projectId, senderName }: ProjectMessagesP
           {messages.map((msg) => {
             const isClient = msg.sender_role === 'client'
             const unread = isClient && !msg.read_at
+            // O11: Freigabe/Änderungswunsch sind Nachrichten mit Präfix — als
+            // Badge zeigen, Präfix aus dem Fließtext nehmen.
+            const abnahme = isClient ? leseAbnahme(msg.body) : null
             return (
               <div
                 key={msg.id}
@@ -84,6 +88,21 @@ export function ProjectMessagesPanel({ projectId, senderName }: ProjectMessagesP
                     {isClient ? (msg.sender_name ?? 'Kunde') : 'Du'}
                     {unread ? ' · neu' : ''}
                   </span>
+                  {abnahme ? (
+                    <span
+                      className="font-mono"
+                      style={{
+                        fontSize: 10,
+                        borderRadius: 999,
+                        padding: '1px 8px',
+                        border: `1px solid ${abnahme.art === 'freigabe' ? 'var(--ck-accent)' : 'var(--ck-warn)'}`,
+                        color: abnahme.art === 'freigabe' ? 'var(--ck-accent)' : 'var(--ck-warn)',
+                      }}
+                    >
+                      {abnahme.art === 'freigabe' ? '✓' : '✎'} {ABNAHME_LABEL[abnahme.art]}:{' '}
+                      {abnahmeTitel(abnahme.deliverableId)}
+                    </span>
+                  ) : null}
                   <span className="font-mono" style={{ fontSize: 9, color: 'var(--ck-text-3)' }}>
                     {formatTime(msg.created_at)}
                   </span>
@@ -92,7 +111,12 @@ export function ProjectMessagesPanel({ projectId, senderName }: ProjectMessagesP
                   className="font-body whitespace-pre-wrap"
                   style={{ fontSize: 13, lineHeight: 1.55, color: 'var(--ck-text-1)', margin: 0 }}
                 >
-                  {msg.body}
+                  {abnahme
+                    ? abnahme.text ||
+                      (abnahme.art === 'freigabe'
+                        ? `${abnahmeTitel(abnahme.deliverableId)} ist freigegeben.`
+                        : `Änderungswunsch zu ${abnahmeTitel(abnahme.deliverableId)}.`)
+                    : msg.body}
                 </p>
               </div>
             )

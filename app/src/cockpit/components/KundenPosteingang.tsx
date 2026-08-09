@@ -6,6 +6,7 @@ import {
   wartetSeit,
   type PosteingangEintrag,
 } from '../lib/posteingang'
+import { ABNAHME_LABEL, abnahmeTitel, leseAbnahme } from '../../lib/abnahme'
 
 /**
  * Kunden-Posteingang als aufklappbare Namensliste — dasselbe Muster wie die
@@ -165,6 +166,10 @@ export function KundenPosteingang({
           const wartet = wartetSeit(e.seit)
           const aenderung = e.art === 'website' ? beschreibeAenderung(e.alt, e.neu) : null
           const busy = laeuft === e.id
+          // O11: Freigaben/Änderungswünsche sind normale Nachrichten mit Präfix.
+          // Der Präfix wird als Badge gerendert und aus dem Fließtext entfernt —
+          // Kevin soll „✓ Freigabe: Logo" lesen, nicht „[freigabe:dlv-logo]".
+          const abnahme = e.art === 'nachricht' ? leseAbnahme(e.text ?? '') : null
 
           return (
             <div key={e.id} style={{ borderBottom: '1px solid var(--ck-border)' }}>
@@ -227,6 +232,21 @@ export function KundenPosteingang({
                       {AENDERUNG_LABEL[aenderung.art]}
                     </span>
                   ) : null}
+                  {abnahme ? (
+                    <span
+                      className="ck-label"
+                      style={{
+                        flexShrink: 0,
+                        border: `1px solid ${abnahme.art === 'freigabe' ? 'var(--ck-accent)' : 'var(--ck-warn)'}`,
+                        borderRadius: 999,
+                        padding: '1px 8px',
+                        color: abnahme.art === 'freigabe' ? 'var(--ck-accent)' : 'var(--ck-warn)',
+                      }}
+                    >
+                      {abnahme.art === 'freigabe' ? '✓' : '✎'} {ABNAHME_LABEL[abnahme.art]}:{' '}
+                      {abnahmeTitel(abnahme.deliverableId)}
+                    </span>
+                  ) : null}
                 </button>
                 {e.art === 'nachricht' ? (
                   <button
@@ -255,7 +275,12 @@ export function KundenPosteingang({
                           overflowY: 'auto',
                         }}
                       >
-                        {e.text}
+                        {abnahme
+                          ? abnahme.text ||
+                            (abnahme.art === 'freigabe'
+                              ? `${abnahmeTitel(abnahme.deliverableId)} ist freigegeben.`
+                              : `Änderungswunsch zu ${abnahmeTitel(abnahme.deliverableId)}.`)
+                          : e.text}
                       </div>
                       <textarea
                         className="ck-input"

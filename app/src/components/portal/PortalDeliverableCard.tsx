@@ -1,15 +1,23 @@
+import { useState } from 'react'
 import {
   DELIVERABLE_STATUS_LABEL,
   type DeliverableItem,
   type DeliverProjectStage,
 } from '../../types/db'
 import { placeholderHint } from '../../lib/deliverableCatalog'
+import type { AbnahmeArt } from '../../lib/abnahme'
 
 interface PortalDeliverableCardProps {
   item: DeliverableItem
   clientStage: DeliverProjectStage
   accentColor: string
   dimmed?: boolean
+  /**
+   * O11: nur im Kundenportal gesetzt. Der Kunde meldet Freigabe oder
+   * Änderungswunsch als Nachricht — den Deliverable-Status setzt weiterhin
+   * ausschließlich der Owner.
+   */
+  onAbnahme?: (art: AbnahmeArt, text: string) => Promise<boolean>
 }
 
 export function PortalDeliverableCard({
@@ -17,7 +25,24 @@ export function PortalDeliverableCard({
   clientStage,
   accentColor,
   dimmed = false,
+  onAbnahme,
 }: PortalDeliverableCardProps) {
+  const [wunschOffen, setWunschOffen] = useState(false)
+  const [wunschText, setWunschText] = useState('')
+  const [sendet, setSendet] = useState(false)
+  const [gemeldet, setGemeldet] = useState<AbnahmeArt | null>(null)
+
+  const melde = async (art: AbnahmeArt, text: string) => {
+    if (!onAbnahme || sendet) return
+    setSendet(true)
+    const ok = await onAbnahme(art, text)
+    setSendet(false)
+    if (!ok) return
+    setGemeldet(art)
+    setWunschOffen(false)
+    setWunschText('')
+  }
+
   const ready = item.status === 'fertig'
   const inProgress = item.status === 'in_arbeit'
   const opacity = dimmed ? 0.55 : ready ? 1 : inProgress ? 0.92 : 0.72
@@ -101,6 +126,67 @@ export function PortalDeliverableCard({
       {ready && item.added_at ? (
         <div className="portal-deliverable-added">
           Hinzugefügt am {new Date(item.added_at).toLocaleDateString('de-DE')}
+        </div>
+      ) : null}
+
+      {ready && onAbnahme ? (
+        <div className="portal-deliverable-abnahme">
+          {gemeldet ? (
+            <p className="portal-deliverable-abnahme__ok" style={{ color: accentColor }}>
+              {gemeldet === 'freigabe'
+                ? '✓ Freigabe ist raus — danke!'
+                : '✎ Dein Änderungswunsch ist raus.'}
+            </p>
+          ) : wunschOffen ? (
+            <>
+              <textarea
+                className="portal-deliverable-abnahme__input"
+                value={wunschText}
+                onChange={(e) => setWunschText(e.target.value)}
+                rows={3}
+                autoFocus
+                placeholder="Was sollen wir ändern?"
+              />
+              <div className="portal-deliverable-abnahme__row">
+                <button
+                  type="button"
+                  className="portal-btn portal-btn-primary"
+                  style={{ background: accentColor }}
+                  disabled={sendet || !wunschText.trim()}
+                  onClick={() => void melde('aenderung', wunschText)}
+                >
+                  {sendet ? 'Sende…' : 'Wunsch senden'}
+                </button>
+                <button
+                  type="button"
+                  className="portal-btn portal-btn-ghost"
+                  onClick={() => setWunschOffen(false)}
+                >
+                  Abbrechen
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="portal-deliverable-abnahme__row">
+              <button
+                type="button"
+                className="portal-btn portal-btn-primary"
+                style={{ background: accentColor }}
+                disabled={sendet}
+                onClick={() => void melde('freigabe', '')}
+              >
+                {sendet ? 'Sende…' : 'Freigeben'}
+              </button>
+              <button
+                type="button"
+                className="portal-btn portal-btn-ghost"
+                style={{ borderColor: accentColor, color: accentColor }}
+                onClick={() => setWunschOffen(true)}
+              >
+                Änderung wünschen
+              </button>
+            </div>
+          )}
         </div>
       ) : null}
     </div>
