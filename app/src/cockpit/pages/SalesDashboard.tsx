@@ -9,13 +9,15 @@ import { AnfragenZaehler } from '../components/AnfragenZaehler'
 import { Arbeitsliste, type LoomSkriptAktionen } from '../components/Arbeitsliste'
 import { Arbeitsmodus, type ArbeitsmodusErgebnis } from '../components/Arbeitsmodus'
 import { ConversionPanel } from '../components/ConversionPanel'
+import { InmailPanel } from '../components/InmailPanel'
 import { WerkzeugePanel } from '../components/WerkzeugePanel'
 import { useActiveBrand } from '../lib/activeBrand'
 import { zeilenId } from '../lib/arbeitsmodusQuellen'
 import { erledigePosten } from '../lib/arbeitsmodusTracking'
 import { bucketOf } from '../lib/linkedinFollowups'
 import { funnelKpis, sumField } from '../lib/metricsAggregate'
-import { RANGFOLGE, tagesstand, type Posten, type Spur } from '../lib/prioritaet'
+import { INMAIL_CREDITS_STAND, RANGFOLGE, tagesstand, type Posten, type Spur } from '../lib/prioritaet'
+import { useUiSetting } from '../lib/uiSettings'
 import { tagesansage } from '../lib/tagesansage'
 import { postRun } from '../lib/runnerApi'
 import { fetchSalesLibrary, salesFileUrl, type SalesLibrary } from '../lib/salesLibraryApi'
@@ -232,7 +234,16 @@ export function SalesDashboard() {
 
   const monthRevenue = useMemo(() => sumField(metrics.monthRows, 'umsatz'), [metrics.monthRows])
   const funnel = useMemo(() => funnelKpis(metrics.monthRows, monthRevenue), [metrics.monthRows, monthRevenue])
-  const tag = useMemo(() => tagesstand(metrics.today), [metrics.today])
+  // D8: der Credits-Stand lebt in ui_settings (0068), nicht mehr hart im Code.
+  // Die Konstante in prioritaet.ts bleibt der Standard, solange nichts gesetzt ist.
+  const { wert: inmailCredits, setzen: setzeInmailCredits } = useUiSetting<number>(
+    'sales.inmailCredits',
+    INMAIL_CREDITS_STAND,
+  )
+  const tag = useMemo(
+    () => tagesstand(metrics.today, inmailCredits),
+    [metrics.today, inmailCredits],
+  )
 
   /**
    * O7 / Wargame Zug 8 — der Anfragen-Posten. Er hat keine Zeile in einer
@@ -579,10 +590,7 @@ export function SalesDashboard() {
       titel: 'InMails',
       kennzahl: `${tag.inmailCredits} Credits übrig`,
       inhalt: () => (
-        <span style={{ fontSize: 13, color: 'var(--ck-text-3)' }}>
-          Bestand, kein Tagesrhythmus (RECON-1 offen — Kevin liest den genauen Stand in LinkedIn nach).
-          Reaktivierung offener Anfragen läuft über den Skill <code>linkedin-inmail</code>.
-        </span>
+        <InmailPanel wert={inmailCredits} onSpeichern={setzeInmailCredits} />
       ),
     },
     {
