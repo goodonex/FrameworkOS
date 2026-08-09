@@ -2,6 +2,20 @@
 
 **Stand:** 2026-08-09 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
 
+**Abnahme am selben Abend, eingeloggt** (09.08., ~23:00): Zug 1–9 und 11 in
+Kevins Session durchgeprüft. Belegt: kein „Infinity" mehr in der Oberfläche ·
+kein `duplicate key` beim Laden · Ruht-Rundlauf (schlafen legen → Weck-Liste →
+aufwecken → `snoozed_until` wieder überall `null`) · Erstnachricht = ein Klick,
+538 Zeichen in der Zwischenablage und Ziel im neuen Tab · Ads-Kacheln
+20/0/20/1 deckungsgleich mit 20 Tabellenzeilen · Blättern per Pfeiltasten, und
+Tippen in der Notiz blättert NICHT · Notiz-Entwurf wandert beim Ad-Wechsel
+nicht mit · „Als gepostet markieren" schreibt einen Post bzw. eine ganze Woche
+in `content.json` (mit Wegwerf-Daten, Original danach byte-gleich zurück) ·
+Uriel antwortet (L6). Zwei Fehler, die dabei auffielen, sind gefixt: „bis
+10.08.**.**" in der Ruht-Zeile und die Ads-Kopfzeile, die bei 390 px aus dem
+Panel lief. Desktop 1280 gemessen: kein Querscrollen auf `/cockpit` und
+`/sales`.
+
 **Runde vom 09.08., dritter Teil** (Umsetzung Technik-Fundament): Die
 Phase-1-Blaupause ist gefahren — Züge 0–12, **21 Code-/Doku-Commits** auf `cockpit-rebuild`,
 **nicht live** (der Fast-Forward bleibt Kevins Wort). `npx tsc -b` +
@@ -9,9 +23,9 @@ Phase-1-Blaupause ist gefahren — Züge 0–12, **21 Code-/Doku-Commits** auf `
 `verify-abnahme` und `verify-ical-rrule`, dazu `verify-kundenarbeit` 13 → 22
 Fälle und `verify-linkedin-followups` 59 → 73). Migration **0069** ist gepusht;
 der Trockenlauf wollte genau diese eine Nummer. Erledigt: **O8, O9, O11, L3,
-L7** und neun O13-Zeilen. **Offen geblieben: L6** — der belastbare Test braucht
-eine eingeloggte Session. Vier Recon-Korrekturen und ein neuer Befund stehen
-jeweils bei ihrem Punkt.
+L6, L7** und neun O13-Zeilen — in Kevins eingeloggter Session am selben Abend
+komplett gegengeprüft (Details bei den Punkten). Vier Recon-Korrekturen und ein
+neuer Befund stehen jeweils bei ihrem Punkt.
 
 **Runde vom 09.08., zweiter Teil** (Planung, kein Code): Phase-1-Blaupause
 **Technik-Fundament** fertig — `docs/wargames/technik-fundament.md` (Züge 0–12,
@@ -236,13 +250,14 @@ Adresse zeigt. Falls ja, fielen die Mails schon vorher ins Leere (die Function w
 nie deployt) — das Streichen verliert also nichts. Wer das sauber abschliessen
 will, loescht den Webhook im Resend-Dashboard.
 
-### L6 · `ANTHROPIC_API_KEY` — **weiter offen** (09.08. erneut nicht abschließend prüfbar)
+### L6 · ~~`ANTHROPIC_API_KEY`~~ ✅ **bestätigt 09.08.2026, eingeloggt getestet**
 
-**Stand 09.08.:** `supabase secrets list` zeigt `ANTHROPIC_API_KEY` und
-`ANTHROPIC_MODEL` als gesetzt (mit Digest). Mehr ist von hier aus nicht zu
-holen: der belastbare Test ist eine Uriel-Nachricht aus einer **eingeloggten**
-Session, und Anmelden gehört Kevin, nicht dem Agenten. **Der Zehn-Sekunden-Test
-steht weiter aus** — eingeloggt eine Frage ins Uriel-Dock tippen.
+Der Zehn-Sekunden-Test ist gelaufen: im Uriel-Dock ein neuer Chat („Ohne Kontakt
+starten"), Frage „Was steht heute an?" — Uriel hat inhaltlich geantwortet
+(Hinweis auf fehlenden Kalender-Zugriff, danach drei konkrete Hebel aus dem
+Geschäftsmodell). Das geht nur mit gültigem Key. `supabase secrets list` zeigt
+`ANTHROPIC_API_KEY` und `ANTHROPIC_MODEL` weiterhin als gesetzt.
+**Damit ist L6 zu** — der Punkt lief seit dem 07.07. als „vermutlich gültig" mit.
 
 <details><summary>Beleglage von 06.08. (unverändert gültig)</summary>
 
@@ -826,17 +841,18 @@ die Antwort ein Satz sein kann.
 | **Pitch-Modus**: weiter am Namens-Suffix „— Pitch" oder eigenes Feld? | **Eigenes Feld**, sobald der Pitch-Modus bleibt. Ein Suffix im Kundennamen ist eine Statuswahrheit im Anzeigetext — der nächste Tippfehler kippt den Modus. |
 | **Beziehungs-Reminder „still geworden"**: überhaupt bauen? | **Nein, nicht jetzt.** Er bräuchte `last_contact_at` als neue Wahrheit neben der Follow-up-Leiter, die genau diesen Zweck schon erfüllt. |
 
-**Nachtrag aus Zug 1, keine der fünf, aber entscheidungsbedürftig:**
-`deliver_projects` hat **keine** `created_at`-Spalte. D1 sah sie als letzten
-Anker für „liegt seit X Tagen" vor; heute greift stattdessen die
-Notfall-Stufe — ein Projekt ohne Stufenwechsel **und** ohne erledigte Aufgabe
-fällt aus der Liste, statt eine erfundene Zahl zu zeigen. Genau das war der
-Fall „Reichentrog & Kollegen GmbH", der die Infinity-Meldung ausgelöst hat: der
-Posten ist damit weg statt falsch. Eine additive Migration
-(`add column created_at timestamptz default now()`) würde die Stufe scharf
-schalten, aber Bestandszeilen bekämen „heute" als Anlagedatum — also „Seit 0
-Tagen keine Bewegung". Deshalb bewusst **nicht** gemacht; wenn der Posten
-zurück soll, ist der ehrliche Weg ein Backfill aus einer echten Quelle.
+**Nachtrag aus Zug 1 — Entwarnung nach der Messung in der Live-Session:**
+`deliver_projects` hat **keine** `created_at`-Spalte, D1-Stufe 2 kann also nie
+greifen. Die Sorge, dass deshalb Posten verschwinden, hat sich **nicht**
+bestätigt: beide aktuell liegenden Projekte haben einen endlichen Anker
+(Reichentrog 82 Tage seit `stage_changed_at` 2026-05-18, Develo 68 Tage seit
+2026-06-01). Die Notfall-Stufe greift bei keinem Projekt, „Infinity" kommt in
+der ganzen Oberfläche nicht mehr vor (Grep über /cockpit, /sales, /linkedin).
+Die fehlende Spalte bleibt eine **latente** Lücke: sie schlägt erst zu, wenn
+ein Projekt ohne Stufenwechsel und ohne erledigte Aufgabe auftaucht. Eine
+Migration mit `default now()` wäre keine Lösung — Bestandszeilen bekämen
+„heute" und damit „Seit 0 Tagen keine Bewegung". Ehrlich wäre nur ein Backfill
+aus einer echten Quelle.
 
 ### O17 · ~~Die Morgen-Agenten laufen ins Timeout~~ ✅ **behoben 07.08.2026**
 **Der Befund war ein anderer als der Verdacht.** Nicht der Agent, nicht die
