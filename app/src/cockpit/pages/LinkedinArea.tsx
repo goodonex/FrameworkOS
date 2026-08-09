@@ -57,6 +57,23 @@ function ThreadCard({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '10px 12px', borderBottom: '1px solid var(--ck-border)' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0 }}>
+          {/* D3: `unread` gehört dem Voyager-Sync. Wir zeigen den Stand nur an
+              und schreiben ihn NIE zurück — sonst überschreibt der nächste Sync
+              die Anzeige oder, schlimmer, wir verfälschen seinen Stand. */}
+          {thread.unread ? (
+            <span
+              title="Ungelesen im LinkedIn-Postfach"
+              aria-label="ungelesen"
+              style={{
+                width: 7,
+                height: 7,
+                flexShrink: 0,
+                borderRadius: 99,
+                background: 'var(--ck-accent)',
+                alignSelf: 'center',
+              }}
+            />
+          ) : null}
           {thread.starred ? (
             <span title="Stern: Ja zur Loom-Analyse" style={{ color: 'var(--ck-accent)', fontSize: 12 }}>
               ★
@@ -630,6 +647,13 @@ export function LinkedinArea({ eingebettet = false }: { eingebettet?: boolean } 
                   key={t.id}
                   style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderBottom: '1px solid var(--ck-border)' }}
                 >
+                  {t.unread ? (
+                    <span
+                      title="Ungelesen im LinkedIn-Postfach"
+                      aria-label="ungelesen"
+                      style={{ width: 7, height: 7, flexShrink: 0, borderRadius: 99, background: 'var(--ck-accent)' }}
+                    />
+                  ) : null}
                   <span style={{ flex: 1, fontSize: 13, color: 'var(--ck-text-1)' }}>{t.name || 'Unbekannt'}</span>
                   {threadUrl(t.thread_key) ? (
                     <a href={threadUrl(t.thread_key)} target="_blank" rel="noreferrer" className="ck-btn" style={{ fontSize: 10, textDecoration: 'none' }}>
