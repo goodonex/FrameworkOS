@@ -9,7 +9,7 @@
  */
 import { spawn } from 'node:child_process'
 import { createServer } from 'node:http'
-import { mkdir, readdir, readFile, realpath, stat, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, realpath, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
@@ -197,7 +197,15 @@ const AGENT_CATALOG = [
       'content-engine/WEEKLY.md in DIESEM Ordner: bestimme die ISO-Woche, ziehe 3 frische ' +
       'Angles aus content-engine/backlog.md (Abgleich mit content-engine/log.md), baue je Angle ' +
       'ein Post-HTML + Captions, erzeuge die Galerie mit build-gallery.mjs und trage die Woche in ' +
-      'content-engine/log.md ein. Kein Auto-Posting — nur das Review-Paket bauen.',
+      'content-engine/log.md ein. Kein Auto-Posting — nur das Review-Paket bauen.\n\n' +
+      'ZULETZT, nicht vergessen: trage die gebauten Posts in content-engine/content.json ein — ' +
+      'das ist die Quelle, aus der das Cockpit die Post-Ebene zeigt. Die Datei hat die Form ' +
+      '{"schemaVersion":1,"brand":"herrmann","updatedAt":null,"posts":[]}; fehlt sie, lege sie so an. ' +
+      'Hänge je gebautem Post ein Objekt an posts an: {"id":"<kw>-<kurz-slug>","title":"<Titel>",' +
+      '"status":"scheduled","channel":"instagram","format":"carousel","week":"<ISO-Woche, z.B. 2026-W33>",' +
+      '"slides":[{"path":"<Pfad der Slide-HTML relativ zum Social-Ordner>"}],"caption":"<Caption>","done":false}. ' +
+      'BESTEHENDE Einträge bleiben unangetastet — weder Status noch Reihenfolge ändern, nichts löschen, ' +
+      'keine id doppelt vergeben. Schreibe die Datei als gültiges JSON zurück.',
   },
   {
     id: 'wochenrecap',
@@ -1942,6 +1950,79 @@ const server = createServer(async (req, res) => {
         await writeFile(file, JSON.stringify(manifest, null, 2) + '\n', 'utf8')
         return json(res, 200, { ok: true, updatedAt: manifest.updatedAt })
       }
+    }
+
+    // ---------- „Als gepostet markieren" (O9 / D5) ----------
+    // Der Schreiber, den das Manifest nie hatte. Bewusst ein eigener, winziger
+    // Endpoint statt des PUT-Wegs: die App schickt nur `{brand, postId}` bzw.
+    // `{brand, week}` und nie ein ganzes Manifest — sie kann den Rest der Datei
+    // also gar nicht überschreiben. Vault-Dateien schreibt nur der Runner (D5).
+    if (url.pathname === '/content/posted' && req.method === 'POST') {
+      let body
+      try {
+        body = JSON.parse(await readBodyCapped(req, MANIFEST_MAX_BYTES))
+      } catch (e) {
+        if (e?.code === 'ETOOBIG') return json(res, 413, { error: 'Body zu groß' })
+        return json(res, 400, { error: 'ungültiges JSON' })
+      }
+      const brand = String(body?.brand ?? '')
+      const week = body?.week ? String(body.week) : null
+      const postId = body?.postId ? String(body.postId) : null
+      const file = contentManifestPath(brand)
+      if (!file) return json(res, 400, { error: `Unbekannter Brand: ${brand}` })
+      if (!week && !postId) return json(res, 400, { error: 'week oder postId erwartet' })
+
+      // Läuft der Batch gerade, schreiben wir NICHT — sonst überschreibt einer
+      // von beiden den anderen und das Manifest ist danach unvollständig.
+      if ([...running.values()].some((r) => r.agent === 'weekly-content')) {
+        return json(res, 409, { error: 'Content-Batch läuft gerade — gleich nochmal.' })
+      }
+
+      let manifest = null
+      try {
+        manifest = JSON.parse(await readFile(file, 'utf8'))
+      } catch (e) {
+        // Fehlt die Datei, ist das kein Fehler: leeres Manifest anlegen.
+        if (e?.code === 'ENOENT') manifest = emptyContentManifest(brand)
+        else return json(res, 500, { error: 'content.json ist kein gültiges JSON — von Hand prüfen' })
+      }
+      if (!manifest || manifest.schemaVersion !== 1 || !Array.isArray(manifest.posts)) {
+        return json(res, 500, { error: 'content.json hat nicht die erwartete Form (schemaVersion 1, posts[])' })
+      }
+
+      const postedAt = new Date().toISOString()
+      let getroffen = 0
+      manifest.posts = manifest.posts.map((p) => {
+        const passt = postId ? p.id === postId : p.week === week
+        if (!passt || p.status === 'posted') return p
+        getroffen++
+        return { ...p, status: 'posted', postedAt }
+      })
+      if (getroffen === 0) {
+        return json(res, 200, { ok: true, getroffen: 0, updatedAt: manifest.updatedAt ?? null })
+      }
+
+      manifest.updatedAt = postedAt
+      // Sicherheitsnetz + atomarer Tausch: erst .bak, dann temp schreiben und
+      // umbenennen. Ein abgebrochener Schreibvorgang hinterlässt so nie eine
+      // halbe Datei, die der nächste GET als kaputtes JSON meldet.
+      const inhalt = JSON.stringify(manifest, null, 2) + '\n'
+      try {
+        const alt = await readFile(file, 'utf8')
+        await writeFile(`${file}.bak`, alt, 'utf8')
+      } catch (e) {
+        if (e?.code !== 'ENOENT') throw e
+      }
+      const tmp = `${file}.tmp`
+      await writeFile(tmp, inhalt, 'utf8')
+      try {
+        await rename(tmp, file)
+      } catch (e) {
+        await unlink(tmp).catch(() => {})
+        throw e
+      }
+      console.log(`[content] ${getroffen} Post(s) als gepostet markiert (${postId ?? week})`)
+      return json(res, 200, { ok: true, getroffen, updatedAt: manifest.updatedAt })
     }
 
     return json(res, 404, { error: 'not found' })

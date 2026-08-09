@@ -42,6 +42,8 @@ export interface ContentPost {
   week?: string
   done: boolean
   notes?: ContentNote[]
+  /** Wann „Als gepostet markieren" gedrückt wurde (schreibt nur der Runner, O9). */
+  postedAt?: string
 }
 
 export interface ContentManifest {
@@ -117,6 +119,23 @@ export function putContentManifest(
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ baseUpdatedAt, manifest }),
+  })
+}
+
+/**
+ * „Als gepostet markieren" (O9 / D5). Schreibt NICHT das ganze Manifest, sondern
+ * schickt nur, was sich ändert — der Runner setzt `status: 'posted'` in
+ * `content.json`. Entweder ein einzelner Post (`postId`) oder eine ganze Woche
+ * (`week`). Braucht den Runner direkt; im Spiegel-Fall gibt es keinen Weg dorthin.
+ */
+export function markiereGepostet(
+  brand: string,
+  ziel: { postId: string } | { week: string },
+): Promise<{ ok: true; getroffen: number; updatedAt: string | null }> {
+  return req('/content/posted', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ brand, ...ziel }),
   })
 }
 

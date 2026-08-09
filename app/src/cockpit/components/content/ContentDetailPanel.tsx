@@ -25,6 +25,9 @@ interface Props {
   onSetChannel: (postId: string, channel: ContentChannel) => void
   onSetFormat: (postId: string, format: ContentFormat) => void
   onAddNote: (postId: string, text: string) => void
+  /** O9 / D5: schreibt der Runner in content.json — nur direkt am Rechner möglich. */
+  onMarkiereGepostet: (postId: string) => void
+  runnerDirekt: boolean
 }
 
 /** Detail-Panel als overlay-right: Slide-Vorschau, Caption-Copy, Pipeline-Status, Datum, Notizen. */
@@ -37,6 +40,8 @@ export function ContentDetailPanel({
   onSetChannel,
   onSetFormat,
   onAddNote,
+  onMarkiereGepostet,
+  runnerDirekt,
 }: Props) {
   const { show } = useToast()
   const [noteText, setNoteText] = useState('')
@@ -97,9 +102,26 @@ export function ContentDetailPanel({
               </div>
             ) : null}
           </div>
-          <button className="ck-btn" onClick={onClose} style={{ flexShrink: 0 }}>
-            Schließen
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            {post.status === 'posted' ? null : (
+              <button
+                className="ck-btn ck-btn--primary"
+                onClick={() => onMarkiereGepostet(post.id)}
+                disabled={!runnerDirekt}
+                style={{ opacity: runnerDirekt ? 1 : 0.45 }}
+                title={
+                  runnerDirekt
+                    ? 'Setzt den Post in content.json auf „Gepostet"'
+                    : 'Am Rechner markieren — content.json liegt im Vault und nur der Runner schreibt sie'
+                }
+              >
+                Als gepostet markieren
+              </button>
+            )}
+            <button className="ck-btn" onClick={onClose}>
+              Schließen
+            </button>
+          </div>
         </div>
 
         {/* Status / Kanal / Format / erledigt */}

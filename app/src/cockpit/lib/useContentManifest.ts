@@ -6,7 +6,7 @@ import type {
   ContentManifest,
   ContentStatus,
 } from './contentApi'
-import { fetchContentManifest, putContentManifest } from './contentApi'
+import { fetchContentManifest, markiereGepostet, putContentManifest } from './contentApi'
 
 const PUT_DEBOUNCE_MS = 600
 
@@ -166,11 +166,43 @@ export function useContentManifest(brand: string | undefined) {
     [updatePost],
   )
 
+  /**
+   * „Als gepostet markieren" geht NICHT über den PUT-Weg: der Runner ist der
+   * Schreiber (D5), er kennt den Disk-Stand und setzt nur dieses eine Feld.
+   * Danach frisch laden — sonst zeigt die App ihren alten Stand weiter.
+   */
+  const markierePostGepostet = useCallback(
+    async (ziel: { postId: string } | { week: string }) => {
+      const b = brandRef.current
+      if (!b) return
+      try {
+        const { getroffen } = await markiereGepostet(b, ziel)
+        await reload()
+        show(
+          getroffen > 0
+            ? `${getroffen} Post${getroffen === 1 ? '' : 's'} als gepostet markiert.`
+            : 'Nichts zu markieren — war schon gepostet.',
+          'success',
+        )
+      } catch (e) {
+        const err = e as Error & { status?: number }
+        show(
+          err.status === 409
+            ? 'Der Content-Batch läuft gerade — gleich nochmal.'
+            : 'Runner nicht erreichbar — am Rechner markieren.',
+          'error',
+        )
+      }
+    },
+    [reload, show],
+  )
+
   return {
     manifest,
     loading,
     error,
     reload,
+    markierePostGepostet,
     setStatus,
     toggleDone,
     setPlannedFor,

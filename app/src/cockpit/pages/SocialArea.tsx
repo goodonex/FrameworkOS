@@ -5,6 +5,7 @@ import { RunnerHinweis } from '../components/RunnerHinweis'
 import { getSeenWeeks, markWeekSeen, syncSocialBatchesFromRunner } from '../lib/socialApi'
 import { loadSocialBatchHtml, loadSocialBatchList, type SocialBatchMeta } from '../lib/socialBatchStore'
 import { postRun } from '../lib/runnerApi'
+import { runnerDirekt } from '../lib/runnerBridge'
 import { useContentManifest } from '../lib/useContentManifest'
 import { ContentCard } from '../components/content/ContentCard'
 import { ContentDetailPanel } from '../components/content/ContentDetailPanel'
@@ -28,6 +29,29 @@ function WeeksView() {
   const [syncing, setSyncing] = useState(false)
   const [seenTick, setSeenTick] = useState(0)
   const htmlCache = useRef<Map<string, string>>(new Map())
+  // O9: `social_batches.posted` hat bis heute keinen Schreiber — das Badge war
+  // damit nie wahr. Die belastbare Auskunft steht in content.json: eine Woche
+  // gilt als gepostet, wenn alle ihre Posts es sind. Keine zweite Wahrheit,
+  // nur die richtige gelesen.
+  const { manifest, markierePostGepostet } = useContentManifest(activeSlug)
+  const direkt = runnerDirekt()
+
+  const wochenStand = useMemo(() => {
+    const stand = new Map<string, { gesamt: number; gepostet: number }>()
+    for (const p of manifest?.posts ?? []) {
+      if (!p.week) continue
+      const cur = stand.get(p.week) ?? { gesamt: 0, gepostet: 0 }
+      cur.gesamt++
+      if (p.status === 'posted') cur.gepostet++
+      stand.set(p.week, cur)
+    }
+    return stand
+  }, [manifest])
+
+  const istGepostet = (w: SocialBatchMeta) => {
+    const s = wochenStand.get(w.week)
+    return w.posted || (s != null && s.gesamt > 0 && s.gepostet === s.gesamt)
+  }
 
   const refreshList = useCallback(async () => {
     const rows = await loadSocialBatchList(activeSlug)
@@ -145,7 +169,7 @@ function WeeksView() {
                       }}
                     />
                     <span style={{ fontSize: 13, fontWeight: isNew ? 600 : 500 }}>{w.week}</span>
-                    {w.posted ? (
+                    {istGepostet(w) ? (
                       <span className="ck-label" style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--ck-accent)' }}>
                         gepostet
                       </span>
@@ -180,9 +204,26 @@ function WeeksView() {
                   }}
                 >
                   <span style={{ fontSize: 13, fontWeight: 600 }}>{active.title || `Woche ${active.week}`}</span>
-                  <button className="ck-btn" style={{ fontSize: 11.5 }} onClick={openInTab} disabled={!html}>
-                    In neuem Tab ↗
-                  </button>
+                  <span style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }}>
+                    {istGepostet(active) || !wochenStand.has(active.week) ? null : (
+                      <button
+                        className="ck-btn"
+                        style={{ fontSize: 11.5, opacity: direkt ? 1 : 0.45 }}
+                        disabled={!direkt}
+                        title={
+                          direkt
+                            ? 'Setzt alle Posts dieser Woche in content.json auf „Gepostet"'
+                            : 'Am Rechner markieren — content.json liegt im Vault und nur der Runner schreibt sie'
+                        }
+                        onClick={() => void markierePostGepostet({ week: active.week })}
+                      >
+                        Als gepostet markieren
+                      </button>
+                    )}
+                    <button className="ck-btn" style={{ fontSize: 11.5 }} onClick={openInTab} disabled={!html}>
+                      In neuem Tab ↗
+                    </button>
+                  </span>
                 </div>
                 {htmlLoading ? (
                   <p className="ck-label" style={{ padding: 16 }}>Lade Vorschau…</p>
@@ -244,10 +285,23 @@ export function SocialArea() {
 function ContentPostsView() {
   const { activeSlug, activeBrand } = useActiveBrand()
   const { show } = useToast()
-  const { manifest, loading, error, setStatus, toggleDone, setPlannedFor, setChannel, setFormat, addNote } =
-    useContentManifest(activeSlug)
+  const {
+    manifest,
+    loading,
+    error,
+    setStatus,
+    toggleDone,
+    setPlannedFor,
+    setChannel,
+    setFormat,
+    addNote,
+    markierePostGepostet,
+  } = useContentManifest(activeSlug)
   const [openId, setOpenId] = useState<string | null>(null)
   const [building, setBuilding] = useState(false)
+  // content.json liegt im Vault; nur der Runner schreibt sie (D5). Am Handy
+  // gibt es keinen Weg dorthin — der Knopf sagt das, statt still zu scheitern.
+  const direkt = runnerDirekt()
 
   const brandName = activeBrand?.name ?? activeSlug
   const openPost = manifest?.posts.find((p) => p.id === openId) ?? null
@@ -330,6 +384,8 @@ function ContentPostsView() {
           onSetChannel={setChannel}
           onSetFormat={setFormat}
           onAddNote={addNote}
+          onMarkiereGepostet={(postId) => void markierePostGepostet({ postId })}
+          runnerDirekt={direkt}
         />
       ) : null}
     </div>
