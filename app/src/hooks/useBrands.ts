@@ -220,6 +220,15 @@ export function useBrands(): UseBrandsResult {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const seedAttemptedRef = useRef(false)
+  /**
+   * Hat der letzte `reload()` die Brands wirklich GELESEN? „Keine Brands" und
+   * „nicht nachgesehen" sahen bisher gleich aus — beides `brands.length === 0`
+   * bei `loading === false`. Genau das ließ den Seed nach einem transienten
+   * Auth-Lock-Fehler (viele Tabs) losfeuern und bei jedem Laden ein
+   * `duplicate key … brands_slug_key` in die Konsole schreiben, obwohl fünf
+   * Brands existieren. Geseedet wird nur noch nach einem geglückten Lesen.
+   */
+  const ladErfolgRef = useRef(false)
   const foundationSeedRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
@@ -262,6 +271,7 @@ export function useBrands(): UseBrandsResult {
         .order('created_at', { ascending: true }),
     )
     if (err) {
+      ladErfolgRef.current = false
       if (isMissingSupabaseTableError(err.message)) {
         console.warn(
           '[useBrands] Tabelle `brands` fehlt oder Cache — 3D-Graph nutzt Fallback. Migration 0001 im Supabase SQL Editor ausführen.',
@@ -283,6 +293,7 @@ export function useBrands(): UseBrandsResult {
       }
     } else {
       setError(null)
+      ladErfolgRef.current = true
       let rawRows = data ?? []
       let syncPromise = canonicalSyncPromiseByUser.get(user.id)
       if (!syncPromise) {
@@ -313,6 +324,8 @@ export function useBrands(): UseBrandsResult {
 
   useEffect(() => {
     if (!supabase || !user?.id || loading) return
+    // Leer heißt nur dann WIRKLICH leer, wenn der letzte Lesevorgang geglückt ist.
+    if (!ladErfolgRef.current || error !== null) return
     if (brands.length > 0) {
       seedAttemptedRef.current = false
       return
@@ -345,7 +358,7 @@ export function useBrands(): UseBrandsResult {
       }
       await reload()
     })()
-  }, [user?.id, brands.length, loading, reload])
+  }, [user?.id, brands.length, loading, error, reload])
 
   return { brands, loading, error, reload }
 }
