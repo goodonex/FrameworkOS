@@ -2,6 +2,20 @@
 
 **Stand:** 2026-08-09 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
 
+**LIVE seit 09.08.2026, ~23:20** — Fast-Forward `63c2177 → 179702f` auf `main`
+gepusht (Kevins Wort), Netlify hat deployt. **Beleg am ausgelieferten Bundle**
+(`index-B2bblpN_.js`, der Hash weicht vom lokalen Build ab, weil Netlify mit
+eigenen Env-Variablen baut — die CSS-Hash `index-BxCwQSrj.css` ist identisch):
+14 Marken dieser Runde nachweisbar („Aufwecken", „Loom verschickt",
+„Kopieren + Website", „Als gepostet markieren", „Änderung wünschen",
+„Freigabe ist raus", „Braucht einen Posten", „zählt beim Abhaken",
+„Credits-Stand", „Monatsziel: Cockpit-Startseite", „Ungelesen im
+LinkedIn-Postfach", „schlafen gelegt, kommen von allein zurück", „Der Runner ist
+offline", „freigegeben"). Gegenprobe bestanden: **„Nur lokal möglich" und
+`preview=true` sind aus dem Prod-Bundle verschwunden.** frameworkos.de,
+`/portal` und `/cockpit` antworten 200. Migration 0069 war schon vorher
+eingespielt.
+
 **Abnahme am selben Abend, eingeloggt** (09.08., ~23:00): Zug 1–9 und 11 in
 Kevins Session durchgeprüft. Belegt: kein „Infinity" mehr in der Oberfläche ·
 kein `duplicate key` beim Laden · Ruht-Rundlauf (schlafen legen → Weck-Liste →
@@ -97,7 +111,7 @@ Alles hier steht zwischen dem heutigen Code und „läuft in Produktion".
 Was in diesem Abschnitt abgehakt ist, ist wirklich in Produktion; die Edge Functions
 (L4, L5) deployen unabhängig vom Frontend und sind es bereits.
 
-### L1 · ~~Fast-Forward~~ ✅ **alles live, auch der v2-Ausbau (09.08.)**
+### L1 · ~~Fast-Forward~~ ✅ **alles live — zuletzt das Technik-Fundament (09.08., 23:20)**
 `git log --oneline origin/main..main` = leer. Netlify liefert
 `index-DXkj1tps.js`; im ausgelieferten Bundle sind alle sieben v2-Marken
 nachweisbar („Nacht-Routinen", `ck-widget-stack`, „Anordnen", „→ morgen",
