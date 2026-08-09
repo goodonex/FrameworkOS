@@ -35,7 +35,6 @@ import { CARD_TILE_TAP } from '../../modules/CardTile'
 import { useSalesPipelines } from '../../hooks/useSalesPro'
 import { EmailTemplatesDrawer } from '../../components/sales/EmailTemplatesDrawer'
 import { PipelineSwitcher } from '../../components/sales/PipelineSwitcher'
-import { SalesGoalsDrawer } from '../../components/sales/SalesGoalsDrawer'
 import { SalesImportDrawer } from '../../components/sales/SalesImportDrawer'
 import { SalesMeetingLinkDrawer } from '../../components/sales/SalesMeetingLinkDrawer'
 import { SectionLabel } from '../../components/SectionLabel'
@@ -1817,7 +1816,6 @@ export function SalesMode({
       { replace: true },
     )
   }, [searchParams, setSearchParams])
-  const [goalsDrawerOpen, setGoalsDrawerOpen] = useState(false)
   const [importDrawerOpen, setImportDrawerOpen] = useState(false)
   const [meetingDrawerOpen, setMeetingDrawerOpen] = useState(false)
   const [bulkTagInput, setBulkTagInput] = useState('')
@@ -2064,15 +2062,18 @@ export function SalesMode({
             >
               ✉ Templates
             </button>
-            <button
-              type="button"
-              onClick={() => setGoalsDrawerOpen(true)}
+            {/* O13: Der „◎ Ziele"-Knopf ist raus. Er öffnete den SalesGoalsDrawer
+                mit einer zweiten Zielverwaltung neben `month_goals` — zwei Orte,
+                zwei Zahlen, eine davon falsch. Das Monatsziel steht auf der
+                Cockpit-Startseite. Drawer-Komponente bleibt vorerst liegen,
+                über sie entscheidet Phase 2 (O14). */}
+            <span
               className="font-mono"
-              style={proSettingsBtn}
-              title="Wochenziele setzen"
+              style={{ ...proSettingsBtn, cursor: 'default', opacity: 0.6 }}
+              title="Das Monatsziel wird auf der Cockpit-Startseite gesetzt"
             >
-              ◎ Ziele
-            </button>
+              ◎ Monatsziel: Cockpit-Startseite
+            </span>
             <button
               type="button"
               onClick={() => setImportDrawerOpen(true)}
@@ -2465,11 +2466,6 @@ export function SalesMode({
       <EmailTemplatesDrawer
         open={tplDrawerOpen}
         onClose={() => setTplDrawerOpen(false)}
-        brandSlug={slug}
-      />
-      <SalesGoalsDrawer
-        open={goalsDrawerOpen}
-        onClose={() => setGoalsDrawerOpen(false)}
         brandSlug={slug}
       />
       <SalesImportDrawer
