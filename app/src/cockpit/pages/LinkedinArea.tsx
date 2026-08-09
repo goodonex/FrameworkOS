@@ -6,7 +6,7 @@ import { HeuteTabs } from '../components/HeuteTabs'
 import { ErstnachrichtenListe } from '../components/ErstnachrichtenListe'
 import { useActiveBrand } from '../lib/activeBrand'
 import { buildLinkedinFollowupInput } from '../lib/approvalDrafts'
-import { bucketOf, coverage, FOLLOWUP_THRESHOLDS_DAYS } from '../lib/linkedinFollowups'
+import { bucketOf, coverage, FOLLOWUP_THRESHOLDS_DAYS, istWeckbar } from '../lib/linkedinFollowups'
 import { RUNNER_BASE_URL, useRunnerStatus } from '../lib/useRunnerStatus'
 import { beauftrageRunner, runnerDirekt } from '../lib/runnerBridge'
 
@@ -127,6 +127,98 @@ function ThreadCard({
         ) : null}
       </div>
     </div>
+  )
+}
+
+const RUHT_DATUM_FMT = new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit' })
+
+/**
+ * Der Weg zurück aus dem Schlaf (Zug 2 / D2). Vorher gab es nur den Zähler
+ * „Ruht: n" in der Abdeckung — was einmal auf „→ morgen" ging, war unsichtbar,
+ * bis der Wecker von allein klingelte.
+ *
+ * Eingeklappt, weil das kein Tagesgeschäft ist; die Zahl steht trotzdem immer
+ * in der Überschrift. Terminale Threads (archiviert/gewonnen/verloren) fehlen
+ * hier bewusst — siehe `istWeckbar`.
+ */
+function RuhtSection({
+  threads,
+  now,
+  onWake,
+}: {
+  threads: LinkedinThread[]
+  now: number
+  onWake: (t: LinkedinThread) => void
+}) {
+  const [offen, setOffen] = useState(false)
+  if (threads.length === 0) return null
+
+  return (
+    <section className="ck-panel" style={{ overflow: 'hidden' }}>
+      <button
+        type="button"
+        onClick={() => setOffen((v) => !v)}
+        aria-expanded={offen}
+        className="ck-label"
+        style={{
+          display: 'block',
+          width: '100%',
+          minHeight: 44,
+          textAlign: 'left',
+          padding: '12px',
+          background: 'transparent',
+          border: 'none',
+          cursor: 'pointer',
+          color: 'var(--ck-text-2)',
+        }}
+      >
+        {offen ? '▾' : '▸'} Ruht · {threads.length}
+        <span style={{ color: 'var(--ck-text-3)' }}> · schlafen gelegt, kommen von allein zurück</span>
+      </button>
+      {offen
+        ? threads.map((t) => {
+            const bis = t.snoozed_until ? RUHT_DATUM_FMT.format(new Date(t.snoozed_until)) : null
+            return (
+              <div
+                key={t.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  minHeight: 44,
+                  padding: '8px 12px',
+                  borderTop: '1px solid var(--ck-border)',
+                }}
+              >
+                <span
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    fontSize: 13,
+                    color: 'var(--ck-text-1)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {t.name || 'Unbekannt'}
+                </span>
+                <span className="ck-label" style={{ flexShrink: 0, fontSize: 10 }}>
+                  {bis ? `bis ${bis}.` : agoLabel(t.last_message_at, now)}
+                </span>
+                <button
+                  type="button"
+                  className="ck-btn"
+                  style={{ flexShrink: 0, fontSize: 10, minHeight: 36 }}
+                  onClick={() => onWake(t)}
+                >
+                  Aufwecken
+                </button>
+              </div>
+            )
+          })
+        : null}
+    </section>
   )
 }
 
@@ -258,7 +350,11 @@ export function LinkedinArea({ eingebettet = false }: { eingebettet?: boolean } 
     const abschluss: LinkedinThread[] = []
     const verwaist: LinkedinThread[] = []
     const pruefen: LinkedinThread[] = []
+    const ruht: LinkedinThread[] = []
     for (const t of threadsQuery.items) {
+      // Weckbar wird VOR dem Bucket geprüft: `bucketOf` wirft Gesnoozte und
+      // Terminale in denselben Topf „ruht", nur die ersten dürfen geweckt werden.
+      if (istWeckbar(t, nowDate)) ruht.push(t)
       const b = bucketOf(t, nowDate)
       if (b === 'faellig') faellig.push(t)
       else if (b === 'du_bist_dran') duBistDran.push(t)
@@ -278,6 +374,8 @@ export function LinkedinArea({ eingebettet = false }: { eingebettet?: boolean } 
       abschluss: abschluss.sort(byAge),
       verwaist: verwaist.sort(byAge),
       pruefen,
+      // Wer als Nächstes aufwacht, steht oben.
+      ruht: ruht.sort((a, b) => (a.snoozed_until ?? '').localeCompare(b.snoozed_until ?? '')),
     }
   }, [threadsQuery.items, nowDate])
 
@@ -496,6 +594,12 @@ export function LinkedinArea({ eingebettet = false }: { eingebettet?: boolean } 
             onSnoozeTomorrow={snoozeTomorrow}
             onMarkDone={(th) => void threadsQuery.markDone(th)}
             onGenerateDraft={(th) => void generateDraft(th)}
+          />
+
+          <RuhtSection
+            threads={buckets.ruht}
+            now={now}
+            onWake={(th) => void threadsQuery.wake(th.id)}
           />
 
           <section className="ck-panel" style={{ padding: 12 }}>

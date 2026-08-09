@@ -2,7 +2,13 @@
  * Verifikation für Wargame Zug 6 (docs/wargames/linkedin-followups.md).
  * Reine Funktionen, keine DB — Start: npx tsx scripts/verify-linkedin-followups.ts
  */
-import { bucketOf, coverage, isDue, markDonePatch } from '../app/src/cockpit/lib/linkedinFollowups'
+import {
+  bucketOf,
+  coverage,
+  isDue,
+  istWeckbar,
+  markDonePatch,
+} from '../app/src/cockpit/lib/linkedinFollowups'
 import type { Contact, LinkedinThread } from '../app/src/types/db'
 
 const NOW = new Date('2026-07-28T12:00:00Z')
@@ -314,6 +320,30 @@ check('11b knapp über Schwelle', isDue(makeThread({ followup_stage: 0, last_mes
     const danachVerwaist = { ...verwaist, ...markDonePatch(verwaist, NOW) }
     check('14h Altlast wartet danach', bucketOf(danachVerwaist, NOW), 'wartet')
   }
+}
+
+// 15. istWeckbar (D2): nur selbst schlafen Gelegtes, nie ein Endzustand.
+{
+  const morgen = new Date(NOW.getTime() + 24 * 60 * 60 * 1000).toISOString()
+  const gestern = new Date(NOW.getTime() - 24 * 60 * 60 * 1000).toISOString()
+
+  const gesnoozt = makeThread({ snoozed_until: morgen, status: 'active' })
+  check('15a gesnoozt ist weckbar', istWeckbar(gesnoozt, NOW), true)
+  check('15b gesnoozt liegt im bucket ruht', bucketOf(gesnoozt, NOW), 'ruht')
+
+  // Die Falle: bucketOf wirft beides in denselben Topf, istWeckbar nicht.
+  for (const status of ['archived', 'won', 'lost'] as const) {
+    const terminal = makeThread({ status, snoozed_until: morgen })
+    check(`15c ${status} liegt in ruht`, bucketOf(terminal, NOW), 'ruht')
+    check(`15d ${status} ist NICHT weckbar`, istWeckbar(terminal, NOW), false)
+  }
+
+  check('15e abgelaufener Snooze ist nicht weckbar', istWeckbar(makeThread({ snoozed_until: gestern }), NOW), false)
+  check('15f ohne Snooze nicht weckbar', istWeckbar(makeThread({ snoozed_until: null }), NOW), false)
+
+  // Aufwecken = snoozed_until null. Danach rechnet bucketOf den echten Bucket.
+  const geweckt = { ...gesnoozt, snoozed_until: null }
+  check('15g nach dem Wecken kein ruht mehr', bucketOf(geweckt, NOW) !== 'ruht', true)
 }
 
 console.log(`${pass}/${pass + fail} Fälle korrekt`)

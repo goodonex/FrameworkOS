@@ -25,12 +25,12 @@ export type FollowupBucket =
 /** Ab hier ist ein nie nachgefasster Thread keine Tagesaufgabe mehr, sondern eine Altlast. */
 export const VERWAIST_AB_TAGEN = 30
 
-function isSnoozed(thread: LinkedinThread, now: number): boolean {
+export function isSnoozed(thread: LinkedinThread, now: number): boolean {
   return thread.snoozed_until != null && new Date(thread.snoozed_until).getTime() > now
 }
 
 /** Endzustände: hier ist nichts mehr zu tun. `waiting_reply` gehört bewusst NICHT dazu. */
-function isTerminal(status: LinkedinThread['status']): boolean {
+export function isTerminal(status: LinkedinThread['status']): boolean {
   return status === 'archived' || status === 'won' || status === 'lost'
 }
 
@@ -52,6 +52,17 @@ export function isDue(thread: LinkedinThread, now: Date): boolean {
   const thresholdDays = FOLLOWUP_THRESHOLDS_DAYS[thread.followup_stage]
   const elapsedMs = now.getTime() - new Date(thread.last_message_at).getTime()
   return elapsedMs >= thresholdDays * DAY_MS
+}
+
+/**
+ * Der Weg zurück aus dem Schlaf (D2, docs/wargames/technik-fundament.md).
+ *
+ * `bucketOf === 'ruht'` reicht als Filter NICHT: dort landen auch archivierte,
+ * gewonnene und verlorene Threads, und die gehören in keine Weck-Liste. Geweckt
+ * wird nur, was Kevin selbst schlafen gelegt hat.
+ */
+export function istWeckbar(thread: LinkedinThread, now: Date): boolean {
+  return isSnoozed(thread, now.getTime()) && !isTerminal(thread.status)
 }
 
 export function bucketOf(thread: LinkedinThread, now: Date): FollowupBucket {

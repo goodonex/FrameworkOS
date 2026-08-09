@@ -13,6 +13,8 @@ interface UseLinkedinThreadsResult {
   error: string | null
   reload: () => Promise<void>
   snooze: (id: string, untilIso: string) => Promise<void>
+  /** Weg zurück aus dem Schlaf (D2): Snooze löschen, der Bucket rechnet sich neu. */
+  wake: (id: string) => Promise<void>
   /**
    * „Erledigt" je nach Bucket: Antwort des Leads → Leiter zurück auf 0,
    * Break-up fällig → archiviert, sonst eine Stufe weiter (markDonePatch).
@@ -91,6 +93,8 @@ export function useLinkedinThreads(brandSlug: string | undefined): UseLinkedinTh
     [applyPatch],
   )
 
+  const wake = useCallback((id: string) => applyPatch(id, { snoozed_until: null }), [applyPatch])
+
   const markDone = useCallback(
     async (thread: LinkedinThread) => {
       // Regel liegt in linkedinFollowups.markDonePatch (bucket-bewusst, per
@@ -107,5 +111,5 @@ export function useLinkedinThreads(brandSlug: string | undefined): UseLinkedinTh
     [applyPatch],
   )
 
-  return { items, loading, tableMissing, error, reload, snooze, markDone, markLoomVerschickt }
+  return { items, loading, tableMissing, error, reload, snooze, wake, markDone, markLoomVerschickt }
 }
