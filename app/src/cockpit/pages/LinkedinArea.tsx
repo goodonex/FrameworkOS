@@ -44,6 +44,7 @@ function ThreadCard({
   onSnoozeTomorrow,
   onMarkDone,
   onGenerateDraft,
+  onLoomVerschickt,
 }: {
   thread: LinkedinThread
   now: number
@@ -51,8 +52,13 @@ function ThreadCard({
   onSnoozeTomorrow: (t: LinkedinThread) => void
   onMarkDone: (t: LinkedinThread) => void
   onGenerateDraft: (t: LinkedinThread) => void
+  onLoomVerschickt: (t: LinkedinThread) => void
 }) {
   const days = daysSince(thread.last_message_at, now)
+  // Der Stern ist die Zusage zur Loom-Analyse; erledigt ist sie erst, wenn das
+  // Video raus ist. 'entfaellt' zaehlt als abgeschlossen — nichts mehr zu tun.
+  const loomOffen =
+    thread.starred && thread.loom_status !== 'verschickt' && thread.loom_status !== 'entfaellt'
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '10px 12px', borderBottom: '1px solid var(--ck-border)' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
@@ -125,6 +131,17 @@ function ThreadCard({
         >
           Entwurf erzeugen
         </button>
+        {loomOffen ? (
+          <button
+            type="button"
+            className="ck-btn"
+            style={{ fontSize: 10, color: 'var(--ck-accent)', borderColor: 'var(--ck-accent)' }}
+            title="Loom ist aufgenommen und verschickt — nimmt den Posten aus der Loom-Spur"
+            onClick={() => onLoomVerschickt(thread)}
+          >
+            Loom verschickt ✓
+          </button>
+        ) : null}
         <button type="button" className="ck-btn" style={{ fontSize: 10 }} onClick={() => onSnoozeTomorrow(thread)}>
           → morgen
         </button>
@@ -256,6 +273,7 @@ function ThreadSection({
   onSnoozeTomorrow,
   onMarkDone,
   onGenerateDraft,
+  onLoomVerschickt,
 }: {
   titel: string
   hinweis?: string
@@ -266,6 +284,7 @@ function ThreadSection({
   onSnoozeTomorrow: (t: LinkedinThread) => void
   onMarkDone: (t: LinkedinThread) => void
   onGenerateDraft: (t: LinkedinThread) => void
+  onLoomVerschickt: (t: LinkedinThread) => void
 }) {
   const [alleZeigen, setAlleZeigen] = useState(false)
   if (threads.length === 0 && !leerText) return null
@@ -291,6 +310,7 @@ function ThreadSection({
               onSnoozeTomorrow={onSnoozeTomorrow}
               onMarkDone={onMarkDone}
               onGenerateDraft={onGenerateDraft}
+              onLoomVerschickt={onLoomVerschickt}
             />
           ))}
           {rest > 0 ? (
@@ -577,6 +597,7 @@ export function LinkedinArea({ eingebettet = false }: { eingebettet?: boolean } 
             onSnoozeTomorrow={snoozeTomorrow}
             onMarkDone={(th) => void threadsQuery.markDone(th)}
             onGenerateDraft={(th) => void generateDraft(th)}
+            onLoomVerschickt={(th) => void threadsQuery.markLoomVerschickt(th.id)}
           />
 
           <ThreadSection
@@ -589,6 +610,7 @@ export function LinkedinArea({ eingebettet = false }: { eingebettet?: boolean } 
             onSnoozeTomorrow={snoozeTomorrow}
             onMarkDone={(th) => void threadsQuery.markDone(th)}
             onGenerateDraft={(th) => void generateDraft(th)}
+            onLoomVerschickt={(th) => void threadsQuery.markLoomVerschickt(th.id)}
           />
 
           <ThreadSection
@@ -600,6 +622,7 @@ export function LinkedinArea({ eingebettet = false }: { eingebettet?: boolean } 
             onSnoozeTomorrow={snoozeTomorrow}
             onMarkDone={(th) => void threadsQuery.markDone(th)}
             onGenerateDraft={(th) => void generateDraft(th)}
+            onLoomVerschickt={(th) => void threadsQuery.markLoomVerschickt(th.id)}
           />
 
           <ThreadSection
@@ -611,6 +634,7 @@ export function LinkedinArea({ eingebettet = false }: { eingebettet?: boolean } 
             onSnoozeTomorrow={snoozeTomorrow}
             onMarkDone={(th) => void threadsQuery.markDone(th)}
             onGenerateDraft={(th) => void generateDraft(th)}
+            onLoomVerschickt={(th) => void threadsQuery.markLoomVerschickt(th.id)}
           />
 
           <RuhtSection
