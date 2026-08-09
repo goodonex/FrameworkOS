@@ -126,7 +126,11 @@ function ThreadCard({
           className="ck-btn ck-btn--primary"
           style={{ fontSize: 10, opacity: entwurfMoeglich ? 1 : 0.45 }}
           disabled={!entwurfMoeglich}
-          title={entwurfMoeglich ? undefined : 'Nur lokal möglich — braucht den Runner'}
+          title={
+            entwurfMoeglich
+              ? undefined
+              : 'Der Runner ist offline — Entwürfe kann gerade niemand erzeugen.'
+          }
           onClick={() => onGenerateDraft(thread)}
         >
           Entwurf erzeugen
@@ -344,8 +348,9 @@ export function LinkedinArea({ eingebettet = false }: { eingebettet?: boolean } 
   const threadsQuery = useLinkedinThreads(slug)
   const contacts = useContacts(slug)
   const { state: runnerState } = useRunnerStatus()
-  // Beide Wege sind bedienbar: lokal direkt, sonst als Auftrag über Supabase
-  // (Migration 0059). Der Knopf muss also nicht mehr gesperrt werden.
+  // Beide Wege brauchen einen LEBENDEN Runner: lokal den direkten Aufruf, sonst
+  // den Auftrag über Supabase (0059), den der Runner abholen muss. `direkt`
+  // entscheidet nur, WELCHER Weg — ob überhaupt einer trägt, sagt `runnerState`.
   const direkt = runnerDirekt()
   const [ansicht, setAnsicht] = useState<'erst' | 'followup'>('erst')
   const [syncing, setSyncing] = useState(false)
@@ -591,7 +596,7 @@ export function LinkedinArea({ eingebettet = false }: { eingebettet?: boolean } 
           <ThreadSection
             titel="Du bist dran"
             hinweis="Lead hat geantwortet · Sterne zuerst"
-            entwurfMoeglich={true}
+            entwurfMoeglich={!isOffline}
             threads={buckets.duBistDran}
             now={now}
             onSnoozeTomorrow={snoozeTomorrow}
@@ -603,7 +608,7 @@ export function LinkedinArea({ eingebettet = false }: { eingebettet?: boolean } 
           <ThreadSection
             titel="Fällig heute"
             hinweis="älteste zuerst"
-            entwurfMoeglich={true}
+            entwurfMoeglich={!isOffline}
             threads={buckets.faellig}
             leerText="Keine fälligen Follow-ups."
             now={now}
@@ -616,7 +621,7 @@ export function LinkedinArea({ eingebettet = false }: { eingebettet?: boolean } 
           <ThreadSection
             titel="Abschluss fällig"
             hinweis="letzte Nachricht, danach wird archiviert"
-            entwurfMoeglich={true}
+            entwurfMoeglich={!isOffline}
             threads={buckets.abschluss}
             now={now}
             onSnoozeTomorrow={snoozeTomorrow}
@@ -628,7 +633,7 @@ export function LinkedinArea({ eingebettet = false }: { eingebettet?: boolean } 
           <ThreadSection
             titel="Altlasten"
             hinweis="über 30 Tage liegen geblieben, nie nachgefasst — wiederbeleben oder schließen"
-            entwurfMoeglich={true}
+            entwurfMoeglich={!isOffline}
             threads={buckets.verwaist}
             now={now}
             onSnoozeTomorrow={snoozeTomorrow}
