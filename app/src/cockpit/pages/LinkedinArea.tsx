@@ -242,7 +242,9 @@ function RuhtSection({
                   {t.name || 'Unbekannt'}
                 </span>
                 <span className="ck-label" style={{ flexShrink: 0, fontSize: 10 }}>
-                  {bis ? `bis ${bis}.` : agoLabel(t.last_message_at, now)}
+                  {/* `RUHT_DATUM_FMT` liefert „10.08." schon MIT Schlusspunkt —
+                      ein eigener machte daraus „bis 10.08..". */}
+                  {bis ? `bis ${bis}` : agoLabel(t.last_message_at, now)}
                 </span>
                 <button
                   type="button"

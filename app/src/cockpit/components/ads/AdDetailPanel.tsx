@@ -101,8 +101,20 @@ export function AdDetailPanel({
           gap: 16,
         }}
       >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
-          <div style={{ minWidth: 0 }}>
+        {/* Am Handy ist das Panel nur ~374 px breit. Ohne Umbruch quetschen
+            Zähler, ‹ › und „Schließen" den Titel auf ein Wort pro Zeile und
+            laufen rechts aus dem Panel — deshalb wrapt die Kopfzeile, und der
+            Titel behält eine Mindestbreite. */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: 10,
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ minWidth: 0, flex: '1 1 180px' }}>
             <div style={{ fontSize: 16, fontWeight: 600 }}>{ad.title}</div>
             {ad.angle ? (
               <div className="ck-label" style={{ marginTop: 2 }}>
@@ -110,7 +122,15 @@ export function AdDetailPanel({
               </div>
             ) : null}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              flexWrap: 'wrap',
+              marginLeft: 'auto',
+            }}
+          >
             {position ? (
               <span className="ck-label" style={{ whiteSpace: 'nowrap' }}>
                 Ad {position.index + 1}/{position.gesamt} · {position.freigegeben} freigegeben
