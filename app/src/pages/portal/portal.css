@@ -1,55 +1,87 @@
-.portal-root {
-  --portal-bg: #f5f5f7;
-  --portal-surface: #ffffff;
-  --portal-border: #e8e8ed;
-  --portal-text: #1d1d1f;
-  --portal-text-secondary: #6e6e73;
-  --portal-text-tertiary: #aeaeb2;
+/* ============================================================
+   KUNDENPORTAL — Welt 2 „Navy × Gold"
+   (Phase 2, Zug C3 · D11 — docs/phase2/DESIGN-TOKENS.md)
 
-  /* Portal ist immer hell — theme-abhängige App-Tokens hier fest auf die
-     Light-Werte gepinnt, damit das Kundenportal unabhängig vom globalen
-     data-ui-theme konsistent und lesbar bleibt. */
-  color-scheme: light;
-  --accent-blue: #2f5fd4;
-  --accent-purple: #6d28d9;
-  --accent-teal: #0f766e;
-  --accent-amber: #b45309;
-  --accent-coral: #c2410c;
-  --accent-ember: #b23c22;
-  --accent-success: #16a34a;
-  --text-accent: #2f5fd4;
-  --text-primary: #12121a;
-  --text-secondary: #45455a;
-  --text-tertiary: #6b6b7f;
-  --bg-void: #ececf0;
-  --bg-base: #f7f7f9;
-  --bg-surface: #ffffff;
-  --glass-1: rgba(0, 0, 0, 0.03);
-  --glass-2: #ffffff;
-  --glass-3: #ffffff;
-  --glass-4: #f0f0f4;
-  --glass-border-1: rgba(0, 0, 0, 0.08);
-  --glass-border-2: rgba(0, 0, 0, 0.12);
-  --glass-border-3: rgba(0, 0, 0, 0.18);
-  --overlay-backdrop: rgba(15, 23, 42, 0.3);
-  --overlay-scrim-strong: rgba(15, 23, 42, 0.42);
-  --surface-drawer: #ffffff;
-  --surface-popover: #ffffff;
-  --surface-card-strong: #ffffff;
-  --input-bg: #ffffff;
-  --chip-text-on-accent: #ffffff;
-  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.1);
-  --shadow-md: 0 4px 14px rgba(15, 23, 42, 0.12);
-  --shadow-lg: 0 14px 34px rgba(15, 23, 42, 0.18);
-  --status-danger: #b91c1c;
-  --status-danger-bg: #fee2e2;
-  --status-warn-bg: #fef3c7;
-  --status-success-bg: #dcfce7;
-  --trend-up: #15803d;
-  --trend-down: #b91c1c;
+   Gleiche Geometrie wie das Cockpit, nur die Palette klappt um: die
+   HERRMANN-Markenfarben tragen die Hülle, in der der Kunde sitzt.
+
+   NAMENS-STOLPERSTELLE: Das Tokens-Doc nennt das Gold `--portal-accent`.
+   Im Code heisst so seit jeher die PROJEKT-Farbe, die `ClientPortal.tsx`
+   je Kunde setzt. D11 will beide behalten — deshalb ist das Gold hier
+   `--portal-gold` (Rahmen-Akzent der HERRMANN-Hülle) und `--portal-accent`
+   bleibt, was es war (Detail-Akzent des jeweiligen Projekts).
+   ============================================================ */
+.portal-root {
+  --portal-bg: #0A1128;
+  --portal-bg-verlauf: linear-gradient(180deg, #101a33 0%, #0A1128 55%, #060b1c 100%);
+  --portal-surface: rgba(28, 38, 64, 0.5);
+  --portal-surface-deckend: #161f36;
+  --portal-border: rgba(197, 160, 89, 0.13);
+  --portal-text: #eef1f8;
+  --portal-text-secondary: #a3adc4;
+  --portal-text-tertiary: #6b7590;
+
+  /* Gold: Rahmen-Akzent der Marke. */
+  --portal-gold: #C5A059;
+  --portal-gold-text: #dfc48e;
+  --portal-gold-warn: #d9b36a;
+  /* Text auf einer gefüllten Akzentfläche — auf Navy wie auf Gold dunkel. */
+  --portal-auf-akzent: #0A1128;
+
+  --portal-display: 'Archivo', var(--font-display);
+
+  /* Das Portal war bis Phase 2 hell und pinnte die App-Tokens auf ihre
+     Light-Werte. Es ist jetzt dunkel — die Pins ziehen mit, sonst stünden
+     weisse Flächen in einer Navy-Welt. Weiterhin unabhängig vom globalen
+     data-ui-theme. */
+  color-scheme: dark;
+  --accent-blue: #7fa0e8;
+  --accent-purple: #a78bfa;
+  --accent-teal: var(--portal-gold);
+  --accent-amber: var(--portal-gold-warn);
+  --accent-coral: var(--portal-gold-warn);
+  --accent-ember: #e5484d;
+  --accent-success: #9db892;
+  --text-accent: var(--portal-gold-text);
+  --text-primary: var(--portal-text);
+  --text-secondary: var(--portal-text-secondary);
+  --text-tertiary: var(--portal-text-tertiary);
+  --bg-void: #060b1c;
+  --bg-base: var(--portal-bg);
+  --bg-surface: var(--portal-surface-deckend);
+  --glass-1: rgba(255, 255, 255, 0.03);
+  --glass-2: var(--portal-surface);
+  --glass-3: var(--portal-surface);
+  --glass-4: rgba(28, 38, 64, 0.7);
+  --glass-border-1: var(--portal-border);
+  --glass-border-2: rgba(197, 160, 89, 0.22);
+  --glass-border-3: rgba(197, 160, 89, 0.32);
+  --overlay-backdrop: rgba(4, 8, 20, 0.55);
+  --overlay-scrim-strong: rgba(4, 8, 20, 0.7);
+  --surface-drawer: var(--portal-surface-deckend);
+  --surface-popover: var(--portal-surface-deckend);
+  --surface-card-strong: var(--portal-surface-deckend);
+  --input-bg: rgba(14, 21, 40, 0.72);
+  --chip-text-on-accent: var(--portal-auf-akzent);
+  --shadow-sm: 0 1px 3px rgba(4, 8, 20, 0.4);
+  --shadow-md: 0 4px 14px rgba(4, 8, 20, 0.45);
+  --shadow-lg: 0 14px 34px rgba(4, 8, 20, 0.55);
+  --status-danger: #e5484d;
+  --status-danger-bg: rgba(229, 72, 77, 0.16);
+  --status-warn-bg: rgba(217, 179, 106, 0.16);
+  --status-success-bg: rgba(157, 184, 146, 0.16);
+  --trend-up: #9db892;
+  --trend-down: #e5484d;
 
   min-height: 100vh;
-  background: var(--portal-bg);
+  /* Der Verlauf traegt den ganzen Bildschirm: die Portal-Spalte ist schmaler
+     als das Fenster, und daneben soll Navy stehen, nicht der Rest der App. */
+  background-color: var(--portal-bg);
+  background-image: var(--portal-bg-verlauf);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  box-shadow: 0 0 0 100vmax var(--portal-bg);
+  clip-path: inset(0 -100vmax);
   color: var(--portal-text);
   font-family: var(--font-body);
   overflow-x: hidden;
@@ -68,7 +100,7 @@
 }
 
 .portal-section-title {
-  font-family: var(--font-display);
+  font-family: var(--portal-display);
   font-size: 18px;
   font-weight: 600;
   margin: 0 0 4px;
@@ -103,7 +135,7 @@
 }
 
 .portal-btn-primary {
-  color: #fff;
+  color: var(--portal-auf-akzent);
 }
 
 .portal-btn-ghost {
@@ -169,7 +201,7 @@
 }
 
 .portal-stat-value {
-  font-family: var(--font-display);
+  font-family: var(--portal-display);
   font-size: 22px;
   font-weight: 700;
 }
@@ -220,7 +252,7 @@
 }
 
 .portal-area__title {
-  font-family: var(--font-display);
+  font-family: var(--portal-display);
   font-size: 22px;
   font-weight: 700;
   margin: 0 0 4px;
@@ -500,7 +532,7 @@
 }
 
 .portal-shell__project {
-  font-family: var(--font-display);
+  font-family: var(--portal-display);
   font-size: 22px;
   font-weight: 700;
   margin: 2px 0 4px;
@@ -554,7 +586,7 @@
 }
 
 .portal-area-view__title {
-  font-family: var(--font-display);
+  font-family: var(--portal-display);
   font-size: 24px;
   font-weight: 700;
   margin: 0 0 4px;
@@ -626,7 +658,7 @@
   display: block;
   text-align: center;
   padding: 12px;
-  color: #fff;
+  color: var(--portal-auf-akzent);
   font-weight: 600;
   font-size: 13px;
   text-decoration: none;
@@ -744,12 +776,12 @@
 }
 
 .portal-chat-bubble--unread {
-  border-color: var(--portal-accent, #111);
+  border-color: var(--portal-accent, var(--portal-gold));
 }
 
 .portal-chat-bubble-row--mine .portal-chat-bubble {
   border: none;
-  color: #fff;
+  color: var(--portal-auf-akzent);
   border-bottom-right-radius: 4px;
 }
 
@@ -808,7 +840,7 @@
   height: 44px;
   border-radius: 12px;
   border: none;
-  color: #fff;
+  color: var(--portal-auf-akzent);
   font-size: 18px;
   font-weight: 700;
   cursor: pointer;
@@ -841,7 +873,7 @@
   z-index: 1;
   width: min(480px, 100%);
   max-height: 85vh;
-  background: var(--portal-bg, #fff);
+  background: var(--portal-surface-deckend, #0A1128);
   border-radius: 20px 20px 0 0;
   display: flex;
   flex-direction: column;
@@ -884,10 +916,10 @@
 }
 
 .portal-lead-card {
-  border: 1px solid var(--portal-border, #e5e7eb);
+  border: 1px solid var(--portal-border);
   border-radius: 12px;
   padding: 14px;
-  background: #fff;
+  background: var(--portal-surface);
 }
 
 .portal-lead-card__name {
@@ -914,7 +946,7 @@
   position: relative;
   width: min(420px, 100%);
   height: 100%;
-  background: var(--portal-bg, #fff);
+  background: var(--portal-surface-deckend, #0A1128);
   padding: 20px;
   overflow-y: auto;
   box-shadow: -8px 0 32px rgba(0, 0, 0, 0.12);

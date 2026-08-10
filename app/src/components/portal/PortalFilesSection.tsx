@@ -89,7 +89,7 @@ export function PortalFilesSection({
         surface: 'var(--portal-surface)',
         text: 'var(--portal-text)',
         sub: 'var(--portal-text-secondary)',
-        accent: 'var(--portal-accent, #111827)',
+        accent: 'var(--portal-accent, #C5A059)',
         danger: 'var(--status-danger)',
       }
 

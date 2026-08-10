@@ -26,7 +26,14 @@ export function ClientPortal({
     userId: user?.id ?? null,
   })
 
-  const accent = brand?.color && brand.color.startsWith('#') ? brand.color : '#111827'
+  /**
+   * D11: Die Projekt-Akzentfarbe bleibt der Detail-Akzent. Ihr Ersatzwert war
+   * `#111827` — ein Fast-Schwarz, das auf der alten WEISSEN Portal-Flaeche
+   * funktionierte und auf Navy unsichtbar ist (1,05:1, in der
+   * Kontrast-Stichprobe zu Zug C3 gefunden). Ohne Projektfarbe traegt jetzt
+   * das Marken-Gold.
+   */
+  const accent = brand?.color && brand.color.startsWith('#') ? brand.color : '#C5A059'
 
   const displayName =
     (typeof user?.user_metadata?.full_name === 'string'
@@ -79,7 +86,7 @@ export function ClientPortal({
             justifyContent: 'space-between',
             gap: 12,
             padding: '8px 16px',
-            background: '#111827',
+            background: 'var(--portal-surface-deckend)',
             color: '#f9fafb',
             fontSize: 13,
           }}

@@ -163,11 +163,17 @@ function App() {
   const isCockpit = COCKPIT_PREFIXES.some(
     (p) => location.pathname === p || location.pathname.startsWith(`${p}/`),
   )
+  /**
+   * Zug C3: Dasselbe gilt fuers Kundenportal. Es bringt seit Welt 2 seinen
+   * eigenen Navy-Verlauf mit — die bunten Blobs des alten Hintergrunds lagen
+   * darunter und schauten links und rechts neben der Portal-Spalte heraus.
+   */
+  const isPortal = location.pathname.startsWith('/portal')
 
   return (
     <ToastProvider>
       <SaveStatusProvider>
-      {isCockpit ? null : <Background />}
+      {isCockpit || isPortal ? null : <Background />}
       {/* Phase 6: Three.js-Welt abgerissen — reines DOM-Layout. */}
       <div
         id="app-ui-overlay"
