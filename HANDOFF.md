@@ -49,11 +49,13 @@ nie im SQL-Editor — genau das hatte die Historie zerlegt.
 | `/aufgaben` `/termine` `/freigaben` | „Heute" (Sub-Tabs `HeuteTabs`) | `AufgabenArea` · `TermineArea` · `FreigabenArea` |
 | `/linkedin` | LinkedIn-Postfach: Buckets, Sterne, Entwürfe | `LinkedinArea.tsx` |
 | `/sales` | Kachel-Dashboard „Jetzt dran" + Arbeitsmodus | `SalesDashboard.tsx` |
-| `/sales/pipeline` `lists` `call-mode` `new` `:contactId` | Altes CRM, in der Shell | `pages/sales/*` (Glass-Ära) |
-| `/sales/bibliothek` | Skripte, Vorlagen, PDFs | `SalesBibliothek.tsx` |
+| `/sales/leads` `:contactId` | **Neubau nach Close** (Phase 2): Liste mit Smart Views, Lead-Detail mit Timeline mittig | `cockpit/pages/sales/LeadListe.tsx`, `LeadDetail.tsx` |
+| `/sales/pipeline` | Glass-Pipeline, **bleibt bis zum Paritäts-Entscheid** (`docs/phase2/sales-paritaet.md`) — kann neun Dinge, die der Neubau nicht kann | `pages/sales/SalesMode.tsx` |
+| `/sales/lists` `call-mode` `new` | Altes CRM, in der Shell | `pages/sales/*` (Glass-Ära) |
+| `/sales/bibliothek` | **Ressourcen** — Skripte, Vorlagen, PDFs | `SalesBibliothek.tsx` |
 | `/projekte` | Deliver / Kundenprojekte + Posteingang | `ProjekteArea.tsx`, `ProjectPage.tsx` |
 | `/ads` | Ads-Review über alle Kunden | `AdsArea.tsx` |
-| `/content` | Wochen-Batches + Post-Ebene | `SocialArea.tsx` |
+| `/content` | Kanal-Tabs **LinkedIn** (text-first) und **Instagram** (slide-first, Wochen + Posts) | `SocialArea.tsx`, `components/content/LinkedinPosts.tsx` |
 | `/agenten` | Agenten-Hub, Run-Drawer | `AgentsArea.tsx` |
 | `/tracking` | Tages-KPIs, Wochen-/Monatskurve, Kanal-Raten | `TrackingArea.tsx` |
 
@@ -83,8 +85,9 @@ nicht in Safari/iOS (Backlog O12).
 
 ### Legacy, noch gemountet
 
-Kundenportal (`/portal/...`), Booking (`/book/...`), Lead-Intake (`/leads/...`),
-Login/Reset/Onboarding. Die Sales-Altwelt lebt als Sub-Tabs unter `/sales`
+Kundenportal (`/portal/...`) — seit Phase 2 in Welt 2 „Navy × Gold"
+(`pages/portal/portal.css`, eigener Breakpoint 768). Booking (`/book/...`),
+Lead-Intake (`/leads/...`), Login/Reset/Onboarding. Die Sales-Altwelt lebt als Sub-Tabs unter `/sales`
 (`SalesMode.tsx`, 2.504 Zeilen, noch Glass — Backlog O14). Die Brand-Welt und
 Deliver-Altwelt sind in Etappe 4 abgerissen.
 

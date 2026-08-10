@@ -508,14 +508,10 @@ export function LinkedinArea({ eingebettet = false }: { eingebettet?: boolean } 
             key={wert}
             type="button"
             onClick={() => setAnsicht(wert)}
-            className="ck-btn"
-            style={{
-              fontSize: 11,
-              minHeight: 36,
-              paddingInline: 14,
-              borderColor: ansicht === wert ? 'var(--ck-accent)' : undefined,
-              color: ansicht === wert ? 'var(--ck-accent)' : undefined,
-            }}
+            // Das inline gesetzte minHeight 36 stach die Daumen-Grenze aus
+            // (Zug C5, Pruefung Punkt 3) — der Knopf nimmt sie jetzt aus .ck-btn.
+            className={`ck-btn${ansicht === wert ? ' ck-btn--primary' : ''}`}
+            style={{ paddingInline: 16 }}
           >
             {label}
           </button>

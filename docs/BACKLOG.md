@@ -2,6 +2,82 @@
 
 **Stand:** 2026-08-10 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
 
+## Runde vom 10.08., dritter Teil — Phase 2, **Etappen B und C gebaut** (nicht live)
+
+Damit ist die Blaupause `docs/wargames/phase2-haptik.md` **komplett gefahren**:
+Etappen A, B und C, zusammen **22 Commits** auf `cockpit-rebuild`, 83 Dateien.
+`npx tsc -b` + `npm run build` grün, **25 verify-Skripte grün** (24 vorher, neu
+`verify-linkedin-content`). **Der Fast-Forward auf `main` bleibt Kevins Wort.**
+
+### Etappe B — Sales nach Close-Vorbild (O14)
+
+| Zug | Ergebnis |
+|---|---|
+| **B0** | Paritäts-Karte der Altwelt: `docs/phase2/sales-paritaet.md`, 24 Funktionen kartiert |
+| **B1/B3** | Neue Lead-Liste `/sales/leads`: Smart Views (Heute fällig · Überfällig · Diese Woche · Ohne Follow-up · Im Deal), Inline-Filter, dichte Zeilen, „Nach Stufe" gruppiert (D7 — kein Kanban-Zwang) |
+| **B2** | Lead-Detail in Close-Anordnung: Timeline mittig, Stammdaten in der Seitenspalte rechts, Kopf in Cockpit-Grammatik |
+| **B4** | „Bibliothek" heisst „Ressourcen" und liegt zweifach: als Bereich und als Panel am Lead (D8) |
+| **B5** | Call-Mode trägt das Insel-Banner (D6), sonst unangetastet |
+| **B6** | Listen-Import hängt auch an der neuen Liste — derselbe Drawer (D9) |
+| **B7** | **Abbruch statt Abriss** — siehe unten |
+
+**B7 ist bewusst nicht ausgeführt worden.** Neun Funktionen der Altwelt haben
+im Neubau keinen Ersatz: Kanban zum Ziehen, die fünf Ansichts-Modi,
+Mehrfachauswahl mit Bulk-Aktionen, Schnell-Erfassung, E-Mail-Vorlagen,
+Meeting-Links, der Pipeline-Umschalter, das Kontextmenü und die Kontaktlisten.
+Die Paritäts-Bedingung aus der Blaupause ist damit nicht erfüllt, also fliegt
+nichts. „Pipeline (klassisch)" bleibt erreichbar und trägt ein Schild, das
+sagt, was nur dort liegt.
+
+**Ehrlich zur Bauart von B2:** der Rahmen ist neu (Kopf, Anordnung,
+Ressourcen-Panel, Cockpit-Optik über `.ck-lead`) — die Maschine darunter ist es
+nicht. Feld-Speicherung mit Entprellung, Aktivitäts-Modale, Anruf-Protokoll,
+Opportunities und Feld-Konfiguration hängen in `ContactPage` zusammen; sie
+nachzubauen hiesse Kernlogik zu duplizieren (Gesetz 4) und die Parität aufs
+Spiel zu setzen. `ContactPage` bekam genau zwei rein darstellende Schalter
+(`ohneKopf`, `seitenspalte`). Wer „neu gebaut" im Wortsinn will, ist das eine
+eigene Runde — mit dem Risiko, das B7 gerade vermieden hat.
+
+### Etappe C — LinkedIn-Kanal, Portal, Desktop
+
+| Zug | Ergebnis |
+|---|---|
+| **C1** | `/content` hat Kanal-Tabs (D10). LinkedIn ist text-first: Textvorschau statt Slide-Vignette, Editor mit Zeichenzähler (1.300 sichtbar / 3.000 hart), Kopier-Griff, „Als gepostet markieren" über den bestehenden Endpunkt, Ordner-Hinweis bei Bild-Beiträgen. Instagram unverändert daneben. Kein neuer Agent |
+| **C2** | `scripts/verify-linkedin-content.ts`, 28 Fälle — hat sofort einen echten Fehler gefunden (`slidesOrdner(['1.png'])` lief in `lastIndexOf === -1` und lieferte „1.pn") |
+| **C3** | Kundenportal auf **Navy × Gold** (D11): war hell, ist jetzt Welt 2, Archivo als Markenschrift |
+| **C4** | Desktop: Karten-Titel in Satzschreibung statt umbrechender Versalien, Monatsziel in Instrument Serif |
+
+**Zwei echte Fehler in C3**, beide über die Kontrast-Stichprobe gefunden: die
+Ersatzfarbe der Projekt-Akzentfarbe war `#111827` — ein Fast-Schwarz, das auf
+der alten WEISSEN Portal-Fläche funktionierte und auf Navy bei **1,05:1**
+landete; „Nachricht schreiben" und die Hinweiszeilen unter den Kennzahlen
+waren praktisch unsichtbar. Dazu: das Tokens-Doc nennt das Gold
+`--portal-accent`, im Code heisst so die Projekt-Farbe — aufgelöst als
+`--portal-gold` (Rahmen) neben `--portal-accent` (Detail), dokumentiert über
+dem Token-Block.
+
+### Verifikation (Stand nach C5)
+
+`tsc -b` + `build` grün · **25/25 verify** · elf Bereiche bei 390×664 geprüft:
+kein Querscrollen, Inhalt bleibt nach vollem Scrollen über der Dock-Kante,
+**alle Touch-Ziele ≥ 44px**, Konsole beim Laden sauber · Desktop 1280 ohne
+Umbrüche · Portal in der Kunden-Ansicht bei 1280 und 390 geprüft.
+
+Was in der Kontrast-Stichprobe übrig bleibt, sind Mikro-Labels bei 3,95–4,39:1
+(eingefrorener Token, Punkt 1 im Entscheidungsblock) und im Portal dieselbe
+Lage bei `--portal-text-tertiary` (#6b7590, 3,55–3,82:1).
+
+### Neue Entscheidungspunkte aus B und C
+
+7. **Sales-Abriss.** Welche der neun Alt-Funktionen kommen mit? Ohne diese
+   Antwort bleibt die Glass-Pipeline stehen. **Vorschlag:** Bulk-Aktionen und
+   Schnell-Erfassung in den Neubau, den Rest streichen — dann ist der Abriss
+   eine kurze Runde.
+8. **Portal-Cover.** Das Alpenglühen-Foto aus dem V6-Mock ist im Tokens-Doc
+   „optional" und **nicht** gebaut. Sag Bescheid, wenn es rein soll.
+9. **Onboarding-Karte** sagt weiter „Brand OS" (`OnboardingPublicPage`) und ist
+   innen Glas-Ära. Kundenseitig, aber ausserhalb von D11/D12 — eigene Runde.
+
 ## Runde vom 10.08., zweiter Teil — Phase 2, **Etappe A gebaut** (nicht live)
 
 Die neue Optik steht: acht Commits auf `cockpit-rebuild`, Züge **A1–A7** der
