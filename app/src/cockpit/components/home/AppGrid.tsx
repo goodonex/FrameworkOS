@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import type { BereichMitIcon } from '../../lib/bereiche'
 import { Badge, BadgeText } from '../Badge'
+import { BereichIcon } from '../BereichIcon'
 
 /**
  * Die App-Kacheln (O18, Zug 4) — auf dem Homescreen unter den Widgets, in der
@@ -176,12 +177,8 @@ export function AppGrid({
               touchAction: 'manipulation',
             }}
           >
-            <span
-              aria-hidden
-              className="ck-nav-icon"
-              style={{ position: 'relative', fontSize: 20, width: 'auto', lineHeight: 1 }}
-            >
-              {b.icon}
+            <span aria-hidden className="ck-nav-icon" style={{ position: 'relative' }}>
+              <BereichIcon name={b.icon} size={22} />
               <Badge anzahl={badge} />
             </span>
             <span
@@ -234,8 +231,8 @@ function SchnellBlatt({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="ck-label" style={{ padding: '2px 4px 8px', display: 'flex', gap: 10 }}>
-          <span aria-hidden className="ck-nav-icon" style={{ width: 'auto' }}>
-            {bereich.icon}
+          <span aria-hidden className="ck-nav-icon">
+            <BereichIcon name={bereich.icon} size={18} />
           </span>
           {bereich.label}
         </div>

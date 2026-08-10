@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { Badge, BadgeText } from './Badge'
+import { BereichIcon, type BereichIconName } from './BereichIcon'
 import { AppGrid } from './home/AppGrid'
 import { PALETTEN_BEREICHE, bereichIcon } from '../lib/bereiche'
 import { useSocialUnread } from '../lib/socialApi'
@@ -10,7 +11,7 @@ import { Benachrichtigungen } from './Benachrichtigungen'
 interface NavItem {
   to: string
   label: string
-  icon: string
+  icon: BereichIconName
   paths?: string[]
 }
 
@@ -30,9 +31,6 @@ const ARBEIT: NavItem[] = [
   { to: '/cockpit', label: 'Cockpit', icon: bereichIcon('/cockpit') },
   // „Heute" fasst die täglichen Operativ-Bereiche zusammen (Sub-Tabs: HeuteTabs) —
   // deshalb hier ein anderes Label als in der Registry, aber dasselbe Zeichen.
-  // O13: '\uFE0E' (Variation Selector-15) erzwingt die Text-Variante. Ohne ihn
-  // rendert iOS ☑ und ⚙ als buntes Emoji — die einzigen zwei Zeichen der Leiste
-  // mit Emoji-Default; alle anderen sind Geometric Shapes ohne Emoji-Form.
   { to: '/aufgaben', label: 'Heute', icon: bereichIcon('/aufgaben'), paths: ['/aufgaben', '/termine', '/freigaben'] },
   { to: '/sales', label: 'Sales', icon: bereichIcon('/sales') },
   { to: '/projekte', label: 'Projekte', icon: bereichIcon('/projekte') },
@@ -78,7 +76,11 @@ function istAktiv(item: NavItem, pathname: string): boolean {
   return pfade.some((p) => pathname === p || pathname.startsWith(`${p}/`))
 }
 
-function NavEintrag({ item, badge }: { item: NavItem; badge: number }) {
+/**
+ * Ein Nav-Ziel. Im Dock (mobil) trägt es nur sein Zeichen — der Bereichsname
+ * bleibt für Vorleseprogramme im Baum, statt ersatzlos zu verschwinden.
+ */
+function NavEintrag({ item, badge, nurZeichen }: { item: NavItem; badge: number; nurZeichen: boolean }) {
   const loc = useLocation()
   return (
     <NavLink
@@ -88,10 +90,10 @@ function NavEintrag({ item, badge }: { item: NavItem; badge: number }) {
       }
     >
       <span aria-hidden className="ck-nav-icon" style={{ position: 'relative' }}>
-        {item.icon}
+        <BereichIcon name={item.icon} />
         <Badge anzahl={badge} />
       </span>
-      <span className="ck-nav-label">
+      <span className={`ck-nav-label${nurZeichen ? ' ck-nur-vorlesen' : ''}`}>
         {item.label}
         <BadgeText anzahl={badge} />
       </span>
@@ -141,7 +143,7 @@ function MehrSheet({ onClose, badgeFuer }: { onClose: () => void; badgeFuer: (to
           <AppGrid
             bereiche={PALETTEN_BEREICHE}
             badgeFuer={badgeFuer}
-            istAktiv={(path) => istAktiv({ to: path, label: '', icon: '' }, loc.pathname)}
+            istAktiv={(path) => istAktiv({ to: path, label: '', icon: 'raute' }, loc.pathname)}
             onWaehle={(path) => {
               navigate(path)
               onClose()
@@ -182,7 +184,7 @@ export function NavRail() {
     <>
       <nav aria-label="Cockpit-Bereiche" className="ck-nav-rail">
         {sichtbar.map((item) => (
-          <NavEintrag key={item.to} item={item} badge={badgeFuer(item.to)} />
+          <NavEintrag key={item.to} item={item} badge={badgeFuer(item.to)} nurZeichen={bottomBar} />
         ))}
         {bottomBar ? (
           <button
@@ -194,10 +196,10 @@ export function NavRail() {
             onClick={() => setMehrOffenBei(mehrOffen ? null : loc.pathname)}
           >
             <span aria-hidden className="ck-nav-icon" style={{ position: 'relative' }}>
-              ⋯
+              <BereichIcon name="mehr" />
               <Badge anzahl={mehrBadge} />
             </span>
-            <span className="ck-nav-label">
+            <span className="ck-nav-label ck-nur-vorlesen">
               Mehr
               <BadgeText anzahl={mehrBadge} />
             </span>

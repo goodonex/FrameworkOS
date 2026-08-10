@@ -48,6 +48,11 @@
   --ck-idle: #78857f;         /* neutral: ruhend/aus — kein Signal */
   /* Gold trägt AUSSCHLIESSLICH den Uriel-Funken ✦ (Klammer zur Marke). */
   --ck-gold: #d9bd7d;
+
+  /* Dock (mobil): schwebende Pille, Werte aus dem V5-Mock. */
+  --ck-dock-bg: rgba(14, 20, 16, 0.78);
+  --ck-dock-border: rgba(255, 255, 255, 0.07);
+  --ck-dock-schatten: 0 10px 34px rgba(0, 0, 0, 0.4);
   /* Neutrale Papierfläche hinter Kunden-Kreativen (Ads/Content-Vorschauen).
      Kein Signal, sondern Passepartout — deshalb ein eigener Token statt
      eines Hexwerts in fünf Komponenten. */
@@ -234,14 +239,31 @@
   width: 148px;
   flex-shrink: 0;
 }
+/* Zeichen-Box: seit Zug A3 steckt hier ein Inline-SVG statt eines Unicode-
+   Zeichens (components/BereichIcon.tsx). Damit ist die alte O13-Emoji-Falle
+   erledigt — `font-variant-emoji` und der Variation Selector werden nicht mehr
+   gebraucht. Die Box zentriert nur noch und hält den Badge im Anker. */
 .ck-nav-icon {
-  font-size: 13px;
-  width: 16px;
-  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
-  /* O13: zweite Sicherung gegen bunte Emoji auf iOS. Die Zeichen tragen bereits
-     U+FE0E (NavRail.tsx); wo der Browser es kennt, entscheidet das hier zusätzlich. */
-  font-variant-emoji: text;
+  color: inherit;
+}
+
+/* Nur für Vorleseprogramme: sichtbar entfernt, im Baum vorhanden. Das mobile
+   Dock zeigt nach dem Mock nur Zeichen — der Bereichsname und die Badge-Zahl
+   dürfen deshalb nicht ersatzlos verschwinden. */
+.ck-nur-vorlesen {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 .ck-main { padding: 18px; }
@@ -659,35 +681,60 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
   .ck-clock-time { font-size: 15px; }
   .ck-clock-seconds { display: none; }
 
-  /* Nav-Rail wird zur Bottom-Tab-Bar (Daumen-erreichbar, Safe-Area für Home-Indicator). */
+  /* Zug A3: Die Nav-Rail wird mobil zum DOCK — eine schwebende Pille statt
+     einer durchgezogenen Leiste (DESIGN-TOKENS.md, „Dock (mobil)"). Sie liegt
+     frei über dem Inhalt, der Verlauf läuft darunter durch. Die Safe-Area
+     versorgt weiter den Home-Indicator, jetzt als Abstand statt als Polster. */
   .ck-nav-rail {
     position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    left: max(14px, env(safe-area-inset-left));
+    right: max(14px, env(safe-area-inset-right));
+    bottom: calc(10px + env(safe-area-inset-bottom));
     flex-direction: row;
+    justify-content: space-around;
     width: auto;
-    border-right: none;
-    border-top: 1px solid var(--ck-border);
-    background: var(--ck-bg);
-    padding: 4px max(4px, env(safe-area-inset-left)) calc(4px + env(safe-area-inset-bottom))
-      max(4px, env(safe-area-inset-right));
+    border: 1px solid var(--ck-dock-border);
+    border-radius: var(--ck-radius-pille);
+    background: var(--ck-dock-bg);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: var(--ck-dock-schatten);
+    padding: 5px 6px;
     gap: 2px;
     z-index: 50;
   }
+  /* Im Dock trägt jeder Tab nur sein Zeichen (Mock). Der Name bleibt für
+     Vorleseprogramme im Baum — siehe .ck-nur-vorlesen. Das Touch-Ziel bleibt
+     über 44px, obwohl die Pille selbst flacher ist als die alte Leiste. */
   .ck-nav-item {
+    position: relative;
     flex: 1;
     flex-direction: column;
     justify-content: center;
-    gap: 3px;
-    padding: 6px 2px;
-    font-size: 9px;
-    min-height: 48px;
+    gap: 0;
+    padding: 0;
+    min-height: 46px;
+    border-radius: var(--ck-radius-pille);
     text-align: center;
   }
-  .ck-nav-icon { font-size: 17px; width: auto; }
-  /* Nur 5 Ziele in der Bar: die Label bleiben lesbar statt auf 9px gequetscht. */
-  .ck-nav-item .ck-nav-label { font-size: 10px; letter-spacing: 0.04em; }
+  /* Aktiv = Zeichen im Akzent plus 4px-Punkt darunter. Kein gefüllter Chip:
+     die Pille soll ruhig bleiben, der Punkt macht die Ansage. */
+  .ck-nav-item.active {
+    background: none;
+    border-color: transparent;
+  }
+  .ck-nav-item.active .ck-nav-icon { color: var(--ck-accent); }
+  .ck-nav-item.active::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    bottom: 6px;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--ck-accent);
+  }
 
   /* „Mehr"-Sheet: sitzt ÜBER der Bar, nicht auf ihr — die Bar bleibt sichtbar
      und tippbar, ein zweiter Tipp auf „Mehr" schließt wieder. */
@@ -696,7 +743,9 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
     top: 0;
     left: 0;
     right: 0;
-    bottom: calc(58px + env(safe-area-inset-bottom));
+    /* Über der schwebenden Dock-Pille enden, nicht auf ihr (Zug A3):
+       10 Abstand + 46 Höhe + 2 Rand + 10 Innenabstand ≈ 68. */
+    bottom: calc(70px + env(safe-area-inset-bottom));
     /* O18, Zug 5: über die beiden FABs (60/61) und das Uriel-Panel (62), unter
        Toast (70) und Palette (80). Vorher lag das Sheet mit 60 unter ihnen —
        bei vier Zeilen fiel das nicht auf, seit die Bibliothek ein volles Grid
@@ -709,9 +758,9 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
   }
   .ck-mehr-sheet {
     width: 100%;
-    background: var(--ck-bg);
-    border-top: 1px solid var(--ck-border);
-    border-radius: 12px 12px 0 0;
+    background: var(--ck-panel);
+    border-top: 1px solid var(--ck-card-border);
+    border-radius: var(--ck-radius) var(--ck-radius) 0 0;
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -734,8 +783,8 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
   }
   .ck-mehr-sheet .ck-nav-item .ck-nav-label { font-size: 12px; letter-spacing: 0.08em; }
 
-  /* Content braucht Platz für die fixe Bottom-Bar + Safe-Area. */
-  .ck-main { padding: 12px 12px calc(78px + env(safe-area-inset-bottom)) 12px; }
+  /* Content braucht Platz für das schwebende Dock + Safe-Area. */
+  .ck-main { padding: 12px 12px calc(80px + env(safe-area-inset-bottom)) 12px; }
 
   /* Chat-FAB/-Panel über die Bottom-Bar heben statt sie zu verdecken. */
   .ck-chat-fab { bottom: calc(70px + env(safe-area-inset-bottom)); right: 14px; }
