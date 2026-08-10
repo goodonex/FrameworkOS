@@ -18,7 +18,7 @@ function SalesSubNav() {
     { to: '/sales/lists', label: 'Listen', end: false },
     { to: '/sales/call-mode', label: 'Call-Mode', end: false },
     { to: '/sales/new', label: 'Neuer Lead', end: false },
-    { to: '/sales/bibliothek', label: 'Bibliothek', end: false },
+    { to: '/sales/bibliothek', label: 'Ressourcen', end: false },
     // Die Glass-Pipeline bleibt erreichbar, bis die Paritaets-Karte
     // (docs/phase2/sales-paritaet.md) abgehakt ist — sie kann neun Dinge,
     // die der Neubau (noch) nicht kann.

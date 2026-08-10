@@ -204,7 +204,7 @@ export function SalesBibliothek() {
   if (runner.state !== 'online') {
     return (
       <section className="ck-panel" style={{ padding: '12px 14px' }}>
-        <p className="ck-label" style={{ margin: 0 }}>Runner offline · Bibliothek nicht erreichbar</p>
+        <p className="ck-label" style={{ margin: 0 }}>Runner offline · Ressourcen nicht erreichbar</p>
         <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--ck-text-3)' }}>
           starte `npm run cockpit` im Repo-Root
         </p>

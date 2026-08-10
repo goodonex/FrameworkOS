@@ -13,6 +13,7 @@ import {
   type StageFilter,
 } from '../../../lib/salesPipelineFilters'
 import { sortPipelineContacts } from '../../../lib/pipelineContactSort'
+import { SalesImportDrawer } from '../../../components/sales/SalesImportDrawer'
 import type { KanbanColumnSort } from '../../../lib/crmViewStorage'
 import type { Contact } from '../../../types/db'
 
@@ -94,6 +95,12 @@ export function LeadListe() {
   const [sortierung, setSortierung] = useState<KanbanColumnSort>('follow_up')
   /** Zug B3: nach Stufe gruppieren statt eine lange Liste. */
   const [gruppiert, setGruppiert] = useState(false)
+  /**
+   * D9: Der Listen-Import bleibt funktional erhalten und bekommt nur die neue
+   * Huelle. Es ist DERSELBE Drawer wie in der Altwelt — Kevin braucht ihn
+   * selten, aber wenn, dann braucht er ihn.
+   */
+  const [importOffen, setImportOffen] = useState(false)
 
   const view = SMART_VIEWS.find((v) => v.id === viewId) ?? SMART_VIEWS[0]
   const heute = ymdToday()
@@ -134,9 +141,14 @@ export function LeadListe() {
             {wert > 0 ? ` · ${formatEuroDe(wert)}` : ''}
           </span>
         </div>
-        <button type="button" className="ck-btn ck-btn--primary" onClick={() => navigate('/sales/new')}>
-          Neuer Lead
-        </button>
+        <span style={{ display: 'flex', gap: 6 }}>
+          <button type="button" className="ck-btn" onClick={() => setImportOffen(true)}>
+            Importieren
+          </button>
+          <button type="button" className="ck-btn ck-btn--primary" onClick={() => navigate('/sales/new')}>
+            Neuer Lead
+          </button>
+        </span>
       </div>
 
       {/* Smart Views — die Fragen des Morgens als Pillen. */}
@@ -226,6 +238,8 @@ export function LeadListe() {
           ))}
         </div>
       )}
+
+      <SalesImportDrawer open={importOffen} onClose={() => setImportOffen(false)} brandSlug={slug} />
     </div>
   )
 }

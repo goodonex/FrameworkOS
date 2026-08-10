@@ -152,6 +152,23 @@ export function CallModePage() {
         </button>
       </header>
 
+      {/* D6 (Phase 2): Der Call-Mode ist eine geparkte Insel — er wird
+          gebraucht, sobald Ads laufen, und dann sofort. Bis dahin wird er
+          weder neu gebaut noch umgefaerbt; das Banner sagt, woran man ist. */}
+      <div
+        style={{
+          margin: '0 14px 10px',
+          padding: '9px 13px',
+          borderRadius: 'var(--ck-radius-innen)',
+          border: '1px solid var(--ck-warn)',
+          color: 'var(--ck-warn)',
+          fontSize: 12,
+          lineHeight: 1.5,
+        }}
+      >
+        Geparkt: wird mit dem Ads-Start auf den echten Funnel gestellt.
+      </div>
+
       {!active ? (
         // Liste
         <div style={{ flex: 1, overflow: 'auto', padding: '12px 14px 80px' }}>
