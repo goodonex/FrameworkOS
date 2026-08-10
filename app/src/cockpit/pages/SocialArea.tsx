@@ -7,6 +7,7 @@ import { loadSocialBatchHtml, loadSocialBatchList, type SocialBatchMeta } from '
 import { postRun } from '../lib/runnerApi'
 import { runnerDirekt } from '../lib/runnerBridge'
 import { useContentManifest } from '../lib/useContentManifest'
+import { LinkedinPosts } from '../components/content/LinkedinPosts'
 import { ContentCard } from '../components/content/ContentCard'
 import { ContentDetailPanel } from '../components/content/ContentDetailPanel'
 
@@ -256,27 +257,89 @@ function WeeksView() {
  * (Datei-Manifest via Runner, lokal-first, nach /ads-Vorbild) und der bestehenden
  * Wochen-Batch-Ansicht (Supabase, live/mobil). Default = Posts.
  */
+/**
+ * Content mit Kanal-Tabs (Phase 2, Zug C1 · D10).
+ *
+ * LinkedIn ist text-first und bekommt eine eigene Ansicht; Instagram bleibt
+ * slide-first genau so, wie es war — inklusive seiner Posts/Wochen-Umschaltung.
+ * Die Kanaele stehen oben, weil die Frage „welcher Kanal" vor der Frage
+ * „welche Ebene" kommt.
+ */
 export function SocialArea() {
+  const [kanal, setKanal] = useState<'linkedin' | 'instagram'>('linkedin')
   const [view, setView] = useState<'posts' | 'weeks'>('posts')
   return (
     <div style={{ maxWidth: 1100 }}>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
         <button
-          className={`ck-btn${view === 'posts' ? ' ck-btn--primary' : ''}`}
-          style={{ fontSize: 12.5 }}
-          onClick={() => setView('posts')}
+          className={`ck-btn${kanal === 'linkedin' ? ' ck-btn--primary' : ''}`}
+          onClick={() => setKanal('linkedin')}
         >
-          Posts
+          LinkedIn
         </button>
         <button
-          className={`ck-btn${view === 'weeks' ? ' ck-btn--primary' : ''}`}
-          style={{ fontSize: 12.5 }}
-          onClick={() => setView('weeks')}
+          className={`ck-btn${kanal === 'instagram' ? ' ck-btn--primary' : ''}`}
+          onClick={() => setKanal('instagram')}
         >
-          Wochen
+          Instagram
         </button>
       </div>
-      {view === 'posts' ? <ContentPostsView /> : <WeeksView />}
+
+      {kanal === 'linkedin' ? (
+        <LinkedinKanal />
+      ) : (
+        <>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+            <button
+              className={`ck-btn${view === 'posts' ? ' ck-btn--primary' : ''}`}
+              onClick={() => setView('posts')}
+            >
+              Posts
+            </button>
+            <button
+              className={`ck-btn${view === 'weeks' ? ' ck-btn--primary' : ''}`}
+              onClick={() => setView('weeks')}
+            >
+              Wochen
+            </button>
+          </div>
+          {view === 'posts' ? <ContentPostsView /> : <WeeksView />}
+        </>
+      )}
+    </div>
+  )
+}
+
+/** Der LinkedIn-Kanal: dieselbe Manifest-Quelle, auf `channel` gefiltert. */
+function LinkedinKanal() {
+  const { activeSlug } = useActiveBrand()
+  const { manifest, loading, error, setCaption, markierePostGepostet } = useContentManifest(activeSlug)
+  const direkt = runnerDirekt()
+  const posts = (manifest?.posts ?? []).filter((p) => p.channel === 'linkedin')
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 600 }}>LinkedIn · Beiträge</div>
+          <div className="ck-label" style={{ marginTop: 2 }}>
+            {posts.length} Beitrag{posts.length === 1 ? '' : 'e'}
+          </div>
+        </div>
+      </div>
+
+      {error ? (
+        <RunnerHinweis error={error} was="Die LinkedIn-Beiträge" hinweis="Die Wochen-Ansicht bleibt überall verfügbar." />
+      ) : loading || !manifest ? (
+        <p className="ck-label">Lade…</p>
+      ) : (
+        <LinkedinPosts
+          posts={posts}
+          onSetCaption={setCaption}
+          onMarkiereGepostet={(postId) => void markierePostGepostet({ postId })}
+          runnerDirekt={direkt}
+        />
+      )}
     </div>
   )
 }

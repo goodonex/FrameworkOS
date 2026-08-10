@@ -154,6 +154,16 @@ export function useContentManifest(brand: string | undefined) {
     [updatePost],
   )
 
+  /**
+   * Der Beitragstext (Zug C1 · D10). Geht denselben Weg wie Status und Format:
+   * `updatePost` legt die Aenderung in den entprellten PUT des ganzen
+   * Manifests. Kein neuer Endpunkt, kein Runner-Umbau — Gesetz 3.
+   */
+  const setCaption = useCallback(
+    (postId: string, caption: string) => updatePost(postId, (p) => ({ ...p, caption })),
+    [updatePost],
+  )
+
   const addNote = useCallback(
     (postId: string, text: string) => {
       const trimmed = text.trim()
@@ -208,6 +218,7 @@ export function useContentManifest(brand: string | undefined) {
     setPlannedFor,
     setChannel,
     setFormat,
+    setCaption,
     addNote,
   }
 }
