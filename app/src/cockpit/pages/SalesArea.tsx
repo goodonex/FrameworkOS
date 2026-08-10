@@ -45,10 +45,37 @@ function SalesSubNav() {
 }
 
 /**
+ * Die Glass-Pipeline mit ihrem Schild (Phase 2, Zug B7).
+ *
+ * B7 sah den Abriss der Altwelt vor — die Paritäts-Karte
+ * (`docs/phase2/sales-paritaet.md`) sagt aber: neun Funktionen haben im Neubau
+ * keinen Ersatz. Damit greift die Regel „Abbruch statt Abriss": nichts wird
+ * gelöscht, und dieses Banner sagt dem, der hier landet, warum es die Seite
+ * noch gibt und was nur hier liegt.
+ */
+function KlassischePipeline() {
+  return (
+    <div>
+      <div
+        className="ck-panel"
+        style={{ padding: '11px 14px', marginBottom: 10, fontSize: 12.5, lineHeight: 1.55, color: 'var(--ck-text-2)' }}
+      >
+        <strong style={{ color: 'var(--ck-text-1)', fontWeight: 600 }}>Die alte Pipeline.</strong>{' '}
+        Der Neubau steht unter „Leads“. Hier liegt, was dort (noch) fehlt:
+        Kanban zum Ziehen, die fünf Ansichts-Modi, Mehrfachauswahl mit
+        Bulk-Aktionen, E-Mail-Vorlagen, Meeting-Links und der
+        Pipeline-Umschalter.
+      </div>
+      <SalesMode panel="full" scrollEmbed />
+    </div>
+  )
+}
+
+/**
  * Sales (ehem. CRM, Home-Refactor Juli 2026): Dashboard (Agenten + Funnel +
- * Bibliothek-Schnellzugriff) + die bestehenden Sales-Seiten in der Cockpit-Shell.
- * CRM-Logik unangetastet — Brand kommt über useCurrentBrandSlug aus dem
- * ActiveBrand-Context statt aus der URL.
+ * Ressourcen-Schnellzugriff) + die bestehenden Sales-Seiten in der
+ * Cockpit-Shell. CRM-Logik unangetastet — Brand kommt über
+ * useCurrentBrandSlug aus dem ActiveBrand-Context statt aus der URL.
  */
 export function SalesArea() {
   return (
@@ -58,7 +85,7 @@ export function SalesArea() {
         <Route index element={<SalesDashboard />} />
         <Route path="linkedin" element={<LinkedinArea eingebettet />} />
         <Route path="leads" element={<LeadListe />} />
-        <Route path="pipeline" element={<SalesMode panel="full" scrollEmbed />} />
+        <Route path="pipeline" element={<KlassischePipeline />} />
         <Route path="lists" element={<ContactListsPage />} />
         <Route path="lists/:listId" element={<ContactListsPage />} />
         <Route path="call-mode" element={<CallModePage />} />
