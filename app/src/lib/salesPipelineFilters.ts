@@ -1,6 +1,13 @@
 import type { Contact, PotenzialTyp, PipelineStage } from '../types/db'
 
-const PIPELINE_STAGES: PipelineStage[] = [
+/**
+ * Die Stufen der Pipeline in ihrer Reihenfolge — und ihre Beschriftung.
+ *
+ * Die Beschriftung stand bis Phase 2 zweimal als lokales `STAGE_LABEL` in
+ * Komponenten. Sie gehoert dorthin, wo auch die Reihenfolge steht, sonst
+ * benennt der Neubau die Stufen anders als die Altwelt daneben.
+ */
+export const PIPELINE_STAGES: PipelineStage[] = [
   'first_contact',
   'conversation',
   'follow_up',
@@ -8,6 +15,15 @@ const PIPELINE_STAGES: PipelineStage[] = [
   'deal',
   'paused',
 ]
+
+export const STAGE_LABEL: Record<PipelineStage, string> = {
+  first_contact: 'Erstkontakt',
+  conversation: 'Gespräch',
+  follow_up: 'Follow up',
+  proposal: 'Pitch',
+  deal: 'Deal',
+  paused: 'Pause',
+}
 
 export type StageFilter = 'all' | Contact['pipeline_stage']
 export type FollowFilter = 'all' | 'today' | 'week' | 'none'

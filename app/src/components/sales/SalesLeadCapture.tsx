@@ -11,15 +11,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useToast } from '../Toast'
 import { useContacts } from '../../hooks/useContacts'
 import type { Contact } from '../../types/db'
-
-const STAGE_LABEL: Record<Contact['pipeline_stage'], string> = {
-  first_contact: 'Erstkontakt',
-  conversation: 'Gespräch',
-  follow_up: 'Follow up',
-  proposal: 'Pitch',
-  deal: 'Deal',
-  paused: 'Pause',
-}
+import { STAGE_LABEL } from '../../lib/salesPipelineFilters'
 
 /** Gleiche Pill-Größe wie HorizontalScroller-Tabs / Filter-Pills. */
 const SALES_ACTION_BTN_BASE: CSSProperties = {

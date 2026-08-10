@@ -1,15 +1,7 @@
 import type { MouseEvent } from 'react'
 import type { Contact, PipelineStage } from '../../types/db'
 import { contactCardTitle } from '../../lib/pipelineContactSort'
-
-const STAGE_LABEL: Record<PipelineStage, string> = {
-  first_contact: 'Erstkontakt',
-  conversation: 'Gespräch',
-  follow_up: 'Follow up',
-  proposal: 'Pitch',
-  deal: 'Deal',
-  paused: 'Pause',
-}
+import { STAGE_LABEL } from '../../lib/salesPipelineFilters'
 
 const STAGE_ACCENT: Record<PipelineStage, string> = {
   first_contact: 'var(--mode-sales)',

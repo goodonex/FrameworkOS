@@ -6,6 +6,7 @@ import { SalesMode } from '../../pages/sales/SalesMode'
 import { SalesNewLeadPage } from '../../pages/sales/SalesNewLeadPage'
 import { SalesBibliothek } from './SalesBibliothek'
 import { SalesDashboard } from './SalesDashboard'
+import { LeadListe } from './sales/LeadListe'
 import { LinkedinArea } from './LinkedinArea'
 
 function SalesSubNav() {
@@ -13,11 +14,15 @@ function SalesSubNav() {
     { to: '/sales', label: 'Dashboard', end: true },
     // LinkedIn-Akquise ist Vertriebsarbeit — sie gehört hierher, nicht nur unter „Heute".
     { to: '/sales/linkedin', label: 'LinkedIn', end: false },
-    { to: '/sales/pipeline', label: 'Pipeline', end: false },
+    { to: '/sales/leads', label: 'Leads', end: false },
     { to: '/sales/lists', label: 'Listen', end: false },
     { to: '/sales/call-mode', label: 'Call-Mode', end: false },
     { to: '/sales/new', label: 'Neuer Lead', end: false },
     { to: '/sales/bibliothek', label: 'Bibliothek', end: false },
+    // Die Glass-Pipeline bleibt erreichbar, bis die Paritaets-Karte
+    // (docs/phase2/sales-paritaet.md) abgehakt ist — sie kann neun Dinge,
+    // die der Neubau (noch) nicht kann.
+    { to: '/sales/pipeline', label: 'Pipeline (klassisch)', end: false },
   ]
   return (
     <nav
@@ -52,6 +57,7 @@ export function SalesArea() {
       <Routes>
         <Route index element={<SalesDashboard />} />
         <Route path="linkedin" element={<LinkedinArea eingebettet />} />
+        <Route path="leads" element={<LeadListe />} />
         <Route path="pipeline" element={<SalesMode panel="full" scrollEmbed />} />
         <Route path="lists" element={<ContactListsPage />} />
         <Route path="lists/:listId" element={<ContactListsPage />} />
