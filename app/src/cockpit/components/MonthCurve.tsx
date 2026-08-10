@@ -64,7 +64,7 @@ export function MonthCurve({
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '0 4px 6px' }}>
-        <span className="ck-label">Soll-Kurve · {month.label}</span>
+        <span className="ck-karten-titel">Soll-Kurve · {month.label}</span>
         <span style={{ fontSize: 12, color: 'var(--ck-text-2)' }}>
           Ist <strong style={{ color: 'var(--ck-text-1)' }}>{formatEuro(istTotal)}</strong>
           <span style={{ color: 'var(--ck-text-2)' }}> / Ziel {formatEuro(month.total)}</span>
@@ -115,10 +115,10 @@ export function MonthCurve({
         ) : null}
       </svg>
       <div style={{ display: 'flex', gap: 16, justifyContent: 'center', paddingTop: 2 }}>
-        <span className="ck-label" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+        <span className="ck-karten-titel" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
           <span style={{ width: 14, borderTop: '2px solid var(--ck-accent)', display: 'inline-block' }} /> Ist kumuliert
         </span>
-        <span className="ck-label" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+        <span className="ck-karten-titel" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
           <span style={{ width: 14, borderTop: '2px dashed var(--ck-idle)', display: 'inline-block' }} /> Soll (back-loaded)
         </span>
       </div>

@@ -59,7 +59,7 @@ export function GoalCard({
   return (
     <section className="ck-panel" aria-label="Monatsziel und Nordstern">
       <div style={{ padding: '12px 14px' }}>
-        <div className="ck-label" style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+        <div className="ck-karten-titel" style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
           <span>Monatsziel · {month?.label ?? 'Monat'}</span>
           {/* „geplant" = für diesen Monat wurde nie ein Ziel gesetzt, es gilt der
               40.000-€-Default. Vorher stand das kommentarlos da und war nicht
@@ -125,9 +125,11 @@ export function GoalCard({
           </div>
         ) : null}
 
-        <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: '0.02em', lineHeight: 1.25 }}>
+        {/* KPI-Grosszahl — einer der drei editorialen Momente, an denen das
+            Tokens-Doc Instrument Serif zulaesst (Zug C4). */}
+        <div className="ck-serif ck-zahl" style={{ fontSize: 30, lineHeight: 1.2, color: 'var(--ck-text-1)' }}>
           {formatEuro(monthRevenue)}
-          <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--ck-text-3)' }}>
+          <span style={{ fontFamily: 'var(--ck-font)', fontSize: 13, fontWeight: 400, color: 'var(--ck-text-2)' }}>
             {' '}/ {formatEuro(total)}
           </span>
         </div>
@@ -149,8 +151,8 @@ export function GoalCard({
             {formatEuro(soll)}
           </span>
         </div>
-        <div className="ck-label" style={{ marginTop: 2 }}>
-          {onTrack ? 'on track' : 'Input prüfen — Ernte folgt dem Lag'}
+        <div className="ck-karten-titel" style={{ marginTop: 2, color: 'var(--ck-text-3)' }}>
+          {onTrack ? 'On track' : 'Input prüfen — Ernte folgt dem Lag'}
         </div>
       </div>
 

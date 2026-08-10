@@ -150,6 +150,17 @@
   font-weight: 700;
 }
 
+/* Karten-Titel. Das Micro-Label (Versalien, 0,15em) traegt kurze
+   Beschriftungen — „Monatsziel · August 2026" oder „Soll (back-loaded)"
+   brechen darin in der schmalen Desktop-Spalte auf zwei Zeilen um. Ein Titel
+   ist ohnehin kein Meta-Label; er steht in Satzschreibung (Zug C4). */
+.ck-karten-titel {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+  color: var(--ck-text-2);
+}
+
 /* --- Zahlen-Ausrichtung: ersetzt die alte Mono-Familie ------------------- */
 .ck-zahl { font-variant-numeric: tabular-nums; }
 
