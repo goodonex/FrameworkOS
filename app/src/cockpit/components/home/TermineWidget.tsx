@@ -28,7 +28,7 @@ export function TermineWidget({ termine, onOeffnen }: { termine: CalEvent[]; onO
     >
       <span className="ck-label">Termine heute</span>
       {termine.length === 0 ? (
-        <span style={{ fontSize: 13, color: 'var(--ck-text-3)' }}>Heute keine.</span>
+        <span style={{ fontSize: 13, color: 'var(--ck-text-2)' }}>Heute keine.</span>
       ) : (
         termine.map((e) => (
           <span key={e.id} style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 13.5 }}>

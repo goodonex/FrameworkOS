@@ -1,7 +1,9 @@
 /* ============================================================
-   COCKPIT — Design Tokens & Base (REBUILD-PLAN §4)
-   Scope: alles unter .ck-root. Kein Glas, kein Blur, kein WebGL.
-   Regel: Kontrast ≥ 4.5:1, Bewegung nur Graph-Physik + Job-Puls.
+   COCKPIT — Design Tokens & Base
+   Welt 1 „Horizont" (Phase 2, docs/phase2/DESIGN-TOKENS.md — eingefroren
+   10.08.2026). Warmes Waldgrün, EIN Akzent (Salbei), Gold nur als
+   Uriel-Funke. Kein reines Schwarz, keine dritte Signalfarbe.
+   Regel bleibt: Kontrast ≥ 4.5:1, Bewegung sparsam.
    ============================================================ */
 
 /* Tokens getrennt vom Anwenden: Toast und Command-Palette hängen über der
@@ -10,26 +12,52 @@
 .ck-root,
 .ck-toast-stack,
 .ck-cmdk-backdrop {
-  /* Farben */
-  --ck-bg: #050708;
-  --ck-panel: #0b0e10;
-  --ck-panel-2: #0e1215;      /* hover / nested */
-  --ck-border: #1a2023;
-  --ck-border-strong: #26313a;
-  --ck-text-1: #f2f4f5;
-  --ck-text-2: #9aa4a8;
-  --ck-text-3: #8a9599;       /* nur für Micro-Labels ≥ 10px auf --ck-bg — 6,57:1 gegen #050708 (Wargame Zug 8, war 3,47:1) */
-  --ck-accent: #34d399;       /* Phosphor-Grün: running, CTA, positiv */
-  --ck-accent-dim: rgba(52, 211, 153, 0.14);
-  --ck-idle: #64748b;         /* Blaugrau: idle */
-  --ck-warn: #f59e0b;         /* Amber: warn, laufend */
-  --ck-warn-dim: rgba(245, 158, 11, 0.14);
+  /* --- Flächen ---------------------------------------------------------
+     --ck-bg ist die Grundfläche, --ck-bg-verlauf der Seiten-Hintergrund,
+     --ck-ambient das Licht von oben. Die drei stehen so im Tokens-Doc. */
+  --ck-bg: #0c130e;
+  --ck-bg-verlauf: linear-gradient(180deg, #131b16 0%, #0f1712 55%, #0c130e 100%);
+  --ck-ambient: radial-gradient(ellipse 90% 44% at 50% -6%, rgba(122, 168, 110, 0.14), transparent 62%);
+
+  /* Kartenfläche aus dem Mock: durchscheinend, Haarlinien-Kante. */
+  --ck-card: rgba(30, 40, 33, 0.55);
+  --ck-card-border: rgba(214, 235, 205, 0.08);
+
+  /* --ck-panel ist die DECKENDE Entsprechung von --ck-card (dieselbe Farbe
+     auf --ck-bg gerechnet). Alles, was über Canvas, Foto oder Backdrop
+     liegt — Toast, Palette, Drawer — braucht sie deckend, sonst scheint
+     der Graph durch die Meldung. */
+  --ck-panel: #161f18;
+  --ck-panel-2: #1c261e;      /* hover / nested */
+  --ck-border: rgba(214, 235, 205, 0.08);
+  --ck-border-strong: rgba(214, 235, 205, 0.16);
+
+  /* --- Text --- */
+  --ck-text-1: #eaf0e6;
+  --ck-text-2: #a7b3a2;
+  --ck-text-3: #737d70;       /* Labels, Meta */
+
+  /* --- Signale: genau vier, mehr gibt es nicht ------------------------- */
+  --ck-accent: #aecfa4;       /* Salbei — DER eine Akzent: aktiv, Balken, Ringe */
+  --ck-accent-text: #c4dcba;  /* Akzent auf dunklem CTA-Grund */
+  --ck-accent-dim: rgba(174, 207, 164, 0.14);
+  --ck-ok: var(--ck-accent);  /* Erfolg = Akzent, keine fünfte Farbe */
+  --ck-warn: #d9ab52;         /* gedämpftes Gold — „liegt/überfällig", NIE Rot */
+  --ck-warn-dim: rgba(217, 171, 82, 0.14);
+  --ck-danger: #e5484d;       /* nur echte Fehler */
+  --ck-idle: #78857f;         /* neutral: ruhend/aus — kein Signal */
+  /* Gold trägt AUSSCHLIESSLICH den Uriel-Funken ✦ (Klammer zur Marke). */
+  --ck-gold: #d9bd7d;
+  /* Neutrale Papierfläche hinter Kunden-Kreativen (Ads/Content-Vorschauen).
+     Kein Signal, sondern Passepartout — deshalb ein eigener Token statt
+     eines Hexwerts in fünf Komponenten. */
+  --ck-medien-bg: #edeae2;
+
   /* O13: beide fehlten und wurden nur per var(--x, fallback) abgefangen. Der
      Run-Drawer fiel damit auf #fff zurück — weiße Fläche im dunklen Cockpit.
      --ck-bg-1 ist bewusst ein Alias auf --ck-panel: Custom Properties lösen
      erst am Element auf, der Hell-Block unten zieht also automatisch mit. */
   --ck-bg-1: var(--ck-panel);
-  --ck-danger: #e5484d;       /* Rot: Fehler-Zustand (5,15:1 gegen --ck-bg) */
 
   /* Graph (OsNebula) */
   --ck-graph-bg: #05080c;
@@ -46,13 +74,20 @@
   --ck-font: 'Inter', system-ui, -apple-system, sans-serif;
   --ck-font-display: 'Instrument Serif', Georgia, 'Times New Roman', serif;
 
-  /* Geometrie */
-  --ck-radius: 8px;
+  /* Geometrie (Tokens-Doc: Karten 24, Kacheln/Innenkarten 18, Pillen 999) */
+  --ck-radius: 24px;
+  --ck-radius-innen: 18px;
+  --ck-radius-pille: 999px;
 }
 
 .ck-root {
   font-family: var(--ck-font);
-  background: var(--ck-bg);
+  /* Zwei Schichten in einem Paint: das Licht von oben über dem Seitenverlauf.
+     .ck-root ist `position: fixed; inset: 0` (CockpitShell) — der Verlauf
+     steht also je Bildschirm einmal und scrollt nicht mit, genau wie im Mock. */
+  background-color: var(--ck-bg);
+  background-image: var(--ck-ambient), var(--ck-bg-verlauf);
+  background-repeat: no-repeat;
   color: var(--ck-text-1);
   font-size: 13px;
   line-height: 1.5;
@@ -85,15 +120,28 @@
 /* --- Zahlen-Ausrichtung: ersetzt die alte Mono-Familie ------------------- */
 .ck-zahl { font-variant-numeric: tabular-nums; }
 
+/* Shell-Befehle und Code bleiben Monospace — das ist keine zweite Hausschrift,
+   sondern die Auszeichnung „das tippt man genau so ab". Seit JetBrains Mono
+   raus ist (A1), steht die System-Monospace hier ausdrücklich statt zufällig. */
+.ck-root code,
+.ck-root pre,
+.ck-root kbd { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
 /* --- Editorial-Moment: Instrument Serif, nur wo DESIGN-TOKENS es erlaubt --- */
 .ck-serif { font-family: var(--ck-font-display); font-weight: 400; letter-spacing: 0; }
 
-/* --- Panel: 1px-Border, KEIN Glas --- */
+/* --- Karte: weiche Fläche, Haarlinien-Kante, kein Schlagschatten-Gewitter ---
+   Die Fläche ist bewusst durchscheinend (--ck-card) — so trägt der
+   Seitenverlauf durch und die Karten stehen nicht als graue Kästen darauf.
+   Wo eine Karte über Canvas/Foto/Backdrop liegt (Toast, Palette, Drawer),
+   steht --ck-panel deckend in der jeweiligen Regel. */
 .ck-panel {
-  background: var(--ck-panel);
-  border: 1px solid var(--ck-border);
+  background: var(--ck-card);
+  border: 1px solid var(--ck-card-border);
   border-radius: var(--ck-radius);
 }
+/* Karte in Karte: eine Stufe kleiner, sonst wirkt die innere aufgeblasen. */
+.ck-panel .ck-panel { border-radius: var(--ck-radius-innen); }
 
 /* --- Status-Punkt --- */
 .ck-dot {
@@ -124,7 +172,9 @@
   gap: 16px;
   padding: 10px 18px;
   border-bottom: 1px solid var(--ck-border);
-  background: var(--ck-bg);
+  /* Transparent statt --ck-bg: sonst läge ein deckender Streifen genau dort,
+     wo --ck-ambient das Licht von oben setzt. */
+  background: transparent;
 }
 .ck-status-brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .ck-wordmark { font-size: 14px; font-weight: 700; letter-spacing: 0.28em; white-space: nowrap; }
@@ -140,7 +190,7 @@
   height: 26px;
   padding: 0 5px;
   border: 1px solid var(--ck-border);
-  border-radius: 6px;
+  border-radius: var(--ck-radius-pille);
   font-size: 12px;
   color: var(--ck-text-2);
   text-decoration: none;
@@ -299,7 +349,7 @@
   width: 100%;
   min-height: 40px;
   padding: 7px 10px;
-  border-radius: 6px;
+  border-radius: var(--ck-radius-innen);
   border: 1px solid transparent;
   background: none;
   font: inherit;
@@ -395,7 +445,7 @@
   align-items: center;
   gap: 10px;
   padding: 9px 12px;
-  border-radius: 6px;
+  border-radius: var(--ck-radius-pille);
   color: var(--ck-text-2);
   font-size: 11px;
   text-transform: uppercase;
@@ -420,7 +470,7 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
   align-items: center;
   gap: 8px;
   padding: 8px 14px;
-  border-radius: 6px;
+  border-radius: var(--ck-radius-pille);
   border: 1px solid var(--ck-border-strong);
   background: var(--ck-panel);
   color: var(--ck-text-1);
@@ -437,14 +487,14 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
 .ck-btn--primary {
   border-color: color-mix(in srgb, var(--ck-accent) 40%, transparent);
   background: var(--ck-accent-dim);
-  color: var(--ck-accent);
+  color: var(--ck-accent-text);
 }
 
 /* --- Inputs --- */
 .ck-input {
   background: var(--ck-bg);
   border: 1px solid var(--ck-border-strong);
-  border-radius: 6px;
+  border-radius: var(--ck-radius-innen);
   color: var(--ck-text-1);
   font-family: var(--ck-font);
   /* 16px, nicht 13 — unter 16px zoomt iOS Safari beim Fokussieren rein. */
@@ -457,7 +507,7 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
 .ck-select {
   background: var(--ck-panel);
   border: 1px solid var(--ck-border-strong);
-  border-radius: 6px;
+  border-radius: var(--ck-radius-innen);
   color: var(--ck-text-2);
   font-family: var(--ck-font);
   font-size: 11px;
@@ -764,7 +814,7 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
     min-height: 48px;
     background: var(--ck-panel-2);
     border: none;
-    border-radius: 8px;
+    border-radius: var(--ck-radius-innen);
     margin: 2px;
     font: inherit;
     font-size: 11px;

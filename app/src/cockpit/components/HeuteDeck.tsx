@@ -180,7 +180,7 @@ export function HeuteDeck({ slug }: { slug: string | undefined }) {
               Termine
             </span>
             {heuteTermine.length === 0 ? (
-              <span style={{ color: 'var(--ck-text-3)' }}>Heute keine.</span>
+              <span style={{ color: 'var(--ck-text-2)' }}>Heute keine.</span>
             ) : (
               heuteTermine.map((e) => (
                 <span key={e.id} style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6 }}>

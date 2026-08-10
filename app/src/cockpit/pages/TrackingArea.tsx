@@ -84,6 +84,9 @@ function Stepper({
         className="ck-label"
         style={{
           fontSize: 10.5,
+          // Zeilen-Titel, kein Meta-Label: --ck-text-3 kommt auf der neuen
+          // Kartenflaeche nur auf 3,95:1 (Phase 2, Kontrast-Stichprobe A2).
+          color: 'var(--ck-text-2)',
           minWidth: 0,
           display: 'inline-flex',
           alignItems: 'center',
@@ -193,7 +196,7 @@ function RatesTable({ rates }: { rates: ReturnType<typeof channelRates> }) {
               >
                 {fmt(r.rate)}
               </td>
-              <td style={{ textAlign: 'right', color: 'var(--ck-text-3)' }}>
+              <td style={{ textAlign: 'right', color: 'var(--ck-text-2)' }}>
                 {Math.round(r.benchMin * 100)}–{Math.round(r.benchMax * 100)}%
               </td>
             </tr>

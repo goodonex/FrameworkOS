@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
-import { useUiTheme } from '../../hooks/useUiTheme'
 import { useUrielBus } from '../../store/urielBus'
 import { useRunnerStatus } from '../lib/useRunnerStatus'
 
@@ -55,10 +54,15 @@ function StatusWord({ label, state }: { label: string; state: 'on' | 'off' | 'pu
   )
 }
 
+/**
+ * Phase 2, D3: Der ☀-Umschalter ist hier raus — das Cockpit ist nur noch
+ * dunkel. Die `plain-light`-Styles bleiben als tote Klasse liegen (kein
+ * Abriss, kein Pflegeversprechen); ein Hell-Modus käme später neu auf
+ * Token-Basis. `useUiTheme` lebt weiter, Graph und Palette lesen es.
+ */
 export function StatusBar() {
   const { user } = useAuth()
   const runner = useRunnerStatus()
-  const { isPlainLight, togglePlainLight } = useUiTheme()
   const urielOpen = useUrielBus((s) => s.open)
   const toggleUriel = useUrielBus((s) => s.toggleOpen)
 
@@ -107,15 +111,6 @@ export function StatusBar() {
             </a>
           ))}
         </span>
-        <button
-          type="button"
-          className="ck-btn"
-          onClick={togglePlainLight}
-          title={isPlainLight ? 'Dunkler Modus' : 'Heller Modus'}
-          aria-label={isPlainLight ? 'Dunkler Modus' : 'Heller Modus'}
-        >
-          {isPlainLight ? '◐' : '☀'}
-        </button>
         <Clock />
       </div>
     </header>

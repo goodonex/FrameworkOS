@@ -100,7 +100,7 @@ export function KachelCard({ kachel, onOeffnen }: { kachel: KachelDef; onOeffnen
         <div
           style={{
             fontSize: 12,
-            color: 'var(--ck-text-3)',
+            color: 'var(--ck-text-2)',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',

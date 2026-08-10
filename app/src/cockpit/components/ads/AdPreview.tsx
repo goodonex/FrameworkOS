@@ -43,14 +43,14 @@ export function AdPreview({ kunde, version }: { kunde: Kunde; version: AdVersion
           border: '1px solid var(--ck-border)',
           borderRadius: 8,
           overflow: 'hidden',
-          background: '#EDEAE2',
+          background: 'var(--ck-medien-bg)',
         }}
       >
         {isHtml ? (
           <iframe
             src={url}
             title={file.path}
-            style={{ width: '100%', height: 480, border: 0, display: 'block', background: '#EDEAE2' }}
+            style={{ width: '100%', height: 480, border: 0, display: 'block', background: 'var(--ck-medien-bg)' }}
           />
         ) : (
           <img src={url} alt={file.path} style={{ width: '100%', display: 'block' }} />

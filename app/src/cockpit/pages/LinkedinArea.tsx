@@ -492,7 +492,7 @@ export function LinkedinArea({ eingebettet = false }: { eingebettet?: boolean } 
   let badgeColor = 'var(--ck-text-3)'
   let badgeText = `Zuletzt synchronisiert ${agoLabel(lastSyncedAt, now)}`
   if (isOffline) {
-    badgeColor = '#ef4444'
+    badgeColor = 'var(--ck-danger)'
     badgeText = `Chrome/Runner offline — Stand vom ${lastSyncedAt ? new Date(lastSyncedAt).toLocaleString('de-DE') : 'nie'}`
   } else if (isStale) {
     badgeColor = 'var(--ck-warn)'

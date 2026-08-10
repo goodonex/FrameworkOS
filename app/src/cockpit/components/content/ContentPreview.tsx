@@ -68,7 +68,7 @@ export function ContentPreview({ post }: { post: ContentPost }) {
           border: '1px solid var(--ck-border)',
           borderRadius: 8,
           overflow: 'hidden',
-          background: '#EDEAE2',
+          background: 'var(--ck-medien-bg)',
         }}
       >
         <iframe

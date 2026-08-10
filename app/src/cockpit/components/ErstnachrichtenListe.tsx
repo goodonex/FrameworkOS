@@ -138,16 +138,16 @@ export function ErstnachrichtenListe({ brandSlug }: { brandSlug: string | undefi
 
   if (q.tableMissing) {
     return (
-      <div className="ck-panel" style={{ padding: '28px 14px', textAlign: 'center', fontSize: 13, color: 'var(--ck-text-3)' }}>
+      <div className="ck-panel" style={{ padding: '28px 14px', textAlign: 'center', fontSize: 13, color: 'var(--ck-text-2)' }}>
         Migration 0060 muss noch eingespielt werden.
       </div>
     )
   }
-  if (q.loading) return <div style={{ fontSize: 12, color: 'var(--ck-text-3)', padding: 12 }}>Lädt …</div>
+  if (q.loading) return <div style={{ fontSize: 12, color: 'var(--ck-text-2)', padding: 12 }}>Lädt …</div>
 
   if (!q.items.length) {
     return (
-      <div className="ck-panel" style={{ padding: '28px 14px', textAlign: 'center', fontSize: 13, color: 'var(--ck-text-3)' }}>
+      <div className="ck-panel" style={{ padding: '28px 14px', textAlign: 'center', fontSize: 13, color: 'var(--ck-text-2)' }}>
         Noch keine Erstnachrichten gespiegelt. Der Runner liest sie aus dem Vault — er muss dafür
         einmal gelaufen sein.
       </div>
@@ -172,7 +172,7 @@ export function ErstnachrichtenListe({ brandSlug }: { brandSlug: string | undefi
       {q.error ? <div style={{ fontSize: 11, color: 'var(--ck-warn)' }}>{q.error}</div> : null}
 
       {offen.length === 0 ? (
-        <div className="ck-panel" style={{ padding: '28px 14px', textAlign: 'center', fontSize: 13, color: 'var(--ck-text-3)' }}>
+        <div className="ck-panel" style={{ padding: '28px 14px', textAlign: 'center', fontSize: 13, color: 'var(--ck-text-2)' }}>
           Alle Erstnachrichten raus. Neue kommen über den Skill <code>linkedin-leads</code> dazu.
         </div>
       ) : (

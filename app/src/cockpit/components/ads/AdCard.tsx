@@ -34,7 +34,7 @@ export function AdCard({ kunde, ad, onOpen }: { kunde: Kunde; ad: Ad; onOpen: ()
         overflow: 'hidden',
       }}
     >
-      <div style={{ height: 130, background: '#EDEAE2', overflow: 'hidden', position: 'relative' }}>
+      <div style={{ height: 130, background: 'var(--ck-medien-bg)', overflow: 'hidden', position: 'relative' }}>
         {previewUrl ? (
           <img
             src={previewUrl}

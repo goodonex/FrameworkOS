@@ -3,14 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <script>
-      /* Theme vor dem ersten Paint setzen — verhindert dunklen Flash im hellen Modus. */
-      try {
-        if (localStorage.getItem('brand-os-ui-theme') === 'plain-light') {
-          document.documentElement.setAttribute('data-ui-theme', 'plain-light')
-        }
-      } catch (e) {}
-    </script>
+    <!-- Der Pre-Paint-Schalter auf `plain-light` ist mit Phase 2 (D3) entfallen:
+         das Cockpit ist nur noch dunkel, und ein gespeicherter Hell-Wert hätte
+         die App ohne Umschalter im toten Hell-Block einfrieren lassen. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

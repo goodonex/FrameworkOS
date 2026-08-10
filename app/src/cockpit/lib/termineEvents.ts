@@ -25,7 +25,9 @@ export const KIND_TONE: Record<EventKind, string> = {
   booking: 'var(--ck-accent)',
   followup: 'var(--ck-warn)',
   content: 'var(--ck-idle)',
-  external: '#a78bfa',
+  // Fremdkalender: neutral. Das Tokens-Doc (Phase 2) laesst keine dritte
+  // Signalfarbe zu — das alte Violett war eine.
+  external: 'var(--ck-text-3)',
 }
 
 export const KIND_LABEL: Record<EventKind, string> = {

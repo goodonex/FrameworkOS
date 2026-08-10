@@ -43,7 +43,7 @@ export function ContentCard({ post, onOpen }: { post: ContentPost; onOpen: () =>
       <div
         style={{
           height: 92,
-          background: '#EDEAE2',
+          background: 'var(--ck-medien-bg)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',

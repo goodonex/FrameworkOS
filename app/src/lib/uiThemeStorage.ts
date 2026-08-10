@@ -5,17 +5,20 @@ const KEY = 'brand-os-ui-theme'
 export const UI_THEME_EVENT = 'brand-os-ui-theme'
 
 const THEME_COLOR: Record<UiTheme, string> = {
-  dark: '#0b0f12',
+  dark: '#0c130e',
   'plain-light': '#f7f7f9',
 }
 
+/**
+ * Phase 2, D3: Das Cockpit ist nur noch dunkel — der ☀-Knopf ist aus der
+ * StatusBar raus. Damit MUSS diese Funktion hart 'dark' liefern: wer den
+ * Umschalter zuletzt auf hell stehen hatte, säße sonst dauerhaft im
+ * ungepflegten `plain-light`-Block fest, ohne Weg zurück.
+ * Typ, Speicherfunktionen und die CSS-Klasse bleiben liegen (kein Abriss,
+ * kein Pflegeversprechen); ein Hell-Modus käme später neu auf Token-Basis.
+ */
 export function loadUiTheme(): UiTheme {
-  try {
-    const v = localStorage.getItem(KEY)
-    return v === 'plain-light' ? 'plain-light' : 'dark'
-  } catch {
-    return 'dark'
-  }
+  return 'dark'
 }
 
 export function saveUiTheme(theme: UiTheme): void {

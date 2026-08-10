@@ -67,7 +67,7 @@ export function MonthCurve({
         <span className="ck-label">Soll-Kurve · {month.label}</span>
         <span style={{ fontSize: 12, color: 'var(--ck-text-2)' }}>
           Ist <strong style={{ color: 'var(--ck-text-1)' }}>{formatEuro(istTotal)}</strong>
-          <span style={{ color: 'var(--ck-text-3)' }}> / Ziel {formatEuro(month.total)}</span>
+          <span style={{ color: 'var(--ck-text-2)' }}> / Ziel {formatEuro(month.total)}</span>
         </span>
       </div>
       <svg
