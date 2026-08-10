@@ -74,17 +74,40 @@
   --trend-down: #e5484d;
 
   min-height: 100vh;
-  /* Der Verlauf traegt den ganzen Bildschirm: die Portal-Spalte ist schmaler
-     als das Fenster, und daneben soll Navy stehen, nicht der Rest der App. */
-  background-color: var(--portal-bg);
-  background-image: var(--portal-bg-verlauf);
-  background-repeat: no-repeat;
-  background-attachment: fixed;
-  box-shadow: 0 0 0 100vmax var(--portal-bg);
-  clip-path: inset(0 -100vmax);
+  position: relative;
+
+  /* FALLE #1 aus dem HANDOFF, und sie hat hier zugeschlagen:
+     `#app-ui-overlay` setzt global `pointer-events: none`. Jede Vollbild-
+     Oberflaeche ausserhalb der CockpitShell muss das ausdruecklich wieder
+     einschalten — Login- und Setup-Seite tun das seit jeher, das Portal
+     selbst nie. Ergebnis: im Portal war KEIN Knopf anklickbar, auch nicht
+     „Zurueck zum Cockpit". Gefunden am 10.08. abends an Kevins Geraet,
+     nachgestellt per elementFromPoint (die Trefferkette lief bis
+     #app-ui-overlay durch, ohne je auf `auto` zu stossen). */
+  pointer-events: auto;
+
+  background: transparent;
   color: var(--portal-text);
   font-family: var(--font-body);
   overflow-x: hidden;
+}
+
+/* Der Navy-Verlauf liegt als eigene, feste Schicht hinter allem und deckt den
+   ganzen Bildschirm — auch links und rechts neben der Portal-Spalte.
+   Er stand bis zum 10.08. abends direkt auf `.portal-root`, als Kombination
+   aus `background-attachment: fixed`, einem 100vmax-Schlagschatten und einem
+   `clip-path`. Alle drei sind auf iOS teuer, und sie lagen ausgerechnet auf
+   dem hoechsten Element der Seite — auf dem Telefon blieb der Bildschirm
+   lange weiss und die Seite fuehlte sich zaeh an. Ein `position: fixed`-
+   Pseudo-Element kostet einen Layer und sonst nichts. */
+.portal-root::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: var(--portal-bg);
+  background-image: var(--portal-bg-verlauf);
 }
 
 .portal-root * {
