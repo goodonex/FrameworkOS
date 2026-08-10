@@ -1117,12 +1117,13 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
    .ck-deliver — die Cockpit-Werte untergeschoben. Das Portal rendert dieselben
    Komponenten weiterhin unverändert in seiner eigenen Optik.
    Die echte Kundensicht prüft Kevin über „Als Kunde ansehen" (öffnet /portal). */
-.ck-deliver {
-  --glass-1: var(--ck-panel);
-  --glass-2: var(--ck-panel);
+.ck-deliver,
+.ck-lead {
+  --glass-1: var(--ck-card);
+  --glass-2: var(--ck-card);
   --glass-3: var(--ck-panel-2);
   --glass-4: var(--ck-panel-2);
-  --glass-border-1: var(--ck-border);
+  --glass-border-1: var(--ck-card-border);
   --glass-border-2: var(--ck-border-strong);
   --text-primary: var(--ck-text-1);
   --text-secondary: var(--ck-text-2);
@@ -1131,9 +1132,21 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
   --accent-coral: var(--ck-warn);
   --accent-blue: var(--ck-idle);
   --chip-text-on-accent: var(--ck-bg);
+  /* Die Lead-Bausteine greifen ausserdem auf diese vier zu — ohne sie stuenden
+     im Detail weiter Teal-Chips und Navy-Flaechen aus der Glas-Aera (Zug B2,
+     im Screenshot-Gegenblick gefunden). */
+  --mode-sales: var(--ck-accent);
+  --accent-amber: var(--ck-warn);
+  --bg-base: var(--ck-bg);
+  --bg-surface: var(--ck-panel);
 }
 /* Im Cockpit ist Inter die Stimme — keine zweite Schriftfamilie im Bild. */
 .ck-deliver .font-display,
-.ck-deliver .deliver-internal-editor {
+.ck-deliver .deliver-internal-editor,
+.ck-lead .font-display {
   font-family: var(--ck-font);
 }
+/* Radien und Kanten der Glas-Bausteine auf die Cockpit-Geometrie ziehen —
+   sonst stehen 10px-Ecken neben 24px-Karten. */
+.ck-lead .rounded-xl,
+.ck-lead .rounded-2xl { border-radius: var(--ck-radius-innen); }

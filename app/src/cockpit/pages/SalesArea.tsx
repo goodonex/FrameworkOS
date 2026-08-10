@@ -1,12 +1,12 @@
 import { NavLink, Route, Routes } from 'react-router-dom'
 import { CallModePage } from '../../pages/sales/CallModePage'
 import { ContactListsPage } from '../../pages/sales/ContactListsPage'
-import { ContactPage } from '../../pages/sales/ContactPage'
 import { SalesMode } from '../../pages/sales/SalesMode'
 import { SalesNewLeadPage } from '../../pages/sales/SalesNewLeadPage'
 import { SalesBibliothek } from './SalesBibliothek'
 import { SalesDashboard } from './SalesDashboard'
 import { LeadListe } from './sales/LeadListe'
+import { LeadDetail } from './sales/LeadDetail'
 import { LinkedinArea } from './LinkedinArea'
 
 function SalesSubNav() {
@@ -64,7 +64,7 @@ export function SalesArea() {
         <Route path="call-mode" element={<CallModePage />} />
         <Route path="new" element={<SalesNewLeadPage />} />
         <Route path="bibliothek" element={<SalesBibliothek />} />
-        <Route path=":contactId" element={<ContactPage variant="page" />} />
+        <Route path=":contactId" element={<LeadDetail />} />
       </Routes>
     </div>
   )

@@ -53,11 +53,21 @@ export function ContactPage({
   scrollInParent = false,
   slugOverride,
   contactIdOverride,
+  seitenspalte = 'links',
+  ohneKopf = false,
 }: {
   variant?: 'page' | 'module'
   scrollInParent?: boolean
   slugOverride?: string
   contactIdOverride?: string
+  /**
+   * Auf welcher Seite die Stammdaten stehen (Phase 2, Zug B2). Close stellt
+   * die Timeline in die Mitte und die Daten daneben — rein darstellend, die
+   * DOM-Reihenfolge und damit die Vorlese-Reihenfolge bleibt gleich.
+   */
+  seitenspalte?: 'links' | 'rechts'
+  /** Der Neubau setzt seinen eigenen Kopf darüber. */
+  ohneKopf?: boolean
 } = {}) {
   const params = useParams<{ slug: string; contactId: string }>()
   const routeSlug = useCurrentBrandSlug()
@@ -364,6 +374,8 @@ export function ContactPage({
         overscrollBehavior: ownScroll ? 'contain' : undefined,
       }}
     >
+      {ohneKopf ? null : (
+      <>
       <div
         className="mb-4"
         style={{
@@ -432,29 +444,40 @@ export function ContactPage({
         </div>
         <ContactSaveStatusIndicator state={saveState} />
       </div>
+      </>
+      )}
 
 
       <div
         className="grid gap-4"
         style={{
-          gridTemplateColumns: wideLayout ? 'minmax(300px, 380px) minmax(0, 1fr)' : '1fr',
+          gridTemplateColumns: wideLayout
+            ? seitenspalte === 'rechts'
+              ? 'minmax(0, 1fr) minmax(300px, 380px)'
+              : 'minmax(300px, 380px) minmax(0, 1fr)'
+            : '1fr',
           alignItems: 'start',
         }}
       >
+        {/* Stammdaten. Die DOM-Reihenfolge bleibt gleich (und damit die
+            Vorlese-Reihenfolge), nur die Spalte wandert — Close stellt die
+            Timeline in die Mitte und die Daten daneben. */}
         {slug ? (
-          <ContactOverviewPanel
-            brandSlug={slug}
-            contact={d}
-            onField={onField}
-            layout={variant === 'page' ? 'page' : 'narrow'}
-            column="left"
-            callOutcomeOpen={callOutcomeOpen}
-            onCallOutcomeOpenChange={setCallOutcomeOpen}
-            onTimelineRefresh={() => setTimelineRefresh((n) => n + 1)}
-          />
+          <div style={{ minWidth: 0, order: seitenspalte === 'rechts' ? 2 : 1 }}>
+            <ContactOverviewPanel
+              brandSlug={slug}
+              contact={d}
+              onField={onField}
+              layout={variant === 'page' ? 'page' : 'narrow'}
+              column="left"
+              callOutcomeOpen={callOutcomeOpen}
+              onCallOutcomeOpenChange={setCallOutcomeOpen}
+              onTimelineRefresh={() => setTimelineRefresh((n) => n + 1)}
+            />
+          </div>
         ) : null}
 
-        <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ minWidth: 0, order: seitenspalte === 'rechts' ? 1 : 2, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <ContactPhaseHeader
             contact={d}
             onField={onField}
