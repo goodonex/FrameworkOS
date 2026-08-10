@@ -109,10 +109,12 @@ export function ResetPasswordPage() {
             fontSize: 10,
             letterSpacing: '0.14em',
             textTransform: 'uppercase',
-            color: 'var(--accent-blue)',
+            // D12: Wortmarke und Akzent kommen aus Welt 1, sonst bleibt die
+            // Karte, wie sie ist.
+            color: 'var(--ck-accent)',
           }}
         >
-          Brand OS
+          Uriel
         </div>
         <h1
           className="font-display mb-6"

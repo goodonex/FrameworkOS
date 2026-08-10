@@ -1,4 +1,9 @@
 @import './styles/tokens.css';
+/* Seit Phase 2 (Zug A7) stehen die Welt-1-Tokens (--ck-*) auf :root und
+   werden auch VOR der Cockpit-Shell gebraucht — die Anmeldekarte steht
+   ausserhalb von .ck-root. Angewendet wird weiterhin nur unter .ck-root;
+   dieser Import stellt allein die Werte bereit. */
+@import './styles/cockpit.css';
 
 @tailwind base;
 @tailwind components;

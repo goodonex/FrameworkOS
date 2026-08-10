@@ -6,12 +6,15 @@
    Regel bleibt: Kontrast ≥ 4.5:1, Bewegung sparsam.
    ============================================================ */
 
-/* Tokens getrennt vom Anwenden: Toast und Command-Palette hängen über der
-   Shell (App.tsx) und damit AUSSERHALB von .ck-root. Ohne diese Trennung
-   stünden ihre Farben als Literale ein zweites Mal im Quelltext. */
-.ck-root,
-.ck-toast-stack,
-.ck-cmdk-backdrop {
+/* Tokens getrennt vom Anwenden. Sie standen bis Zug A7 auf
+   `.ck-root, .ck-toast-stack, .ck-cmdk-backdrop` — drei Selektoren, weil Toast
+   und Command-Palette über der Shell hängen und damit ausserhalb von .ck-root.
+   Mit der Anmeldekarte kam ein vierter Ort dazu, der die Welt-1-Werte braucht
+   und ebenfalls vor der Shell steht. Statt die Liste weiterwachsen zu lassen,
+   stehen die Werte jetzt auf `:root`: sie kosten nichts, solange sie niemand
+   liest, und jede Fläche der App kann dieselbe Wahrheit benutzen.
+   ANGEWENDET wird weiterhin nur unter .ck-root (Regel darunter). */
+:root {
   /* --- Flächen ---------------------------------------------------------
      --ck-bg ist die Grundfläche, --ck-bg-verlauf der Seiten-Hintergrund,
      --ck-ambient das Licht von oben. Die drei stehen so im Tokens-Doc. */

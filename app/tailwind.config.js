@@ -29,10 +29,15 @@ export default {
           tertiary: 'var(--text-tertiary)',
         },
       },
+      // Eine Wahrheit statt zweier: die Familien stehen in tokens.css. Bis
+      // Phase 2 standen die alten Namen (Syne/DM Sans/JetBrains) hier hart —
+      // und weil Tailwinds Utilities NACH tokens.css geladen werden, gewann
+      // diese Liste. Die Anmelde- und Portal-Flaechen liefen deshalb nach dem
+      // Font-Wechsel (Zug A1) auf System-Ersatzschriften statt auf Inter.
       fontFamily: {
-        display: ['Syne', 'sans-serif'],
-        body: ['DM Sans', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace'],
+        display: ['var(--font-display)'],
+        body: ['var(--font-body)'],
+        mono: ['var(--font-mono)'],
       },
       fontSize: {
         xs: 'var(--text-xs)',

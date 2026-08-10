@@ -1,11 +1,11 @@
 {
-  "name": "HERRMANN & CO.",
-  "short_name": "Herrmann",
-  "description": "Cockpit — CRM, Ads & Projekte",
+  "name": "Uriel",
+  "short_name": "Uriel",
+  "description": "Cockpit — Sales, Projekte, Agenten",
   "start_url": "/cockpit",
   "display": "standalone",
-  "background_color": "#0b0f12",
-  "theme_color": "#0b0f12",
+  "background_color": "#0c130e",
+  "theme_color": "#0c130e",
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
