@@ -1,4 +1,4 @@
-# Uriel — Handoff (Stand 2026-08-06, abends)
+# Uriel — Handoff (Stand 2026-08-10, nach Phase 2)
 
 Kompakter Einstieg in den **realen** Stand nach Cockpit-Rebuild und den Etappen 1–4.
 
@@ -87,8 +87,10 @@ nicht in Safari/iOS (Backlog O12).
 
 Kundenportal (`/portal/...`) — seit Phase 2 in Welt 2 „Navy × Gold"
 (`pages/portal/portal.css`, eigener Breakpoint 768). Booking (`/book/...`),
-Lead-Intake (`/leads/...`), Login/Reset/Onboarding. Die Sales-Altwelt lebt als Sub-Tabs unter `/sales`
-(`SalesMode.tsx`, 2.504 Zeilen, noch Glass — Backlog O14). Die Brand-Welt und
+Lead-Intake (`/leads/...`), Login/Reset/Onboarding. Die Sales-Altwelt lebt als
+Sub-Tabs unter `/sales` (`SalesMode.tsx`, ~2.500 Zeilen, noch Glass) — sie ist
+in Phase 2 **bewusst stehen geblieben**, weil neun ihrer Funktionen im Neubau
+keinen Ersatz haben (`docs/phase2/sales-paritaet.md`). Die Brand-Welt und
 Deliver-Altwelt sind in Etappe 4 abgerissen.
 
 ### Runner (`runner/index.mjs`)
