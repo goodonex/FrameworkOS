@@ -208,7 +208,7 @@ export function Arbeitsmodus({ posten, onErledigt, onClose, loom }: Arbeitsmodus
               style={{
                 marginTop: 14,
                 border: '1px solid var(--ck-border-strong)',
-                borderRadius: 6,
+                borderRadius: 'var(--ck-radius-innen)',
                 padding: '10px 12px',
               }}
             >

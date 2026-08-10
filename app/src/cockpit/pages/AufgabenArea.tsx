@@ -317,9 +317,9 @@ export function AufgabenArea() {
       </section>
 
       {tasks.loading ? (
-        <div style={{ fontSize: 12, color: 'var(--ck-text-3)', padding: 12 }}>Lädt …</div>
+        <div style={{ fontSize: 12, color: 'var(--ck-text-2)', padding: 12 }}>Lädt …</div>
       ) : visible.length === 0 ? (
-        <div className="ck-panel" style={{ padding: '28px 14px', textAlign: 'center', fontSize: 13, color: 'var(--ck-text-3)' }}>
+        <div className="ck-panel" style={{ padding: '28px 14px', textAlign: 'center', fontSize: 13, color: 'var(--ck-text-2)' }}>
           Keine offenen Aufgaben. Sauberer Schreibtisch.
         </div>
       ) : (

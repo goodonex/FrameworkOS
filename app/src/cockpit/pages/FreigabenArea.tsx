@@ -338,14 +338,14 @@ export function FreigabenArea() {
       ) : null}
 
       {runner.state !== 'online' ? (
-        <div className="ck-panel" style={{ padding: '10px 14px', fontSize: 12.5, color: 'var(--ck-text-3)' }}>
+        <div className="ck-panel" style={{ padding: '10px 14px', fontSize: 12.5, color: 'var(--ck-text-2)' }}>
           Runner offline — zum Erzeugen neuer Entwürfe muss der Runner laufen. Bereits geladene
           Karten kannst du trotzdem freigeben (Versand läuft über Supabase).
         </div>
       ) : null}
 
       {loading ? (
-        <div className="ck-panel" style={{ padding: 14, fontSize: 12.5, color: 'var(--ck-text-3)' }}>
+        <div className="ck-panel" style={{ padding: 14, fontSize: 12.5, color: 'var(--ck-text-2)' }}>
           Lädt Entwürfe …
         </div>
       ) : sichtbareCards.length === 0 ? (
@@ -353,7 +353,7 @@ export function FreigabenArea() {
           <div style={{ fontSize: 13.5, color: 'var(--ck-text-2)', marginBottom: 6 }}>
             Noch keine Entwürfe.
           </div>
-          <div style={{ fontSize: 12.5, color: 'var(--ck-text-3)' }}>
+          <div style={{ fontSize: 12.5, color: 'var(--ck-text-2)' }}>
             „Entwürfe erzeugen" lässt den Follow-up-Agenten deine wartenden Kontakte durchgehen —
             danach erscheinen sie hier zur Freigabe.
           </div>

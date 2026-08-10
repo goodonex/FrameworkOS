@@ -300,7 +300,7 @@ export function Arbeitsliste({ posten, onErledigt, onZaehler, morgen, loom, proj
                   <div
                     style={{
                       border: '1px solid var(--ck-border-strong)',
-                      borderRadius: 6,
+                      borderRadius: 'var(--ck-radius-innen)',
                       padding: '10px 12px',
                       display: 'flex',
                       flexDirection: 'column',

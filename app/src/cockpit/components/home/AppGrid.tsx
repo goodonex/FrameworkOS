@@ -161,7 +161,7 @@ export function AppGrid({
               justifyContent: 'center',
               gap: 6,
               padding: '8px 2px',
-              borderRadius: 12,
+              borderRadius: 'var(--ck-radius-innen)',
               border: `1px solid ${
                 aufgenommen === b.path ? 'var(--ck-warn)' : aktiv ? 'var(--ck-accent)' : 'var(--ck-border)'
               }`,

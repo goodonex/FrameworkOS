@@ -427,9 +427,9 @@ export function UrielDock() {
             flexDirection: 'column',
             background: 'var(--ck-panel)',
             border: '1px solid var(--ck-border-strong)',
-            borderRadius: 10,
+            borderRadius: 'var(--ck-radius-innen)',
             overflow: 'hidden',
-            boxShadow: '0 8px 40px rgba(0,0,0,0.5)',
+            boxShadow: 'var(--ck-schatten-panel)',
           }}
         >
           {/* Kopf */}
@@ -622,7 +622,7 @@ export function UrielDock() {
                   style={{
                     background: t.role === 'user' ? 'var(--ck-accent-dim)' : 'var(--ck-panel-2)',
                     border: '1px solid var(--ck-border)',
-                    borderRadius: 8,
+                    borderRadius: 'var(--ck-radius-innen)',
                     padding: '7px 11px',
                     fontSize: 12.5,
                     lineHeight: 1.55,
@@ -729,7 +729,7 @@ export function UrielDock() {
           color: open ? '#000' : 'var(--ck-accent)',
           fontSize: 20,
           cursor: 'pointer',
-          boxShadow: '0 4px 24px rgba(0,0,0,0.4)',
+          boxShadow: 'var(--ck-schatten-schwebend)',
         }}
       >
         ✦

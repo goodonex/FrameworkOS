@@ -41,7 +41,7 @@ export function ChatBubble() {
           color: open ? 'var(--ck-accent)' : 'var(--ck-text-1)',
           fontSize: 20,
           cursor: 'pointer',
-          boxShadow: '0 4px 24px rgba(0,0,0,0.4)',
+          boxShadow: 'var(--ck-schatten-schwebend)',
         }}
       >
         {open ? '✕' : '💬'}
@@ -81,9 +81,9 @@ function ChatPanel({
         flexDirection: 'column',
         background: 'var(--ck-panel)',
         border: '1px solid var(--ck-border-strong)',
-        borderRadius: 10,
+        borderRadius: 'var(--ck-radius-innen)',
         overflow: 'hidden',
-        boxShadow: '0 8px 40px rgba(0,0,0,0.5)',
+        boxShadow: 'var(--ck-schatten-panel)',
       }}
     >
       {chat.tableMissing ? (
@@ -313,7 +313,7 @@ function Conversation({
               maxWidth: '88%',
               background: m.role === 'user' ? 'var(--ck-accent-dim)' : 'var(--ck-panel-2)',
               border: '1px solid var(--ck-border)',
-              borderRadius: 8,
+              borderRadius: 'var(--ck-radius-innen)',
               padding: '7px 11px',
               fontSize: 12.5,
               lineHeight: 1.55,

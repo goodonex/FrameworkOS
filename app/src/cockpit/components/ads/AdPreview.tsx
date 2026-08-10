@@ -41,7 +41,7 @@ export function AdPreview({ kunde, version }: { kunde: Kunde; version: AdVersion
       <div
         style={{
           border: '1px solid var(--ck-border)',
-          borderRadius: 8,
+          borderRadius: 'var(--ck-radius-innen)',
           overflow: 'hidden',
           background: 'var(--ck-medien-bg)',
         }}

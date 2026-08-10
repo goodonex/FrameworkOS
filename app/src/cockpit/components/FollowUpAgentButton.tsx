@@ -48,7 +48,7 @@ export function FollowUpAgentButton({ contact }: { contact: Contact }) {
         fontSize: 12,
         color: state === 'error' ? 'var(--accent-amber)' : 'var(--accent-success)',
         padding: '8px 14px',
-        borderRadius: 10,
+        borderRadius: 'var(--ck-radius-innen)',
         border: '1px solid var(--glass-border-2)',
         background: 'var(--glass-2)',
         cursor: state === 'starting' ? 'wait' : 'pointer',

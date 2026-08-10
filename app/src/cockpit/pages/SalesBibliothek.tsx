@@ -141,7 +141,7 @@ function SkriptePreview({ rel, kind }: { rel: string; kind: 'md' | 'html' | 'pdf
       <iframe
         src={url}
         title={rel}
-        style={{ width: '100%', height: '78vh', border: '1px solid var(--ck-border)', borderRadius: 8, background: '#fff' }}
+        style={{ width: '100%', height: '78vh', border: '1px solid var(--ck-border)', borderRadius: 'var(--ck-radius-innen)', background: 'var(--ck-medien-bg)' }}
       />
     )
   }

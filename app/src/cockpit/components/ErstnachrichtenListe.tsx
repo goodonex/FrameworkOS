@@ -70,7 +70,7 @@ function LeadKarte({
           color: 'var(--ck-text-2)',
           whiteSpace: 'pre-wrap',
           background: 'var(--ck-panel-2)',
-          borderRadius: 6,
+          borderRadius: 'var(--ck-radius-innen)',
           padding: 12,
         }}
       >

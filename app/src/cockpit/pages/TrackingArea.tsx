@@ -75,18 +75,20 @@ function Stepper({
         justifyContent: 'space-between',
         gap: 8,
         minWidth: 0, // erlaubt Schrumpfen im Grid (sonst Overflow → Karte übersteht)
-        padding: '7px 10px',
-        border: '1px solid var(--ck-border)',
-        borderRadius: 6,
+        padding: '9px 13px',
+        border: '1px solid var(--ck-card-border)',
+        borderRadius: 'var(--ck-radius-innen)',
       }}
     >
+      {/* Zeilen-TITEL, kein Meta-Label (Zug A5): in Versalien mit 0,15em
+          Sperrung passte „Vernetzungsanfragen" nicht mehr in die Zeile, und
+          --ck-text-3 kam auf der Karte nur auf 3,95:1. Jetzt die Karten-
+          Grammatik aus dem Mock: Satzschreibung, Titel-Farbe. */}
       <span
-        className="ck-label"
         style={{
-          fontSize: 10.5,
-          // Zeilen-Titel, kein Meta-Label: --ck-text-3 kommt auf der neuen
-          // Kartenflaeche nur auf 3,95:1 (Phase 2, Kontrast-Stichprobe A2).
-          color: 'var(--ck-text-2)',
+          fontSize: 13,
+          fontWeight: 500,
+          color: 'var(--ck-text-1)',
           minWidth: 0,
           display: 'inline-flex',
           alignItems: 'center',
@@ -136,12 +138,12 @@ function UmsatzInput({ value, onSet }: { value: number; onSet: (v: number) => vo
         alignItems: 'center',
         justifyContent: 'space-between',
         gap: 8,
-        padding: '7px 10px',
+        padding: '9px 13px',
         border: '1px solid var(--ck-border-strong)',
-        borderRadius: 6,
+        borderRadius: 'var(--ck-radius-innen)',
       }}
     >
-      <span className="ck-label" style={{ fontSize: 10.5 }}>Umsatz (€)</span>
+      <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--ck-text-1)' }}>Umsatz (€)</span>
       <input
         className="ck-input"
         type="number"

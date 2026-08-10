@@ -848,7 +848,7 @@ export function OsNebula({ map, contacts, runs = [], onNodeClick, onRefresh, hei
           padding: '7px 10px',
           background: 'var(--ck-graph-panel)',
           border: '1px solid var(--ck-border-strong)',
-          borderRadius: 6,
+          borderRadius: 'var(--ck-radius-innen)',
           pointerEvents: 'none',
           zIndex: 5,
           fontSize: 11,
@@ -934,7 +934,7 @@ export function OsNebula({ map, contacts, runs = [], onNodeClick, onRefresh, hei
               padding: '10px 12px 12px',
               background: 'var(--ck-graph-panel)',
               border: '1px solid var(--ck-border)',
-              borderRadius: 8,
+              borderRadius: 'var(--ck-radius-innen)',
               backdropFilter: 'blur(6px)',
             }}
           >

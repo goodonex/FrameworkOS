@@ -73,7 +73,7 @@ export function ContentDetailPanel({
     <>
       <div
         onClick={onClose}
-        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.35)', zIndex: 40 }}
+        style={{ position: 'fixed', inset: 0, background: 'var(--ck-backdrop)', zIndex: 40 }}
       />
       <aside
         style={{

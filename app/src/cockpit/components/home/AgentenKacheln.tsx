@@ -81,7 +81,7 @@ export function AgentenKacheln({
                 justifyContent: 'center',
                 gap: 4,
                 padding: '8px 2px',
-                borderRadius: 12,
+                borderRadius: 'var(--ck-radius-innen)',
                 border: '1px solid var(--ck-border)',
                 background: 'var(--ck-panel)',
                 font: 'inherit',

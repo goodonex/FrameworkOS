@@ -55,7 +55,7 @@ function Counter({
           gap: 3,
           minWidth: 0,
           border: '1px solid var(--ck-border)',
-          borderRadius: 6,
+          borderRadius: 'var(--ck-radius-innen)',
           padding: '5px 4px',
         }}
       >
@@ -83,7 +83,7 @@ function Counter({
         gap: 4,
         minWidth: 0, // erlaubt Schrumpfen im Grid (sonst Overflow → Overlap)
         border: '1px solid var(--ck-border)',
-        borderRadius: 6,
+        borderRadius: 'var(--ck-radius-innen)',
         padding: '4px 5px 4px 7px',
       }}
     >

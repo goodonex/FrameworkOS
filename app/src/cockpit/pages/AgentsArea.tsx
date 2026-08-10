@@ -210,7 +210,7 @@ function RunDetailDrawer({ run, onClose }: { run: RunDetail; onClose: () => void
       role="dialog"
       aria-label={`Run ${run.agent}`}
       onClick={onClose}
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 60, display: 'flex', justifyContent: 'flex-end', pointerEvents: 'auto' }}
+      style={{ position: 'fixed', inset: 0, background: 'var(--ck-backdrop)', zIndex: 60, display: 'flex', justifyContent: 'flex-end', pointerEvents: 'auto' }}
     >
       <div
         onClick={(e) => e.stopPropagation()}

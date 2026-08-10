@@ -402,7 +402,7 @@ function WebsiteTile({ kunde }: { kunde: Kunde }) {
         <iframe
           src={site.live}
           title={`${kunde.name} Website`}
-          style={{ width: '100%', height: 420, border: '1px solid var(--ck-border)', borderRadius: 8, marginTop: 10, background: '#fff' }}
+          style={{ width: '100%', height: 420, border: '1px solid var(--ck-border)', borderRadius: 'var(--ck-radius-innen)', marginTop: 10, background: 'var(--ck-medien-bg)' }}
         />
       ) : null}
     </div>

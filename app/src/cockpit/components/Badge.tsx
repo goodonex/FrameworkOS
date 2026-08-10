@@ -19,7 +19,9 @@ export function Badge({ anzahl }: { anzahl: number }) {
         padding: '0 3px',
         borderRadius: 99,
         background: 'var(--ck-accent)',
-        color: '#fff',
+        // Dunkel auf dem Akzent, nicht weiss: der Salbei aus Welt 1 ist
+        // hell — weisse Ziffern darauf kamen auf 1,6:1.
+        color: 'var(--ck-bg)',
         fontSize: 9,
         fontWeight: 700,
         lineHeight: '14px',

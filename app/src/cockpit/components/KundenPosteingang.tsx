@@ -47,7 +47,7 @@ function Wert({ titel, wert, gedimmt }: { titel: string; wert: string | null; ge
           lineHeight: 1.55,
           color: leer ? 'var(--ck-text-3)' : gedimmt ? 'var(--ck-text-2)' : 'var(--ck-text-1)',
           border: '1px solid var(--ck-border)',
-          borderRadius: 6,
+          borderRadius: 'var(--ck-radius-innen)',
           padding: '8px 10px',
           maxHeight: 200,
           overflowY: 'auto',
