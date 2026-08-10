@@ -16,12 +16,19 @@ Kompakter Einstieg in den **realen** Stand nach Cockpit-Rebuild und den Etappen 
 
 ## Der wichtigste Satz für eine neue Session
 
-**Die Etappen 1–4 sind live** (`main` = `de60288`, ausgeliefert `index-BjbadBHB.js`).
-Auf `cockpit-rebuild` liegt die **Aufräum-Runde vom Abend des 06.08.**, noch nicht
-live. Wie viele Commits das sind, sagt `git log --oneline main..cockpit-rebuild` —
-eine Zahl in diesem Dokument wäre ab dem nächsten Commit falsch.
-Der Livegang ist ein Fast-Forward (`main` hat keinen eigenen Commit) und steht als
-Abschnitt 1 im Backlog. **Kevin schaltet live, niemand sonst.**
+**Phase 2 ist live** (10.08.2026, `main` = `fff3118`, ausgeliefert
+`index-UUyMJUxE.js`): die neue Optik steht — Cockpit in „Horizont", Portal in
+Navy × Gold, Sales-Neubau nach Close, LinkedIn als eigener Content-Kanal.
+`main` und `cockpit-rebuild` zeigen auf denselben Commit.
+
+Weitergearbeitet wird auf `cockpit-rebuild`; der Livegang ist ein
+Fast-Forward (`main` bekommt keine eigenen Commits). **Kevin schaltet live,
+niemand sonst.**
+
+**Was als Nächstes ansteht,** steht im Backlog unter „Entscheidungsblock
+Phase 2" — neun offene Punkte, allen voran der Sales-Abriss (welche der neun
+Alt-Funktionen kommen in den Neubau) und die Kontrast-Frage bei
+`--ck-text-3`.
 
 Zur Migrations-Historie: `0001–0066` sind seit dem 06.08. lückenlos als angewendet
 verbucht (Backlog L2). **Regel daraus:** Migrationen ausschließlich über `db push`,

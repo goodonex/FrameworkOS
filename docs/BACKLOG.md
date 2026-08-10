@@ -2,7 +2,35 @@
 
 **Stand:** 2026-08-10 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
 
-## Runde vom 10.08., dritter Teil — Phase 2, **Etappen B und C gebaut** (nicht live)
+## **LIVE seit 10.08.2026, ~19:10 — Phase 2 komplett**
+
+Fast-Forward `fc6f1b5 → fff3118` auf `main` gepusht (Kevins Wort), Netlify hat
+deployt. **24 Commits**, 83 Dateien.
+
+**Beleg am ausgelieferten Bundle** (`index-UUyMJUxE.js`, CSS
+`index-LnM_7L1j.css`): `<title>Uriel — Cockpit</title>` und
+`theme-color #0c130e` stehen im HTML; im JS nachweisbar „Frag Uriel — oder halt
+zum Sprechen.", „Pipeline (klassisch)", „Die alte Pipeline.", „Geparkt: wird
+mit dem Ads-Start", „Überfällig seit", „klappt LinkedIn zusammen",
+„Ressourcen"; im CSS `#0c130e`, `ck-hero-foto`, `ck-nur-vorlesen`,
+`ck-zeile-karte`, `ck-karten-titel`, `portal-gold`, `Instrument Serif`.
+**Gegenprobe bestanden:** „JetBrains Mono" ist aus dem Bundle verschwunden.
+Routen `/`, `/cockpit`, `/sales/leads`, `/content`, `/portal/login` antworten
+200; die neuen Assets ebenfalls (`/ambient/horizont.jpg` 55 KB,
+`/icon-512.png`, `/favicon.svg`, `/site.webmanifest`).
+
+**Zwei Treffer in der Gegenprobe, die bewusst stehen bleiben:** „Brand OS"
+kommt genau einmal vor — in `OnboardingPublicPage` (Entscheidungspunkt 9,
+ausserhalb von D12). Und `#34d399` steht in `lib/coachPipelines.ts`, den
+Stufen-Farben der Glass-Pipeline, die nach dem Paritäts-Entscheid ohnehin zur
+Debatte steht (Entscheidungspunkt 7).
+
+**Noch nicht mit echten Daten gesehen.** Alle Screenshots und Prüfungen liefen
+ohne Supabase-Session gegen Leer- bzw. Demo-Zustände. Die erste eingeloggte
+Session ist die eigentliche Abnahme — vor allem Lead-Liste, Lead-Detail und
+das Portal mit echtem Projekt.
+
+## Runde vom 10.08., dritter Teil — Phase 2, **Etappen B und C gebaut**
 
 Damit ist die Blaupause `docs/wargames/phase2-haptik.md` **komplett gefahren**:
 Etappen A, B und C, zusammen **22 Commits** auf `cockpit-rebuild`, 83 Dateien.
