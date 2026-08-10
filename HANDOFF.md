@@ -4,7 +4,10 @@ Kompakter Einstieg in den **realen** Stand nach Cockpit-Rebuild und den Etappen 
 
 - **Was noch offen ist:** [`docs/BACKLOG.md`](docs/BACKLOG.md) — die eine Quelle der Wahrheit.
 - **Warum etwas so gebaut ist:** [`docs/rebuild-notes.md`](docs/rebuild-notes.md) + `git log`.
-- **Design-Regeln:** [`docs/REBUILD-PLAN.md`](docs/REBUILD-PLAN.md) §4 (Mission Control, verbindlich).
+- **Design-Regeln:** [`docs/phase2/DESIGN-TOKENS.md`](docs/phase2/DESIGN-TOKENS.md) —
+  seit dem 10.08. die eingefrorene Ästhetik-Wahrheit (Cockpit = „Horizont",
+  Portal = Navy×Gold). `docs/REBUILD-PLAN.md` §4 („Mission Control") beschreibt
+  den Stand davor und gilt für Farben, Schrift und Geometrie **nicht mehr**.
 
 > Ein früherer Handoff beschrieb die Vor-Rebuild-App („Brand OS", sechs Denk-Modi,
 > Three.js-Universe, Migrationen bis 0013). Das ist überholt.
@@ -56,8 +59,11 @@ nie im SQL-Editor — genau das hatte die Historie zerlegt.
 
 **Navigation** (`NavRail.tsx`): vorne die Warteschlange — Cockpit · Heute · Sales ·
 Projekte; hinten das Nachschlagewerk — Ads · Content · Agenten · Tracking. Mobil
-sind es 5 Tabs (letzter = „Mehr"-Sheet). `/crm/*` redirected auf `/sales/*`,
-`/brand/:slug/*` auf das Cockpit.
+sind es 5 Tabs (letzter = „Mehr"-Sheet), seit Phase 2 als **schwebende
+Dock-Pille mit reinen Zeichen** — die Zeichen kommen als Inline-SVG aus
+`components/BereichIcon.tsx`, die Registry (`lib/bereiche.ts`) trägt nur noch
+den Schlüssel. `/crm/*` redirected auf `/sales/*`, `/brand/:slug/*` auf das
+Cockpit.
 
 **Uriel selbst:** `UrielDock.tsx` + `UrielAura.tsx` — Chat mit Werkzeugen
 (`lib/urielTools.ts`: navigieren, Graph steuern, CRM/KPIs lesen, `remember`),
@@ -170,6 +176,17 @@ cd app && npx tsc -b && npm run build     # muss grün sein
    06.08. abends ist der Tree sauber — das ist die Ausnahme, nicht die Regel.)
 7. **`ANTHROPIC_API_KEY` in den Supabase-Edge-Secrets** war am 07.07. ungültig (401).
    Bei KI-Fehlern zuerst dort nachsehen (Backlog L6).
+8. **Tailwind gewinnt gegen `tokens.css`.** Die Utilities laden nach dem Import,
+   also schlägt `font-mono`/`font-display` aus `tailwind.config.js` jede Regel
+   gleichen Namens in `tokens.css`. Seit Phase 2 zeigen die drei Familien dort
+   auf die CSS-Variablen — wer sie wieder hart einträgt, bricht die Schrift auf
+   allen Flächen außerhalb von `.ck-root` (Anmeldung, Portal), ohne dass der
+   Build meckert.
+9. **Das Foto-Band des Cockpit-Homes ist absolut positioniert** und ragt über
+   den Hero hinaus, wenn dieser kürzer ist als das Band (`.ck-hero`
+   `min-height`). Dann legt es sich über die Beschriftungen darunter — heller
+   Text ohne Scrim auf hellem Bild. Wer am Hero-Aufbau schraubt, prüft die
+   Sektionen **darunter** mit.
 
 ---
 

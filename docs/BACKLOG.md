@@ -1,8 +1,81 @@
 # Uriel — Backlog (die eine Quelle der Wahrheit)
 
-**Stand:** 2026-08-09 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
+**Stand:** 2026-08-10 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
 
-**Runde vom 10.08.** (Phase-2-Planung, kein App-Code): Design entschieden und
+## Runde vom 10.08., zweiter Teil — Phase 2, **Etappe A gebaut** (nicht live)
+
+Die neue Optik steht: acht Commits auf `cockpit-rebuild`, Züge **A1–A7** der
+Blaupause (`docs/wargames/phase2-haptik.md`) plus ein Commit mit den Befunden
+der Etappen-Verifikation. **Der Fast-Forward auf `main` bleibt Kevins Wort.**
+
+| Zug | Was jetzt anders ist | Datei |
+|---|---|---|
+| **A1** | Syne/DM Sans/JetBrains Mono raus, **Inter** trägt alles; Instrument Serif liegt als `--ck-font-display` bereit und wird nur an den drei editorialen Momenten gerufen. Zahlen richten sich über `tabular-nums` aus, nicht über eine zweite Familie. Der Graph-Canvas kennt keine CSS-Variablen — seine fünf Font-Literale sind eine Konstante geworden | `app/index.html`, `styles/tokens.css`, `styles/cockpit.css`, `graph/OsNebula.tsx` |
+| **A2** | **Farb-Token-Swap auf Welt 1**: die ganze App dreht in einem Zug. Neu als Token: `--ck-bg-verlauf`, `--ck-ambient`, `--ck-card`/`--ck-card-border`, `--ck-accent-text`, `--ck-gold`, `--ck-medien-bg`, drei Radien (24/18/999). `--ck-panel` bleibt als **deckende** Entsprechung der Karte, weil Toast, Palette und Drawer über Canvas und Backdrop liegen | `styles/cockpit.css` |
+| **A2 (D3)** | Hell-Modus raus. Mehr als der ☀-Knopf: `loadUiTheme()` liefert hart `'dark'` und der Pre-Paint-Schalter in `index.html` ist weg — wer zuletzt auf hell stand, säße sonst dauerhaft im ungepflegten `plain-light`-Block fest. Die Klasse bleibt liegen | `lib/uiThemeStorage.ts`, `components/StatusBar.tsx` |
+| **A3** | Mobil ist aus der Bottom-Bar das **Dock** geworden: schwebende Pille, `blur(14px)`, aktiv = Zeichen im Akzent + 4px-Punkt. Die Unicode-Zeichen sind ein **Inline-SVG-Satz** — damit ist die O13-Emoji-Falle ersatzlos erledigt. `bereiche.ts` bleibt die eine Registry und trägt jetzt Schlüssel statt Zeichen | `components/BereichIcon.tsx`, `lib/bereiche.ts`, `styles/cockpit.css` |
+| **A4** | **Cockpit-Home = V5-Hero** (D4): Foto-Ambiente, Begrüßung in Serifen, Tages-Ring, Uriel-Pille, dann HEUTE · JETZT DRAN · Apps · Agenten-Zeile. Der Hero rechnet nichts — Ring = `li_anfragen` gegen `ANFRAGEN_LIMIT_TAG`, Liste = `geordnet` abgeschnitten | `components/home/HeroHorizont.tsx`, `components/home/JetztDran.tsx`, `pages/UrielHome.tsx` |
+| **A5** | Labels stehen nach Tokens-Doc (10px/700/0,15em), Knöpfe haben die Versalien abgelegt (Satzschreibung wie im Mock). 19 Radius-Literale, zwei `#fff`-Rahmen, Schatten und Abdunkelung sind tokenisiert | `styles/cockpit.css` + 15 Komponenten |
+| **A6** | Der Graph ist aus dem Deep-Space-Neon in die Horizont-Tonart gerückt; die vier Zustände holen sich die echten Signal-Farben | `graph/nebulaLayout.ts`, `graph/OsNebula.tsx` |
+| **A7** | PWA-Rahmen: ✦ in Gold auf `#0c130e` als Icon (SVG + 192/512/180/256), `theme_color`, Manifest, Fenstertitel. Anmeldekarte sagt **URIEL** (D12) | `app/public/*`, `app/index.html`, `pages/LoginPage.tsx` |
+
+**Zwei echte Fehler, die der Token-Swap ans Licht gebracht hat** — beide gefixt:
+der Badge malte **weiße Ziffern auf den Akzent** (in der alten Welt war der
+Akzent Phosphor-Grün, in Welt 1 heller Salbei → 1,6:1), und
+`tailwind.config.js` nannte Syne/DM Sans/JetBrains **hart**. Weil Tailwinds
+Utilities nach `tokens.css` laden, gewann diese Liste — Anmelde- und
+Portal-Flächen liefen seit A1 auf System-Ersatzschriften statt auf Inter.
+
+**Verifikation gefahren** (die neun Punkte der Blaupause): `npx tsc -b` +
+`npm run build` grün, **24/24 verify-Skripte** grün. Kontrast-Stichprobe mit
+echten `computed styles` über zehn Bereiche — zwölf Fließtext-Stellen standen
+auf `--ck-text-3` (3,95:1) und sind auf `--ck-text-2` (8,0:1) gehoben. Bei
+390×664: kein Querscrollen, der letzte Inhalt bleibt nach vollem Scrollen über
+der Dock-Kante, Touch-Ziele ≥ 44px, Konsole beim Laden sauber. Desktop 1280:
+`/cockpit` und `/sales` ohne Layout-Brüche. Zahlen-Konsistenz belegt:
+Hero-Ring == Tracking, JETZT DRAN == Arbeitsmodus-Reihenfolge (der
+Erinnerungs-Posten des Sales-Dashboards ist mobil ohnehin `null`).
+
+**Ehrlich dazu:** die Screenshots entstehen ohne Supabase-Session — der
+Prüf-Lauf legt eine Schein-Sitzung an und beantwortet alle Supabase-Aufrufe mit
+leeren Listen. Die Oberflächen sind also echt, die Zahlen darin sind
+Leer-Zustände.
+
+### Entscheidungsblock Phase 2 (offen, Stand 10.08.)
+
+1. **`--ck-text-3` und die 4,5:1-Grenze.** Der eingefrorene Wert `#737d70`
+   kommt auf der Kartenfläche auf **3,95:1**, als `.ck-label` auf 4,39:1 —
+   unter AA für kleinen Text. Fließtext ist überall gehoben; was übrig bleibt,
+   sind echte Mikro-Labels. **Vorschlag:** `#7d8879` (≈ 4,5:1), sonst bleibt es
+   wie eingefroren. Nicht im Alleingang geändert.
+2. **Kalender-Punkt.** Der Fremdkalender war Violett `#a78bfa` — dafür lässt
+   das Tokens-Doc keine dritte Signalfarbe zu, er ist jetzt neutral
+   (`--ck-text-3`). Damit liegt er nah an „Content" (`--ck-idle`). **Wenn du
+   die beiden unterscheidbar willst, wird daraus ein eigener Token.**
+3. **Graph-Kategoriefarben.** Ein Graph braucht unterscheidbare Kategorien —
+   das Tokens-Doc deckt sie nicht ab. Die 13 Töne liegen jetzt in der
+   Horizont-Tonart, die vier Zustände auf den echten Signalen. **Ansehen und
+   sagen, ob es passt.**
+4. **Dock ohne Text-Label.** Mock und Tokens-Doc beschreiben das Dock als
+   Zeichen + Punkt, ohne Beschriftung — so ist es gebaut. Die Namen sind für
+   Vorleseprogramme erhalten. **Sag Bescheid, wenn du die Label zurückwillst.**
+5. **Zwei Uriel-Einstiege auf dem Home.** Die neue Ask-Pille und der
+   schwebende ✦-Knopf öffnen dasselbe Dock, und der Knopf legt sich beim
+   Scrollen über Karten. **Vorschlag:** auf dem Home den FAB ausblenden, die
+   Pille ist dort der Weg. Auf allen anderen Flächen bleibt er.
+6. **Foto-Auflösung.** Das Ambiente ist das eingebettete Bild aus dem Mock
+   (780×465, 54 KB) — auf einem 3×-Display sichtbar weich. Der Blaupause nach
+   wäre der Ersatz das Unsplash-Original (`photo-1470071459604-3b5ec3a7fe05`),
+   selbst gehostet. **Das ist ein Download — sag einmal Ja, dann hole ich es.**
+
+**Für Etappe C vorgemerkt** (kein Handlungsbedarf jetzt): die Anmelde- und
+Onboarding-Karten sind innen noch Glas-Ära (`OnboardingPublicPage` sagt weiter
+„Brand OS"), und in der schmalen Desktop-Sidebar brechen ein paar lange
+Versal-Labels seit A5 auf zwei Zeilen um — beides gehört in C3/C4.
+
+---
+
+**Runde vom 10.08., erster Teil** (Phase-2-Planung, kein App-Code): Design entschieden und
 eingefroren nach vier Varianten-Runden mit Kevin — **Cockpit = V5 „Horizont"
 (Waldgrün/Salbei, Serifen-Momente, Foto-Ambiente nur im Home), Kundenportal =
 Navy×Gold (Markenfarben)**; Stern-Ornament bleibt Wallpaper, nicht App (V7
