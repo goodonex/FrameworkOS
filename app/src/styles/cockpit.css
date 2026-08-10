@@ -1006,6 +1006,10 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
     width: min(400px, calc(100vw - 20px)) !important;
   }
   .ck-uriel-fab { bottom: calc(70px + env(safe-area-inset-bottom)); right: 74px; }
+  /* Auf dem Homescreen steht die Uriel-Pille im Hero — der schwebende Knopf
+     waere dort ein zweiter Weg zur selben Sache und lag ausgerechnet auf der
+     Aktion der ersten „Jetzt dran"-Zeile. */
+  .ck-root[data-home='true'] .ck-uriel-fab { display: none; }
   .ck-uriel-panel {
     bottom: calc(130px + env(safe-area-inset-bottom));
     right: 10px;

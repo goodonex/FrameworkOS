@@ -69,9 +69,10 @@ export function GoalCard({
             <button
               type="button"
               onClick={oeffneEditor}
-              className="ck-label"
+              className="ck-karten-titel"
               style={{
                 marginLeft: 'auto',
+                whiteSpace: 'nowrap',
                 background: 'none',
                 border: 'none',
                 padding: 0,

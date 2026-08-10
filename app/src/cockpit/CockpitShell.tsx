@@ -1,4 +1,4 @@
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import { ChatBubble } from './components/ChatBubble'
 import { NavRail } from './components/NavRail'
 import { RunWatcher } from './components/RunWatcher'
@@ -14,10 +14,21 @@ import '../styles/cockpit.css'
  * Kein Canvas, kein Glas — bewusst schlichtes DOM-Layout.
  */
 export function CockpitShell() {
+  /**
+   * Der Homescreen bekommt seit Phase 2 (D4) eine eigene Uriel-Eingabe direkt
+   * unter dem Ring. Der schwebende ✦-Knopf ist dort also ein zweiter Weg zur
+   * selben Sache — und er lag mit seinen 48px genau auf der Aktion der ersten
+   * „Jetzt dran"-Zeile. Am Handy blendet ihn die Regel in cockpit.css hier
+   * aus; auf allen anderen Bereichen bleibt er.
+   */
+  const loc = useLocation()
+  const istHome = loc.pathname === '/cockpit'
+
   return (
     <ActiveBrandProvider>
       <div
         className="ck-root"
+        data-home={istHome ? 'true' : undefined}
         style={{
           position: 'fixed',
           inset: 0,
