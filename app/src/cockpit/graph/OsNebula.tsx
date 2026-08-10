@@ -24,6 +24,13 @@ interface Settings {
 
 const SETTINGS_KEY = 'ck-nebula'
 
+/**
+ * Canvas kennt keine CSS-Variablen — die Schrift muss als Zeichenkette in den
+ * 2D-Kontext. Eine Konstante statt fünf Literale, damit ein Font-Wechsel
+ * (Phase 2: JetBrains Mono → Inter) genau eine Stelle hat.
+ */
+const CANVAS_FONT = "'Inter', system-ui, sans-serif"
+
 function defaultSettings(): Settings {
   const reduced =
     typeof window !== 'undefined' &&
@@ -389,7 +396,7 @@ export function OsNebula({ map, contacts, runs = [], onNodeClick, onRefresh, hei
 
     const drawCurvedLabel = (text: string, radius: number, color: string) => {
       const fs = 10.5
-      ctx.font = `700 ${fs}px 'JetBrains Mono', ui-monospace, monospace`
+      ctx.font = `700 ${fs}px ${CANVAS_FONT}`
       const widths = [...text].map((ch) => ctx.measureText(ch).width + fs * 0.28)
       const totalAngle = widths.reduce((s, w) => s + w, 0) / radius
       let a = TOP - totalAngle / 2
@@ -635,7 +642,7 @@ export function OsNebula({ map, contacts, runs = [], onNodeClick, onRefresh, hei
             }
             if (n.glyph) {
               ctx.fillStyle = rgba(n.kind === 'core' ? P.core : color, 0.95)
-              ctx.font = `700 ${n.size * 0.95}px 'JetBrains Mono', ui-monospace, monospace`
+              ctx.font = `700 ${n.size * 0.95}px ${CANVAS_FONT}`
               ctx.textAlign = 'center'
               ctx.textBaseline = 'middle'
               ctx.fillText(n.glyph, p.x, p.y + 0.5)
@@ -652,7 +659,7 @@ export function OsNebula({ map, contacts, runs = [], onNodeClick, onRefresh, hei
             (s.labels && (n.kind === 'app' || n.kind === 'routine') && view.k >= 0.9)
           if (showLabel) {
             const fs = Math.max(8.5, 9.5 / view.k)
-            ctx.font = `600 ${fs}px 'JetBrains Mono', ui-monospace, monospace`
+            ctx.font = `600 ${fs}px ${CANVAS_FONT}`
             ctx.textAlign = 'center'
             ctx.fillStyle = isHover ? P.core : rgba(P.label, 0.9)
             const label = n.label.length > 24 ? `${n.label.slice(0, 23)}…` : n.label
@@ -663,7 +670,7 @@ export function OsNebula({ map, contacts, runs = [], onNodeClick, onRefresh, hei
             }
             if (n.kind === 'core') {
               ctx.fillStyle = rgba(P.label, 0.7)
-              ctx.font = `500 ${fs * 0.85}px 'JetBrains Mono', ui-monospace, monospace`
+              ctx.font = `500 ${fs * 0.85}px ${CANVAS_FONT}`
               ctx.fillText(n.sub.toUpperCase(), p.x, p.y + n.size + fs * 2 + 5)
             }
           }
@@ -810,7 +817,7 @@ export function OsNebula({ map, contacts, runs = [], onNodeClick, onRefresh, hei
         padding: '3px 8px',
         fontSize: 10,
         fontWeight: active ? 600 : 400,
-        fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+        fontFamily: CANVAS_FONT,
         letterSpacing: '0.02em',
         border: 'none',
         borderRadius: 5,

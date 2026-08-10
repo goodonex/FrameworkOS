@@ -65,10 +65,15 @@
   --mode-sales:        #2dd4bf;   /* teal */
   --mode-intelligence: #f59e0b;   /* amber */
 
-  /* --- Typography --- */
-  --font-display: 'Syne', sans-serif;       /* headings, brand name */
-  --font-body:    'DM Sans', sans-serif;    /* body, UI */
-  --font-mono:    'JetBrains Mono', monospace; /* code, data */
+  /* --- Typography (Phase 2, DESIGN-TOKENS.md) ---
+     Eine Familie für alles: Inter. Die Serifen-Momente (Begrüßung, Ring-Zahl,
+     KPI-Großzahl) holen sich --ck-font-display gezielt; sie sind bewusst NICHT
+     der Default, sonst rutschen Serifen in Fließtext und Knöpfe.
+     --font-mono ist kein Mono mehr — Zahlen richten sich über
+     `font-variant-numeric: tabular-nums` aus, nicht über eine zweite Familie. */
+  --font-display: 'Inter', system-ui, sans-serif;  /* headings, brand name */
+  --font-body:    'Inter', system-ui, sans-serif;  /* body, UI */
+  --font-mono:    'Inter', system-ui, sans-serif;  /* Labels, Datenspalten */
 
   --text-xs:   11px;
   --text-sm:   13px;
@@ -223,8 +228,8 @@ select:focus-visible {
 .h-section    { font-family: var(--font-display); font-size: 22px; font-weight: 600; letter-spacing: -0.3px; line-height: 1.15; }
 .h-card       { font-family: var(--font-display); font-size: 16px; font-weight: 600; letter-spacing: -0.1px; line-height: 1.25; }
 
-.label-mono   { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.14em; color: var(--text-tertiary); text-transform: uppercase; }
-.label-meta   { font-family: var(--font-mono); font-size: 9px;  letter-spacing: 0.1em; color: var(--text-tertiary); }
+.label-mono   { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.14em; color: var(--text-tertiary); text-transform: uppercase; font-variant-numeric: tabular-nums; }
+.label-meta   { font-family: var(--font-mono); font-size: 9px;  letter-spacing: 0.1em; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
 
 .text-muted   { color: var(--text-tertiary); }
 .text-soft    { color: var(--text-secondary); }

@@ -39,8 +39,12 @@
   --ck-graph-label: #9aa4a8;
   --ck-graph-panel: rgba(8, 12, 17, 0.92);
 
-  /* Typo */
-  --ck-font: 'JetBrains Mono', ui-monospace, monospace;
+  /* Typo (Phase 2, DESIGN-TOKENS.md Welt 1)
+     Inter trägt alles. Instrument Serif ist ein Sonderwerkzeug für die drei
+     editorialen Momente (Begrüßung, Ring-Zahl, KPI-Großzahl auf dem Home) —
+     nie Fließtext, nie Knöpfe. */
+  --ck-font: 'Inter', system-ui, -apple-system, sans-serif;
+  --ck-font-display: 'Instrument Serif', Georgia, 'Times New Roman', serif;
 
   /* Geometrie */
   --ck-radius: 8px;
@@ -77,6 +81,12 @@
   color: var(--ck-text-3);
   font-weight: 500;
 }
+
+/* --- Zahlen-Ausrichtung: ersetzt die alte Mono-Familie ------------------- */
+.ck-zahl { font-variant-numeric: tabular-nums; }
+
+/* --- Editorial-Moment: Instrument Serif, nur wo DESIGN-TOKENS es erlaubt --- */
+.ck-serif { font-family: var(--ck-font-display); font-weight: 400; letter-spacing: 0; }
 
 /* --- Panel: 1px-Border, KEIN Glas --- */
 .ck-panel {
@@ -163,7 +173,7 @@
   background: var(--ck-accent);
 }
 .ck-nebula-slider::-moz-range-track { height: 3px; border-radius: 2px; background: var(--ck-border-strong); }
-.ck-clock-time { font-size: 20px; font-weight: 500; letter-spacing: 0.04em; }
+.ck-clock-time { font-size: 20px; font-weight: 500; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
 
 .ck-nav-rail {
   display: flex;
@@ -554,7 +564,9 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
 /* --- Tabellen (CRM/E-Mail: konventionell lesbar, HUD nur als Rahmen) --- */
 /* Scroll statt Clipping — Tabellen mit vielen Spalten passen sonst nicht auf 375px. */
 .ck-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.ck-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+/* Zahlen in Tabellen stehen untereinander — das leistete früher JetBrains Mono,
+   heute `tabular-nums` in Inter (DESIGN-TOKENS.md, Typografie). */
+.ck-table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
 .ck-table th {
   text-align: left;
   padding: 10px 12px;
@@ -820,7 +832,7 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
   --accent-blue: var(--ck-idle);
   --chip-text-on-accent: var(--ck-bg);
 }
-/* Im Cockpit ist Mono die Stimme — keine zweite Schriftfamilie im Bild. */
+/* Im Cockpit ist Inter die Stimme — keine zweite Schriftfamilie im Bild. */
 .ck-deliver .font-display,
 .ck-deliver .deliver-internal-editor {
   font-family: var(--ck-font);
