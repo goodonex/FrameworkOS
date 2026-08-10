@@ -726,7 +726,7 @@ export function UrielDock() {
           borderRadius: '50%',
           border: '1px solid var(--ck-accent)',
           background: open ? 'var(--ck-accent)' : 'var(--ck-panel)',
-          color: open ? '#000' : 'var(--ck-accent)',
+          color: open ? 'var(--ck-bg)' : 'var(--ck-accent)',
           fontSize: 20,
           cursor: 'pointer',
           boxShadow: 'var(--ck-schatten-schwebend)',

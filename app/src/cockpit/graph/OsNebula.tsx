@@ -75,6 +75,12 @@ interface GraphPalette {
   nodeFill: string
 }
 
+/**
+ * Spiegel der --ck-graph-*-Tokens als Zeichenketten. Notwendig, weil der
+ * Canvas keine CSS-Variablen kennt UND weil `readGraphPalette` beim
+ * allerersten Render noch kein Element hat, von dem es lesen koennte.
+ * Wer die Tokens in cockpit.css aendert, aendert diese Werte mit.
+ */
 const GRAPH_DARK_FALLBACK = {
   bg: '#0a110c',
   star: '#cbd8c4',

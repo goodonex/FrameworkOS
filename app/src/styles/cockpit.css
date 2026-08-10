@@ -845,7 +845,10 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
    Steht bewusst am Dateiende — gleiche Spezifität wie die Basisregeln oben, muss also
    nach ihnen im Stylesheet stehen, um im Cascade zu gewinnen (keine !important-Hacks). --- */
 @media (max-width: 900px) {
-  .ck-btn { min-height: 40px; min-width: 40px; }
+  /* 44px ist die Daumen-Grenze (Verifikationspunkt 3 der Blaupause). Der
+     Zaehl-Knopf bleibt bewusst kleiner: er steht zu zweit in einer dichten
+     Zeile, 44px wuerden das Raster sprengen. */
+  .ck-btn { min-height: 44px; min-width: 44px; }
   .ck-counter-btn { min-height: 36px; min-width: 36px; }
   .ck-select { min-height: 40px; max-width: 34vw; }
 

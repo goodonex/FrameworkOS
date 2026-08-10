@@ -246,7 +246,7 @@ export function UrielHome() {
               if (!anordnen && reihenfolge.length === 0) setReihenfolge(sortierteApps.map((b) => b.path))
               setAnordnen((a) => !a)
             }}
-            style={{ fontSize: 10, minHeight: 32, padding: '0 12px' }}
+            style={{ fontSize: 11, padding: '0 14px' }}
           >
             {anordnen ? 'Fertig' : 'Anordnen'}
           </button>

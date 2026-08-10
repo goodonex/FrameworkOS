@@ -4,6 +4,12 @@ const KEY = 'brand-os-ui-theme'
 
 export const UI_THEME_EVENT = 'brand-os-ui-theme'
 
+/**
+ * Die Browser-Leiste kann keine CSS-Variable lesen — der Wert muss als
+ * Zeichenkette in das `theme-color`-Meta. Er steht deshalb zwangslaeufig
+ * zweimal: hier und in `app/index.html` (vor dem ersten Paint). Beide sind
+ * --ck-bg aus Welt 1; wer den Grundton aendert, aendert alle drei.
+ */
 const THEME_COLOR: Record<UiTheme, string> = {
   dark: '#0c130e',
   'plain-light': '#f7f7f9',
