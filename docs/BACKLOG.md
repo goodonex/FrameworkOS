@@ -2,6 +2,17 @@
 
 **Stand:** 2026-08-09 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
 
+**Runde vom 10.08.** (Phase-2-Planung, kein App-Code): Design entschieden und
+eingefroren nach vier Varianten-Runden mit Kevin — **Cockpit = V5 „Horizont"
+(Waldgrün/Salbei, Serifen-Momente, Foto-Ambiente nur im Home), Kundenportal =
+Navy×Gold (Markenfarben)**; Stern-Ornament bleibt Wallpaper, nicht App (V7
+angesehen und verworfen). Wahrheit: `docs/phase2/DESIGN-TOKENS.md` + Mocks
+`docs/phase2/style-varianten*.html`. **Blaupause für die Umsetzung:**
+`docs/wargames/phase2-haptik.md` (Etappen A/B/C, D1–D12, blind ausführbar für
+Opus auf xhigh; deckt O14-Neubau nach Close-Vorbild und O16 LinkedIn-Kanal).
+Nebenbei erledigt und live: Marken-Umschalter entfernt — es gibt nur noch
+HERRMANN & CO.
+
 **LIVE seit 09.08.2026, ~23:20** — Fast-Forward `63c2177 → 179702f` auf `main`
 gepusht (Kevins Wort), Netlify hat deployt. **Beleg am ausgelieferten Bundle**
 (`index-B2bblpN_.js`, der Hash weicht vom lokalen Build ab, weil Netlify mit
