@@ -8,10 +8,10 @@ import { useCommandPalette } from '../../lib/commandPaletteContext'
 import { AgentenKacheln } from '../components/home/AgentenKacheln'
 import { AppGrid } from '../components/home/AppGrid'
 import { BefundZeile } from '../components/home/BefundZeile'
-import { HeuteWidget } from '../components/home/HeuteWidget'
+import { HeroHorizont } from '../components/home/HeroHorizont'
+import { JetztDran } from '../components/home/JetztDran'
 import { TermineWidget } from '../components/home/TermineWidget'
 import { VitalsWidget } from '../components/home/VitalsWidget'
-import { WidgetStack } from '../components/home/WidgetStack'
 import { useActiveBrand } from '../lib/activeBrand'
 import { agentenBefund } from '../lib/agentenGesundheit'
 import { PALETTEN_BEREICHE } from '../lib/bereiche'
@@ -27,6 +27,8 @@ import { useUiSetting } from '../lib/uiSettings'
 import { tagesansage } from '../lib/tagesansage'
 import { eventsByDate, termineAmTag, ymd, type CalEvent } from '../lib/termineEvents'
 import { CALENDAR_ICAL_KEY, useCalendarFeed } from '../lib/useCalendarFeed'
+import { ANFRAGEN_LIMIT_TAG } from '../lib/prioritaet'
+import { useUrielBus } from '../../store/urielBus'
 import { useDailyMetrics } from '../lib/useDailyMetrics'
 import { useRunnerData } from '../lib/useRunnerData'
 
@@ -85,6 +87,8 @@ const SCHNELL_AKTIONEN: Record<string, Array<{ label: string; route: string }>> 
 export function UrielHome() {
   const navigate = useNavigate()
   const { openPalette } = useCommandPalette()
+  // Die Ask-Pille oeffnet das BESTEHENDE Uriel-Dock (D4) — kein zweiter Chat.
+  const urielOeffnen = useUrielBus((s) => s.setOpen)
   const { activeBrand } = useActiveBrand()
   const slug = activeBrand?.slug
 
@@ -181,60 +185,48 @@ export function UrielHome() {
         flexDirection: 'column',
         gap: 12,
         // Unten Luft für die Uriel-Blase und die Bottom-Bar (am 390er geprüft).
-        padding: '6px 0 96px',
+        padding: '0 0 96px',
       }}
     >
-      <header style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-        <div>
-          <div style={{ fontSize: 19, color: 'var(--ck-text-1)' }}>{gruss(jetzt)}.</div>
-          <div className="ck-label" style={{ marginTop: 2 }}>
-            {datumLang(jetzt)}
-          </div>
-        </div>
-        {/* Suche = die bestehende CommandPalette (Zug 6). Am Handy gab es bisher
-            keinen Weg dorthin — Cmd+K hat kein Telefon. */}
-        <button
-          type="button"
-          className="ck-btn"
-          onClick={openPalette}
-          aria-label="Suchen und springen"
-          style={{ minHeight: 44, minWidth: 44, fontSize: 17, flexShrink: 0 }}
-        >
-          ⌕
-        </button>
-      </header>
+      <HeroHorizont
+        gruss={`${gruss(jetzt)}.`}
+        datum={laedt ? datumLang(jetzt) : ansage}
+        ringWert={metrics.today.li_anfragen}
+        ringZiel={ANFRAGEN_LIMIT_TAG}
+        ringLabel="Anfragen"
+        onAsk={() => urielOeffnen(true)}
+      />
 
       <BefundZeile meldung={befund.meldung} onOeffnen={() => navigate('/agenten')} />
 
-      {/* v2 (c): nebeneinander statt gestapelt — Heute bleibt Seite 1, damit
-          „Loslegen" nicht hinter einem Wisch liegt. */}
-      <WidgetStack
-        seiten={[
-          {
-            id: 'heute',
-            label: 'Heute',
-            inhalt: (
-              <HeuteWidget
-                ansage={ansage}
-                offen={geordnet.length}
-                entwuerfe={entwuerfe}
-                laedt={laedt}
-                onLoslegen={() => navigate('/sales?kachel=jetzt-dran&modus=arbeit')}
-              />
-            ),
-          },
-          {
-            id: 'termine',
-            label: 'Termine heute',
-            inhalt: <TermineWidget termine={termine} onOeffnen={() => navigate('/termine')} />,
-          },
-          {
-            id: 'woche',
-            label: 'Woche',
-            inhalt: <VitalsWidget vitals={vitals} onOeffnen={() => navigate('/tracking')} />,
-          },
-        ]}
+      {/* HEUTE — was feststeht. Derselbe Baustein wie vorher im Wisch-Stapel,
+          jetzt als eigene Sektion (D4: keine versteckten Seiten mehr). */}
+      <section style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <span className="ck-label" style={{ paddingLeft: 2, letterSpacing: '0.16em' }}>
+          Heute
+        </span>
+        <TermineWidget termine={termine} onOeffnen={() => navigate('/termine')} />
+      </section>
+
+      {/* JETZT DRAN — die obersten drei Posten DER EINEN Rangfolge. Der Weg in
+          die Arbeit ist derselbe wie der frühere „Loslegen"-Knopf. */}
+      <JetztDran
+        posten={geordnet}
+        entwuerfe={entwuerfe}
+        laedt={laedt}
+        onOeffnen={() => navigate('/sales?kachel=jetzt-dran&modus=arbeit')}
       />
+
+      {/* Suche = die bestehende CommandPalette (O18, Zug 6). Am Handy gibt es
+          keinen anderen Weg dorthin — Cmd+K hat kein Telefon. */}
+      <button
+        type="button"
+        className="ck-btn"
+        onClick={openPalette}
+        style={{ alignSelf: 'flex-start', minHeight: 44, fontSize: 12 }}
+      >
+        Suchen und springen
+      </button>
 
       {/* Die Apps. `/cockpit` fehlt bewusst — man ist schon da. Reihenfolge =
           Registry-Reihenfolge, also Warteschlange vorn. */}
@@ -275,6 +267,11 @@ export function UrielHome() {
           nicht hinter einen Bereichswechsel. Dieselben Runs, aus denen oben
           schon die Warnzeile kommt. */}
       <AgentenKacheln runs={runs} befund={befund} jetzt={jetzt} onOeffnen={() => navigate('/agenten')} />
+
+      {/* Die Wochenzahlen stehen in D4 nicht im Hero — geloescht werden sie
+          deshalb nicht. Sie sind unter die Apps gerueckt, wo sie niemandem im
+          Weg stehen und trotzdem ohne Bereichswechsel lesbar bleiben. */}
+      <VitalsWidget vitals={vitals} onOeffnen={() => navigate('/tracking')} />
     </div>
   )
 }

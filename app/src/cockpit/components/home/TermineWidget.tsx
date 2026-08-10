@@ -26,7 +26,10 @@ export function TermineWidget({ termine, onOeffnen }: { termine: CalEvent[]; onO
         color: 'var(--ck-text-1)',
       }}
     >
-      <span className="ck-label">Termine heute</span>
+      {/* Kein eigenes Label mehr: seit dem V5-Hero (Zug A4) steht „HEUTE" als
+          Sektions-Beschriftung über der Karte — zwei Überschriften für eine
+          Liste sind eine zu viel. Der Knopf traegt seinen Namen weiter im
+          aria-label, Vorleseprogramme verlieren also nichts. */}
       {termine.length === 0 ? (
         <span style={{ fontSize: 13, color: 'var(--ck-text-2)' }}>Heute keine.</span>
       ) : (

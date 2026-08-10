@@ -49,6 +49,23 @@
   /* Gold trägt AUSSCHLIESSLICH den Uriel-Funken ✦ (Klammer zur Marke). */
   --ck-gold: #d9bd7d;
 
+  /* Foto-Ambiente — NUR auf dem Cockpit-Home (DESIGN-TOKENS.md). Das Bild ist
+     selbst gehostet (app/public/ambient/), nie ein Hotlink. Der Schutzverlauf
+     steht mit im Token: Text über Foto ohne Scrim gibt es nicht. */
+  --ck-foto: url('/ambient/horizont.jpg');
+  --ck-foto-scrim: linear-gradient(
+    180deg,
+    rgba(12, 19, 14, 0.28) 0%,
+    rgba(12, 19, 14, 0.06) 34%,
+    rgba(12, 19, 14, 0.62) 72%,
+    #0c130e 99%
+  );
+
+  /* Uriel-Eingabe (Pille) — Werte aus DESIGN-TOKENS.md. */
+  --ck-ask-bg: rgba(17, 24, 20, 0.72);
+  --ck-ask-border: rgba(174, 207, 164, 0.24);
+  --ck-ask-glow: 0 0 30px rgba(174, 207, 164, 0.13);
+
   /* Dock (mobil): schwebende Pille, Werte aus dem V5-Mock. */
   --ck-dock-bg: rgba(14, 20, 16, 0.78);
   --ck-dock-border: rgba(255, 255, 255, 0.07);
@@ -147,6 +164,162 @@
 }
 /* Karte in Karte: eine Stufe kleiner, sonst wirkt die innere aufgeblasen. */
 .ck-panel .ck-panel { border-radius: var(--ck-radius-innen); }
+
+/* ============================================================
+   V5-HERO „Horizont" — nur auf dem Cockpit-Home (Zug A4)
+   Foto-Ambiente gibt es genau hier. Arbeitsflächen bleiben ruhige
+   Farbfläche (DESIGN-TOKENS.md, Haltung).
+   ============================================================ */
+
+.ck-hero {
+  position: relative;
+  /* Randlos bis an die Kanten, obwohl .ck-main 12px Innenabstand hat. */
+  margin: -12px -12px 0;
+  padding: 10px 18px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  /* Der Hero ist so hoch wie sein Foto-Band. Ohne das würde das absolut
+     liegende Foto über die folgenden Sektionen ragen und deren Beschriftungen
+     verdecken — Text ohne Scrim auf hellem Bild, also genau der Fehler, den
+     die Scrim-Regel verhindern soll. Der Wert leitet sich aus dem Mock ab:
+     dort sind es 470px ab Bildschirmkante, hier beginnt der Inhalt erst
+     unter der ~48px hohen Statusleiste. */
+  min-height: 422px;
+  justify-content: flex-start;
+}
+
+/* Das Foto liegt hinter dem Inhalt und läuft nach unten in die Grundfläche
+   aus — der Verlauf ist Teil des Bildes, nicht ein Kasten darüber. */
+.ck-hero-foto {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 422px;
+  z-index: 0;
+  pointer-events: none;
+  background-image: var(--ck-foto-scrim), var(--ck-foto);
+  background-size: cover;
+  background-position: center 30%;
+}
+.ck-hero > *:not(.ck-hero-foto) { position: relative; z-index: 1; }
+
+/* Scrim-Pflicht: alles, was auf dem Foto steht, trägt seinen Schutzschatten. */
+.ck-hero-gruss {
+  font-family: var(--ck-font-display);
+  font-weight: 400;
+  font-size: 34px;
+  line-height: 1.15;
+  letter-spacing: 0;
+  color: var(--ck-text-1);
+  text-shadow: 0 1px 22px rgba(0, 0, 0, 0.45);
+}
+.ck-hero-datum {
+  margin-top: 6px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--ck-text-2);
+  text-shadow: 0 1px 14px rgba(0, 0, 0, 0.55);
+}
+
+/* Tages-Ring: r52, Strich 5, Akzent, dunkle Glas-Mitte, Zahl in Serifen. */
+.ck-ring { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.ck-ring-feld { position: relative; }
+.ck-ring svg { display: block; width: 158px; height: 158px; filter: drop-shadow(0 4px 26px rgba(0, 0, 0, 0.5)); }
+.ck-ring-mitte {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.ck-ring-zahl {
+  font-family: var(--ck-font-display);
+  font-weight: 400;
+  font-size: 40px;
+  line-height: 1;
+  color: var(--ck-text-1);
+  text-shadow: 0 1px 18px rgba(0, 0, 0, 0.5);
+}
+.ck-ring-zahl i { font-style: normal; font-size: 17px; color: var(--ck-text-2); }
+.ck-ring-mitte .ck-label {
+  margin-top: 5px;
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  font-weight: 700;
+  color: var(--ck-text-2);
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.6);
+}
+.ck-ring-unter { font-size: 12px; color: var(--ck-text-2); text-shadow: 0 1px 12px rgba(0, 0, 0, 0.55); }
+
+/* Uriel-Eingabe: die Pille, die das bestehende Dock öffnet. */
+.ck-ask {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  min-height: 52px;
+  padding: 14px 18px;
+  border-radius: var(--ck-radius-pille);
+  background: var(--ck-ask-bg);
+  border: 1px solid var(--ck-ask-border);
+  box-shadow: var(--ck-ask-glow);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: var(--ck-text-3);
+  font: inherit;
+  font-size: 13.5px;
+  text-align: left;
+  cursor: pointer;
+}
+/* Der Funke ist der EINZIGE Ort, an dem Gold vorkommt. */
+.ck-ask-funke { color: var(--ck-gold); font-size: 15px; flex-shrink: 0; }
+.ck-ask-text { flex: 1; min-width: 0; }
+.ck-ask svg { width: 17px; height: 17px; flex-shrink: 0; }
+
+/* Zeilen-Karte aus dem Mock: Titel, Meta, rechts die eine Aktion. */
+.ck-zeile-karte {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 14px 16px;
+  text-align: left;
+  font: inherit;
+  color: var(--ck-text-1);
+  cursor: pointer;
+}
+.ck-zeile-karte-text { flex: 1; min-width: 0; }
+.ck-zeile-karte-titel {
+  display: block;
+  font-size: 14.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ck-zeile-karte-meta {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--ck-text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ck-zeile-karte-meta.ist-warnung { color: var(--ck-warn); }
+.ck-zeile-karte-tu {
+  flex-shrink: 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 9px 14px;
+  border-radius: var(--ck-radius-pille);
+  color: var(--ck-accent-text);
+  background: var(--ck-accent-dim);
+  border: 1px solid color-mix(in srgb, var(--ck-accent) 26%, transparent);
+  white-space: nowrap;
+}
 
 /* --- Status-Punkt --- */
 .ck-dot {
