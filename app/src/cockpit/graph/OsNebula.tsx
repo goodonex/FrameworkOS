@@ -76,12 +76,12 @@ interface GraphPalette {
 }
 
 const GRAPH_DARK_FALLBACK = {
-  bg: '#05080c',
-  star: '#cfd8e3',
-  line: '#f2f4f5',
-  core: '#f2f4f5',
-  label: '#9aa4a8',
-  panel: 'rgba(8,12,17,0.92)',
+  bg: '#0a110c',
+  star: '#cbd8c4',
+  line: '#eaf0e6',
+  core: '#eaf0e6',
+  label: '#a7b3a2',
+  panel: 'rgba(14,21,16,0.92)',
 }
 
 const GRAPH_LIGHT_FALLBACK = {
@@ -110,7 +110,7 @@ function readGraphPalette(el: HTMLElement | null, isLight: boolean): GraphPalett
     core: v('--ck-graph-core', fb.core),
     label: v('--ck-graph-label', fb.label),
     panel: v('--ck-graph-panel', fb.panel),
-    nodeFill: isLight ? '#ffffff' : '#0a0f15',
+    nodeFill: isLight ? '#ffffff' : '#0d150f',
   }
 }
 
@@ -820,7 +820,7 @@ export function OsNebula({ map, contacts, runs = [], onNodeClick, onRefresh, hei
         fontFamily: CANVAS_FONT,
         letterSpacing: '0.02em',
         border: 'none',
-        borderRadius: 5,
+        borderRadius: 'var(--ck-radius-pille)',
         cursor: 'pointer',
         whiteSpace: 'nowrap',
         background: active ? 'color-mix(in srgb, var(--ck-accent) 18%, transparent)' : 'transparent',
@@ -877,7 +877,7 @@ export function OsNebula({ map, contacts, runs = [], onNodeClick, onRefresh, hei
             padding: 2,
             gap: 2,
             border: '1px solid var(--ck-border)',
-            borderRadius: 7,
+            borderRadius: 'var(--ck-radius-pille)',
             background: 'var(--ck-graph-panel)',
             backdropFilter: 'blur(6px)',
           }}
@@ -905,7 +905,7 @@ export function OsNebula({ map, contacts, runs = [], onNodeClick, onRefresh, hei
                 padding: 2,
                 gap: 2,
                 border: '1px solid var(--ck-border)',
-                borderRadius: 7,
+                borderRadius: 'var(--ck-radius-pille)',
                 background: 'var(--ck-graph-panel)',
                 backdropFilter: 'blur(6px)',
               }}

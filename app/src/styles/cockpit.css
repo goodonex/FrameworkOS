@@ -86,13 +86,14 @@
      erst am Element auf, der Hell-Block unten zieht also automatisch mit. */
   --ck-bg-1: var(--ck-panel);
 
-  /* Graph (OsNebula) */
-  --ck-graph-bg: #05080c;
-  --ck-graph-star: #cfd8e3;
-  --ck-graph-line: #f2f4f5;
-  --ck-graph-core: #f2f4f5;
-  --ck-graph-label: #9aa4a8;
-  --ck-graph-panel: rgba(8, 12, 17, 0.92);
+  /* Graph (OsNebula) — dieselbe Welt, nur eine Spur tiefer als die Seite,
+     damit der Graph als Fenster liest und nicht als Fläche (Zug A6). */
+  --ck-graph-bg: #0a110c;
+  --ck-graph-star: #cbd8c4;
+  --ck-graph-line: #eaf0e6;
+  --ck-graph-core: #eaf0e6;
+  --ck-graph-label: #a7b3a2;
+  --ck-graph-panel: rgba(14, 21, 16, 0.92);
 
   /* Typo (Phase 2, DESIGN-TOKENS.md Welt 1)
      Inter trägt alles. Instrument Serif ist ein Sonderwerkzeug für die drei

@@ -28,20 +28,32 @@ export type LayerId =
   | 'fehler'
   | 'läuft'
 
+/**
+ * Die Kategorie-Farben des Graphen (Phase 2, Zug A6).
+ *
+ * Ein Graph braucht unterscheidbare Kategorien — das ist Datenkodierung, nicht
+ * Oberflächen-Schmuck, und deshalb der einzige Ort im Cockpit mit mehr als
+ * einem Farbton. Was er NICHT mehr sein darf, ist ein Neon-Nebel neben einer
+ * warmen Waldgrün-Welt: die Töne liegen jetzt alle in derselben Tonart
+ * (gedämpft, mittlere Sättigung), und die vier Zustände holen sich die echten
+ * Signal-Tokens — Erfolg = Akzent, Fehler = Rot, läuft = Gold-Kühl, ruhend =
+ * neutral. Das Tokens-Doc deckt Kategoriefarben nicht ab; steht im
+ * Entscheidungsblock.
+ */
 export const LAYER_COLOR: Record<LayerId, string> = {
-  core: '#f2f4f5',
-  skills: '#f59e0b', // orange (innen)
-  memory: '#a78bfa', // violett
-  routines: '#eab308', // gold
-  apps: '#38bdf8', // eis-blau (außen)
-  sales: '#34d399', // grün = Geld, nah am Kern
-  loom: '#fbbf24', // amber
-  kalt: '#60a5fa', // blau
-  paused: '#64748b', // grau
-  agent: '#eab308', // Agent-Hub (gold, wie Routinen)
-  erledigt: '#34d399', // Run erfolgreich
-  fehler: '#f87171', // Run fehlgeschlagen (rot)
-  'läuft': '#22d3ee', // Run läuft gerade (cyan)
+  core: '#eaf0e6', // --ck-text-1
+  skills: '#c9b27a', // warmes Beige (innen)
+  memory: '#9fb8c4', // kühles Graublau
+  routines: '#d9ab52', // Gold — wie --ck-warn
+  apps: '#8fb8a8', // Salbei-Teal (außen)
+  sales: '#aecfa4', // Akzent = Geld, nah am Kern
+  loom: '#d3a98a', // Ton/Clay
+  kalt: '#8a9bb5', // gedämpftes Blau
+  paused: '#78857f', // neutral, wie --ck-idle
+  agent: '#d9ab52', // Agent-Hub (Gold, wie Routinen)
+  erledigt: '#aecfa4', // Run erfolgreich = Akzent
+  fehler: '#e5484d', // Run fehlgeschlagen = --ck-danger
+  'läuft': '#9fc7d1', // Run läuft gerade
 }
 
 /** Abgedunkelte Pendants (gleiche Farbtöne) — lesbar auf hellem Hintergrund. */
