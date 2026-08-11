@@ -201,14 +201,16 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  /* Der Hero ist so hoch wie sein Foto-Band. Ohne das würde das absolut
-     liegende Foto über die folgenden Sektionen ragen und deren Beschriftungen
-     verdecken — Text ohne Scrim auf hellem Bild, also genau der Fehler, den
-     die Scrim-Regel verhindern soll. Der Wert leitet sich aus dem Mock ab:
-     dort sind es 470px ab Bildschirmkante, hier beginnt der Inhalt erst
-     unter der ~48px hohen Statusleiste. */
-  min-height: 422px;
+  /* Der Hero ist so hoch wie sein Foto-Band (470px ab Bildschirmkante, wie im
+     Mock). Ohne diese Hoehe wuerde das absolut liegende Foto ueber die
+     folgenden Sektionen ragen und deren Beschriftungen verdecken — Text ohne
+     Scrim auf hellem Bild, also genau der Fehler, den die Scrim-Regel
+     verhindern soll. */
+  min-height: 470px;
   justify-content: flex-start;
+  /* Platz fuer die Statusleiste, die auf dem Home ueber dem Foto schwebt
+     statt darueber zu sitzen (Regel weiter unten). */
+  padding-top: calc(56px + env(safe-area-inset-top));
 }
 
 /* Das Foto liegt hinter dem Inhalt und läuft nach unten in die Grundfläche
@@ -216,7 +218,7 @@
 .ck-hero-foto {
   position: absolute;
   inset: 0 0 auto 0;
-  height: 422px;
+  height: 470px;
   z-index: 0;
   pointer-events: none;
   background-image: var(--ck-foto-scrim), var(--ck-foto);
@@ -1116,6 +1118,35 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
      waere dort ein zweiter Weg zur selben Sache und lag ausgerechnet auf der
      Aktion der ersten „Jetzt dran"-Zeile. */
   .ck-root[data-home='true'] .ck-uriel-fab { display: none; }
+
+  /* Das Foto laeuft bis an die Bildschirmkante — kein dunkler Streifen mehr
+     ueber dem Bild (Kevins Befund am Geraet, 11.08.).
+     Die Statusleiste ist dafuer aus dem Fluss genommen und schwebt UEBER dem
+     Hero, statt eine Zeile darueber zu belegen. Genau so steht sie im Mock:
+     Uhrzeit und Datum liegen im Bild. `.ck-main` beginnt damit bei 0 und der
+     Hero bringt seinen eigenen Kopf-Abstand mit.
+     Nur auf dem Home — auf allen anderen Flaechen bleibt die Leiste, wo sie war. */
+  .ck-root[data-home='true'] .ck-statusbar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 30;
+    border-bottom: none;
+    pointer-events: none;
+  }
+  /* Die Wortmarke bleibt der Uriel-Schalter — nur die Leiste selbst faengt
+     keine Tipps mehr ab, damit sie dem Foto nicht im Weg steht. */
+  .ck-root[data-home='true'] .ck-statusbar > * { pointer-events: auto; }
+  /* Scrim-Pflicht: was auf dem Foto steht, traegt seinen Schatten. Und das
+     Datum wird hell — als Meta-Grau (--ck-text-3) verschwand es auf dem hellen
+     Himmel komplett. Im Mock ist die Statuszeile ebenfalls hell auf dem Bild. */
+  .ck-root[data-home='true'] .ck-wordmark,
+  .ck-root[data-home='true'] .ck-clock-time,
+  .ck-root[data-home='true'] .ck-statusbar .ck-label {
+    text-shadow: 0 1px 12px rgba(0, 0, 0, 0.65);
+  }
+  .ck-root[data-home='true'] .ck-statusbar .ck-label { color: var(--ck-text-1); }
   /* Im Zähl-Modus ist die ganze Fläche der Knopf — beide Schwebeknöpfe wären
      dort Fallen für den Daumen. */
   .ck-root[data-zaehlen='true'] .ck-uriel-fab,
