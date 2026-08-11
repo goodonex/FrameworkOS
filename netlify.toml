@@ -13,3 +13,48 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+# ---------------------------------------------------------------------------
+# Caching (11.08.2026, gemessen statt geraten)
+#
+# Vorgefunden: die Dateien unter /assets liefen mit
+# `max-age=14400, must-revalidate` — vier Stunden, danach muss JEDER App-Start
+# die 544 KB (brotli) erst bestaetigen lassen, bevor irgendetwas erscheint.
+# Am Handy im Mobilfunk ist das genau der lange weisse Bildschirm.
+#
+# Dabei sind diese Dateien unveraenderlich: Vite schreibt den Inhalts-Hash in
+# den Namen (`index-CbXs3Ivr.js`). Aendert sich der Inhalt, aendert sich der
+# Name — eine alte Datei kann gar nicht falsch werden. Deshalb ein Jahr und
+# `immutable`: der Browser fragt nicht mal mehr nach.
+#
+# WICHTIG, wenn hier jemand aufraeumt: Das gilt NUR fuer /assets/*. Alles in
+# `public/` behaelt seinen Namen ueber Deploys hinweg (z. B.
+# /ambient/horizont.jpg) — mit `immutable` waere ein Austausch dort nicht mehr
+# auszuliefern.
+# ---------------------------------------------------------------------------
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Die Einstiegsseite verweist auf die gehashten Dateien und muss deshalb bei
+# jedem Aufruf frisch sein — sonst zeigt ein Deploy erst beim naechsten Mal.
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# Der Service Worker ist der Weg, auf dem Aktualisierungen ueberhaupt ankommen.
+# Ein gecachter Worker kann sich nicht selbst ersetzen.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+# Manifest und Icons aendern sich selten, tragen aber feste Namen — ein Tag ist
+# lang genug, um zu helfen, und kurz genug, um ein neues Icon durchzulassen.
+[[headers]]
+  for = "/site.webmanifest"
+  [headers.values]
+    Cache-Control = "public, max-age=86400"
