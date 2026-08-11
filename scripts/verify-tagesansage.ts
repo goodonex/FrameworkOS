@@ -71,9 +71,9 @@ function posten(spur: Spur): Posten {
   check('3 kein Gesamtmedian', leer.gesamt, null)
   check('3b keine Restdauer', restarbeit([posten('antwort')], leer).sekunden, null)
   check(
-    '3c Ansage ohne Uhrzeit',
+    '3c Ansage ohne Uhrzeit — nur die Zahl, kein Jargon (D8)',
     tagesansage([posten('antwort'), posten('loom')], leer, NOW),
-    '2 offen · noch keine Messwerte',
+    '2 offen',
   )
 }
 
@@ -103,7 +103,7 @@ function posten(spur: Spur): Posten {
   ])
   const viele = Array.from({ length: 200 }, () => posten('erstnachricht'))
   check('7 unter Gesamt-Schwelle → keine Zahl', restarbeit(viele, dreiTests).sekunden, null)
-  check('7b Ansage bleibt ehrlich', tagesansage(viele, dreiTests, NOW), '200 offen · noch keine Messwerte')
+  check('7b Ansage bleibt ehrlich', tagesansage(viele, dreiTests, NOW), '200 offen')
 
   // Spur-Median aus 2 Messungen ist Rauschen → Gesamt-Median trägt.
   const duenneSpur = medianeJeSpur([

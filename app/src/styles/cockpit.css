@@ -240,12 +240,20 @@
   color: var(--ck-text-1);
   text-shadow: 0 1px 22px rgba(0, 0, 0, 0.45);
 }
+/* Die Zeile unter der Begrüßung liegt an der hellsten Stelle des Fotos und war
+   dort die schlechteste Stelle der Seite (D8). Drei Dinge zusammen:
+   der hellste Textton statt des mittleren, eine Spur mehr Grad — und ein
+   zweilagiger Schatten. Die enge Lage setzt eine dunkle Kante direkt an die
+   Buchstaben, die weite dämpft den Bildbereich dahinter; eine einzelne weiche
+   Lage trug über den hellen Stellen nicht. */
 .ck-hero-datum {
   margin-top: 6px;
-  font-size: 13.5px;
-  line-height: 1.55;
-  color: var(--ck-text-2);
-  text-shadow: 0 1px 14px rgba(0, 0, 0, 0.55);
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--ck-text-1);
+  text-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.8),
+    0 1px 18px rgba(0, 0, 0, 0.65);
 }
 
 /* Tages-Ring: r52, Strich 5, Akzent, dunkle Glas-Mitte, Zahl in Serifen. */

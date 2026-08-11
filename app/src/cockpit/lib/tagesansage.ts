@@ -115,13 +115,18 @@ function uhrzeit(d: Date): string {
 }
 
 /**
- * Die Zeile unter „Jetzt dran". Ohne Messwerte bleibt es bei der Zahl — lieber
+ * Die Zeile unter der Begrüßung. Ohne Messwerte bleibt es bei der Zahl — lieber
  * eine halbe Ansage als eine erfundene Uhrzeit.
+ *
+ * **Ohne den Zusatz „noch keine Messwerte"** (D8, 11.08.): Kevin liest diese
+ * Zeile morgens als Erstes, und sie erklärte ihm die Innereien der Messung,
+ * statt ihm den Tag zu sagen. Dass keine Zeit dasteht, sagt schon alles, was
+ * es dazu zu sagen gibt.
  */
 export function tagesansage(posten: Posten[], dauern: Dauern, jetzt: Date = new Date()): string {
   const r = restarbeit(posten, dauern)
   if (r.offen === 0) return 'Liste leer'
-  if (r.sekunden == null) return `${r.offen} offen · noch keine Messwerte`
+  if (r.sekunden == null) return `${r.offen} offen`
   const fertig = new Date(jetzt.getTime() + r.sekunden * 1000)
   return `${r.offen} offen · ≈ ${formatDauer(r.sekunden)} · um ${uhrzeit(fertig)} durch`
 }
