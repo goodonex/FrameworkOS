@@ -155,5 +155,20 @@ check(
   'Zwei Knöpfe auf dasselbe daily_metrics-Feld sind der kürzeste Weg zu einer Zahl, der niemand mehr glaubt.',
 )
 
+// --- 6. Der Weg vom Homescreen führt in EINEN Zähler --------------------
+const home = lies('app/src/cockpit/pages/UrielHome.tsx')
+check(
+  'die Schnell-Aktion führt in den Zähl-Modus, nicht in den alten Anfragen-Zähler',
+  // Auf die Route gemünzt, nicht auf das Wort: der Kommentar daneben darf den
+  // alten Weg erklären, ohne dass die Prüfung darüber stolpert.
+  /route: '\/tracking\/zaehlen\/li_anfragen'/.test(home) &&
+    !/route: '[^']*kachel=vernetzungsanfragen/.test(home),
+  'Zwei Bedienbilder für dieselbe Zahl — und nur eines kennt den Tages-Flow.',
+)
+check(
+  'der Hero öffnet den Zähl-Modus für die angetippte Stufe',
+  /\/tracking\/zaehlen\/\$\{feld\}/.test(home),
+)
+
 console.log(`\nverify-zaehl-modus: ${pass} ok, ${fail} fehlgeschlagen`)
 process.exit(fail === 0 ? 0 : 1)

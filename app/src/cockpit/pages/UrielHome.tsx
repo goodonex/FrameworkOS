@@ -72,15 +72,19 @@ const APPS = PALETTEN_BEREICHE.filter((b) => b.path !== '/cockpit')
  * Schnell-Aktionen hinter dem Halten (v2 a).
  *
  * Bewusst nur dort, wo eine Route wirklich in EINE Arbeit springt — ein
- * Halte-Menü, das nur „Bereich öffnen" anbietet, ist ein leerer Umweg. Alle
- * drei Ziele sind Parameter, die `SalesDashboard` schon auswertet
- * (`?kachel=…`, `?modus=arbeit`); es entsteht keine neue Route.
+ * Halte-Menü, das nur „Bereich öffnen" anbietet, ist ein leerer Umweg.
+ *
+ * **Der Zähler zeigt seit dem 11.08. auf den Zähl-Modus**, nicht mehr auf
+ * `/sales?kachel=vernetzungsanfragen`. Dort lag am Handy noch der alte
+ * `AnfragenZaehler` — ein zweites Bedienbild für dieselbe Zahl, und das
+ * einzige, das den Tages-Flow nicht kennt. Der Desktop-Weg über die
+ * Sales-Kachel bleibt unangetastet.
  */
 const SCHNELL_AKTIONEN: Record<string, Array<{ label: string; route: string }>> = {
   '/sales': [
     { label: 'Arbeitsmodus starten', route: '/sales?kachel=jetzt-dran&modus=arbeit' },
     { label: 'Antworten', route: '/sales?kachel=antworten' },
-    { label: 'Anfragen-Zähler', route: '/sales?kachel=vernetzungsanfragen' },
+    { label: 'Anfragen zählen', route: '/tracking/zaehlen/li_anfragen' },
   ],
 }
 
