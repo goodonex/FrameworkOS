@@ -62,8 +62,9 @@ const sw = blockFuer('/sw.js')
 check(
   'der Service Worker wird nicht gecacht',
   /max-age=0/.test(sw),
-  'Ein gecachter Worker kann sich nicht selbst ersetzen. Achtung: ein blosses ' +
-    '`no-cache` hat Netlify nicht uebernommen — es braucht die volle Form.',
+  'Ein gecachter Worker kann sich nicht selbst ersetzen. ACHTUNG: diese Wache ' +
+    'prueft die ABSICHT in netlify.toml — live setzt sich Netlify bei /sw.js ' +
+    'darueber hinweg (zweimal nachgemessen, siehe Kommentar dort).',
 )
 check('der Service Worker ist nicht immutable', !/immutable/.test(sw))
 

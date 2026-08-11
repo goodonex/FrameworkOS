@@ -48,9 +48,18 @@
 # Der Service Worker ist der Weg, auf dem Aktualisierungen ueberhaupt ankommen.
 # Ein gecachter Worker kann sich nicht selbst ersetzen.
 #
-# Bewusst dieselbe Schreibweise wie bei der Einstiegsseite: ein blosses
-# `no-cache` hat Netlify hier NICHT uebernommen (live gemessen — es blieb bei
-# `max-age=14400`), diese Form greift nachweislich.
+# ACHTUNG, damit es niemand ein drittes Mal versucht: Netlify setzt sich hier
+# ueber die Regel hinweg. Zweimal deployt, zweimal live nachgemessen — `/sw.js`
+# kommt beide Male mit Netlifys Standard `public, max-age=14400,
+# must-revalidate` zurueck, waehrend dieselbe Schreibweise auf `/index.html`
+# und `/site.webmanifest` anstandslos greift.
+#
+# Wir lassen die Regel trotzdem stehen: sie sagt die Absicht, kostet nichts und
+# gilt sofort, falls Netlify das aendert. Und der Schaden ist klein, weil
+# `public/sw.js` NICHTS cached (kein fetch-Handler) — eine bis zu vier Stunden
+# alte Fassung verzoegert hoechstens einen neuen Push-Handler, nie die App.
+# Wer das wirklich braucht, muss den Worker umbenennen (der Sonderfall haengt
+# am Dateinamen) — das ist eine eigene Entscheidung, kein Nebenbei-Fix.
 [[headers]]
   for = "/sw.js"
   [headers.values]
