@@ -17,11 +17,20 @@ const FEATURED_FIELDS: Array<{ field: MetricField; label: string }> = ZAEHL_FELD
   label: z.label,
 }))
 
-const MORE_FIELDS: Array<{ field: MetricField; label: string }> = [
+/**
+ * Was hinter „alle anzeigen" liegt — abzüglich dessen, was schon vorne steht.
+ *
+ * Der Filter ist kein Zierrat: seit die Reaktivierungs-Stufe (`inmails`) zum
+ * Tages-Flow gehört, steht sie vorne. Ohne diese Zeile stünde derselbe Zähler
+ * zweimal auf der Seite — zwei Knöpfe, die dasselbe Feld hochzählen, sind der
+ * kürzeste Weg zu einer Zahl, der niemand mehr glaubt.
+ */
+const MORE_FIELDS_ALLE: Array<{ field: MetricField; label: string }> = [
   { field: 'inmails', label: 'InMail' },
   { field: 'ig_followups', label: 'IG Follow-up' },
   { field: 'cold_calls', label: 'Cold Call' },
 ]
+const MORE_FIELDS = MORE_FIELDS_ALLE.filter((f) => !FEATURED_FIELDS.some((v) => v.field === f.field))
 
 const RESULT_FIELDS: Array<{ field: MetricField; label: string }> = [
   { field: 'termine_li', label: 'Termin LI' },

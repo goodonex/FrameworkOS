@@ -1,5 +1,5 @@
-import { ANFRAGEN_LIMIT_TAG } from './prioritaet'
 import type { MetricField } from './metrikFelder'
+import { TAGES_FLOW, type Stufe, type StufenId } from './tagesFlow'
 
 /**
  * Die Felder, die Kevin im Tagesgeschäft wirklich mit dem Daumen zählt.
@@ -11,6 +11,12 @@ import type { MetricField } from './metrikFelder'
  *
  * Bewusst NICHT alle 19 Metrikfelder: der Zähl-Modus ist zum Abarbeiten da,
  * nicht zum Nachtragen. Alles Übrige bleibt in `/tracking` erreichbar.
+ *
+ * **Die Reihenfolge ist der Tages-Flow** (D7, 11.08.): vorne die fünf Stufen
+ * aus `tagesFlow.ts` in Kevins Reihenfolge, dahinter die Kanäle, die nicht Teil
+ * des Rituals sind. Damit wischt der Zähl-Modus den Tag entlang statt quer
+ * durch die Kanäle. QuickTrack liest dieselbe Liste und ordnet sich mit um —
+ * gewollt, es ist dieselbe Arbeit in einer anderen Hülle.
  */
 export interface ZaehlFeld {
   field: MetricField
@@ -19,25 +25,43 @@ export interface ZaehlFeld {
   /** Lang — für die Vollbild-Überschrift, wo Platz ist. */
   langLabel: string
   /**
-   * Tagesziel, falls es eines GIBT. Erfunden wird hier nichts: heute existiert
-   * genau ein echtes Tagesziel im Code (`ANFRAGEN_LIMIT_TAG` in
-   * `prioritaet.ts`, die Zahl, gegen die auch der Ring auf dem Homescreen
-   * läuft). Alle anderen Felder zeigen ihren Stand ohne Ziel, statt eine
-   * Wunschzahl zu behaupten.
+   * Tagesziel, falls es ein FESTES gibt. Erfunden wird hier nichts: die Ziele
+   * stammen aus `tagesFlow.ts`, das sie seinerseits aus `ANFRAGEN_LIMIT_TAG`
+   * und den Wochenzielen in `goals.ts` ableitet. Felder ohne Ziel zeigen ihren
+   * Stand, statt eine Wunschzahl zu behaupten.
+   *
+   * Die Follow-up-Stufe steht bewusst OHNE Ziel in dieser Liste: ihr Soll
+   * hängt an den heute fälligen Threads und ist einer statischen Liste nicht
+   * bekannt. Wer es braucht, fragt den Flow (`useTagesFlow`).
    */
   tagesziel?: number
 }
 
+/**
+ * Die kurzen Kachel-Namen. Sie bleiben, wie sie waren — im Raster steht der
+ * Kanal vorne („LI …"), weil dort Instagram daneben liegt. Die langen Namen
+ * und die Ziele kommen aus dem Flow, damit sie nur an einer Stelle stehen.
+ */
+const KURZ_LABEL: Record<StufenId, string> = {
+  anfragen: 'LI Vernetzung',
+  nachrichten: 'LI Nachricht',
+  looms: 'Loom',
+  followups: 'LI Follow-up',
+  reaktivierung: 'Reaktivierung',
+}
+
+function ausStufe(stufe: Stufe): ZaehlFeld {
+  const feld: ZaehlFeld = {
+    field: stufe.feld,
+    label: KURZ_LABEL[stufe.id],
+    langLabel: stufe.langLabel,
+  }
+  if (stufe.standardZiel !== null) feld.tagesziel = stufe.standardZiel
+  return feld
+}
+
 export const ZAEHL_FELDER: ZaehlFeld[] = [
-  {
-    field: 'li_anfragen',
-    label: 'LI Vernetzung',
-    langLabel: 'Vernetzungsanfragen',
-    tagesziel: ANFRAGEN_LIMIT_TAG,
-  },
-  { field: 'li_nachrichten', label: 'LI Nachricht', langLabel: 'Erstnachrichten · LinkedIn' },
-  { field: 'li_followups', label: 'LI Follow-up', langLabel: 'Follow-ups · LinkedIn' },
-  { field: 'looms', label: 'Loom', langLabel: 'Looms' },
+  ...TAGES_FLOW.map(ausStufe),
   { field: 'ig_anfragen', label: 'IG Follow', langLabel: 'Follows · Instagram' },
   { field: 'ig_nachrichten', label: 'IG Nachricht', langLabel: 'Erstnachrichten · Instagram' },
   { field: 'call_followups', label: 'FU Call', langLabel: 'Follow-up-Calls' },
