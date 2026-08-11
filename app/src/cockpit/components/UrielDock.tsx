@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm'
 import { useContacts } from '../../hooks/useContacts'
 import { useUrielBus } from '../../store/urielBus'
 import { useLinkedinThreads } from '../../hooks/useLinkedinThreads'
+import { useErstnachrichten } from '../../hooks/useErstnachrichten'
 import { bucketOf, type FollowupBucket } from '../lib/linkedinFollowups'
 import { useActiveBrand } from '../lib/activeBrand'
 import { useDailyMetrics } from '../lib/useDailyMetrics'
@@ -131,6 +132,9 @@ export function UrielDock() {
   const contacts = useContacts(activeSlug)
   // Dasselbe Postfach, das /linkedin zeigt — Uriel liest es, schreibt nie.
   const linkedinThreads = useLinkedinThreads(activeSlug)
+  // Die Frage „an wen muss ich noch eine Erstnachricht schicken" beantwortet
+  // NICHT das Postfach, sondern diese Liste. Genau daran ist Uriel gescheitert.
+  const erstnachrichten = useErstnachrichten(activeSlug)
   const monatsziel = useMonthGoal(activeBrand?.id, monthKeyOf())
   const requestGraph = useUrielBus((s) => s.requestGraph)
   const voice = useUrielVoice()
@@ -319,6 +323,15 @@ export function UrielDock() {
               ungelesen: linkedinThreads.items.filter((t) => t.unread).length,
               mit_stern: linkedinThreads.items.filter((t) => t.starred).length,
               zuletzt_synchronisiert: zuletzt ?? null,
+              /**
+               * Die Zahl, nach der Kevin wirklich gefragt hat. Sie steht mit in
+               * derselben Antwort, damit Uriel sie nicht aus einem Eimer
+               * herleiten muss — genau das ging schief.
+               */
+              erstnachrichten_offen: erstnachrichten.items.filter((e) => e.status === 'offen').length,
+              hinweis_erstnachrichten:
+                'erstnachrichten_offen ist die Antwort auf „an wen muss ich noch eine Erstnachricht schicken". ' +
+                'Die Eimer des Postfachs sind es NICHT — dort wurde ueberall schon geschrieben.',
               // Der Grund, warum Uriel vorher geraten hat: die Grenze muss mit.
               nicht_enthalten: 'Wer eine offene Vernetzungsanfrage angenommen hat — das spiegelt der Sync nicht.',
             },
@@ -377,7 +390,7 @@ export function UrielDock() {
           return { ok: false, summary: `Unbekanntes Werkzeug: ${name}`, data: { error: 'unknown_tool' } }
       }
     },
-    [ensureCockpit, requestGraph, navigate, brands, metrics, contacts, linkedinThreads, activeBrand, activeSlug],
+    [ensureCockpit, requestGraph, navigate, brands, metrics, contacts, linkedinThreads, erstnachrichten, activeBrand, activeSlug],
   )
 
   const send = useCallback(

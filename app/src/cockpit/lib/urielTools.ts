@@ -146,16 +146,32 @@ export const URIEL_TOOLS: UrielTool[] = [
    * Datensatz. Ein Werkzeug, das seine eigene Grenze nicht nennt, laedt zum
    * naechsten selbstbewussten Irrtum ein.
    */
+  /**
+   * Die Eimer-Namen standen hier zuerst OHNE Bedeutung — nur als Liste. Uriel
+   * hat sich daraufhin ausgedacht, was `faellig` heisst, und Kevin gesagt, das
+   * seien 61 Leute ohne Erstnachricht. Das Gegenteil ist der Fall: in `faellig`
+   * liegt nur, wo Kevin BEREITS geschrieben hat und das Follow-up ueberfaellig
+   * ist. Haette er danach gehandelt, waeren 61 zweite „erste" Nachrichten
+   * rausgegangen. Seitdem steht jede Bedeutung ausgeschrieben da.
+   */
   {
     name: 'get_linkedin_postfach',
     description:
-      'Der Stand von Kevins LinkedIn-Postfach, wie ihn der Voyager-Sync gespiegelt hat: ' +
-      'wie viele Unterhaltungen in welchem Eimer liegen (faellig, du_bist_dran = der Lead ' +
-      'hat geantwortet, wartet, pruefen, abschluss, verwaist, ruht), wie viele ungelesen ' +
-      'sind, wie viele einen Stern tragen (Loom zugesagt) und wann zuletzt synchronisiert ' +
-      'wurde. WICHTIG und ehrlich zu sagen, wenn danach gefragt wird: hier steht NICHT, wer ' +
-      'eine offene Vernetzungsanfrage angenommen hat — das spiegelt der Sync nicht. Wer ' +
-      'angenommen HAT und schon im Postfach liegt, zaehlt hier mit.',
+      'Der Stand von Kevins LinkedIn-Postfach, wie ihn der Voyager-Sync gespiegelt hat. ' +
+      'Ein Thread existiert hier NUR, wenn schon eine Unterhaltung laeuft. Die Eimer ' +
+      'bedeuten genau das hier — nicht raten, sondern diese Bedeutung benutzen: ' +
+      '`faellig` = Kevin hat zuletzt geschrieben und das Follow-up ist ueberfaellig ' +
+      '(3/7/14 Tage je Stufe); `du_bist_dran` = der Lead hat geantwortet, Kevin ist am Zug; ' +
+      '`wartet` = Kevin hat geschrieben, die Frist laeuft noch; ' +
+      '`verwaist` = Kevin hat vor ueber 30 Tagen geschrieben und nie nachgefasst; ' +
+      '`abschluss` = drei Follow-ups durch, Break-up faellig; ' +
+      '`pruefen` = Sync unsicher, wer zuletzt schrieb; `ruht` = archiviert, gewonnen, ' +
+      'verloren oder schlafen gelegt. ' +
+      'In ALLEN diesen Eimern hat Kevin bereits geschrieben — ausser `du_bist_dran` und ' +
+      '`pruefen`. Keiner davon beantwortet „an wen muss ich noch eine Erstnachricht ' +
+      'schicken": dafuer gibt es das Feld `erstnachrichten_offen` in der Antwort. ' +
+      'Und wer eine OFFENE Vernetzungsanfrage angenommen hat, steht hier gar nicht — ' +
+      'das spiegelt der Sync nicht.',
     input_schema: { type: 'object', properties: {} },
   },
   {

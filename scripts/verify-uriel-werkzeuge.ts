@@ -80,6 +80,41 @@ check(
   'Sonst steht sie nur im Schema und fällt aus der Antwort heraus.',
 )
 
+/**
+ * Der zweite, teurere Irrtum: Uriel bekam die Eimer-NAMEN ohne ihre Bedeutung
+ * und hat sich `faellig` als „noch keine Erstnachricht geschrieben" ausgedacht.
+ * Tatsaechlich liegt dort nur, wo Kevin BEREITS geschrieben hat. Wer danach
+ * handelt, schickt 61 zweite „erste" Nachrichten.
+ */
+const beschreibung = postfach?.description ?? ''
+for (const eimer of ['faellig', 'du_bist_dran', 'wartet', 'verwaist', 'abschluss', 'pruefen', 'ruht']) {
+  check(
+    `die Beschreibung erklärt den Eimer ${eimer}`,
+    // Bewusst `includes` statt einer zusammengebauten RegExp: die erste Fassung
+    // stand als Template-Literal da, in dem `\s` zu einem simplen „s" zerfiel —
+    // die Prüfung meldete drei Fehler, die es nicht gab.
+    beschreibung.includes(`\`${eimer}\` =`),
+    'Ein Eimer-Name ohne Bedeutung ist eine Einladung, sich eine auszudenken.',
+  )
+}
+check(
+  'die Beschreibung sagt, dass in faellig schon geschrieben wurde',
+  /BEREITS geschrieben|bereits geschrieben/.test(postfach?.description ?? ''),
+)
+check(
+  'die Beschreibung verweist für Erstnachrichten auf das richtige Feld',
+  /erstnachrichten_offen/.test(postfach?.description ?? ''),
+)
+check(
+  'der Executor liefert erstnachrichten_offen mit',
+  /erstnachrichten_offen:/.test(dock),
+  'Sonst muss Uriel die Zahl wieder aus einem Eimer herleiten — genau das ging schief.',
+)
+check(
+  'erstnachrichten_offen zählt nur den Status offen',
+  /erstnachrichten\.items\.filter\(\(e\) => e\.status === 'offen'\)/.test(dock),
+)
+
 // --- 4. Uriel liest das Postfach, schreibt es aber nicht ----------------
 const linkedinZweig = dock.slice(dock.indexOf("case 'get_linkedin_postfach':"), dock.indexOf("case 'search_contacts':"))
 check(
