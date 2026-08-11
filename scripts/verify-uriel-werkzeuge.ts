@@ -115,6 +115,17 @@ check(
   /erstnachrichten\.items\.filter\(\(e\) => e\.status === 'offen'\)/.test(dock),
 )
 
+/**
+ * Dritte Runde desselben Musters: eine Zahl ohne ihre Herkunft. 90 klingt nach
+ * „alle Angenommenen ohne Nachricht", ist aber der Arbeitsvorrat mit fertigem
+ * Text aus dem letzten Lead-Lauf. Wer danach angenommen hat, fehlt darin.
+ */
+check(
+  'die Beschreibung nennt die Herkunft der Erstnachrichten',
+  /linkedin-leads/.test(beschreibung) && /Off-ICP/.test(beschreibung),
+)
+check('der Executor liefert die Herkunft mit aus', /Herkunft: vorbereitete Texte/.test(dock))
+
 // --- 4. Uriel liest das Postfach, schreibt es aber nicht ----------------
 const linkedinZweig = dock.slice(dock.indexOf("case 'get_linkedin_postfach':"), dock.indexOf("case 'search_contacts':"))
 check(

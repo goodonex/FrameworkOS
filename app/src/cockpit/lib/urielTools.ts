@@ -170,6 +170,11 @@ export const URIEL_TOOLS: UrielTool[] = [
       'In ALLEN diesen Eimern hat Kevin bereits geschrieben — ausser `du_bist_dran` und ' +
       '`pruefen`. Keiner davon beantwortet „an wen muss ich noch eine Erstnachricht ' +
       'schicken": dafuer gibt es das Feld `erstnachrichten_offen` in der Antwort. ' +
+      'Auch dessen Herkunft gehoert in die Auskunft: das sind die VORBEREITETEN ' +
+      'Erstnachrichten aus dem letzten Lauf des linkedin-leads-Skills, die noch nicht ' +
+      'verschickt sind. Wer erst nach diesem Lauf angenommen hat oder als Off-ICP ' +
+      'aussortiert wurde, steht NICHT darin — die Zahl ist der Arbeitsvorrat mit fertigem ' +
+      'Text, nicht die Gesamtzahl aller Angenommenen. ' +
       'Und wer eine OFFENE Vernetzungsanfrage angenommen hat, steht hier gar nicht — ' +
       'das spiegelt der Sync nicht.',
     input_schema: { type: 'object', properties: {} },

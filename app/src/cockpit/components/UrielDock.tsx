@@ -331,7 +331,9 @@ export function UrielDock() {
               erstnachrichten_offen: erstnachrichten.items.filter((e) => e.status === 'offen').length,
               hinweis_erstnachrichten:
                 'erstnachrichten_offen ist die Antwort auf „an wen muss ich noch eine Erstnachricht schicken". ' +
-                'Die Eimer des Postfachs sind es NICHT — dort wurde ueberall schon geschrieben.',
+                'Die Eimer des Postfachs sind es NICHT — dort wurde ueberall schon geschrieben. ' +
+                'Herkunft: vorbereitete Texte aus dem letzten linkedin-leads-Lauf, noch nicht verschickt. ' +
+                'Wer erst danach angenommen hat oder Off-ICP war, fehlt darin.',
               // Der Grund, warum Uriel vorher geraten hat: die Grenze muss mit.
               nicht_enthalten: 'Wer eine offene Vernetzungsanfrage angenommen hat — das spiegelt der Sync nicht.',
             },
