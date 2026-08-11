@@ -4,6 +4,8 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useContacts } from '../../hooks/useContacts'
 import { useUrielBus } from '../../store/urielBus'
+import { useLinkedinThreads } from '../../hooks/useLinkedinThreads'
+import { bucketOf, type FollowupBucket } from '../lib/linkedinFollowups'
 import { useActiveBrand } from '../lib/activeBrand'
 import { useDailyMetrics } from '../lib/useDailyMetrics'
 import { METRIC_FIELDS, METRIK_LABEL, berechneStand, pruefeBuchung } from '../lib/metrikFelder'
@@ -127,6 +129,8 @@ export function UrielDock() {
   const { activeBrand, activeSlug, brands } = useActiveBrand()
   const metrics = useDailyMetrics()
   const contacts = useContacts(activeSlug)
+  // Dasselbe Postfach, das /linkedin zeigt — Uriel liest es, schreibt nie.
+  const linkedinThreads = useLinkedinThreads(activeSlug)
   const monatsziel = useMonthGoal(activeBrand?.id, monthKeyOf())
   const requestGraph = useUrielBus((s) => s.requestGraph)
   const voice = useUrielVoice()
@@ -295,6 +299,55 @@ export function UrielDock() {
           }
           return { ok: true, summary: 'Monatsumsatz gelesen', data }
         }
+        case 'get_linkedin_postfach': {
+          const jetzt = new Date()
+          const eimer: Record<FollowupBucket, number> = {
+            faellig: 0, du_bist_dran: 0, wartet: 0, pruefen: 0, abschluss: 0, verwaist: 0, ruht: 0,
+          }
+          for (const t of linkedinThreads.items) eimer[bucketOf(t, jetzt)] += 1
+          const zuletzt = linkedinThreads.items
+            .map((t) => t.last_synced_at)
+            .filter(Boolean)
+            .sort()
+            .at(-1)
+          return {
+            ok: true,
+            summary: `${linkedinThreads.items.length} Unterhaltungen · ${eimer.du_bist_dran} warten auf dich`,
+            data: {
+              gesamt: linkedinThreads.items.length,
+              eimer,
+              ungelesen: linkedinThreads.items.filter((t) => t.unread).length,
+              mit_stern: linkedinThreads.items.filter((t) => t.starred).length,
+              zuletzt_synchronisiert: zuletzt ?? null,
+              // Der Grund, warum Uriel vorher geraten hat: die Grenze muss mit.
+              nicht_enthalten: 'Wer eine offene Vernetzungsanfrage angenommen hat — das spiegelt der Sync nicht.',
+            },
+          }
+        }
+
+        case 'search_linkedin': {
+          const q = String(input.query ?? '').toLowerCase().trim()
+          if (!q) return { ok: false, summary: 'Leere Suche', data: { error: 'empty_query' } }
+          const jetzt = new Date()
+          const treffer = linkedinThreads.items
+            .filter((t) => `${t.name} ${t.company}`.toLowerCase().includes(q))
+            .slice(0, 6)
+            .map((t) => ({
+              name: t.name,
+              firma: t.company || null,
+              eimer: bucketOf(t, jetzt),
+              zuletzt_von: t.last_from,
+              zuletzt_am: t.last_message_at,
+              entwurf_liegt_bereit: Boolean(t.entwurf),
+              stern: t.starred,
+            }))
+          return {
+            ok: true,
+            summary: `${treffer.length} Unterhaltung(en) für „${q}"`,
+            data: { treffer },
+          }
+        }
+
         case 'search_contacts': {
           const q = String(input.query ?? '').toLowerCase().trim()
           if (!q) return { ok: false, summary: 'Leere Suche', data: { error: 'empty_query' } }
@@ -324,7 +377,7 @@ export function UrielDock() {
           return { ok: false, summary: `Unbekanntes Werkzeug: ${name}`, data: { error: 'unknown_tool' } }
       }
     },
-    [ensureCockpit, requestGraph, navigate, brands, metrics, contacts, activeBrand, activeSlug],
+    [ensureCockpit, requestGraph, navigate, brands, metrics, contacts, linkedinThreads, activeBrand, activeSlug],
   )
 
   const send = useCallback(

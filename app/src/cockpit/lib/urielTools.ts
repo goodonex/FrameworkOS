@@ -133,6 +133,44 @@ export const URIEL_TOOLS: UrielTool[] = [
       'Liefert den Monatsumsatz der aktiven Brand gegen das Monatsziel (und den bis heute fälligen Soll-Stand).',
     input_schema: { type: 'object', properties: {} },
   },
+  // ---- LinkedIn-Postfach (11.08.) ----
+  /**
+   * Uriel behauptete auf die Frage „wie viele haben angenommen" sinngemaess,
+   * das Cockpit kenne nur handgetippte Zahlen. Das stimmte nicht: der
+   * Voyager-Sync spiegelt Kevins Postfach nach `linkedin_threads`. Uriel hatte
+   * nur kein Werkzeug dafuer — also erzaehlte es etwas ueber die App, statt
+   * nachzusehen. Ab hier kann es nachsehen.
+   *
+   * Was es damit NICHT kann, steht ausdruecklich in der Beschreibung: wer eine
+   * offene Vernetzungsanfrage angenommen hat, steht in keinem gespiegelten
+   * Datensatz. Ein Werkzeug, das seine eigene Grenze nicht nennt, laedt zum
+   * naechsten selbstbewussten Irrtum ein.
+   */
+  {
+    name: 'get_linkedin_postfach',
+    description:
+      'Der Stand von Kevins LinkedIn-Postfach, wie ihn der Voyager-Sync gespiegelt hat: ' +
+      'wie viele Unterhaltungen in welchem Eimer liegen (faellig, du_bist_dran = der Lead ' +
+      'hat geantwortet, wartet, pruefen, abschluss, verwaist, ruht), wie viele ungelesen ' +
+      'sind, wie viele einen Stern tragen (Loom zugesagt) und wann zuletzt synchronisiert ' +
+      'wurde. WICHTIG und ehrlich zu sagen, wenn danach gefragt wird: hier steht NICHT, wer ' +
+      'eine offene Vernetzungsanfrage angenommen hat — das spiegelt der Sync nicht. Wer ' +
+      'angenommen HAT und schon im Postfach liegt, zaehlt hier mit.',
+    input_schema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'search_linkedin',
+    description:
+      'Sucht eine Person im gespiegelten LinkedIn-Postfach (Name oder Firma) und gibt ' +
+      'zurueck, in welchem Eimer sie liegt, wer zuletzt geschrieben hat, wann das war, ' +
+      'ob ein Entwurf bereitliegt und ob sie einen Stern hat. Damit laesst sich „habe ich ' +
+      'dem schon geschrieben" beantworten, ohne dass Kevin nachsieht.',
+    input_schema: {
+      type: 'object',
+      properties: { query: { type: 'string', description: 'Name oder Firma' } },
+      required: ['query'],
+    },
+  },
   {
     name: 'search_contacts',
     description:
