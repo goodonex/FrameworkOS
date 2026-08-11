@@ -245,7 +245,19 @@
 
 /* Tages-Ring: r52, Strich 5, Akzent, dunkle Glas-Mitte, Zahl in Serifen. */
 .ck-ring { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.ck-ring-feld { position: relative; }
+/* Der Ring ist ein Knopf, sieht aber keiner sein: keine Flaeche, kein Rand,
+   nur das Ziel unter dem Daumen. */
+.ck-ring-feld {
+  position: relative;
+  display: block;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
 .ck-ring svg { display: block; width: 158px; height: 158px; filter: drop-shadow(0 4px 26px rgba(0, 0, 0, 0.5)); }
 .ck-ring-mitte {
   position: absolute;
@@ -355,6 +367,100 @@
   background: var(--ck-accent-dim);
   border: 1px solid color-mix(in srgb, var(--ck-accent) 26%, transparent);
   white-space: nowrap;
+}
+
+/* ============================================================
+   ZÄHL-MODUS (11.08.) — ein Bildschirm, eine Kennzahl, ein Daumen
+   Vorbild ist Kevins bisherige Tracking-App: die ganze Fläche ist der
+   Knopf, die Zahl ist so gross, dass man sie ohne Hinsehen trifft.
+   ============================================================ */
+
+.ck-zaehl-kachel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 10px 14px;
+  font: inherit;
+  color: var(--ck-text-1);
+  cursor: pointer;
+  /* Der Daumen landet hier oft schräg — kein Textmarkieren, kein iOS-Menü. */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+.ck-zaehl-kachel-ring { position: relative; display: block; width: 104px; height: 104px; }
+.ck-zaehl-kachel-ring svg { width: 100%; height: 100%; display: block; }
+.ck-zaehl-kachel-zahl {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 34px;
+  line-height: 1;
+  color: var(--ck-text-1);
+}
+.ck-zaehl-kachel-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--ck-text-2);
+}
+.ck-zaehl-kachel-ziel { font-size: 11px; color: var(--ck-text-3); }
+
+/* --- Vollbild ---------------------------------------------------------- */
+.ck-zaehl-vollbild {
+  /* Randlos über den Innenabstand von .ck-main hinaus, und so hoch wie der
+     Platz zwischen Statusleiste und Dock: die Fläche IST der Knopf. */
+  margin: -12px -12px calc(-80px - env(safe-area-inset-bottom));
+  min-height: calc(100svh - 96px);
+  display: flex;
+  flex-direction: column;
+  padding: 12px 16px calc(92px + env(safe-area-inset-bottom));
+  cursor: pointer;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+  transition: background-color 160ms ease;
+}
+/* Die einzige Bewegung hier: ein kurzes Aufleuchten als Quittung. Ohne sie
+   weiss der Daumen nicht, ob der Tipp angekommen ist. */
+.ck-zaehl-vollbild.ist-getippt { background-color: var(--ck-accent-dim); }
+@media (prefers-reduced-motion: reduce) {
+  .ck-zaehl-vollbild { transition: none; }
+}
+
+.ck-zaehl-kopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.ck-zaehl-mitte {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 0;
+}
+.ck-zaehl-zahl {
+  font-size: clamp(96px, 34vw, 180px);
+  line-height: 1;
+  color: var(--ck-text-1);
+}
+.ck-zaehl-ziel { font-size: 14px; color: var(--ck-text-2); }
+.ck-zaehl-fuss {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
 /* --- Status-Punkt --- */
@@ -1010,6 +1116,10 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
      waere dort ein zweiter Weg zur selben Sache und lag ausgerechnet auf der
      Aktion der ersten „Jetzt dran"-Zeile. */
   .ck-root[data-home='true'] .ck-uriel-fab { display: none; }
+  /* Im Zähl-Modus ist die ganze Fläche der Knopf — beide Schwebeknöpfe wären
+     dort Fallen für den Daumen. */
+  .ck-root[data-zaehlen='true'] .ck-uriel-fab,
+  .ck-root[data-zaehlen='true'] .ck-chat-fab { display: none; }
   .ck-uriel-panel {
     bottom: calc(130px + env(safe-area-inset-bottom));
     right: 10px;

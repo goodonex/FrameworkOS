@@ -22,6 +22,7 @@ export function HeroHorizont({
   ringZiel,
   ringLabel,
   onAsk,
+  onRing,
 }: {
   /** „Guten Morgen." — die Begrüßung, fertig formuliert. */
   gruss: string
@@ -32,6 +33,8 @@ export function HeroHorizont({
   ringLabel: string
   /** Öffnet das bestehende Uriel-Dock. Der Hero kennt Uriel nicht selbst. */
   onAsk: () => void
+  /** Der Ring ist der kürzeste Weg in den Zähl-Modus (11.08.). */
+  onRing: () => void
 }) {
   const anteil = ringZiel > 0 ? Math.min(1, Math.max(0, ringWert / ringZiel)) : 0
   const rest = Math.max(0, ringZiel - ringWert)
@@ -52,7 +55,14 @@ export function HeroHorizont({
       </div>
 
       <div className="ck-ring">
-        <div className="ck-ring-feld">
+        {/* Der Ring zeigt die Anfragen — und ist zugleich der Knopf, der sie
+            zählt. Kürzer kommt Kevin morgens nicht an den Daumen-Zähler. */}
+        <button
+          type="button"
+          className="ck-ring-feld"
+          onClick={onRing}
+          aria-label={`${ringLabel} zählen — ${ringWert} von ${ringZiel}`}
+        >
           <svg viewBox="0 0 120 120" role="img" aria-label={`${ringLabel}: ${ringWert} von ${ringZiel}`}>
             {/* Glas-Mitte + Bahn */}
             <circle
@@ -79,14 +89,14 @@ export function HeroHorizont({
               transform="rotate(-90 60 60)"
             />
           </svg>
-          <div className="ck-ring-mitte" aria-hidden>
+          <span className="ck-ring-mitte" aria-hidden>
             <span className="ck-ring-zahl">
               {ringWert}
               <i>/{ringZiel}</i>
             </span>
             <span className="ck-label">{ringLabel}</span>
-          </div>
-        </div>
+          </span>
+        </button>
         <p className="ck-ring-unter">{unterzeile}</p>
       </div>
 

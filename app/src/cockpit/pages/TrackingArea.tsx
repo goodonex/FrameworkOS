@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ConversionPanel } from '../components/ConversionPanel'
 import { MonthCurve } from '../components/MonthCurve'
 import { VitalsPanel } from '../components/VitalsPanel'
@@ -216,6 +217,7 @@ function RatesTable({ rates }: { rates: ReturnType<typeof channelRates> }) {
  * alarmiert deshalb über fehlenden INPUT, nicht über fehlenden Umsatz.
  */
 export function TrackingArea() {
+  const navigate = useNavigate()
   const metrics = useDailyMetrics()
   const vitals = useMemo(
     () => weekVitals(metrics.weekRows, metrics.windowRows),
@@ -329,6 +331,16 @@ export function TrackingArea() {
         </div>
 
         <div style={{ padding: '0 12px 6px' }}>
+          {/* Der Weg in den Zähl-Modus (11.08.). Er steht ueber den Zaehlern,
+              weil er sie ersetzt, sobald der Daumen im Spiel ist. */}
+          <button
+            type="button"
+            className="ck-btn ck-btn--primary"
+            onClick={() => navigate('/tracking/zaehlen')}
+            style={{ width: '100%', minHeight: 52, fontSize: 14, margin: '2px 0 10px' }}
+          >
+            Zählen — ein Tipp, eine Anfrage
+          </button>
           <div className="ck-label" style={{ margin: '4px 0 6px', color: 'var(--ck-text-3)' }}>Aktivitäten (Frühindikator)</div>
           {INPUT_GROUPS.map((g) => (
             <div key={g.title} style={{ marginBottom: 8 }}>

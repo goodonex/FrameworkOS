@@ -195,6 +195,7 @@ export function UrielHome() {
         ringZiel={ANFRAGEN_LIMIT_TAG}
         ringLabel="Anfragen"
         onAsk={() => urielOeffnen(true)}
+        onRing={() => navigate('/tracking/zaehlen/li_anfragen')}
       />
 
       <BefundZeile meldung={befund.meldung} onOeffnen={() => navigate('/agenten')} />

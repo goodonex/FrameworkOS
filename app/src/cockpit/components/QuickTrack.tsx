@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { DailyMetricsRow, MetricField } from '../lib/useDailyMetrics'
+import { ZAEHL_FELDER } from '../lib/zaehlFelder'
 
 const EXPAND_KEY = 'ck.quicktrack.expanded'
 
@@ -7,16 +8,14 @@ const EXPAND_KEY = 'ck.quicktrack.expanded'
  * Dauerhaft sichtbare Zähler (Kevins tägliche Kanäle, Juli 2026) — der Rest
  * ist Eingabe-Detail und lebt hinter „alle anzeigen": das Dashboard zeigt
  * Status, kein Dauerformular.
+ *
+ * Die Liste selbst liegt seit dem 11.08. in `lib/zaehlFelder.ts`, weil der
+ * Zähl-Modus dieselbe Auswahl braucht. Eine Liste, zwei Orte.
  */
-const FEATURED_FIELDS: Array<{ field: MetricField; label: string }> = [
-  { field: 'li_anfragen', label: 'LI Vernetzung' },
-  { field: 'li_nachrichten', label: 'LI Nachricht' },
-  { field: 'li_followups', label: 'LI Follow-up' },
-  { field: 'looms', label: 'Loom' },
-  { field: 'ig_anfragen', label: 'IG Follow' },
-  { field: 'ig_nachrichten', label: 'IG Nachricht' },
-  { field: 'call_followups', label: 'FU Call' },
-]
+const FEATURED_FIELDS: Array<{ field: MetricField; label: string }> = ZAEHL_FELDER.map((z) => ({
+  field: z.field,
+  label: z.label,
+}))
 
 const MORE_FIELDS: Array<{ field: MetricField; label: string }> = [
   { field: 'inmails', label: 'InMail' },

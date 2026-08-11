@@ -23,12 +23,18 @@ export function CockpitShell() {
    */
   const loc = useLocation()
   const istHome = loc.pathname === '/cockpit'
+  /**
+   * Im Zähl-Modus IST die Fläche der Knopf — ein Schwebeknopf darauf fängt
+   * genau die Tipps ab, für die der Bildschirm da ist. Beide sind hier aus.
+   */
+  const istZaehlen = loc.pathname.startsWith('/tracking/zaehlen')
 
   return (
     <ActiveBrandProvider>
       <div
         className="ck-root"
         data-home={istHome ? 'true' : undefined}
+        data-zaehlen={istZaehlen ? 'true' : undefined}
         style={{
           position: 'fixed',
           inset: 0,

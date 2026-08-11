@@ -26,6 +26,7 @@ import { CockpitHome } from './cockpit/pages/CockpitHome'
 import { MorgenArea } from './cockpit/pages/MorgenArea'
 import { SalesArea } from './cockpit/pages/SalesArea'
 import { ProjekteArea } from './cockpit/pages/ProjekteArea'
+import { ZaehlModus } from './cockpit/pages/ZaehlModus'
 import { TrackingArea } from './cockpit/pages/TrackingArea'
 import { AdsArea } from './cockpit/pages/AdsArea'
 import { SocialArea } from './cockpit/pages/SocialArea'
@@ -240,6 +241,10 @@ function App() {
               <Route path="/content/*" element={<SocialArea />} />
               <Route path="/agenten" element={<AgentsArea />} />
                 <Route path="/tracking" element={<TrackingArea />} />
+                {/* Zähl-Modus (11.08.): Raster und Vollbild teilen sich eine
+                    Komponente — mit :feld ist es das Vollbild, ohne das Raster. */}
+                <Route path="/tracking/zaehlen" element={<ZaehlModus />} />
+                <Route path="/tracking/zaehlen/:feld" element={<ZaehlModus />} />
               </Route>
               {/* Phase 6: Universe + Denk-Modi abgerissen → Cockpit ist Home */}
               <Route path="/" element={<Navigate to="/cockpit" replace />} />
