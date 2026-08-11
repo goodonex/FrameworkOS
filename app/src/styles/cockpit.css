@@ -1234,9 +1234,10 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
      Tages-Überblick — deshalb tragen erledigte Stufen den Akzent. */
   .ck-flow-punkte { display: flex; align-items: center; gap: 2px; }
   .ck-flow-punkt {
-    /* Sichtbar ist ein 6px-Punkt; angefasst wird die volle Höhe, sonst wäre
-       das Ziel unter dem Daumen kleiner als die Regel erlaubt. */
-    width: 34px;
+    /* Sichtbar ist ein 6px-Punkt; angefasst werden 44×44, sonst wäre das Ziel
+       unter dem Daumen kleiner als die Regel erlaubt. Fünf davon plus Abstand
+       sind 228px — auf dem 390er bleibt reichlich Luft. */
+    width: 44px;
     height: 44px;
     padding: 0;
     border: none;

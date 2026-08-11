@@ -1,6 +1,101 @@
 # Uriel — Backlog (die eine Quelle der Wahrheit)
 
-**Stand:** 2026-08-10 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
+**Stand:** 2026-08-11 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
+
+## Runde vom 11.08. — **Mobiler Tages-Flow gebaut** (nicht live)
+
+Aus dem einen Ring auf dem Homescreen sind **fünf Stufen in fester
+Reihenfolge** geworden: Anfragen → Nachrichten → Looms → Follow-ups (Riege 1) →
+Reaktivierung (Riege 2, InMail-Welle). Wischbare Kette im Hero, ein Tipp öffnet
+den Zähl-Modus für genau diese Stufe, und steht eine Stufe, schiebt der Zähler
+selbst weiter. Züge Z0–Z7 der Blaupause
+(`~/.claude/plans/twinkly-baking-locket.md`), **sieben Commits** auf
+`cockpit-rebuild`. `npx tsc -b` + `npm run build` grün, **30 verify-Skripte
+grün** (29 vorher, neu `verify-tages-flow` mit 78 Fällen).
+**Der Fast-Forward auf `main` bleibt Kevins Wort.**
+
+| Zug | Ergebnis | Datei |
+|---|---|---|
+| **Z1** | `lib/tagesFlow.ts`: die fünf Stufen, ihre Ziele, das dynamische Soll. Reine Funktionen, keine React-Importe, kein Schreibweg | `cockpit/lib/tagesFlow.ts`, `scripts/verify-tages-flow.ts` |
+| **Z2** | Die Zähl-Liste beginnt mit dem Flow in seiner Reihenfolge; `inmails` ist als fünfte Stufe **erstmals zählbar**. Ziele und lange Namen kommen aus `tagesFlow`, nicht aus einer zweiten Zahlenreihe | `cockpit/lib/zaehlFelder.ts` |
+| **Z3** | Auto-Advance im Vollbild (D5): „Stufe steht." mit Ansage → nach 0,8 s die nächste offene Stufe; nach der letzten bleibt „Der Tag steht." stehen. Die Follow-up-Stufe zeigt ihr echtes Soll | `cockpit/pages/ZaehlModus.tsx`, `cockpit/lib/useTagesFlow.ts` |
+| **Z4** | Die Kette im Hero: ein Ring je Stufe auf der `.ck-widget-stack`-Bahn, die seit O18 ungenutzt herumlag; Punkte darunter zeigen den Tagesstand ohne Wischen | `components/home/TagesFlowStack.tsx`, `HeroHorizont.tsx`, `pages/UrielHome.tsx` |
+| **Z5** | Das Halten auf der Sales-Kachel führte mobil noch in den alten `AnfragenZaehler` — jetzt in den Zähl-Modus. Desktop-`/sales` unangetastet | `pages/UrielHome.tsx` |
+| **Z6** | „209 offen · noch keine Messwerte" heisst nur noch „209 offen" (D8), dazu der Scrim-Fix der Zeile über dem Foto | `cockpit/lib/tagesansage.ts`, `styles/cockpit.css` |
+
+**Die Zählwahrheit ist unangetastet.** Jeder Tipp geht weiter durch
+`useDailyMetrics().bump()`; der Flow liest nur. Und er erfindet keine
+Fälligkeit: wie viele Follow-ups heute dran sind, sagt weiterhin
+`linkedinFollowups.bucketOf` über `arbeitsmodusQuellen.followupPosten` — die
+Home reicht dafür `quellen.followup` durch, das `usePosten` ohnehin hält. Kein
+zweiter Ladelauf, keine Migration, kein Runner-Umbau.
+
+**Die Tagesziele werden abgeleitet, nicht abgetippt:** 15 Nachrichten und
+5 Looms sind `WEEK_TARGETS` geteilt durch die fünf Arbeitstage, die 30 Anfragen
+weiterhin `ANFRAGEN_LIMIT_TAG`. Die Reaktivierung hat kein Wochenziel im Code
+und steht als benannte Konstante (5) — überschreibbar über `ui_settings`
+(Schlüssel `tagesFlowZiele`), ohne Migration. Ein kaputter Wert dort fällt auf
+den Standard zurück, statt eine Stufe für immer offen zu halten.
+
+### Vier echte Fehler, die diese Runde gefunden hat
+
+1. **Die Kette blieb auf einer längst erledigten Stufe stehen.** Der
+   Einstiegs-Sprung verbrauchte seinen einen Schuss im Ladezustand — da stehen
+   alle Zähler auf 0, also galt Stufe 1 als offen. Dazu flackert der
+   Ladezustand (mehrere Quellen werden nacheinander fertig), und bei jedem
+   Wechsel zieht das Scroll-Snap die Bahn auf die erste Seite zurück.
+2. **Der Frame-Weg dagegen war messbar wirkungslos.** Weil die Stände bei jedem
+   Render eine neue Referenz bekommen, räumte der Effekt seinen eigenen
+   `requestAnimationFrame` jedes Mal weg — **null Ausführungen** im laufenden
+   Cockpit gemessen. Jetzt `useLayoutEffect` ohne Frame, mit „sitzt schon"-Prüfung.
+3. **QuickTrack hätte die InMails zweimal gezeigt** — einmal vorne über die
+   geteilte Liste, einmal hinter „alle anzeigen". Zwei Knöpfe auf dasselbe
+   `daily_metrics`-Feld; die Liste filtert das jetzt selbst weg.
+4. **Die Punkte unter der Kette waren nicht zu lesen.** Die Farbe trug „steht"
+   und „hier" zugleich. Jetzt sagt die Farbe, ob die Stufe steht, und ein Ring
+   sagt, wo man ist.
+
+### Verifikation (am laufenden System, eingeloggt, 390×664)
+
+Alle fünf Stufen mit Kevins echten Zahlen durchgewischt: Anfragen 30/30
+(„Steht."), Nachrichten 0/15, Looms 0/5, **Follow-ups 0/61** — das dynamische
+Soll, also die tatsächlich heute fälligen Threads —, Reaktivierung 0/5. Der
+Einstieg rückt zuverlässig auf die erste offene Stufe (zehn Messungen in Folge
+Seite 2), und nach der ersten Berührung bleibt die Bahn, wo der Daumen sie
+hinlegt (acht Messungen in Folge Seite 5). Auto-Advance am echten Zähler
+belegt: „Stufe steht. / Weiter zu Nachrichten", danach steht der Zähler auf
+„Stufe 2 von 5 · Nachrichten" — der Sprung sucht also nach der letzten Stufe
+von vorn weiter. Kein Querscrollen (390 == 390), alle Touch-Ziele 44×44, ein
+voller Durchlauf durch alle fünf Stufen ohne eine einzige Warnung in der
+Konsole.
+
+**Ehrlich zum Test-Eingriff:** Für den Auto-Advance musste einmal echt gezählt
+werden. Dafür lag kurzzeitig ein Ziel von 1 bzw. 2 für die Reaktivierungs-Stufe
+im localStorage; die zwei gebuchten InMails sind über `/tracking` wieder
+abgezogen worden, `inmails` steht wie vorher auf **0**, und die
+Ziel-Überschreibung ist gelöscht. In `ui_settings` (Supabase) wurde dabei nichts
+geschrieben.
+
+**Ehrlich zu den Screenshots:** Die Abnahme-Bilder liegen in Kevins Sitzung, nicht
+als Datei im Repo. Ein Datei-Export der eingeloggten Ansicht hätte bedeutet,
+das Supabase-Session-Token aus dem Browser in ein Skript zu reichen — das ist
+bewusst unterblieben. Ohne Session zeigt ein Skript-Screenshot nur die
+Anmeldeseite und wäre als Beleg wertlos.
+
+### Was diese Runde bewusst NICHT angefasst hat
+
+- **Per-Person-Tracking gesendeter Vernetzungsanfragen** („angenommen ja/nein")
+  gibt es nirgends (dokumentiert an `urielTools.ts:189`). Riege 2 läuft deshalb
+  als reine Zähl-Stufe über `inmails`; die Namensliste bleibt LinkedIn/Sales
+  Navigator. Das ist ein eigener Brocken, kein Nebenbei.
+- **Der `AnfragenZaehler` lebt weiter** — über `/sales` mit
+  `?kachel=vernetzungsanfragen` (mobil als Vollbild, `SalesDashboard.tsx:650`).
+  Nur der Weg vom Homescreen führt nicht mehr dorthin. Ob die Kachel selbst auf
+  den Zähl-Modus zeigen soll, ist eine Entscheidung, keine Aufräumarbeit.
+- **`li_nachrichten` zählt den LinkedIn-Anteil**, das abgeleitete Wochenziel
+  (75) deckt LI und IG zusammen ab. 15 am Tag ist damit die strengere Lesart —
+  wenn das falsch gerechnet ist, ist `ARBEITSTAGE_WOCHE` bzw. das Ziel in
+  `tagesFlow.ts` die eine Stelle dafür.
 
 ## **LIVE seit 10.08.2026, ~19:10 — Phase 2 komplett**
 
