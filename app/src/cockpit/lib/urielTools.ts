@@ -118,19 +118,31 @@ export const URIEL_TOOLS: UrielTool[] = [
   {
     name: 'get_today_kpis',
     description:
-      'Liefert Kevins Vertriebs-Zahlen von HEUTE für die aktive Brand: Anfragen, Nachrichten, Looms, vereinbarte Termine, Abschlüsse, Umsatz.',
+      'Kevins Vertriebs-Zahlen von HEUTE (bis jetzt) für die aktive Brand: Anfragen, ' +
+      'Nachrichten, Looms, vereinbarte Termine, Abschlüsse, Umsatz. ' +
+      'HERKUNFT, die in die Auskunft gehoert: das sind AUSSCHLIESSLICH von Hand gebuchte ' +
+      'Zahlen (Zaehl-Modus, QuickTrack, log_metric) — nicht von LinkedIn gemessen. Eine 0 ' +
+      'heisst „noch nicht gebucht", nicht zwingend „nicht gemacht". Was tatsaechlich im ' +
+      'Postfach passiert ist, steht in get_linkedin_postfach.',
     input_schema: { type: 'object', properties: {} },
   },
   {
     name: 'get_week_vitals',
     description:
-      'Liefert die Wochen-Vitals der aktiven Brand: je Kategorie (Anfragen, Nachrichten, Looms, Termine, Abschlüsse) der aktuelle Stand gegen das Wochenziel.',
+      'Die Wochen-Vitals der aktiven Brand: je Kategorie (Anfragen, Nachrichten, Looms, ' +
+      'Termine, Abschlüsse) der Stand gegen das Wochenziel. Die Woche laeuft MONTAG bis ' +
+      'SONNTAG der laufenden Kalenderwoche — nicht „die letzten 7 Tage". Am Montagmorgen ' +
+      'stehen die Zahlen deshalb naturgemaess bei fast null; das ist kein Einbruch. ' +
+      'Gleiche Herkunft wie get_today_kpis: von Hand gebucht, nicht gemessen.',
     input_schema: { type: 'object', properties: {} },
   },
   {
     name: 'get_month_revenue',
     description:
-      'Liefert den Monatsumsatz der aktiven Brand gegen das Monatsziel (und den bis heute fälligen Soll-Stand).',
+      'Der Monatsumsatz der aktiven Brand gegen das Monatsziel, dazu der bis heute faellige ' +
+      'Soll-Stand. Der Soll-Verlauf ist BACK-LOADED, nicht linear: er steigt zum Monatsende ' +
+      'hin staerker, weil Akquise dem Ergebnis nachlaeuft. Aus „Soll bis heute" darf also ' +
+      'nicht Monatsziel geteilt durch Tage gerechnet werden.',
     input_schema: { type: 'object', properties: {} },
   },
   // ---- LinkedIn-Postfach (11.08.) ----
@@ -195,7 +207,16 @@ export const URIEL_TOOLS: UrielTool[] = [
   {
     name: 'search_contacts',
     description:
-      'Sucht CRM-Kontakte der aktiven Brand nach Name oder Firma. Liefert Treffer mit id, Name, Firma, Pipeline-Stage und geschätztem Potenzial. Nutze die id danach für open_contact.',
+      'Sucht CRM-Kontakte der aktiven Brand nach Name oder Firma. Liefert id, Name, Firma, ' +
+      'Pipeline-Stufe und geschaetztes Potenzial. Nutze die id danach fuer open_contact. ' +
+      'Die Stufen bedeuten genau das hier — nicht raten: ' +
+      '`first_contact` = angeschrieben, noch kein Gespraech; ' +
+      '`conversation` = im Gespraech; ' +
+      '`follow_up` = wartet auf Nachfassen; ' +
+      '`proposal` = Angebot draussen; ' +
+      '`deal` = gewonnen; ' +
+      '`paused` = zurueckgestellt. ' +
+      'Das Potenzial ist eine SCHAETZUNG von Kevin, kein vereinbarter Betrag.',
     input_schema: {
       type: 'object',
       properties: { query: { type: 'string' } },

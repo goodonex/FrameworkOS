@@ -126,6 +126,40 @@ check(
 )
 check('der Executor liefert die Herkunft mit aus', /Herkunft: vorbereitete Texte/.test(dock))
 
+/**
+ * Dieselbe Prüfung für die übrigen Daten-Werkzeuge. Der Fehler wiederholte sich
+ * dreimal in zwei Tagen, immer gleich: eine Zahl oder ein Zustandsname ohne
+ * Bedeutung, und Uriel legt sich eine zurecht. Was ein Werkzeug zurueckgibt,
+ * muss es auch erklaeren — und sagen, woher es kommt.
+ */
+const beschreibungVon = (n: string) => URIEL_TOOLS.find((t) => t.name === n)?.description ?? ''
+
+check(
+  'get_today_kpis sagt, dass die Zahlen von Hand gebucht sind',
+  /von Hand gebucht/.test(beschreibungVon('get_today_kpis')),
+  'Sonst liest Uriel eine 0 als „nicht gemacht" statt als „nicht gebucht".',
+)
+check(
+  'get_week_vitals nennt die Wochengrenze',
+  /MONTAG bis\s+'?\s*\+?\s*'?SONNTAG|MONTAG bis SONNTAG/.test(beschreibungVon('get_week_vitals')),
+  'Ohne das wird „diese Woche" als „letzte 7 Tage" gelesen.',
+)
+check(
+  'get_month_revenue warnt vor linearer Soll-Rechnung',
+  /BACK-LOADED/.test(beschreibungVon('get_month_revenue')),
+)
+for (const stufe of ['first_contact', 'conversation', 'follow_up', 'proposal', 'deal', 'paused']) {
+  check(
+    `search_contacts erklärt die Pipeline-Stufe ${stufe}`,
+    beschreibungVon('search_contacts').includes(`\`${stufe}\` =`),
+    'Pipeline-Stufen sind derselbe Fall wie die LinkedIn-Eimer: Namen ohne Bedeutung.',
+  )
+}
+check(
+  'search_contacts nennt das Potenzial als Schätzung',
+  /SCHAETZUNG|Schaetzung/.test(beschreibungVon('search_contacts')),
+)
+
 // --- 4. Uriel liest das Postfach, schreibt es aber nicht ----------------
 const linkedinZweig = dock.slice(dock.indexOf("case 'get_linkedin_postfach':"), dock.indexOf("case 'search_contacts':"))
 check(
