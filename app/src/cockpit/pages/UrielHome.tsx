@@ -27,9 +27,9 @@ import { useUiSetting } from '../lib/uiSettings'
 import { tagesansage } from '../lib/tagesansage'
 import { eventsByDate, termineAmTag, ymd, type CalEvent } from '../lib/termineEvents'
 import { CALENDAR_ICAL_KEY, useCalendarFeed } from '../lib/useCalendarFeed'
-import { ANFRAGEN_LIMIT_TAG } from '../lib/prioritaet'
 import { useUrielBus } from '../../store/urielBus'
 import { useDailyMetrics } from '../lib/useDailyMetrics'
+import { useTagesFlow } from '../lib/useTagesFlow'
 import { useRunnerData } from '../lib/useRunnerData'
 
 /**
@@ -119,6 +119,16 @@ export function UrielHome() {
     return termineAmTag(map, ymd(jetzt))
   }, [bookings.items, contacts.items, content.items, cal.events, jetzt])
 
+  /**
+   * Die fünf Stufen des Tages für die Hero-Kette (D6: der Hero rechnet nichts).
+   *
+   * Das Soll der Follow-up-Stufe kommt aus `quellen.followup` — derselben
+   * Liste, die auch „Jetzt dran" und die Sales-Kachel füttern. Die Seite lädt
+   * dafür nichts nach: `usePosten` hat die Threads schon in der Hand.
+   */
+  const faelligeFollowups = posten.quellen.followup?.length ?? 0
+  const flow = useTagesFlow(metrics.today, faelligeFollowups, metrics.loading || posten.linkedinThreads.loading)
+
   const ansage = useMemo(() => tagesansage(geordnet, dauern, jetzt), [geordnet, dauern, jetzt])
   const entwuerfe = useMemo(() => entwuerfeOffen(geordnet), [geordnet])
   const befund = useMemo(() => agentenBefund(runs, jetzt), [runs, jetzt])
@@ -191,11 +201,10 @@ export function UrielHome() {
       <HeroHorizont
         gruss={`${gruss(jetzt)}.`}
         datum={laedt ? datumLang(jetzt) : ansage}
-        ringWert={metrics.today.li_anfragen}
-        ringZiel={ANFRAGEN_LIMIT_TAG}
-        ringLabel="Anfragen"
+        stufen={flow.staende}
+        stufenLaden={flow.laedt}
         onAsk={() => urielOeffnen(true)}
-        onRing={() => navigate('/tracking/zaehlen/li_anfragen')}
+        onStufe={(feld) => navigate(`/tracking/zaehlen/${feld}`)}
       />
 
       <BefundZeile meldung={befund.meldung} onOeffnen={() => navigate('/agenten')} />

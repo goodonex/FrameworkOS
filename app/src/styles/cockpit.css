@@ -44,6 +44,9 @@
   --ck-accent: #aecfa4;       /* Salbei — DER eine Akzent: aktiv, Balken, Ringe */
   --ck-accent-text: #c4dcba;  /* Akzent auf dunklem CTA-Grund */
   --ck-accent-dim: rgba(174, 207, 164, 0.14);
+  /* Glas-Mitte der Tages-Ringe: dunkle Scheibe, damit die Zahl auch über der
+     hellsten Stelle des Hero-Fotos steht (Scrim-Pflicht). */
+  --ck-ring-glas: rgba(8, 13, 9, 0.5);
   --ck-ok: var(--ck-accent);  /* Erfolg = Akzent, keine fünfte Farbe */
   --ck-warn: #d9ab52;         /* gedämpftes Gold — „liegt/überfällig", NIE Rot */
   --ck-warn-dim: rgba(217, 171, 82, 0.14);
@@ -433,6 +436,8 @@
 .ck-zaehl-vollbild.ist-getippt { background-color: var(--ck-accent-dim); }
 @media (prefers-reduced-motion: reduce) {
   .ck-zaehl-vollbild { transition: none; }
+  /* Auch der Punkt unter der Stufen-Kette wechselt dann ohne Weg (D5). */
+  .ck-flow-punkt::after { transition: none; }
 }
 
 .ck-zaehl-kopf {
@@ -1207,6 +1212,47 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
      statt eine Lücke bis zu den Punkten zu lassen — und die Höhe springt beim
      Wischen nicht, was eine mitwachsende Bahn zwangsläufig täte. */
   .ck-widget-stack > * > * { flex: 1; }
+
+  /* ---- Tages-Flow: die fünf Stufen als wischbare Kette (11.08.) ----------
+     Die Bahn ist der Widget-Stack von oben — hier steht nur, was der Hero
+     dazugibt. `overscroll-behavior-x: contain` hält den Wisch in der Kette,
+     damit er nicht die iOS-Zurück-Geste auslöst. */
+  .ck-flow { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .ck-flow-bahn { width: 100%; overscroll-behavior-x: contain; }
+  .ck-flow-seite { align-items: center; }
+  .ck-flow-seite .ck-ring { justify-content: center; }
+
+  /* Wo bin ich, und was steht schon? Die Punkte sind zugleich der
+     Tages-Überblick — deshalb tragen erledigte Stufen den Akzent. */
+  .ck-flow-punkte { display: flex; align-items: center; gap: 2px; }
+  .ck-flow-punkt {
+    /* Sichtbar ist ein 6px-Punkt; angefasst wird die volle Höhe, sonst wäre
+       das Ziel unter dem Daumen kleiner als die Regel erlaubt. */
+    width: 34px;
+    height: 44px;
+    padding: 0;
+    border: none;
+    background: none;
+    position: relative;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .ck-flow-punkt::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 6px;
+    height: 6px;
+    margin: -3px 0 0 -3px;
+    border-radius: 50%;
+    background: var(--ck-text-3);
+    box-shadow: 0 1px 8px rgba(0, 0, 0, 0.55);
+    transition: background-color 160ms ease, transform 160ms ease;
+  }
+  .ck-flow-punkt.ist-fertig::after { background: var(--ck-accent); }
+  .ck-flow-punkt.ist-hier::after { transform: scale(1.6); background: var(--ck-text-1); }
+  .ck-flow-punkt.ist-hier.ist-fertig::after { background: var(--ck-accent); }
 
   /* O18 v2 (f): Wisch-Bahn je Listen-Zeile. Wieder nativ mit Snap statt eigener
      Gesten-Erkennung — `overscroll-behavior-x: contain` hält die Geste in der

@@ -205,5 +205,53 @@ check(
 // Ob die Zähl-Liste den Flow trägt (Reihenfolge, kein fehlendes Feld), prüft
 // `verify-zaehl-modus.ts` — dort ist diese Liste zu Hause.
 
+// --- 9. Die Kette im Hero (D6: der Hero rechnet nichts) -----------------
+const kette = lies('app/src/cockpit/components/home/TagesFlowStack.tsx')
+const hero = lies('app/src/cockpit/components/home/HeroHorizont.tsx')
+const home = lies('app/src/cockpit/pages/UrielHome.tsx')
+
+check(
+  'die Kette bekommt die Stände als Prop, statt sie selbst zu rechnen',
+  /staende:\s*StufenStand\[\]/.test(kette) && !/stufenStaende\(/.test(kette),
+)
+check(
+  'die Kette fragt keine Fälligkeit und kein Tagesziel selbst ab',
+  !/bucketOf|linkedinFollowups|ANFRAGEN_LIMIT_TAG|WEEK_TARGETS/.test(kette),
+  'Der Hero, der selbst rechnet, läuft der Zahl im Tracking davon.',
+)
+check(
+  'die Kette schreibt nichts',
+  !/bump\(|supabase|upsert/.test(kette),
+)
+check(
+  'die Kette nutzt den bestehenden Widget-Stack, statt eigene Gesten zu bauen',
+  /ck-widget-stack/.test(kette) && !/onTouchMove|onPointerMove/.test(kette),
+)
+check(
+  'auch der Hero selbst rechnet keine Stände',
+  !/stufenStaende\(|useTagesFlow\(/.test(hero),
+)
+check(
+  'der Homescreen holt das Follow-up-Soll aus der bestehenden Postenquelle',
+  /quellen\.followup/.test(home),
+  'Ein zweiter Ladelauf für dieselben Threads wäre der teuerste Weg zu derselben Zahl.',
+)
+
+// Token-Disziplin: keine Farbe im Komponenten-Code (Gesetz 6).
+for (const [name, inhalt] of [
+  ['TagesFlowStack.tsx', kette],
+  ['HeroHorizont.tsx', hero],
+] as const) {
+  check(
+    `${name} trägt keinen Hexwert und kein rgba()`,
+    !/#[0-9a-fA-F]{3,8}\b|rgba?\(/.test(inhalt),
+    'Jede Farbe kommt aus den --ck-*-Tokens.',
+  )
+}
+check(
+  'die Glas-Mitte der Ringe steht als Token in cockpit.css',
+  /--ck-ring-glas:/.test(lies('app/src/styles/cockpit.css')) && /var\(--ck-ring-glas\)/.test(kette),
+)
+
 console.log(`\nverify-tages-flow: ${pass} ok, ${fail} fehlgeschlagen`)
 process.exit(fail === 0 ? 0 : 1)
