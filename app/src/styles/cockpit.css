@@ -457,6 +457,21 @@
   color: var(--ck-text-1);
 }
 .ck-zaehl-ziel { font-size: 14px; color: var(--ck-text-2); }
+/* Der „Stufe steht"-Moment vor dem Weiterschieben (D5). Er tritt an die Stelle
+   der Ziel-Zeile, statt sich darüber zu legen — so springt die Mitte nicht. */
+.ck-zaehl-uebergang {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  text-align: center;
+}
+.ck-zaehl-uebergang strong {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ck-accent-text);
+}
+.ck-zaehl-uebergang span { font-size: 13px; color: var(--ck-text-2); }
 .ck-zaehl-fuss {
   display: flex;
   align-items: center;

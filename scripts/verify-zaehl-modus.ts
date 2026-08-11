@@ -113,6 +113,36 @@ check(
   'Sonst zöge der Knopf Zahlen ab, die woanders gebucht wurden.',
 )
 
+// --- 4b. Der Auto-Advance (D5) ------------------------------------------
+check(
+  'der Zähl-Modus fragt den Flow, wohin es weitergeht',
+  /naechsteStufe\(/.test(ui),
+  'Eine eigene „nächste Stufe"-Rechnung hier wäre eine zweite Reihenfolge.',
+)
+check(
+  'der Sprung wartet, bis die Daten da sind',
+  /if\s*\(\s*flow\.laedt/.test(ui),
+  'Beim ersten Render stehen alle Zähler auf 0 — aus diesem Zustand zu springen wäre blind.',
+)
+check(
+  'gesprungen wird nur, wenn die Stufe in dieser Sitzung offen war',
+  /stufeWarOffen/.test(ui),
+  'Sonst schöbe schon das Ansehen einer erledigten Stufe sofort weiter.',
+)
+check(
+  'eine Rücknahme innerhalb des Moments nimmt den Sprung zurück',
+  /if\s*\(\s*!stufeErledigt\s*\)\s*\{[\s\S]{0,400}?setUebergang\(null\)/.test(ui),
+)
+check(
+  'die Lesepause steht als benannte Konstante, nicht als Zahl im Effekt',
+  /const STUFE_STEHT_MS = \d+/.test(ui) && /}, STUFE_STEHT_MS\)/.test(ui),
+)
+check(
+  'der Sprung ersetzt den Verlaufseintrag, statt ihn zu stapeln',
+  /naechsteStufe[\s\S]*?replace: true/.test(ui),
+  'Sonst führte „Zurück" durch jede abgeschlossene Stufe des Tages.',
+)
+
 // --- 5. Eine Liste, zwei Orte -------------------------------------------
 const quickTrack = lies('app/src/cockpit/components/QuickTrack.tsx')
 check(

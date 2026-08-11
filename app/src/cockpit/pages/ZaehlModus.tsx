@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { TAGES_FLOW, naechsteStufe } from '../lib/tagesFlow'
+import { useFaelligeFollowups, useTagesFlow, type TagesFlowStand } from '../lib/useTagesFlow'
 import { ZAEHL_FELDER, zaehlFeldFuer, type ZaehlFeld } from '../lib/zaehlFelder'
 import { useDailyMetrics } from '../lib/useDailyMetrics'
 
@@ -18,17 +20,53 @@ import { useDailyMetrics } from '../lib/useDailyMetrics'
  * Zwei Ansichten, eine Route:
  *   `/tracking/zaehlen`        → Raster aller Tageszähler
  *   `/tracking/zaehlen/:feld`  → Vollbild für genau einen
+ *
+ * Seit dem Tages-Flow (11.08.) schiebt das Vollbild weiter: steht eine Stufe,
+ * springt es nach einem kurzen Moment zur nächsten offenen (D5). Die Daten
+ * dafür werden **hier oben einmal** geholt und nach unten gereicht — sonst
+ * abonnierten Raster und Vollbild dieselben Tabellen zweimal.
  */
 export function ZaehlModus() {
   const { feld } = useParams<{ feld: string }>()
   const gewaehlt = zaehlFeldFuer(feld)
-  return gewaehlt ? <Vollbild zaehlFeld={gewaehlt} /> : <Raster />
+  const metrics = useDailyMetrics()
+  const faellig = useFaelligeFollowups()
+  const flow = useTagesFlow(metrics.today, faellig.anzahl, metrics.loading || faellig.laedt)
+
+  return gewaehlt ? (
+    <Vollbild zaehlFeld={gewaehlt} metrics={metrics} flow={flow} />
+  ) : (
+    <Raster metrics={metrics} flow={flow} />
+  )
+}
+
+type Metrics = ReturnType<typeof useDailyMetrics>
+
+/**
+ * Wie lange „Stufe steht." stehen bleibt, bevor der Flow weiterschiebt (D5).
+ *
+ * Lang genug, um es zu lesen, kurz genug, um nicht im Weg zu stehen. Es ist
+ * eine Lesepause, keine Animation — deshalb bleibt sie auch bei
+ * `prefers-reduced-motion` bestehen; was dort wegfällt, ist die Bewegung
+ * (siehe `.ck-zaehl-vollbild` in cockpit.css).
+ */
+const STUFE_STEHT_MS = 800
+
+/**
+ * Das Soll einer Kachel/Stufe für heute. Steht das Feld im Tages-Flow, gilt
+ * dessen Soll (bei den Follow-ups ist das die Zahl der heute fälligen Threads);
+ * sonst das feste Ziel aus der Liste — oder gar keines.
+ */
+function sollUndStand(zaehlFeld: ZaehlFeld, flow: TagesFlowStand) {
+  const index = TAGES_FLOW.findIndex((s) => s.feld === zaehlFeld.field)
+  const stand = index >= 0 ? flow.staende[index] : null
+  return { index, stand, soll: stand ? stand.soll : (zaehlFeld.tagesziel ?? null) }
 }
 
 /** Das Raster: jede Kachel zeigt den Tagesstand, ein Tipp öffnet das Vollbild. */
-function Raster() {
+function Raster({ metrics, flow }: { metrics: Metrics; flow: TagesFlowStand }) {
   const navigate = useNavigate()
-  const { today, loading } = useDailyMetrics()
+  const { today, loading } = metrics
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -45,7 +83,10 @@ function Raster() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
         {ZAEHL_FELDER.map((z) => {
           const wert = today[z.field]
-          const anteil = z.tagesziel ? Math.min(1, wert / z.tagesziel) : 0
+          // Das Soll kommt aus dem Flow, wo es eines gibt — bei den Follow-ups
+          // ist das die Zahl der heute fälligen Threads, nicht eine feste Zahl.
+          const { soll } = sollUndStand(z, flow)
+          const anteil = soll ? Math.min(1, wert / soll) : 0
           return (
             <button
               key={z.field}
@@ -55,7 +96,7 @@ function Raster() {
               aria-label={`${z.langLabel} zählen — Stand ${wert}`}
             >
               <span className="ck-zaehl-kachel-ring" aria-hidden>
-                {z.tagesziel ? (
+                {soll ? (
                   <svg viewBox="0 0 120 120">
                     <circle cx="60" cy="60" r="54" fill="none" stroke="var(--ck-card-border)" strokeWidth="6" />
                     <circle
@@ -78,10 +119,14 @@ function Raster() {
                 <span className="ck-zaehl-kachel-zahl ck-serif">{loading ? '·' : wert}</span>
               </span>
               <span className="ck-zaehl-kachel-label">{z.label}</span>
-              {z.tagesziel ? (
+              {soll ? (
                 <span className="ck-zaehl-kachel-ziel ck-zahl">
-                  {wert >= z.tagesziel ? 'Ziel steht' : `noch ${z.tagesziel - wert}`}
+                  {wert >= soll ? 'Ziel steht' : `noch ${soll - wert}`}
                 </span>
+              ) : soll === 0 ? (
+                // Soll 0 heisst hier nicht „kein Ziel", sondern „heute ist
+                // nichts fällig" — das ist eine Aussage und gehört hin.
+                <span className="ck-zaehl-kachel-ziel ck-zahl">nichts fällig</span>
               ) : null}
             </button>
           )
@@ -96,9 +141,17 @@ function Raster() {
  * (Schließen, Rückgängig, Wechseln) als eigener Knopf DARÜBER und stoppt die
  * Weitergabe des Klicks, sonst zählte jeder Griff ans Kreuz mit.
  */
-function Vollbild({ zaehlFeld }: { zaehlFeld: ZaehlFeld }) {
+function Vollbild({
+  zaehlFeld,
+  metrics,
+  flow,
+}: {
+  zaehlFeld: ZaehlFeld
+  metrics: Metrics
+  flow: TagesFlowStand
+}) {
   const navigate = useNavigate()
-  const { today, bump } = useDailyMetrics()
+  const { today, bump } = metrics
   const wert = today[zaehlFeld.field]
 
   /**
@@ -126,10 +179,53 @@ function Vollbild({ zaehlFeld }: { zaehlFeld: ZaehlFeld }) {
     setDieseSitzung((n) => n - 1)
   }, [bump, dieseSitzung, zaehlFeld.field])
 
-  // Beim Wechsel des Feldes beginnt eine neue Sitzung.
+  /**
+   * Der Tages-Flow (D5): steht die Stufe, geht es weiter.
+   *
+   * `stufeWarOffen` ist der Unterschied zwischen „Kevin hat die Stufe eben
+   * fertiggemacht" und „Kevin sieht sich eine längst erledigte Stufe an". Ohne
+   * diese Merke würde jedes Öffnen einer fertigen Stufe sofort weiterspringen,
+   * und man käme nie dorthin, wo man hinwollte.
+   */
+  const { index: stufenIndex, stand, soll } = sollUndStand(zaehlFeld, flow)
+  const stufeErledigt = stand?.erledigt ?? false
+  const zielStufe = stufeErledigt ? naechsteStufe(flow.staende, stufenIndex) : -2
+  const stufeWarOffen = useRef(false)
+  const [uebergang, setUebergang] = useState<{ ziel: number } | null>(null)
+
+  // Beim Wechsel des Feldes beginnt eine neue Sitzung — und eine neue Merke.
   useEffect(() => {
     setDieseSitzung(0)
+    stufeWarOffen.current = false
+    setUebergang(null)
   }, [zaehlFeld.field])
+
+  useEffect(() => {
+    // Solange geladen wird, stehen alle Zähler auf 0 und jede Stufe sähe offen
+    // aus. Aus diesem Zustand darf weder gemerkt noch gesprungen werden.
+    if (flow.laedt || !stand) return
+    if (!stufeErledigt) {
+      stufeWarOffen.current = true
+      // Nimmt Kevin innerhalb des Moments zurück, ist die Stufe wieder offen —
+      // dann fällt der angekündigte Sprung mitsamt seinem Timer weg.
+      setUebergang(null)
+      return
+    }
+    if (!stufeWarOffen.current) return
+    setUebergang({ ziel: zielStufe })
+  }, [flow.laedt, stand, stufeErledigt, zielStufe])
+
+  useEffect(() => {
+    // Ziel < 0 heisst: der Tag steht. Dann wird nichts mehr angesteuert, die
+    // Meldung bleibt einfach stehen.
+    if (!uebergang || uebergang.ziel < 0) return
+    const ziel = TAGES_FLOW[uebergang.ziel]
+    if (!ziel) return
+    const id = window.setTimeout(() => {
+      navigate(`/tracking/zaehlen/${ziel.feld}`, { replace: true })
+    }, STUFE_STEHT_MS)
+    return () => window.clearTimeout(id)
+  }, [uebergang, navigate])
 
   // Der kurze Aufleuchten-Effekt nach dem Tippen — die einzige Bewegung hier.
   useEffect(() => {
@@ -175,7 +271,8 @@ function Vollbild({ zaehlFeld }: { zaehlFeld: ZaehlFeld }) {
     if (Math.abs(dx) < 14 && Math.abs(dy) < 14) zaehle()
   }
 
-  const rest = zaehlFeld.tagesziel ? Math.max(0, zaehlFeld.tagesziel - wert) : null
+  const rest = soll !== null && soll > 0 ? Math.max(0, soll - wert) : null
+  const naechste = uebergang && uebergang.ziel >= 0 ? TAGES_FLOW[uebergang.ziel] : null
 
   return (
     <div
@@ -193,7 +290,12 @@ function Vollbild({ zaehlFeld }: { zaehlFeld: ZaehlFeld }) {
       }}
     >
       <div className="ck-zaehl-kopf">
-        <span className="ck-label">{zaehlFeld.langLabel}</span>
+        <span className="ck-label">
+          {/* Wo im Tag steht Kevin gerade? Nur für die fünf Stufen — die
+              Kanäle dahinter sind kein Ritual und tragen keine Nummer. */}
+          {stufenIndex >= 0 ? `Stufe ${stufenIndex + 1} von ${TAGES_FLOW.length} · ` : ''}
+          {zaehlFeld.langLabel}
+        </span>
         <button
           type="button"
           className="ck-btn"
@@ -210,10 +312,20 @@ function Vollbild({ zaehlFeld }: { zaehlFeld: ZaehlFeld }) {
 
       <div className="ck-zaehl-mitte">
         <span className="ck-zaehl-zahl ck-serif">{wert}</span>
-        {rest !== null ? (
-          <span className="ck-zaehl-ziel ck-zahl">
-            {rest === 0 ? 'Tagesziel steht.' : `noch ${rest} · Ziel ${zaehlFeld.tagesziel}`}
+        {uebergang ? (
+          // Der Moment, in dem die Stufe steht (D5). Er sagt zugleich, wohin
+          // es gleich geht — ein Sprung ohne Ankündigung fühlt sich an wie ein
+          // Fehler, auch wenn er richtig ist.
+          <span className="ck-zaehl-uebergang" role="status">
+            <strong>{naechste ? 'Stufe steht.' : 'Der Tag steht.'}</strong>
+            <span>{naechste ? `Weiter zu ${naechste.label}` : 'Alle fünf Stufen sind durch.'}</span>
           </span>
+        ) : rest !== null ? (
+          <span className="ck-zaehl-ziel ck-zahl">
+            {rest === 0 ? 'Tagesziel steht.' : `noch ${rest} · Ziel ${soll}`}
+          </span>
+        ) : soll === 0 ? (
+          <span className="ck-zaehl-ziel ck-zahl">Heute ist nichts fällig.</span>
         ) : null}
       </div>
 
