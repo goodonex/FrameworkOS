@@ -2,7 +2,35 @@
 
 **Stand:** 2026-08-11 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
 
-## Runde vom 11.08. — **Mobiler Tages-Flow gebaut** (nicht live)
+## **LIVE seit 11.08.2026, ~22:30 — Mobiler Tages-Flow**
+
+Fast-Forward `ad0a987 → 3d935df` auf `main` gepusht (Kevins Wort), Netlify hat
+deployt. **9 Commits**, genau die Runde unten — zwischen `origin/main` und dem
+Arbeitsbranch lag nichts Fremdes.
+
+**Beleg am ausgelieferten Bundle** (`index-mmfmDw1y.js`, CSS
+`index-DOPzdSz4.css`): elf Marken dieser Runde nachweisbar — „Stufe steht.",
+„Der Tag steht.", „Alle fünf Stufen sind durch.", „Reaktivierung · InMails",
+„Nie angenommene Anfragen", „Chats ohne Antwort", „Antworten und
+Erstnachrichten", „Analysen aufnehmen und rausschicken", „Heute ist nichts
+fällig", `ck-flow-punkt`, „Anfragen zählen"; im CSS zusätzlich `ck-ring-glas`
+und `ck-zaehl-uebergang`. **Gegenprobe bestanden:** „noch keine Messwerte" und
+`kachel=vernetzungsanfragen` sind aus dem Prod-Bundle verschwunden. Die Routen
+`/`, `/cockpit`, `/tracking/zaehlen` und `/tracking/zaehlen/inmails` antworten
+200.
+
+**Noch nicht am Gerät gesehen.** Die Abnahme lief im Browser bei 390×664 mit
+echter Session — die Zahlen sind also echt, das Gerät ist es nicht. Der
+Daumen-Test am iPhone (Wischen durch die Kette, Auto-Advance) steht aus.
+
+### L1 · Production-Branch — ✅ **geprüft 11.08.2026, nicht mehr ungeprüft**
+`netlify api getSite` sagt: `repo_branch = main`, `stop_builds = false`, Repo
+`github.com/goodonex/uriel`, Base `app`, Publish `dist`, Command
+`npm run build`. Damit ist der Vorbehalt aus dem Livegang-Abschnitt („steht
+nicht in `netlify.toml`, **ungeprüft**") erledigt: ein Push auf `main` löst den
+Produktions-Build aus, und genau das ist hier passiert.
+
+## Runde vom 11.08. — **Mobiler Tages-Flow gebaut**
 
 Aus dem einen Ring auf dem Homescreen sind **fünf Stufen in fester
 Reihenfolge** geworden: Anfragen → Nachrichten → Looms → Follow-ups (Riege 1) →
@@ -12,8 +40,7 @@ selbst weiter. Züge Z0–Z7 der Blaupause
 (`~/.claude/plans/twinkly-baking-locket.md`), **sieben Commits** auf
 `cockpit-rebuild`. `npx tsc -b` + `npm run build` grün, **30 verify-Skripte
 grün** (29 vorher, neu `verify-tages-flow` mit 75 Fällen; `verify-zaehl-modus`
-von 28 auf 46 Fälle gewachsen).
-**Der Fast-Forward auf `main` bleibt Kevins Wort.**
+von 28 auf 46 Fälle gewachsen). **Seit dem Abend live** — siehe oben.
 
 | Zug | Ergebnis | Datei |
 |---|---|---|
