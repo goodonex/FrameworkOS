@@ -47,10 +47,14 @@
 
 # Der Service Worker ist der Weg, auf dem Aktualisierungen ueberhaupt ankommen.
 # Ein gecachter Worker kann sich nicht selbst ersetzen.
+#
+# Bewusst dieselbe Schreibweise wie bei der Einstiegsseite: ein blosses
+# `no-cache` hat Netlify hier NICHT uebernommen (live gemessen — es blieb bei
+# `max-age=14400`), diese Form greift nachweislich.
 [[headers]]
   for = "/sw.js"
   [headers.values]
-    Cache-Control = "no-cache"
+    Cache-Control = "public, max-age=0, must-revalidate"
 
 # Manifest und Icons aendern sich selten, tragen aber feste Namen — ein Tag ist
 # lang genug, um zu helfen, und kurz genug, um ein neues Icon durchzulassen.

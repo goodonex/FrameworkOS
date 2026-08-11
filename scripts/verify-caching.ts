@@ -61,9 +61,11 @@ check('die Einstiegsseite bleibt frisch', /max-age=0/.test(index) && !/immutable
 const sw = blockFuer('/sw.js')
 check(
   'der Service Worker wird nicht gecacht',
-  /no-cache|max-age=0/.test(sw),
-  'Ein gecachter Worker kann sich nicht selbst ersetzen.',
+  /max-age=0/.test(sw),
+  'Ein gecachter Worker kann sich nicht selbst ersetzen. Achtung: ein blosses ' +
+    '`no-cache` hat Netlify nicht uebernommen — es braucht die volle Form.',
 )
+check('der Service Worker ist nicht immutable', !/immutable/.test(sw))
 
 // --- 3. Der Build verdient das Versprechen noch -------------------------
 const dist = join(wurzel, 'app/dist/assets')
