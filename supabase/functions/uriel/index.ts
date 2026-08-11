@@ -29,6 +29,8 @@ interface Body {
   messages: AnthropicMessage[]
   tools: AnthropicTool[]
   context?: { brandName?: string; brandSlug?: string; date?: string; area?: string }
+  /** 'schnell' (Standard) oder 'gruendlich' — steuert Modell und Spielraum. */
+  tiefe?: 'schnell' | 'gruendlich'
 }
 
 function json(status: number, body: Record<string, unknown>) {
@@ -44,11 +46,6 @@ Deno.serve(async (req) => {
   }
 
   const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')?.trim()
-  // Uriel läuft bewusst auf einem schnellen Modell (Haiku): Cockpit-Kommandos =
-  // Tool wählen, Ergebnis lesen, knapp antworten — da zählt Reaktionszeit mehr
-  // als Tiefe. Eigene Env, damit der geteilte ANTHROPIC_MODEL (sonnet, für
-  // brand-assistant) unberührt bleibt.
-  const anthropicModel = Deno.env.get('URIEL_MODEL')?.trim() || 'claude-haiku-4-5-20251001'
   if (!anthropicKey) {
     return json(500, { ok: false, message: 'ANTHROPIC_API_KEY fehlt — Uriel nicht verfügbar.' })
   }
@@ -68,7 +65,7 @@ Deno.serve(async (req) => {
     return json(400, { ok: false, message: 'Invalid JSON body' })
   }
 
-  const { messages, tools, context } = body
+  const { messages, tools, context, tiefe } = body
   if (!Array.isArray(messages) || messages.length === 0) {
     return json(400, { ok: false, message: 'messages required' })
   }
@@ -82,7 +79,26 @@ Deno.serve(async (req) => {
     return json(401, { ok: false, message: 'Invalid session' })
   }
 
-  const system = buildUrielSystemPrompt(context)
+  /**
+   * Zwei Geschwindigkeiten (11.08.2026).
+   *
+   * Uriel lief bis hierher immer auf Haiku — schnell, aber unter Unsicherheit
+   * neigt es dazu, sich Zusammenhaenge auszudenken statt nachzufragen. Genau
+   * das ist an einem Tag dreimal passiert (LinkedIn-Postfach, Eimer-Bedeutung,
+   * Herkunft einer Zahl).
+   *
+   * `schnell` bleibt der Standard: „trag 30 Anfragen ein", navigieren, eine
+   * Zahl nennen — da zaehlt Reaktionszeit. `gruendlich` schaltet auf das
+   * groessere Modell und mehr Spielraum, wenn Kevin etwas analysiert haben
+   * will. Beide Namen sind per Env ueberschreibbar, damit ein Modellwechsel
+   * kein Deploy braucht.
+   */
+  const MODELL_SCHNELL = Deno.env.get('URIEL_MODEL')?.trim() || 'claude-haiku-4-5-20251001'
+  const MODELL_GRUENDLICH = Deno.env.get('URIEL_MODEL_GRUENDLICH')?.trim() || 'claude-sonnet-5'
+  const istGruendlich = tiefe === 'gruendlich'
+  const anthropicModel = istGruendlich ? MODELL_GRUENDLICH : MODELL_SCHNELL
+
+  const system = buildUrielSystemPrompt({ ...context, tiefe: istGruendlich ? 'gruendlich' : 'schnell' })
 
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -93,7 +109,7 @@ Deno.serve(async (req) => {
     },
     body: JSON.stringify({
       model: anthropicModel,
-      max_tokens: 4096,
+      max_tokens: istGruendlich ? 8192 : 4096,
       system,
       messages,
       ...(Array.isArray(tools) && tools.length ? { tools } : {}),
@@ -113,5 +129,8 @@ Deno.serve(async (req) => {
     ok: true,
     stop_reason: data.stop_reason ?? 'end_turn',
     content: data.content ?? [],
+    // Damit im Client sichtbar ist, wer geantwortet hat — und ein stiller
+    // Rueckfall auf das schnelle Modell nicht unbemerkt bleibt.
+    modell: anthropicModel,
   })
 })

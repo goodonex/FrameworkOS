@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm'
 import { useContacts } from '../../hooks/useContacts'
 import { useUrielBus } from '../../store/urielBus'
 import { useLinkedinThreads } from '../../hooks/useLinkedinThreads'
+import type { UrielTiefe } from '../lib/urielAgent'
 import { useErstnachrichten } from '../../hooks/useErstnachrichten'
 import { bucketOf, type FollowupBucket } from '../lib/linkedinFollowups'
 import { useActiveBrand } from '../lib/activeBrand'
@@ -41,6 +42,9 @@ import {
 } from '../lib/urielThreads'
 import { addMemory, loadMemory, removeMemory, type UrielFact } from '../lib/urielMemory'
 import type { ViewMode } from '../graph/nebulaLayout'
+
+/** Wo die Wahl „schnell/gruendlich" liegt — lokal, sie gehoert an dieses Geraet. */
+const TIEFE_KEY = 'ck.uriel.tiefe'
 
 const AREA_PATH: Record<string, string> = {
   cockpit: '/cockpit',
@@ -132,6 +136,26 @@ export function UrielDock() {
   const contacts = useContacts(activeSlug)
   // Dasselbe Postfach, das /linkedin zeigt — Uriel liest es, schreibt nie.
   const linkedinThreads = useLinkedinThreads(activeSlug)
+  /**
+   * Schnell oder gruendlich (11.08.2026). Standard bleibt schnell — das ist der
+   * Normalfall (Zahl buchen, navigieren). Die Wahl haelt lokal, damit Kevin sie
+   * nicht bei jedem Oeffnen neu treffen muss.
+   */
+  const [tiefe, setTiefe] = useState<UrielTiefe>(() => {
+    try {
+      return localStorage.getItem(TIEFE_KEY) === 'gruendlich' ? 'gruendlich' : 'schnell'
+    } catch {
+      return 'schnell'
+    }
+  })
+  const setzeTiefe = useCallback((t: UrielTiefe) => {
+    setTiefe(t)
+    try {
+      localStorage.setItem(TIEFE_KEY, t)
+    } catch {
+      /* ohne Speicher gilt die Wahl nur fuer diese Sitzung */
+    }
+  }, [])
   // Die Frage „an wen muss ich noch eine Erstnachricht schicken" beantwortet
   // NICHT das Postfach, sondern diese Liste. Genau daran ist Uriel gescheitert.
   const erstnachrichten = useErstnachrichten(activeSlug)
@@ -412,7 +436,7 @@ export function UrielDock() {
           date: new Date().toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }),
           area: location.pathname.replace('/', '') || 'cockpit',
           memory: memory.map((f) => f.text),
-        })
+        }, tiefe)
         historyRef.current = result.messages
         const finalText = result.finalText || '(keine Antwort)'
         const withUriel: DisplayTurn[] = [
@@ -765,10 +789,29 @@ export function UrielDock() {
                 🎤
               </button>
             )}
+            {/* Schnell oder gruendlich (11.08.). Schnell = Haiku, der Normalfall:
+                Zahl buchen, navigieren, kurz antworten. Gruendlich schaltet in
+                der Edge Function auf das groessere Modell — fuer die Fragen, bei
+                denen ein schnelles Modell anfaengt zu raten statt nachzusehen.
+                Sichtbar, nicht versteckt: Kevin soll sehen, mit wem er spricht. */}
+            <button
+              type="button"
+              className={`ck-btn${tiefe === 'gruendlich' ? ' ck-btn--primary' : ''}`}
+              onClick={() => setzeTiefe(tiefe === 'gruendlich' ? 'schnell' : 'gruendlich')}
+              aria-pressed={tiefe === 'gruendlich'}
+              title={
+                tiefe === 'gruendlich'
+                  ? 'Gründlich: grösseres Modell, mehr Zeit. Tippen schaltet zurück auf schnell.'
+                  : 'Schnell: kurze Antworten, sofort. Tippen schaltet auf gründlich.'
+              }
+              style={{ minWidth: 40, flexShrink: 0, paddingInline: 12 }}
+            >
+              {tiefe === 'gruendlich' ? 'Gründlich' : 'Schnell'}
+            </button>
             <textarea
               className="ck-input"
               style={{ flex: 1, resize: 'none', height: 60, lineHeight: 1.45 }}
-              placeholder="Uriel fragen …"
+              placeholder={tiefe === 'gruendlich' ? 'Uriel fragen — er lässt sich Zeit …' : 'Uriel fragen …'}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {

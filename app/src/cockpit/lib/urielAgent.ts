@@ -37,6 +37,16 @@ export type ToolExecutor = (
   input: Record<string, unknown>,
 ) => Promise<ToolResult>
 
+/**
+ * Wie viel Zeit Uriel sich nehmen darf (11.08.2026).
+ *
+ * `schnell` ist der Standard und bleibt es: Zahlen buchen, navigieren, kurz
+ * antworten. `gruendlich` schaltet in der Edge Function auf das groessere
+ * Modell — fuer die Fragen, bei denen ein schnelles Modell anfaengt zu raten
+ * statt nachzusehen.
+ */
+export type UrielTiefe = 'schnell' | 'gruendlich'
+
 export interface UrielTurnContext {
   brandName?: string
   brandSlug?: string
@@ -83,6 +93,7 @@ export async function runUrielTurn(
   userText: string,
   execute: ToolExecutor,
   context: UrielTurnContext,
+  tiefe: UrielTiefe = 'schnell',
 ): Promise<UrielTurnResult> {
   if (!supabase) throw new Error('Supabase nicht konfiguriert.')
 
@@ -110,7 +121,7 @@ export async function runUrielTurn(
 
   for (let step = 0; step < MAX_STEPS; step++) {
     const { data, error } = await supabase.functions.invoke<EdgeReply>('uriel', {
-      body: { messages, tools: URIEL_TOOLS, context },
+      body: { messages, tools: URIEL_TOOLS, context, tiefe },
     })
 
     if (error) {
