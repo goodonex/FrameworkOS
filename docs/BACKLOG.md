@@ -11,7 +11,8 @@ den Zähl-Modus für genau diese Stufe, und steht eine Stufe, schiebt der Zähle
 selbst weiter. Züge Z0–Z7 der Blaupause
 (`~/.claude/plans/twinkly-baking-locket.md`), **sieben Commits** auf
 `cockpit-rebuild`. `npx tsc -b` + `npm run build` grün, **30 verify-Skripte
-grün** (29 vorher, neu `verify-tages-flow` mit 78 Fällen).
+grün** (29 vorher, neu `verify-tages-flow` mit 75 Fällen; `verify-zaehl-modus`
+von 28 auf 46 Fälle gewachsen).
 **Der Fast-Forward auf `main` bleibt Kevins Wort.**
 
 | Zug | Ergebnis | Datei |
