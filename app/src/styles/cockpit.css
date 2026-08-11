@@ -1258,9 +1258,17 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
     box-shadow: 0 1px 8px rgba(0, 0, 0, 0.55);
     transition: background-color 160ms ease, transform 160ms ease;
   }
+  /* Zwei Aussagen, zwei Mittel — sonst liest man sie gegeneinander: die FARBE
+     sagt, ob die Stufe steht, der RING sagt, wo man gerade ist. Beides über die
+     Farbe zu erzählen hiess, dass ein grüner Punkt „erledigt" und „hier"
+     zugleich bedeutet — am 390er nicht auseinanderzuhalten. */
   .ck-flow-punkt.ist-fertig::after { background: var(--ck-accent); }
-  .ck-flow-punkt.ist-hier::after { transform: scale(1.6); background: var(--ck-text-1); }
-  .ck-flow-punkt.ist-hier.ist-fertig::after { background: var(--ck-accent); }
+  .ck-flow-punkt.ist-hier::after {
+    transform: scale(1.5);
+    box-shadow:
+      0 0 0 1.5px var(--ck-text-1),
+      0 1px 8px rgba(0, 0, 0, 0.55);
+  }
 
   /* O18 v2 (f): Wisch-Bahn je Listen-Zeile. Wieder nativ mit Snap statt eigener
      Gesten-Erkennung — `overscroll-behavior-x: contain` hält die Geste in der

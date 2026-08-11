@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import type { MetricField } from '../../lib/metrikFelder'
 import { ersteOffeneStufe, type StufenStand } from '../../lib/tagesFlow'
 
@@ -44,27 +44,70 @@ export function TagesFlowStack({
 }) {
   const bahn = useRef<HTMLDivElement>(null)
   const [sichtbar, setSichtbar] = useState(0)
-  /** Einmal je Sitzung an die richtige Stelle rücken — danach gehört die Bahn dem Daumen. */
-  const schonGerueckt = useRef(false)
+  /**
+   * Hat der Daumen die Bahn schon in der Hand? Ab dann rückt nichts mehr von
+   * selbst — eine Oberfläche, die sich unter dem eigenen Wisch weiterbewegt,
+   * ist kein Dienst, sondern ein Ärgernis.
+   */
+  const angefasst = useRef(false)
 
+  /**
+   * Eine Seite anfahren. Über das Kind, nicht über `scrollLeft` des Containers:
+   * `scrollIntoView` referenziert das Element und übersteht ein Neu-Layout, bei
+   * dem eine gerechnete Pixelposition ins Leere zeigt.
+   */
   const zuSeite = useCallback((index: number, weich: boolean) => {
     const el = bahn.current
     if (!el || index < 0) return
-    el.scrollTo({ left: index * el.clientWidth, behavior: weich ? 'smooth' : 'auto' })
+    const seite = el.children[index] as HTMLElement | undefined
+    seite?.scrollIntoView({ inline: 'start', block: 'nearest', behavior: weich ? 'smooth' : 'auto' })
   }, [])
 
-  useEffect(() => {
-    if (laedt || schonGerueckt.current || staende.length === 0) return
-    const ziel = ersteOffeneStufe(staende)
-    schonGerueckt.current = true
-    // Steht der ganze Tag, bleibt die Kette vorne — die erste Stufe ist dann
-    // die Zusammenfassung, kein Rücksprung ins Nichts.
-    if (ziel <= 0) return
+  /**
+   * Wo steigt Kevin ein? Bei der ersten Stufe, die heute noch offen ist.
+   *
+   * Bewusst KEIN „einmal beim Öffnen und nie wieder". Zwei gemessene Gründe
+   * (11.08., am laufenden Cockpit):
+   *
+   * 1. Beim ersten Rendern stehen alle Zähler auf 0, also sind alle Stufen
+   *    offen — ein Versuch aus diesem Zustand verbrauchte den einen Schuss und
+   *    die Kette bliebe auf einer längst erledigten Stufe stehen.
+   * 2. Der Ladezustand flackert (mehrere Quellen werden nacheinander fertig).
+   *    Bei jedem Wechsel rendert die Bahn neu, und das Scroll-Snap zieht sie
+   *    auf die erste Seite zurück. Gegen dieses Zurückziehen kommt ein
+   *    einmaliger Sprung nicht an.
+   *
+   * Der Sprung folgt deshalb dem Ziel, solange die Bahn noch nicht dort steht
+   * — und hört auf, sobald sie sitzt oder der Daumen übernimmt.
+   */
+  const zielStufe = laedt || staende.length === 0 ? -1 : ersteOffeneStufe(staende)
+
+  /**
+   * Bewusst `useLayoutEffect` und bewusst OHNE `requestAnimationFrame`.
+   *
+   * Der erste Anlauf plante den Sprung in einem Frame und räumte ihn im
+   * Cleanup wieder ab. Weil `staende` bei jedem Render eine neue Referenz
+   * bekommt, lief der Effekt praktisch dauernd — und jeder geplante Frame
+   * wurde gestrichen, bevor er dran war. Der Sprung kam nie zustande (am
+   * 11.08. im laufenden Cockpit gemessen: null Frame-Läufe).
+   *
+   * Synchron nach dem Layout ist beides gelöst: die Bahn hat ihre Breite, und
+   * zieht ein Neu-Rendern sie zurück auf die erste Seite, rückt der nächste
+   * Durchlauf sie sofort wieder zurecht. Die Prüfung „sitzt schon" macht das
+   * billig und verhindert, dass hier eine laufende Bewegung abgerissen wird.
+   */
+  useLayoutEffect(() => {
+    // Steht der ganze Tag (-1) oder ist gleich die erste Stufe dran (0), bleibt
+    // die Kette vorne — es gibt nichts anzusteuern.
+    if (zielStufe <= 0 || angefasst.current) return
+    const el = bahn.current
+    if (!el || el.clientWidth === 0) return
+    if (Math.round(el.scrollLeft / el.clientWidth) === zielStufe) return
     // Ohne Bewegung ankommen: beim Öffnen ist ein Scroll-Flug nur Unruhe, und
     // wer Bewegung abbestellt hat, bekommt hier ohnehin keine.
-    zuSeite(ziel, false)
-    setSichtbar(ziel)
-  }, [laedt, staende, zuSeite])
+    zuSeite(zielStufe, false)
+    setSichtbar(zielStufe)
+  }, [zielStufe, staende, zuSeite])
 
   const onScroll = () => {
     const el = bahn.current
@@ -75,7 +118,15 @@ export function TagesFlowStack({
 
   return (
     <div className="ck-flow">
-      <div className="ck-widget-stack ck-flow-bahn" ref={bahn} onScroll={onScroll}>
+      <div
+        className="ck-widget-stack ck-flow-bahn"
+        ref={bahn}
+        onScroll={onScroll}
+        // Ab der ersten Berührung gehört die Bahn dem Daumen (siehe `angefasst`).
+        onPointerDown={() => {
+          angefasst.current = true
+        }}
+      >
         {staende.map((s) => {
           const anteil = s.soll > 0 ? Math.min(1, Math.max(0, s.wert / s.soll)) : 0
           return (
@@ -140,6 +191,7 @@ export function TagesFlowStack({
             aria-label={`${s.stufe.label}${s.erledigt ? ' — steht' : ''}`}
             className={`ck-flow-punkt${i === sichtbar ? ' ist-hier' : ''}${s.erledigt ? ' ist-fertig' : ''}`}
             onClick={() => {
+              angefasst.current = true
               zuSeite(i, true)
               setSichtbar(i)
             }}

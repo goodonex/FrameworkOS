@@ -228,6 +228,27 @@ check(
   /ck-widget-stack/.test(kette) && !/onTouchMove|onPointerMove/.test(kette),
 )
 check(
+  'der Einstiegs-Sprung läuft synchron nach dem Layout, nicht in einem Frame',
+  // Auf den Aufruf gemünzt, nicht auf das Wort — der Kommentar daneben darf
+  // erklären, warum der Frame-Weg gescheitert ist.
+  /useLayoutEffect\(/.test(kette) && !/requestAnimationFrame\(/.test(kette),
+  'Am 11.08. gemessen: der Frame wurde bei jedem Render weggeräumt, der Sprung kam nie zustande.',
+)
+check(
+  'der Sprung fasst nichts an, was schon sitzt',
+  /scrollLeft \/ el\.clientWidth\) === zielStufe\) return/.test(kette),
+  'Sonst risse er bei jedem Datenwechsel eine laufende Bewegung ab.',
+)
+check(
+  'ab der ersten Berührung hört das Nachrücken auf',
+  /angefasst\.current = true/.test(kette) && /angefasst\.current\) return/.test(kette),
+  'Eine Bahn, die sich unter dem eigenen Wisch weiterbewegt, ist ein Ärgernis.',
+)
+check(
+  'die Instrumentierung der Fehlersuche ist wieder draussen',
+  !/console\.log|__flow/.test(kette),
+)
+check(
   'auch der Hero selbst rechnet keine Stände',
   !/stufenStaende\(|useTagesFlow\(/.test(hero),
 )
