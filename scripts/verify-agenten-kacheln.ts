@@ -91,7 +91,7 @@ function mitGrund(r: RunSummary, grund: NonNullable<RunSummary['grund']>): RunSu
 const ANMELDUNG = {
   schluessel: 'anmeldung',
   kurz: 'Anmeldung abgelaufen',
-  hinweis: 'Im Terminal `claude` neu anmelden — bis dahin läuft kein Agent',
+  hinweis: 'Im Terminal `claude` neu anmelden',
   handeln: true,
 } as const
 const ZEITLIMIT = {
@@ -114,7 +114,7 @@ check(
 check(
   'verlangt ein Grund Handeln, sagt die Meldung, was zu tun ist',
   agentenBefund([mitGrund(run('morgenbrief', 'error', MI), ANMELDUNG)], MI).meldung,
-  'Anmeldung abgelaufen — Im Terminal `claude` neu anmelden — bis dahin läuft kein Agent',
+  'Anmeldung abgelaufen — Im Terminal `claude` neu anmelden',
 )
 check(
   'Handlungsbedarf sticht die Namensliste — auch wenn mehrere Agenten scheitern',
@@ -125,7 +125,7 @@ check(
     ],
     MI,
   ).meldung,
-  'Anmeldung abgelaufen — Im Terminal `claude` neu anmelden — bis dahin läuft kein Agent',
+  'Anmeldung abgelaufen — Im Terminal `claude` neu anmelden',
 )
 check(
   'der Handlungsbedarf zeigt auf den richtigen Lauf',

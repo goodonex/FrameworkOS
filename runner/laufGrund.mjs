@@ -27,14 +27,14 @@ const MUSTER = [
     schluessel: 'anmeldung',
     test: /OAuth session expired|Failed to authenticate|authentication_error|Invalid API key|Please run .?\/login|not logged in/i,
     kurz: 'Anmeldung abgelaufen',
-    hinweis: 'Im Terminal `claude` neu anmelden — bis dahin läuft kein Agent',
+    hinweis: 'Im Terminal `claude` neu anmelden',
     handeln: true,
   },
   {
     schluessel: 'kontingent',
     test: /rate.?limit|usage limit|quota exceeded|insufficient credit|overloaded_error/i,
     kurz: 'Kontingent erschöpft',
-    hinweis: 'Der nächste Versuch läuft wieder — Handeln nur, wenn es bleibt',
+    hinweis: 'Der nächste Versuch läuft wieder',
     handeln: false,
   },
   {
