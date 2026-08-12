@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useContacts } from '../../hooks/useContacts'
+import { useErstnachrichten } from '../../hooks/useErstnachrichten'
+import { useLinkedinNetzwerk } from '../../hooks/useLinkedinNetzwerk'
 import { useLinkedinThreads } from '../../hooks/useLinkedinThreads'
 import type { LinkedinThread } from '../../types/db'
 import { HeuteTabs } from '../components/HeuteTabs'
 import { ErstnachrichtenListe } from '../components/ErstnachrichtenListe'
+import { FunnelStufen } from '../components/linkedin/FunnelStufen'
 import { useActiveBrand } from '../lib/activeBrand'
 import { buildLinkedinFollowupInput } from '../lib/approvalDrafts'
 import { bucketOf, coverage, FOLLOWUP_THRESHOLDS_DAYS, istWeckbar } from '../lib/linkedinFollowups'
@@ -348,6 +351,10 @@ export function LinkedinArea({ eingebettet = false }: { eingebettet?: boolean } 
   const { activeBrand } = useActiveBrand()
   const slug = activeBrand?.slug
   const threadsQuery = useLinkedinThreads(slug)
+  // Für den Trichter (12.08.): das Netzwerk trägt zwei der vier Kacheln, die
+  // Erstnachrichten entscheiden, wer schon eine bekommen hat.
+  const netzwerk = useLinkedinNetzwerk(slug)
+  const erstnachrichten = useErstnachrichten(slug)
   const contacts = useContacts(slug)
   const { state: runnerState } = useRunnerStatus()
   // Beide Wege brauchen einen LEBENDEN Runner: lokal den direkten Aufruf, sonst
@@ -555,6 +562,17 @@ export function LinkedinArea({ eingebettet = false }: { eingebettet?: boolean } 
         <div style={{ fontSize: 12, color: 'var(--ck-text-3)', padding: 12 }}>Lädt …</div>
       ) : (
         <>
+          {/* Der Trichter (12.08.): wer steckt wo? Steht ÜBER den Buckets —
+              die Buckets sagen, was heute fällig ist, der Trichter, wer
+              insgesamt wartet. */}
+          <FunnelStufen
+            netzwerk={netzwerk.items}
+            threads={threadsQuery.items}
+            erstnachrichten={erstnachrichten.items}
+            letzterVollerEinladungsLauf={netzwerk.letzterVollerEinladungsLauf}
+            netzwerkLaedt={netzwerk.loading}
+          />
+
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <div className="ck-panel" style={{ padding: '10px 14px', flex: 1, minWidth: 140 }}>
               <div className="ck-label" style={{ fontSize: 9 }}>Du bist dran</div>
