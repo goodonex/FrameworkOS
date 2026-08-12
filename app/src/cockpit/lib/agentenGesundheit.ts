@@ -24,6 +24,11 @@ export interface AgentenBefund {
   erfolgreich: string[]
   /** Routinen, von denen heute weder Erfolg noch Fehlschlag vorliegt. */
   ausstehend: string[]
+  /**
+   * Der jüngste Fehlschlag, der Kevins Eingreifen verlangt — oder `null`.
+   * Für den Hinweis, der über der Agenten-Liste steht.
+   */
+  handlungsbedarf: RunSummary | null
   /** Eine Zeile für den Morgen — null, wenn alles in Ordnung ist. */
   meldung: string | null
 }
@@ -64,14 +69,29 @@ export function agentenBefund(runs: RunSummary[], jetzt: Date = new Date()): Age
     (a) => !heutige.some((r) => r.agent === a && (r.status === 'done' || r.status === 'error')),
   )
 
+  /**
+   * Der jüngste Fehlschlag, den Kevin selbst beheben muss (12.08.).
+   *
+   * Er sticht die Namensliste: dass „2 Agenten gescheitert" sind, half am
+   * 11.08. niemandem — dass die Anmeldung abgelaufen war, hätte den Tag
+   * gerettet. Verlangt kein Grund ein Eingreifen, bleibt es bei den Namen.
+   */
+  const handlungsbedarf = fehlschlaege.find((r) => r.grund?.handeln) ?? null
+
   let meldung: string | null = null
-  if (fehlschlaege.length > 0) {
+  if (handlungsbedarf?.grund) {
+    meldung = `${handlungsbedarf.grund.kurz} — ${handlungsbedarf.grund.hinweis}`
+  } else if (fehlschlaege.length > 0) {
     const namen = [...new Set(fehlschlaege.map((r) => r.agent))]
-    meldung =
+    // Ist der Grund bekannt, aber harmlos, steht er trotzdem dabei — sonst
+    // rätselt man bei „gescheitert" jedes Mal neu.
+    const grund = fehlschlaege[0].grund?.kurz
+    const kern =
       namen.length === 1
         ? `${namen[0]} ist heute gescheitert`
         : `${namen.length} Agenten sind heute gescheitert: ${namen.join(', ')}`
+    meldung = grund ? `${kern} — ${grund}` : kern
   }
 
-  return { fehlschlaege, erfolgreich, ausstehend, meldung }
+  return { fehlschlaege, erfolgreich, ausstehend, handlungsbedarf, meldung }
 }

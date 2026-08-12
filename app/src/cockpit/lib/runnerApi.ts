@@ -1,6 +1,25 @@
 import { RUNNER_BASE_URL } from './useRunnerStatus'
 import { beauftrageRunner, leseSpiegel, runnerDirekt } from './runnerBridge'
 
+/**
+ * Warum ein Lauf abgebrochen ist — kommt fertig vom Runner
+ * (`runner/laufGrund.mjs`), das Cockpit deutet hier nichts selbst.
+ *
+ * `handeln` ist das Feld, auf das es ankommt: es trennt „Kevin muss ran"
+ * (abgelaufene Anmeldung) von „erledigt sich beim nächsten Lauf" (kein Netz).
+ * Fehlt der Grund, ist er schlicht nicht erkannt worden — dann bleibt es beim
+ * allgemeinen „Fehler", statt einen zu erfinden.
+ */
+export interface LaufGrund {
+  schluessel: 'anmeldung' | 'kontingent' | 'netz' | 'zeitlimit' | 'unbekannt'
+  /** Kurz, für die Zeile in der Liste: „Anmeldung abgelaufen". */
+  kurz: string
+  /** Was zu tun ist — ein Satz. */
+  hinweis: string
+  /** Muss Kevin selbst ran? */
+  handeln: boolean
+}
+
 export interface RunSummary {
   id: string
   agent: string
@@ -8,6 +27,8 @@ export interface RunSummary {
   started: string
   finished: string
   preview: string
+  /** Nur bei `status: 'error'`, und nur wenn der Grund erkennbar war. */
+  grund?: LaufGrund
 }
 
 export interface RunDetail extends RunSummary {
@@ -81,13 +102,16 @@ export async function fetchRuns(limit = 20): Promise<RunSummary[]> {
     // fetchRun. (Sonst hinge er an jeder Poll-Runde im React-State.)
     return (await leseRunsSpiegel())
       .slice(0, limit)
-      .map(({ id, agent, status, started, finished, preview }) => ({
+      .map(({ id, agent, status, started, finished, preview, grund }) => ({
         id,
         agent,
         status,
         started,
         finished,
         preview,
+        // Der Grund ist ein Vier-Felder-Objekt und wiegt nichts — er muss mit,
+        // sonst stünde am Handy wieder nur „Fehler". Der Inhalt bleibt draussen.
+        ...(grund ? { grund } : {}),
       }))
   }
   const { runs } = await req<{ runs: RunSummary[] }>(`/runs?limit=${limit}`)

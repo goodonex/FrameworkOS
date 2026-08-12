@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { RunnerHinweis } from '../components/RunnerHinweis'
+import { agentenBefund } from '../lib/agentenGesundheit'
 import {
   fetchAgents,
   fetchRun,
@@ -56,6 +57,8 @@ export function AgentsArea() {
   const [busy, setBusy] = useState<Set<string>>(new Set())
   const [openRun, setOpenRun] = useState<RunDetail | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  /** Dieselbe Bewertung wie auf dem Homescreen — eine Quelle, zwei Orte. */
+  const befund = useMemo(() => agentenBefund(runs), [runs])
   const timer = useRef<number | null>(null)
 
   const load = useCallback(async () => {
@@ -167,6 +170,31 @@ export function AgentsArea() {
         })}
       </div>
 
+      {/* Was Kevin selbst beheben muss, steht ÜBER der Liste — nicht als
+          zwölfte rote Zeile darin. Genau daran ist der 11.08. verlorengegangen:
+          die Anmeldung war abgelaufen, und alles, was dort stand, war „Fehler". */}
+      {befund.handlungsbedarf?.grund ? (
+        <div
+          className="ck-panel"
+          role="status"
+          style={{
+            marginBottom: 10,
+            padding: '11px 13px',
+            borderColor: 'var(--ck-danger)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 3,
+          }}
+        >
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ck-danger)' }}>
+            {befund.handlungsbedarf.grund.kurz}
+          </span>
+          <span className="ck-label" style={{ color: 'var(--ck-text-2)', letterSpacing: 0, textTransform: 'none' }}>
+            {befund.handlungsbedarf.grund.hinweis}
+          </span>
+        </div>
+      ) : null}
+
       {/* Läuft & zuletzt */}
       <div className="ck-label" style={{ marginBottom: 8 }}>Läuft &amp; zuletzt</div>
       <div className="ck-panel" style={{ padding: 0, overflow: 'hidden' }}>
@@ -191,9 +219,17 @@ export function AgentsArea() {
               }}
             >
               <span aria-hidden style={{ width: 8, height: 8, borderRadius: 99, background: STATUS_COLOR[r.status], flexShrink: 0 }} />
-              <span style={{ fontSize: 12.5, fontWeight: 600, minWidth: 130 }}>{r.agent}</span>
-              <span className="ck-label" style={{ color: STATUS_COLOR[r.status] }}>{STATUS_LABEL[r.status]}</span>
-              <span className="ck-label" style={{ marginLeft: 'auto' }}>{fmt(r.started)}</span>
+              {/* Der Name oben, darunter was los ist. Zweizeilig, weil
+                  „Anmeldung abgelaufen" neben dem Agentennamen bei 390 px
+                  nicht mehr in eine Zeile passt — und abgeschnitten wäre die
+                  Auskunft so wertlos wie das alte „Fehler". */}
+              <span style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0, flex: 1 }}>
+                <span style={{ fontSize: 12.5, fontWeight: 600 }}>{r.agent}</span>
+                <span className="ck-label" style={{ color: STATUS_COLOR[r.status] }}>
+                  {r.status === 'error' ? (r.grund?.kurz ?? STATUS_LABEL.error) : STATUS_LABEL[r.status]}
+                </span>
+              </span>
+              <span className="ck-label" style={{ flexShrink: 0 }}>{fmt(r.started)}</span>
             </button>
           ))
         )}

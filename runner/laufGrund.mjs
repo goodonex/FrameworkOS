@@ -27,21 +27,21 @@ const MUSTER = [
     schluessel: 'anmeldung',
     test: /OAuth session expired|Failed to authenticate|authentication_error|Invalid API key|Please run .?\/login|not logged in/i,
     kurz: 'Anmeldung abgelaufen',
-    hinweis: 'Im Terminal `claude` starten und neu anmelden — bis dahin läuft kein Agent.',
+    hinweis: 'Im Terminal `claude` neu anmelden — bis dahin läuft kein Agent',
     handeln: true,
   },
   {
     schluessel: 'kontingent',
     test: /rate.?limit|usage limit|quota exceeded|insufficient credit|overloaded_error/i,
     kurz: 'Kontingent erschöpft',
-    hinweis: 'Das Limit ist erreicht. Der nächste Versuch läuft wieder — Handeln nur, wenn es bleibt.',
+    hinweis: 'Der nächste Versuch läuft wieder — Handeln nur, wenn es bleibt',
     handeln: false,
   },
   {
     schluessel: 'netz',
     test: /ENOTFOUND|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|fetch failed|network error|socket hang up/i,
     kurz: 'Kein Netz',
-    hinweis: 'Der Agent kam nicht ins Internet. Erledigt sich beim nächsten Lauf von selbst.',
+    hinweis: 'Erledigt sich beim nächsten Lauf von selbst',
     handeln: false,
   },
   {
@@ -53,7 +53,7 @@ const MUSTER = [
     detail: /Zeitlimit\s+(\d+)\s+Minuten/i,
     zusatz: (wert) => `${wert} Min.`,
     kurz: 'Zeitlimit erreicht',
-    hinweis: 'Der Agent war zu lange unterwegs und wurde abgebrochen.',
+    hinweis: 'Der Agent war zu lange unterwegs und wurde abgebrochen',
     handeln: false,
   },
 ]
@@ -94,7 +94,7 @@ export function laufGrund(text) {
     return {
       schluessel: 'unbekannt',
       kurz: `Abbruch (Code ${code})`,
-      hinweis: 'Kein bekanntes Muster — die Mitschrift öffnen.',
+      hinweis: 'Kein bekanntes Muster — die Mitschrift öffnen',
       handeln: false,
     }
   }

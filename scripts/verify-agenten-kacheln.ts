@@ -81,5 +81,68 @@ check(
   'wartet',
 )
 
+// --- Der Grund eines Fehlschlags (12.08.2026) ------------------------------
+// Die Meldung ist das, was morgens auf dem Homescreen steht. Am 11.08. sagte
+// sie nur „ist heute gescheitert" — und die Anmeldung war seit einem Tag
+// abgelaufen, ohne dass es irgendwo stand.
+function mitGrund(r: RunSummary, grund: NonNullable<RunSummary['grund']>): RunSummary {
+  return { ...r, grund }
+}
+const ANMELDUNG = {
+  schluessel: 'anmeldung',
+  kurz: 'Anmeldung abgelaufen',
+  hinweis: 'Im Terminal `claude` neu anmelden — bis dahin läuft kein Agent',
+  handeln: true,
+} as const
+const ZEITLIMIT = {
+  schluessel: 'zeitlimit',
+  kurz: 'Zeitlimit erreicht (10 Min.)',
+  hinweis: 'Der Agent war zu lange unterwegs und wurde abgebrochen',
+  handeln: false,
+} as const
+
+check(
+  'ohne erkannten Grund bleibt die alte Meldung',
+  agentenBefund([run('morgenbrief', 'error', MI)], MI).meldung,
+  'morgenbrief ist heute gescheitert',
+)
+check(
+  'ein harmloser Grund steht dabei, statt Rätsel aufzugeben',
+  agentenBefund([mitGrund(run('morgenbrief', 'error', MI), ZEITLIMIT)], MI).meldung,
+  'morgenbrief ist heute gescheitert — Zeitlimit erreicht (10 Min.)',
+)
+check(
+  'verlangt ein Grund Handeln, sagt die Meldung, was zu tun ist',
+  agentenBefund([mitGrund(run('morgenbrief', 'error', MI), ANMELDUNG)], MI).meldung,
+  'Anmeldung abgelaufen — Im Terminal `claude` neu anmelden — bis dahin läuft kein Agent',
+)
+check(
+  'Handlungsbedarf sticht die Namensliste — auch wenn mehrere Agenten scheitern',
+  agentenBefund(
+    [
+      mitGrund(run('linkedin-antwort-entwuerfe', 'error', MI), ZEITLIMIT),
+      mitGrund(run('morgenbrief', 'error', MI), ANMELDUNG),
+    ],
+    MI,
+  ).meldung,
+  'Anmeldung abgelaufen — Im Terminal `claude` neu anmelden — bis dahin läuft kein Agent',
+)
+check(
+  'der Handlungsbedarf zeigt auf den richtigen Lauf',
+  agentenBefund([mitGrund(run('morgenbrief', 'error', MI), ANMELDUNG)], MI).handlungsbedarf?.agent,
+  'morgenbrief',
+)
+check(
+  'harmlose Gründe erzeugen keinen Handlungsbedarf',
+  agentenBefund([mitGrund(run('morgenbrief', 'error', MI), ZEITLIMIT)], MI).handlungsbedarf,
+  null,
+)
+check(
+  'ein Fehlschlag von gestern ist kein Handlungsbedarf von heute',
+  agentenBefund([mitGrund(run('morgenbrief', 'error', GESTERN), ANMELDUNG)], MI).handlungsbedarf,
+  null,
+)
+check('ohne Fehlschlag keine Meldung', agentenBefund([run('morgenbrief', 'done', MI)], MI).meldung, null)
+
 console.log(`${pass} bestanden, ${fail} fehlgeschlagen`)
 process.exit(fail === 0 ? 0 : 1)

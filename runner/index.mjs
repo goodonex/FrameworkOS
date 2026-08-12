@@ -20,6 +20,7 @@ import { baueAntwortInput, holeAntwortThreads } from './linkedin/antwortThreads.
 import { parseDraftsRoh, schreibeEntwuerfe } from './linkedin/entwuerfe.mjs'
 import { neuerLauf, nimmBrocken, protokollText } from './agentStream.mjs'
 import { bewerteTagesLaeufe, darfRoutineStarten } from './routineGuard.mjs'
+import { laufGrund } from './laufGrund.mjs'
 
 // ---------- Lokale .env (nur für Secrets wie den Supabase-Key; gitignored) ----------
 // Minimaler Parser (zero-dependency). Prozess-Env hat Vorrang vor der Datei.
@@ -380,7 +381,15 @@ function parseRun(name, raw) {
   }
   const body = m ? raw.slice(m[0].length) : raw
   const preview = body.trim().split('\n').slice(0, 3).join(' ').slice(0, 160)
-  return { id: name.replace(/\.md$/, ''), ...meta, preview }
+  const eintrag = { id: name.replace(/\.md$/, ''), ...meta, preview }
+  // Warum es schiefging, steht in der Mitschrift, nicht in der Frontmatter.
+  // Hier beim Ausliefern gelesen statt beim Schreiben — so sprechen auch die
+  // Läufe, die längst im Vault liegen (12.08.).
+  if (eintrag.status === 'error') {
+    const grund = laufGrund(body)
+    if (grund) eintrag.grund = grund
+  }
+  return eintrag
 }
 
 /**
