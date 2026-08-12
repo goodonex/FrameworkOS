@@ -2,6 +2,91 @@
 
 **Stand:** 2026-08-12 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
 
+## Runde vom 12.08., zweiter Teil — **Der Funnel-Trichter steht** (nicht live)
+
+Kevins Auftrag: „herausfinden, wie viele Vernetzungsanfragen noch offen sind
+(haben noch keine Erstnachricht), wer auf eine Antwort wartet, auf ein Loom,
+wer nie angenommen hat und wem ich dann eine InMail schicken kann." Dazu die
+Wochenziele, die nicht stimmten. Blaupause: `docs/wargames/funnel-stufen.md`
+(Züge F0–F6, D1–D10), **sechs Commits**. `tsc -b` + `build` grün, **33
+verify-Skripte grün** (31 vorher; neu `verify-netzwerk-parse` mit 57 Fällen und
+`verify-funnel-stufen` mit 32).
+
+### Was jetzt im LinkedIn-Bereich steht (echte Zahlen, 12.08.)
+
+| Kachel | Zahl | Herkunft |
+|---|---:|---|
+| **Angenommen · ohne Nachricht** | 481 | Kontakt-Sync ⋈ Threads ⋈ Erstnachrichten |
+| **Angeschrieben · keine Antwort** | 119 | Threads, getrennt nach schon nachgefasst |
+| **Loom zugesagt** | 15 | Stern + `loom_status = 'offen'` |
+| **Nie angenommen · InMail** | 876 | Einladungs-Sync, nur aus vollständigen Läufen |
+
+Jede Kachel öffnet die Namensliste (Name, Headline, Alter, Profil-Link),
+älteste zuerst. **Die Handerhebung vom 27.07. ist damit eine laufende Zahl
+geworden** — sie sagte 880 offene Einladungen, gemessen sind es 876.
+
+### Die Wochenziele (D1, Kevins Wort)
+
+Anfragen **75 → 180**, Nachrichten **75 → 40**, Looms **25 → 10**. Die alten
+Zahlen stammten aus dem Split einer Sammel-150 und hatten mit dem echten
+Rhythmus nichts zu tun (Blöcke von 65–70 Einladungen an drei Tagen die Woche).
+Weil `tagesFlow.ts` durch `ARBEITSTAGE_WOCHE` teilt, drehten die Tagesziele im
+Zähler automatisch mit: Nachrichten 15 → **8**, Looms 5 → **2**.
+
+### Vier Befunde, ohne die der Sync nicht liefe
+
+1. **Es gibt keine GraphQL-Query zum Replayen.** Die beiden Netzwerk-Seiten
+   feuern beim Nachladen **keinen einzigen** Request — sie rendern aus einem
+   Store, den die Seite schon hält. Der Postfach-Sync replayt eine Query, hier
+   ist der DOM die Schnittstelle. (RECON R2/R3 der Blaupause, damit beantwortet.)
+2. **Chrome drosselt Hintergrund-Tabs.** Der `IntersectionObserver` am
+   Listenende feuert dort nie: der Tab scrollte zwanzig Runden brav auf
+   Position 476 von 1163 und blieb bei zehn Einträgen. `Page.bringToFront` löst es.
+3. **Eine CDP-Verbindung je Aufruf reicht nicht** — zwischen den Runden schläft
+   der Tab wieder ein (20 von 882). Eine durchgehend offene Sitzung hält ihn
+   wach: **876 von 882 in 92 Runden, vier Minuten.**
+4. **PostgREST deckelt bei 1.000 Zeilen.** Kevins Netzwerk hat 1.506. Die
+   InMail-Kachel zeigte 370 statt 876 — plausibel und falsch. Der Hook blättert
+   jetzt.
+
+Dazu zwei kleinere: die Karte einer Person findet man über eindeutige
+Profil-*Ziele*, nicht über Link-Elemente (eine Karte verlinkt dieselbe Person
+zweimal — wer Elemente zählt, erntet 622 Namen und null Headlines); und der
+Upsert scheiterte an „All object keys must match", weil eine Zeile ihr Datum
+weglässt, wenn es nicht lesbar war.
+
+### Die zwei Regeln, an denen die Verlässlichkeit hängt
+
+- **Nur vollständige Läufe ziehen Abwesenheits-Schlüsse** (D4). Wer nicht mehr
+  in der Einladungsliste steht, hat angenommen oder wurde zurückgezogen — aber
+  das weiss man nur, wenn die Liste zu Ende gelesen wurde. Ein Teil-Lauf
+  ergänzt und aktualisiert, er nimmt niemandem seinen Status. Ohne diese Regel
+  hätte ein abgebrochener Sync Hunderte fälschlich als „wartet noch" geführt.
+- **Mehrdeutige Namen verschwinden nicht still** (D5). Erstnachrichten haben
+  keine Profil-URL (Migration 0060); über den Namen allein ist „hab ich dem
+  schon geschrieben" nicht beweisbar. Solche Einträge stehen in der Liste, mit
+  der Markierung „prüfen".
+
+### Verifikation
+
+Migration **0070** über `db push`, Trockenlauf wollte genau diese eine —
+danach 0001–0070 lückenlos in Local und Remote. Netzwerk-Sync live gefahren:
+876 offene Einladungen und 630 Kontakte in der Tabelle (per `count=exact`
+gegengeprüft). Oberfläche bei 390×664 abgenommen, zwei Namenslisten geöffnet,
+Gegenprobe „keine Person steht in zwei Listen" als Testfall.
+
+### Offen aus dieser Runde
+
+- **Kein Sync-Knopf in der Oberfläche.** Der Netzwerk-Sync läuft heute nur von
+  Hand (`node runner/linkedin/netzwerkUpsert.mjs`). Der Endpunkt
+  `POST /linkedin/netzwerk-sync` samt Huckepack nach dem Postfach-Sync (D10)
+  ist **nicht** gebaut — der Trichter zeigt bis dahin den Stand des letzten
+  Handlaufs.
+- **`linkedin-inmail`-Skill** (Vault) zieht seine Namen weiter aus Chrome, nicht
+  aus `linkedin_netzwerk` (D8, bewusst eigene Runde).
+- **ICP-Feinfilter** bleibt Routine-Arbeit: der Sync speichert roh, „Angenommen
+  · ohne Nachricht" heisst deshalb genau das und nicht „ICP offen" (D9).
+
 ## Runde vom 12.08. — **Ein Fehlschlag sagt jetzt, warum** (nicht live)
 
 Ausgelöst durch Kevins Beobachtung am Handy: die Agenten-Liste war eine Wand
