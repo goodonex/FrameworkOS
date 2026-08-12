@@ -1,6 +1,58 @@
 # Uriel — Backlog (die eine Quelle der Wahrheit)
 
-**Stand:** 2026-08-11 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
+**Stand:** 2026-08-12 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
+
+## Runde vom 12.08. — **Ein Fehlschlag sagt jetzt, warum** (nicht live)
+
+Ausgelöst durch Kevins Beobachtung am Handy: die Agenten-Liste war eine Wand
+aus roten „FEHLER"-Zeilen. Sein Wunsch war, statt der Meldungen einfach
+nachzuholen, wenn der Mac wieder auf ist.
+
+**Das Nachholen gibt es längst** (O17, 07.08.): der 5-Minuten-Tick startet jede
+Tages-Routine, solange heute kein erfolgreicher Lauf vorliegt — im Code steht
+wörtlich „Läuft der Mac erst um 9 an, kommt der Brief eben um 9". Die roten
+Zeilen waren deshalb **keine verpassten Läufe, sondern echte Fehlschläge**.
+
+### Der eigentliche Befund: seit dem 11.08. lief kein einziger Agent
+
+```
+Failed to authenticate: OAuth session expired and could not be refreshed
+```
+
+Die Anmeldung der Claude-CLI auf dem Mac ist abgelaufen — direkt reproduziert
+mit `claude -p`. Betroffen ist **jeder** Vault-Agent (Morgenbrief,
+LinkedIn-Antwort-Entwürfe, dream-check). Die zwei Zeitstempel pro Tag sind die
+zwei Versuche, die `MAX_VERSUCHE_PRO_TAG` erlaubt.
+
+**Das kann nur Kevin beheben** (Browser-Login): `claude` starten, `/login`.
+Danach läuft es ab dem nächsten Morgen von allein wieder; am selben Tag ist der
+Versuchsdeckel bereits erreicht, da hilft der „Ausführen"-Knopf.
+
+**Zweiter Befund, offen:** `linkedin-antwort-entwuerfe` läuft seit dem **04.08.
+an jedem einzelnen Tag** ins 10-Minuten-Zeitlimit — 13 von 17 Fehlläufen der
+letzten Woche. Der Agent hat also seit über einer Woche kein einziges Mal
+geliefert, unabhängig vom Anmeldeproblem. Das ist eine eigene Runde: entweder
+das Limit passt nicht zur Aufgabe, oder der Agent braucht einen engeren
+Auftrag. **Nicht angefasst, weil es eine Entscheidung ist, keine Aufräumarbeit.**
+
+### Was gebaut wurde
+
+| Zug | Ergebnis | Datei |
+|---|---|---|
+| **A1** | `laufGrund()` liest den Abbruchgrund aus der Mitschrift und trennt „Kevin muss ran" (Anmeldung) von „erledigt sich selbst" (Netz, Kontingent, Zeitlimit). Beim Zeitlimit steht die Dauer dabei | `runner/laufGrund.mjs`, `scripts/verify-lauf-grund.ts` |
+| **A2** | Der Runner liefert den Grund in `/runs` mit — auch in den Supabase-Spiegel, damit das Handy ihn sieht | `runner/index.mjs`, `cockpit/lib/runnerApi.ts` |
+| **A3** | Die Liste zeigt den Grund statt „FEHLER"; darüber steht ein Hinweis, wenn Kevin selbst ran muss. Dieselbe Unterscheidung trägt die Warnzeile auf dem Homescreen | `pages/AgentsArea.tsx`, `cockpit/lib/agentenGesundheit.ts` |
+
+**Der Grund wird beim Ausliefern gelesen, nicht beim Schreiben.** Deshalb
+sprechen auch die Läufe, die längst im Vault liegen — keine Zeile Bestand
+angefasst, keine Migration, kein neues Feld in der Frontmatter.
+
+**Verifikation:** `tsc -b` + `build` grün, **31 verify-Skripte grün** (30
+vorher, neu `verify-lauf-grund` mit 33 Fällen; `verify-agenten-kacheln` von 11
+auf 19 gewachsen). Gegenprobe an **allen 17 echten Fehlläufen** im Vault: keiner
+fällt durch (4× Anmeldung, 13× Zeitlimit). Ende-zu-Ende am laufenden Runner
+geprüft — `/runs` liefert den Grund, die Oberfläche zeigt ihn, bei 390×664 ohne
+Querscrollen.
 
 ## **LIVE seit 11.08.2026, ~22:30 — Mobiler Tages-Flow**
 
