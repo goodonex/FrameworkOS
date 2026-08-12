@@ -79,9 +79,9 @@ export const TAGES_FLOW: readonly Stufe[] = [
     label: 'Nachrichten',
     langLabel: 'Nachrichten · LinkedIn',
     hinweis: 'Antworten und Erstnachrichten.',
-    // 75 die Woche (`WEEK_TARGETS.nachrichten`) auf fünf Arbeitstage. Das
-    // Wochenziel deckt LI und IG zusammen ab, gezählt wird hier der
-    // LinkedIn-Anteil — der Kanal, auf dem Kevins Outreach tatsächlich läuft.
+    // `WEEK_TARGETS.nachrichten` auf fünf Arbeitstage. Das Wochenziel deckt LI
+    // und IG zusammen ab, gezählt wird hier der LinkedIn-Anteil — der Kanal,
+    // auf dem Kevins Outreach tatsächlich läuft.
     standardZiel: Math.round(WEEK_TARGETS.nachrichten / ARBEITSTAGE_WOCHE),
   },
   {

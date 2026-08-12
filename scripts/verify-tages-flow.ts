@@ -79,12 +79,12 @@ check(
   'das Nachrichten-Ziel kommt aus dem Wochenziel geteilt durch die Arbeitswoche',
   TAGES_FLOW[1].standardZiel === Math.round(WEEK_TARGETS.nachrichten / ARBEITSTAGE_WOCHE),
 )
-check('das Nachrichten-Ziel ist damit 15', TAGES_FLOW[1].standardZiel === 15)
+check('das Nachrichten-Ziel ist damit 8', TAGES_FLOW[1].standardZiel === 8)
 check(
   'das Loom-Ziel kommt aus dem Wochenziel geteilt durch die Arbeitswoche',
   TAGES_FLOW[2].standardZiel === Math.round(WEEK_TARGETS.looms / ARBEITSTAGE_WOCHE),
 )
-check('das Loom-Ziel ist damit 5', TAGES_FLOW[2].standardZiel === 5)
+check('das Loom-Ziel ist damit 2', TAGES_FLOW[2].standardZiel === 2)
 check(
   'Follow-ups haben kein festes Ziel — ihr Soll kommt aus den Daten des Tages',
   TAGES_FLOW[3].standardZiel === null,
@@ -132,7 +132,7 @@ for (const [was, wert] of [
 ] as const) {
   check(
     `eine kaputte Überschreibung (${was}) fällt auf den Standard zurück`,
-    sollFuer(TAGES_FLOW[1], eingabe({ ziele: { nachrichten: wert as unknown as number } })) === 15,
+    sollFuer(TAGES_FLOW[1], eingabe({ ziele: { nachrichten: wert as unknown as number } })) === 8,
     'Ein kaputter ui_settings-Wert darf keine Stufe für immer offen halten.',
   )
 }
@@ -140,14 +140,14 @@ check('der ui_settings-Schlüssel ist benannt', TAGES_FLOW_ZIELE.length > 0)
 
 // --- 6. Stände ----------------------------------------------------------
 const standardTag = eingabe({
-  today: { li_anfragen: 30, li_nachrichten: 15, looms: 5, li_followups: 0, inmails: 0 },
+  today: { li_anfragen: 30, li_nachrichten: 8, looms: 2, li_followups: 0, inmails: 0 },
   faelligHeute: 3,
 })
 const s1 = stufenStaende(standardTag)
 check('fünf Stände für fünf Stufen', s1.length === 5)
 check('Anfragen stehen bei 30/30', s1[0].erledigt && s1[0].wert === 30 && s1[0].soll === 30)
-check('Nachrichten stehen bei 15/15', s1[1].erledigt)
-check('Looms stehen bei 5/5', s1[2].erledigt)
+check('Nachrichten stehen bei 8/8', s1[1].erledigt)
+check('Looms stehen bei 2/2', s1[2].erledigt)
 check('Follow-ups sind offen (0 von 3)', !s1[3].erledigt && s1[3].soll === 3)
 check('Reaktivierung ist offen (0 von 5)', !s1[4].erledigt && s1[4].soll === 5)
 check('die erste offene Stufe ist Nummer 4', ersteOffeneStufe(s1) === 3)
@@ -165,7 +165,7 @@ check(
 check('ein fehlendes Feld in der Tageszeile zählt als 0, nicht als NaN', leererTag[0].wert === 0)
 
 const allesFertig = stufenStaende(
-  eingabe({ today: { li_anfragen: 30, li_nachrichten: 15, looms: 5, inmails: 5 }, faelligHeute: 0 }),
+  eingabe({ today: { li_anfragen: 30, li_nachrichten: 8, looms: 2, inmails: 5 }, faelligHeute: 0 }),
 )
 check('ein vollendeter Tag hat keine offene Stufe', ersteOffeneStufe(allesFertig) === -1)
 check('Fortschritt am vollendeten Tag: 5 von 5', flowFortschritt(allesFertig).erledigt === 5)
@@ -183,7 +183,7 @@ check(
   'die eigene Stufe kommt nie als Antwort zurück',
   (() => {
     const nurEineOffen = stufenStaende(
-      eingabe({ today: { li_anfragen: 30, li_nachrichten: 15, looms: 5, inmails: 0 }, faelligHeute: 0 }),
+      eingabe({ today: { li_anfragen: 30, li_nachrichten: 8, looms: 2, inmails: 0 }, faelligHeute: 0 }),
     )
     // Offen ist nur Stufe 5 (Index 4) — von dort aus gibt es kein Weiter.
     return naechsteStufe(nurEineOffen, 4) === -1

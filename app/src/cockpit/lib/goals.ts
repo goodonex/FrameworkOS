@@ -4,13 +4,35 @@
  * v1 fest verdrahtet — später konfigurierbar.
  */
 
+/**
+ * Die Wochenziele. **Auf Kevins Wort neu gesetzt am 12.08.2026** — die alten
+ * Zahlen (75/75/25) stammten aus dem Split einer Sammel-150 und hatten mit dem
+ * echten Rhythmus nichts mehr zu tun.
+ *
+ * Woher die neuen kommen:
+ * - **Anfragen 180** — der reale Sende-Rhythmus, nicht 30/Tag: Blöcke von
+ *   ~65–70 Einladungen an ~3 Tagen die Woche (Funnel-Baseline, 27.07.).
+ * - **Nachrichten 40** — aus derselben Baseline gerechnet: 180 Anfragen bei
+ *   ~16 % Annahme sind ~30 Kontakte, davon ~60 % ICP → ~20 Erstnachrichten,
+ *   plus die Antworten darauf.
+ * - **Looms 10** — zwei am Tag: proaktive Anbahnung plus die zugesagten
+ *   Analysen. Die alten 25 hat Kevin nie erreicht und nie angestrebt.
+ *
+ * **Diese Zahlen steuern zwei Dinge:** die Vitals-Balken (`metricsAggregate`)
+ * UND die Tagesziele im Zähl-Modus (`tagesFlow.ts` teilt durch
+ * `ARBEITSTAGE_WOCHE`). Wer hier justiert, verschiebt beides — das ist
+ * Absicht, es soll nur eine Zahlenreihe geben.
+ *
+ * Anfragen sind die Ausnahme: ihr Tagesziel bleibt `ANFRAGEN_LIMIT_TAG = 30`
+ * aus `prioritaet.ts`, weil das Tageslimit eine andere Größe ist als das
+ * Wochenziel — Kevin schickt in Blöcken, nicht gleichmäßig.
+ */
 export const WEEK_TARGETS = {
-  // Getrennt seit der Vitals-Trennung: Anfragen = LI-Vernetzung + IG-Follows,
-  // Nachrichten = LI- + IG-Erstnachrichten. Split der alten Sammel-150
-  // („alle Kanäle") — bei Bedarf hier justieren.
-  anfragen: 75,
-  nachrichten: 75,
-  looms: 25,
+  // Anfragen = LI-Vernetzung + IG-Follows, Nachrichten = LI- + IG-Nachrichten
+  // (beide Summen bildet `metricsAggregate`).
+  anfragen: 180,
+  nachrichten: 40,
+  looms: 10,
   termine: 5, // neu vereinbarte Termine (alle Herkunfts-Kanäle)
   abschluesse: 2,
 } as const
