@@ -58,7 +58,13 @@
   /* Foto-Ambiente — NUR auf dem Cockpit-Home (DESIGN-TOKENS.md). Das Bild ist
      selbst gehostet (app/public/ambient/), nie ein Hotlink. Der Schutzverlauf
      steht mit im Token: Text über Foto ohne Scrim gibt es nicht. */
-  --ck-foto: url('/ambient/horizont.jpg');
+  /* Der Hero ist die einzige Foto-Fläche, und es gibt ihn nur in UrielHome —
+     also nur am Handy (CockpitHome schaltet ab MOBILE_MAX_WIDTH auf den
+     Desktop-Graphen um, der kein Foto trägt). Deshalb steht hier EIN Asset
+     ohne Media-Query, und es ist hochformatig geschnitten: `.ck-hero-foto`
+     ist volle Breite auf 470px Höhe, am 390er also 0,83 — ein Querformat-Bild
+     verlöre dort per `cover` gut die Hälfte seiner Breite. */
+  --ck-foto: url('/ambient/horizont-hero.jpg');
   --ck-foto-scrim: linear-gradient(
     180deg,
     rgba(12, 19, 14, 0.28) 0%,
@@ -125,6 +131,26 @@
   color: var(--ck-text-1);
   font-size: 13px;
   line-height: 1.5;
+}
+
+/* Der Schleier (13.08.) — dieselbe Szene wie auf dem Sperrbildschirm und dem
+   MacBook, hier aber nur als Ahnung hinter der Arbeitsfläche. Sie liegt ÜBER
+   --ck-bg-verlauf (der ist deckend) und unter einem kräftigen Schutzverlauf,
+   damit von ihr nur Licht und Silhouette übrig bleiben; die Karten sind mit
+   --ck-card (0.55) ohnehin durchscheinend und tragen sie weiter.
+   Nur am Desktop: am Handy trägt der Hero das Foto schon, zwei wären zu viel.
+   Zurückdrehen = diesen Block löschen. Stärker/schwächer = die zwei Werte im
+   Schutzverlauf; kleiner heisst mehr Foto. */
+@media (min-width: 901px) {
+  .ck-root {
+    background-image:
+      var(--ck-ambient),
+      linear-gradient(180deg, rgba(12, 19, 14, 0.74), rgba(12, 19, 14, 0.86)),
+      url('/ambient/horizont-desktop.jpg'),
+      var(--ck-bg-verlauf);
+    background-size: auto, auto, cover, auto;
+    background-position: center, center, center 34%, center;
+  }
 }
 
 /* Fokus-Ring: tokens.css setzt global Teal (--semantic-primary) — im Cockpit
