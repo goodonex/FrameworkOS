@@ -1,5 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { funnelStufen, type FunnelPerson, type NetzwerkEintrag } from '../../lib/funnelStufen'
+import { runnerDirekt } from '../../lib/runnerBridge'
+import { RUNNER_BASE_URL } from '../../lib/useRunnerStatus'
 import type { Erstnachricht } from '../../../hooks/useErstnachrichten'
 import type { LinkedinThread } from '../../../types/db'
 
@@ -37,12 +39,27 @@ function tageText(p: FunnelPerson): string {
   return `seit ${Math.floor(p.tage / 30)} Monaten`
 }
 
+/** „vor 2 Stunden" — wie frisch die Netzwerk-Zahlen sind. */
+function frischeText(iso: string | null, jetzt: Date): string | null {
+  if (!iso) return null
+  const t = new Date(iso).getTime()
+  if (Number.isNaN(t)) return null
+  const min = Math.max(0, Math.round((jetzt.getTime() - t) / 60_000))
+  if (min < 2) return 'gerade eben'
+  if (min < 60) return `vor ${min} Min.`
+  const std = Math.round(min / 60)
+  if (std < 24) return `vor ${std} Std.`
+  const tage = Math.round(std / 24)
+  return tage === 1 ? 'gestern' : `vor ${tage} Tagen`
+}
+
 export function FunnelStufen({
   netzwerk,
   threads,
   erstnachrichten,
   letzterVollerEinladungsLauf,
   netzwerkLaedt,
+  onNeuLaden,
   jetzt = new Date(),
 }: {
   netzwerk: NetzwerkEintrag[]
@@ -50,9 +67,78 @@ export function FunnelStufen({
   erstnachrichten: Erstnachricht[]
   letzterVollerEinladungsLauf: string | null
   netzwerkLaedt: boolean
+  /** Nach einem Sync die Tabelle neu lesen. */
+  onNeuLaden: () => void
   jetzt?: Date
 }) {
   const [offen, setOffen] = useState<string | null>(null)
+  const [syncLaeuft, setSyncLaeuft] = useState(false)
+  const [syncMeldung, setSyncMeldung] = useState<string | null>(null)
+  const pollRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) window.clearInterval(pollRef.current)
+    }
+  }, [])
+
+  /**
+   * Den Sync anstossen — und dann warten, ohne die Oberfläche zu blockieren.
+   *
+   * Der Lauf dauert rund fünf Minuten; der Runner antwortet deshalb sofort mit
+   * „gestartet" und legt sein Ergebnis ab. Hier wird alle zwanzig Sekunden
+   * nachgefragt, bis er durch ist — und dann die Tabelle neu gelesen, damit die
+   * Kacheln die frischen Zahlen zeigen.
+   */
+  const starteSync = useCallback(async () => {
+    if (syncLaeuft) return
+    setSyncLaeuft(true)
+    setSyncMeldung('Sync läuft — das dauert ein paar Minuten.')
+    try {
+      if (runnerDirekt()) {
+        const res = await fetch(`${RUNNER_BASE_URL}/linkedin/netzwerk-sync`, { method: 'POST' })
+        if (res.status === 409) {
+          setSyncMeldung('Ein Sync läuft schon.')
+        } else if (!res.ok) {
+          setSyncMeldung(`Start fehlgeschlagen (HTTP ${res.status})`)
+          setSyncLaeuft(false)
+          return
+        }
+        // Nachfragen, bis der Runner fertig meldet.
+        pollRef.current = window.setInterval(async () => {
+          try {
+            const s = await (await fetch(`${RUNNER_BASE_URL}/linkedin/netzwerk`)).json()
+            if (s?.laeuft) return
+            if (pollRef.current) window.clearInterval(pollRef.current)
+            pollRef.current = null
+            setSyncLaeuft(false)
+            setSyncMeldung(s?.letztes?.fehler ? `Sync-Fehler: ${s.letztes.fehler}` : 'Netzwerk ist aktuell.')
+            onNeuLaden()
+          } catch {
+            /* Runner kurz weg — beim nächsten Takt erneut */
+          }
+        }, 20_000)
+      } else {
+        /**
+         * Am Handy nicht auslösbar — und das ist kein Versäumnis.
+         *
+         * Der Sync steuert einen Browser auf Kevins Mac; ohne laufenden Runner
+         * gibt es nichts zu steuern. Der Weg über `runner_jobs` gäbe es zwar,
+         * aber `beauftrageRunner` wartet höchstens fünf Minuten auf ein
+         * Ergebnis — genau die Laufzeit dieses Syncs. Ein Knopf, der zuverlässig
+         * in einen Timeout läuft, ist schlechter als eine klare Ansage.
+         *
+         * Gebraucht wird er hier ohnehin selten: die Tages-Routine im Runner
+         * hält die Zahlen frisch, sobald der Mac läuft.
+         */
+        setSyncLaeuft(false)
+        setSyncMeldung('Der Sync läuft nur am Mac. Vom Handy aus: der Runner holt das morgens von allein nach.')
+      }
+    } catch (e) {
+      setSyncLaeuft(false)
+      setSyncMeldung(e instanceof Error ? e.message : 'Sync fehlgeschlagen')
+    }
+  }, [onNeuLaden, syncLaeuft])
 
   const stufen = useMemo(
     () => funnelStufen({ netzwerk, threads, erstnachrichten, letzterVollerEinladungsLauf }, jetzt),
@@ -61,6 +147,7 @@ export function FunnelStufen({
 
   /** Ohne Netzwerk-Daten sind zwei der vier Kacheln blind — das wird gesagt, nicht mit 0 kaschiert. */
   const netzwerkDa = netzwerk.length > 0
+  const frische = frischeText(letzterVollerEinladungsLauf, jetzt)
 
   const kacheln: Kachel[] = [
     {
@@ -94,16 +181,34 @@ export function FunnelStufen({
 
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
-        <span className="ck-label">Trichter</span>
-        {netzwerkLaedt ? (
-          <span className="ck-label">lädt…</span>
-        ) : !netzwerkDa ? (
-          <span className="ck-label" style={{ color: 'var(--ck-warn)' }}>
-            Netzwerk-Sync ausstehend
-          </span>
-        ) : null}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+        <span className="ck-label">
+          Trichter
+          {/* Wie alt sind die Netzwerk-Zahlen? Ohne diese Angabe weiss niemand,
+              ob 876 von heute früh oder von letzter Woche stammt. */}
+          {!netzwerkLaedt && netzwerkDa && frische ? (
+            <span style={{ color: 'var(--ck-text-3)' }}>{'\u00a0· Netzwerk '}{frische}</span>
+          ) : null}
+        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {netzwerkLaedt ? (
+            <span className="ck-label">lädt…</span>
+          ) : !netzwerkDa ? (
+            <span className="ck-label" style={{ color: 'var(--ck-warn)' }}>
+              Sync ausstehend
+            </span>
+          ) : null}
+          <button type="button" className="ck-btn" onClick={() => void starteSync()} disabled={syncLaeuft}>
+            {syncLaeuft ? 'Sync läuft…' : 'Netzwerk sync'}
+          </button>
+        </div>
       </div>
+
+      {syncMeldung ? (
+        <div className="ck-label" style={{ textTransform: 'none', letterSpacing: 0, color: 'var(--ck-text-2)' }}>
+          {syncMeldung}
+        </div>
+      ) : null}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8 }}>
         {kacheln.map((k) => {

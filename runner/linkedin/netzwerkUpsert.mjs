@@ -145,6 +145,9 @@ export async function upsertNetzwerk(liste, { jetzt = new Date() } = {}) {
     if (res.ok) veraltet = (await res.json()).length
   }
 
+  // Der Merker für die Oberfläche — siehe `schreibeMeta`.
+  if (liste.vollstaendig) await schreibeMeta(liste.seite, stempel, liste.gesamt, zeilen.length)
+
   return {
     seite: liste.seite,
     status: liste.status,
@@ -155,21 +158,63 @@ export async function upsertNetzwerk(liste, { jetzt = new Date() } = {}) {
   }
 }
 
+/**
+ * Wann lief zuletzt ein VOLLSTÄNDIGER Lauf je Liste?
+ *
+ * **Das lässt sich aus den Daten nicht zuverlässig ableiten, und der Versuch
+ * ging schief.** Die Oberfläche nahm zuerst den jüngsten `zuletzt_gesehen_at`
+ * als Lauf-Zeitpunkt. Dann startete am 12.08. die Tages-Routine einen Lauf, der
+ * nach 50 von 882 Einträgen abbrach — und weil diese 50 den jüngsten Stempel
+ * trugen, zeigte die InMail-Kachel prompt 50 statt 876. Ein Teil-Lauf hatte die
+ * Zahl gekippt, obwohl genau das ausgeschlossen sein sollte.
+ *
+ * Deshalb steht der Zeitpunkt jetzt ausdrücklich hier, geschrieben NUR nach
+ * einem vollständigen Lauf. Ein abgebrochener lässt ihn, wo er war — die
+ * Oberfläche zeigt dann eben ältere, aber richtige Zahlen.
+ */
+async function schreibeMeta(seite, stempel, gesamt, geerntet) {
+  const key = 'linkedin_netzwerk_meta'
+  let data = {}
+  try {
+    const rows = await hole(`runner_snapshots?key=eq.${key}&select=data&limit=1`)
+    data = rows[0]?.data ?? {}
+  } catch {
+    /* noch keine Zeile — dann eben eine neue */
+  }
+  data[seite] = { vollAt: stempel, gesamt, geerntet }
+
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/runner_snapshots`, {
+    method: 'POST',
+    headers: { ...authHeaders(), Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify({ key, data, updated_at: stempel }),
+  })
+  if (!res.ok) {
+    console.error(`[netzwerk] Meta-Zeile HTTP ${res.status}: ${(await res.text().catch(() => '')).slice(0, 160)}`)
+  }
+}
+
 // --- Direktaufruf: node runner/linkedin/netzwerkUpsert.mjs [liste] ---------
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const { leseListe } = await import('./netzwerk.mjs')
+  const { leseListe, mitNetzwerkLock } = await import('./netzwerk.mjs')
   const welche = process.argv.find((a) => a === 'einladungen' || a === 'kontakte')
   const listen = welche ? [welche] : ['einladungen', 'kontakte']
-  for (const l of listen) {
-    const gelesen = await leseListe(l, { log: (...a) => console.log(...a) })
-    if (gelesen.loginWall) {
-      console.log('LOGIN-WALL — im Sync-Chrome bei LinkedIn anmelden')
-      break
+
+  // Unter demselben Lock wie die Tages-Routine im Runner — sonst greifen zwei
+  // Läufe auf dieselben Chrome-Tabs zu und beide enden unvollständig.
+  const r = await mitNetzwerkLock(async () => {
+    for (const l of listen) {
+      const gelesen = await leseListe(l, { log: (...a) => console.log(...a) })
+      if (gelesen.loginWall) {
+        console.log('LOGIN-WALL — im Sync-Chrome bei LinkedIn anmelden')
+        break
+      }
+      console.log(
+        `${l}: ${gelesen.eintraege.length} von ${gelesen.gesamt} · vollständig: ${gelesen.vollstaendig ? 'JA' : 'NEIN'}`,
+      )
+      console.log(JSON.stringify(await upsertNetzwerk(gelesen), null, 1))
     }
-    console.log(
-      `${l}: ${gelesen.eintraege.length} von ${gelesen.gesamt} · vollständig: ${gelesen.vollstaendig ? 'JA' : 'NEIN'}`,
-    )
-    console.log(JSON.stringify(await upsertNetzwerk(gelesen), null, 1))
-  }
+    return null
+  })
+  if (r?.blockiert) console.log(`Ein Netzwerk-Sync läuft bereits (seit ${r.seit}, PID ${r.pid}).`)
   process.exit(0)
 }

@@ -32,19 +32,18 @@ export interface UseLinkedinNetzwerkResult {
   reload: () => Promise<void>
 }
 
-/**
- * Wie nah beieinander die Zeitstempel eines Laufs liegen dürfen.
- *
- * Ein Lauf schreibt alle seine Zeilen mit demselben Stempel — durch die
- * Stapel-Requests können ein paar Sekunden dazwischenliegen. Fünf Minuten
- * Toleranz fassen jeden realen Lauf (der längste dauerte vier) und trennen ihn
- * sauber vom vorherigen.
- */
-const LAUF_FENSTER_MS = 5 * 60 * 1000
+/** Der Merker, den `netzwerkUpsert.mjs` nach jedem vollständigen Lauf schreibt. */
+const META_KEY = 'linkedin_netzwerk_meta'
+
+interface NetzwerkMeta {
+  einladungen?: { vollAt: string; gesamt: number | null; geerntet: number }
+  kontakte?: { vollAt: string; gesamt: number | null; geerntet: number }
+}
 
 export function useLinkedinNetzwerk(brandSlug: string | undefined): UseLinkedinNetzwerkResult {
   const brandId = useBrandId(brandSlug)
   const [items, setItems] = useState<NetzwerkEintrag[]>([])
+  const [meta, setMeta] = useState<NetzwerkMeta>({})
   const [loading, setLoading] = useState(true)
   const [tableMissing, setTableMissing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -94,6 +93,16 @@ export function useLinkedinNetzwerk(brandSlug: string | undefined): UseLinkedinN
     setTableMissing(false)
     setError(null)
     setItems(alle)
+
+    // Der Merker sagt, welchem Stand zu trauen ist. Fehlt er, gilt: noch kein
+    // vollständiger Lauf — dann bleibt die InMail-Liste leer statt falsch.
+    const { data: metaRow } = await supabase
+      .from('runner_snapshots')
+      .select('data')
+      .eq('key', META_KEY)
+      .maybeSingle()
+    setMeta(((metaRow as { data?: NetzwerkMeta } | null)?.data ?? {}) as NetzwerkMeta)
+
     setLoading(false)
   }, [brandId])
 
@@ -101,16 +110,15 @@ export function useLinkedinNetzwerk(brandSlug: string | undefined): UseLinkedinN
     void reload()
   }, [reload])
 
-  const offene = items.filter((e) => e.status === 'offen')
-  const juengster = offene.reduce<string | null>((max, e) => {
-    const t = e.zuletzt_gesehen_at
-    return !max || String(t) > max ? String(t) : max
-  }, null)
+  // Eine Sekunde Luft nach hinten: der Lauf stempelt alle Zeilen gleich, aber
+  // die Filter vergleichen mit `>=` und Zeitstempel runden unterschiedlich.
+  const vollAt = meta.einladungen?.vollAt ?? null
+  const grenze = vollAt ? new Date(new Date(vollAt).getTime() - 1000).toISOString() : null
 
-  // Alles, was im selben Zeitfenster gestempelt wurde, gehört zu diesem Lauf.
-  const grenze = juengster ? new Date(juengster).getTime() - LAUF_FENSTER_MS : 0
-  const frischGesehen = juengster
-    ? offene.filter((e) => new Date(e.zuletzt_gesehen_at).getTime() >= grenze).length
+  const frischGesehen = grenze
+    ? items.filter(
+        (e) => e.status === 'offen' && new Date(e.zuletzt_gesehen_at).getTime() >= new Date(grenze).getTime(),
+      ).length
     : 0
 
   return {
@@ -118,10 +126,7 @@ export function useLinkedinNetzwerk(brandSlug: string | undefined): UseLinkedinN
     loading,
     tableMissing,
     error,
-    // Der Stempel des Laufs ist sein ÄLTESTER Eintrag im Fenster — die Filter
-    // in `inmailKandidaten` vergleichen mit `>=`, und der jüngste Stempel würde
-    // die früh geschriebenen Stapel desselben Laufs ausschliessen.
-    letzterVollerEinladungsLauf: juengster ? new Date(grenze).toISOString() : null,
+    letzterVollerEinladungsLauf: grenze,
     frischGesehen,
     reload,
   }

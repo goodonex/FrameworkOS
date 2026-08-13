@@ -21,6 +21,9 @@ import { parseDraftsRoh, schreibeEntwuerfe } from './linkedin/entwuerfe.mjs'
 import { neuerLauf, nimmBrocken, protokollText } from './agentStream.mjs'
 import { bewerteTagesLaeufe, darfRoutineStarten } from './routineGuard.mjs'
 import { laufGrund } from './laufGrund.mjs'
+import { leseListe, mitNetzwerkLock } from './linkedin/netzwerk.mjs'
+import { upsertNetzwerk } from './linkedin/netzwerkUpsert.mjs'
+import { installiereLogHygiene, kuerzeLogDatei } from './logHygiene.mjs'
 
 // ---------- Lokale .env (nur für Secrets wie den Supabase-Key; gitignored) ----------
 // Minimaler Parser (zero-dependency). Prozess-Env hat Vorrang vor der Datei.
@@ -45,6 +48,27 @@ function loadLocalEnv() {
   }
 }
 loadLocalEnv()
+
+// ---------- Log-Hygiene (13.08.2026) ----------
+// Muss vor der ersten Ausgabe stehen, sonst rutschen die Startzeilen ohne
+// Zeitstempel durch. Warum es das braucht: siehe Kopf von logHygiene.mjs.
+installiereLogHygiene({ fensterMs: Number(process.env.LOG_DAEMPFER_MS ?? 60_000) })
+
+const LOG_DIR = process.env.RUNNER_LOG_DIR ?? join(homedir(), 'Library', 'Logs', 'kevin-os')
+for (const name of ['cockpit-runner.log', 'cockpit-runner.err.log']) {
+  try {
+    const r = await kuerzeLogDatei(join(LOG_DIR, name), {
+      maxBytes: Number(process.env.LOG_MAX_BYTES ?? 5_000_000),
+    })
+    if (r.gekuerzt) {
+      console.log(
+        `[runner] ${name} gekürzt: ${(r.vorher / 1_000_000).toFixed(1)} MB → Rest in ${name}.1`,
+      )
+    }
+  } catch (e) {
+    console.error(`[runner] ${name} konnte nicht gekürzt werden:`, e?.message ?? e)
+  }
+}
 
 // ---------- Konfiguration ----------
 const PORT = Number(process.env.RUNNER_PORT ?? 4711)
@@ -323,6 +347,19 @@ function agentConfig(agent) {
 const running = new Map()
 let linkedinSyncRunning = false
 
+/**
+ * Der Netzwerk-Sync (Einladungen + Kontakte) hat einen EIGENEN Guard.
+ *
+ * Er teilt sich das Sync-Chrome mit dem Postfach-Sync, aber nicht dessen Tab —
+ * und er dauert rund fünf Minuten statt einer. Mit demselben Flag hätte ein
+ * laufender Netzwerk-Sync jeden Postfach-Sync blockiert; das ist zu teuer für
+ * die Zahl, die Kevin morgens wirklich braucht.
+ *
+ * `stand` ist das, was die Oberfläche abfragt: ein langer Lauf antwortet nicht
+ * im Request, sondern hinterlässt hier sein Ergebnis.
+ */
+let netzwerkSync = { laeuft: false, seit: null, letztes: null }
+
 // ---------- Helpers ----------
 function nowStamp() {
   const d = new Date()
@@ -401,6 +438,14 @@ function parseRun(name, raw) {
 const MAX_VERSUCHE_PRO_TAG = Number(process.env.MAX_VERSUCHE_PRO_TAG ?? 2)
 
 /**
+ * Eigener, höherer Deckel für Läufe, die nur an der Anmeldung scheiterten
+ * (13.08.). Vier statt zwei: so ein Lauf kostet nichts und ist nach einem
+ * Neu-Login sofort wieder gut — er darf das echte Kontingent nicht
+ * aufbrauchen, aber auch nicht endlos nachschlagen.
+ */
+const MAX_ANMELDUNG_PRO_TAG = Number(process.env.MAX_ANMELDUNG_PRO_TAG ?? 4)
+
+/**
  * Was ein Agent heute schon getan hat — nach **Status**, nicht nach Dateiname.
  *
  * O17 Schritt 4: Der alte Guard prüfte nur, ob eine Datei mit heutigem Datum und
@@ -425,12 +470,14 @@ async function tagesLaufStand(agent, heute) {
  * vorher in jeder `maybe*`-Funktion einzeln (und ungleich) standen.
  */
 async function routineFaellig(agent, heute) {
-  const { erfolg, fehlschlaege } = await tagesLaufStand(agent, heute)
+  const { erfolg, fehlschlaege, anmeldungFehler } = await tagesLaufStand(agent, heute)
   return darfRoutineStarten({
     erfolg,
     fehlschlaege,
+    anmeldungFehler,
     laeuft: [...running.values()].some((r) => r.agent === agent),
     maxVersuche: MAX_VERSUCHE_PRO_TAG,
+    maxAnmeldung: MAX_ANMELDUNG_PRO_TAG,
   })
 }
 
@@ -692,6 +739,12 @@ async function startRun(agent, input) {
           ...(stderr.trim() ? ['', '**stderr**', '', '```', stderr.trim().slice(-2000), '```'] : []),
         ].join('\n')
         await writeRunFile(id, agent, 'error', startedAt, err + '\n')
+        // 13.08.: Die Anmelde-Meldung der CLI kommt über stdout, nicht über
+        // stderr — deshalb blieb das Runner-Log während der fünf stillen Tage ab
+        // dem 11.08. leer, und der Ausfall stand nur in der Run-Datei. Was Kevin
+        // von Hand beheben muss (`handeln`), gehört ins Log.
+        const warum = laufGrund(err)
+        if (warum?.handeln) console.error(`[runner] ${id}: ${warum.kurz} — ${warum.hinweis}`)
       }
     } catch (e) {
       console.error(`[runner] Run-Datei für ${id} konnte nicht geschrieben werden:`, e)
@@ -1311,6 +1364,15 @@ async function spiegleErstnachrichten() {
 
 /** Führt genau einen Auftrag aus. Rückgabe landet als `result` am Auftrag. */
 async function fuehreJobAus(job) {
+  // Der Weg vom Handy: dort gibt es keinen Draht auf 127.0.0.1, der Auftrag
+  // kommt über `runner_jobs`. Hier darf gewartet werden — anders als am
+  // HTTP-Pfad hängt niemand an der Antwort.
+  if (job.kind === 'linkedin_netzwerk_sync') {
+    if (netzwerkSync.laeuft) throw new Error('Netzwerk-Sync läuft bereits')
+    await starteNetzwerkSync()
+    return netzwerkSync.letztes ?? netzwerkStand()
+  }
+
   if (job.kind === 'linkedin_sync') {
     // O6 (06.08.2026): derselbe Guard wie am HTTP-Pfad (POST /linkedin/sync,
     // `:1531`). Ohne ihn konnten ein Auftrag aus `runner_jobs` und ein Klick im
@@ -1746,6 +1808,19 @@ const server = createServer(async (req, res) => {
       }
     }
 
+    // ---------- Netzwerk-Sync: Einladungen + Kontakte (Wargame funnel-stufen.md) ----------
+    // Fünf Minuten Laufzeit — deshalb im Hintergrund gestartet und sofort
+    // geantwortet. Wer wissen will, ob er durch ist, fragt GET /linkedin/netzwerk.
+    if (req.method === 'POST' && url.pathname === '/linkedin/netzwerk-sync') {
+      if (netzwerkSync.laeuft) return json(res, 409, { error: 'Netzwerk-Sync läuft bereits', ...netzwerkStand() })
+      void starteNetzwerkSync()
+      return json(res, 202, { gestartet: true, ...netzwerkStand() })
+    }
+
+    if (req.method === 'GET' && url.pathname === '/linkedin/netzwerk') {
+      return json(res, 200, netzwerkStand())
+    }
+
     // ---------- LinkedIn-Follow-ups (Wargame Zug 9, docs/wargames/linkedin-followups.md) ----------
     // Rein lesend gegen die Voyager-API des Sync-Chrome-Profils (~/.uriel-chrome).
     // Kein Klick, kein Senden. Ein Lauf zur Zeit.
@@ -2144,6 +2219,93 @@ async function maybeAntwortEntwuerfe() {
 }
 
 /** Dream-Check (REBUILD-PLAN §8): beim Start, max. 1x pro Kalendertag. */
+/** Was die Oberfläche über den Netzwerk-Sync wissen muss. */
+function netzwerkStand() {
+  return { laeuft: netzwerkSync.laeuft, seit: netzwerkSync.seit, letztes: netzwerkSync.letztes }
+}
+
+/**
+ * Beide Netzwerk-Listen lesen und wegschreiben.
+ *
+ * Läuft im Hintergrund (der Aufrufer wartet nicht) und hinterlässt sein
+ * Ergebnis in `netzwerkSync.letztes`. Einladungen zuerst: sie sind die längere
+ * Liste und die, an der die InMail-Welle hängt.
+ *
+ * **Ein Teil-Ergebnis wird geschrieben, nicht verworfen.** Bricht die zweite
+ * Liste ab, ist die erste trotzdem aktuell — und `vollstaendig` sagt ohnehin,
+ * worauf man sich verlassen darf.
+ */
+async function starteNetzwerkSync() {
+  if (netzwerkSync.laeuft) return netzwerkStand()
+  netzwerkSync = { laeuft: true, seit: new Date().toISOString(), letztes: netzwerkSync.letztes }
+  const teile = []
+  try {
+    // Der Lock gilt prozessübergreifend: ein Handlauf im Terminal und die
+    // Tages-Routine hier würden sich sonst dieselben Chrome-Tabs streitig
+    // machen (am 12.08. gemessen: beide Läufe endeten unvollständig).
+    const ergebnis = await mitNetzwerkLock(async () => {
+      for (const welche of ['einladungen', 'kontakte']) {
+        const gelesen = await leseListe(welche, { log: (...a) => console.log(...a) })
+        if (gelesen.loginWall) {
+          teile.push({ seite: welche, fehler: 'Login-Wall — im Sync-Chrome bei LinkedIn anmelden' })
+          break
+        }
+        teile.push(await upsertNetzwerk(gelesen))
+        console.log(
+          `[runner] netzwerk-sync ${welche}: ${gelesen.eintraege.length}/${gelesen.gesamt}` +
+            ` · vollständig: ${gelesen.vollstaendig ? 'ja' : 'nein'}`,
+        )
+      }
+      return null
+    })
+    if (ergebnis?.blockiert) {
+      console.log('[runner] netzwerk-sync übersprungen — ein anderer Lauf hält den Lock')
+      netzwerkSync.letztes = { fertig: new Date().toISOString(), teile: [], blockiert: true }
+      return netzwerkStand()
+    }
+    netzwerkSync.letztes = { fertig: new Date().toISOString(), teile }
+  } catch (e) {
+    console.error('[runner] netzwerk-sync fehlgeschlagen:', e?.message ?? e)
+    netzwerkSync.letztes = { fertig: new Date().toISOString(), teile, fehler: e?.message ?? String(e) }
+  } finally {
+    netzwerkSync.laeuft = false
+    netzwerkSync.seit = null
+  }
+  return netzwerkStand()
+}
+
+/**
+ * Der Netzwerk-Sync als Tages-Routine (12.08.2026).
+ *
+ * Bewusst NICHT huckepack am Postfach-Sync: der läuft eine Minute und wird oft
+ * gerufen, dieser fünf. Einmal am Tag genügt vollkommen — Einladungen und
+ * Annahmen sind Tagesgeschäft, keine Minutenzahlen. Damit muss Kevin an den
+ * Knopf nur, wenn er es genauer wissen will.
+ *
+ * Kein Vault-Run, also auch kein `routineFaellig`: das Gedächtnis ist die
+ * Uhrzeit des letzten erfolgreichen Laufs in diesem Prozess plus der Stempel in
+ * der Tabelle. Nach einem Runner-Neustart läuft er einmal zusätzlich — das ist
+ * billiger als eine eigene Buchführung.
+ */
+const NETZWERK_AB_STUNDE = Number(process.env.NETZWERK_SYNC_STUNDE ?? 7)
+let netzwerkTagesStempel = null
+
+async function maybeNetzwerkSync() {
+  try {
+    const jetzt = new Date()
+    if (jetzt.getHours() < NETZWERK_AB_STUNDE) return
+    const heute = nowStamp().slice(0, 10)
+    if (netzwerkTagesStempel === heute) return
+    if (netzwerkSync.laeuft) return
+    if (!SNAPSHOT_ENABLED) return // ohne service_role kein Schreibweg
+    netzwerkTagesStempel = heute
+    console.log('[runner] netzwerk-sync startet (Tages-Routine)…')
+    await starteNetzwerkSync()
+  } catch (e) {
+    console.error('[runner] netzwerk-sync übersprungen:', e?.message ?? e)
+  }
+}
+
 async function maybeDream() {
   try {
     const today = nowStamp().slice(0, 10)
@@ -2179,6 +2341,12 @@ server.listen(PORT, '127.0.0.1', () => {
   setTimeout(() => void maybeAntwortEntwuerfe(), 20_000)
   const ae = setInterval(() => void maybeAntwortEntwuerfe(), MORGENBRIEF_CHECK_MS)
   ae.unref?.()
+
+  // Netzwerk-Sync einmal täglich — NUR über den regulären Tick. Ein Lauf kurz
+  // nach dem Start wäre bei jedem Runner-Neustart ein neuer Fünf-Minuten-Lauf
+  // über Kevins LinkedIn; der erste Tick in fünf Minuten reicht vollkommen.
+  const nw = setInterval(() => void maybeNetzwerkSync(), MORGENBRIEF_CHECK_MS)
+  nw.unref?.()
 
   // OS-Map-Snapshot für die Live-Domain: einmal beim Start + periodisch spiegeln.
   if (SNAPSHOT_ENABLED) {

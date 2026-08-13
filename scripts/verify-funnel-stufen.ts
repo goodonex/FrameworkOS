@@ -8,6 +8,9 @@
  *
  * Start: npx tsx scripts/verify-funnel-stufen.ts
  */
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { dirname, join } from 'node:path'
 import { profilKeyAus as profilKeyRunner } from '../runner/linkedin/netzwerkParse.mjs'
 import {
   angenommenOhneErstnachricht,
@@ -20,6 +23,8 @@ import {
 } from '../app/src/cockpit/lib/funnelStufen'
 import type { Erstnachricht } from '../app/src/hooks/useErstnachrichten'
 import type { LinkedinThread } from '../app/src/types/db'
+
+const wurzel = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 let pass = 0
 let fail = 0
@@ -259,6 +264,43 @@ for (const url of [
 {
   const leer = funnelStufen({ netzwerk: [], threads: [], erstnachrichten: [], letzterVollerEinladungsLauf: null }, JETZT)
   check('alles leer, kein Absturz', Object.values(leer).every((l) => Array.isArray(l) && l.length === 0))
+}
+
+// --- 9. Der Lauf-Zeitpunkt wird GEWUSST, nicht geraten (12.08.) ----------
+// Der teuerste Fehler dieser Runde: die Oberfläche leitete „letzter voller
+// Lauf" aus dem jüngsten Zeitstempel ab. Ein Teil-Lauf schrieb 50 von 882
+// Einträgen — und die InMail-Kachel zeigte prompt 50. Seitdem hinterlegt der
+// Runner den Zeitpunkt ausdrücklich, und zwar nur nach vollständigen Läufen.
+{
+  const hook = readFileSync(join(wurzel, 'app/src/hooks/useLinkedinNetzwerk.ts'), 'utf8')
+  check(
+    'der Hook liest den Merker aus runner_snapshots',
+    /linkedin_netzwerk_meta/.test(hook) && /runner_snapshots/.test(hook),
+  )
+  check(
+    'der Hook leitet den Lauf-Zeitpunkt NICHT mehr aus dem jüngsten Stempel ab',
+    !/juengster/.test(hook),
+    'Ein Teil-Lauf würde die InMail-Liste sonst wieder kippen.',
+  )
+  check(
+    'ohne Merker gibt es keinen Lauf-Zeitpunkt (und damit keine Liste)',
+    /vollAt\s*\?\s*new Date|\?\?\s*null/.test(hook),
+  )
+  check(
+    'der Hook blättert über den 1.000-Zeilen-Deckel hinaus',
+    /\.range\(/.test(hook),
+    'Kevins Netzwerk hat 1.506 Zeilen — ohne Blättern fehlt ein Drittel.',
+  )
+
+  const upsert = readFileSync(join(wurzel, 'runner/linkedin/netzwerkUpsert.mjs'), 'utf8')
+  check(
+    'der Merker wird nur nach einem vollständigen Lauf geschrieben',
+    /if \(liste\.vollstaendig\) await schreibeMeta/.test(upsert),
+  )
+  check(
+    'der Abwesenheits-Schluss hängt ebenfalls an der Vollständigkeit',
+    /if \(liste\.vollstaendig\)/.test(upsert),
+  )
 }
 
 console.log(`\nverify-funnel-stufen: ${pass} ok, ${fail} fehlgeschlagen`)

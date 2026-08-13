@@ -26,25 +26,47 @@
 export function bewerteTagesLaeufe(metas, agent) {
   let erfolg = false
   let fehlschlaege = 0
+  let anmeldungFehler = 0
   for (const m of metas ?? []) {
     if (!m || m.agent !== agent) continue
     if (m.status === 'done') erfolg = true
-    else if (m.status === 'error') fehlschlaege += 1
+    else if (m.status === 'error') {
+      // 13.08.: Eine abgelaufene Anmeldung ist kein gescheiterter Agent, sondern
+      // ein Lauf, der nie stattgefunden hat — die CLI bricht nach zwei Sekunden
+      // ohne einen einzigen Zug ab. Zählte das aufs normale Kontingent, wäre der
+      // Agent nach Kevins Neu-Anmeldung trotzdem bis Mitternacht gesperrt: genau
+      // das ist am 12./13.08. passiert. Eigener Zähler, eigener Deckel.
+      if (m.grund?.schluessel === 'anmeldung') anmeldungFehler += 1
+      else fehlschlaege += 1
+    }
     // 'running' zählt weder als Erfolg noch als Fehlschlag — der Lauf ist offen.
   }
-  return { erfolg, fehlschlaege }
+  return { erfolg, fehlschlaege, anmeldungFehler }
 }
 
 /**
- * Startfreigabe. Drei Gründe zu schweigen, in dieser Reihenfolge:
+ * Startfreigabe. Vier Gründe zu schweigen, in dieser Reihenfolge:
  * 1. Der Agent läuft schon (der Tick darf keinen zweiten danebenstellen).
  * 2. Es gibt heute bereits einen erfolgreichen Lauf.
  * 3. Der Tagesdeckel an Versuchen ist erreicht — sonst startet der
  *    5-Minuten-Tick einen dauerhaft scheiternden Agenten den ganzen Tag neu.
+ * 4. Auch die Anmelde-Fehlversuche haben einen Deckel, nur einen höheren
+ *    (13.08.). Er ist großzügiger, weil ein Neu-Login den Lauf sofort wieder
+ *    gelingen lässt — aber es MUSS einer sein: ohne ihn hämmert der Tick bei
+ *    dauerhaft abgelaufener Anmeldung alle fünf Minuten los und legt dabei
+ *    knapp 300 nutzlose Run-Dateien pro Tag im Vault ab.
  */
-export function darfRoutineStarten({ erfolg, fehlschlaege, laeuft, maxVersuche = 2 }) {
+export function darfRoutineStarten({
+  erfolg,
+  fehlschlaege,
+  anmeldungFehler = 0,
+  laeuft,
+  maxVersuche = 2,
+  maxAnmeldung = 4,
+}) {
   if (laeuft) return false
   if (erfolg) return false
   if (fehlschlaege >= maxVersuche) return false
+  if (anmeldungFehler >= maxAnmeldung) return false
   return true
 }

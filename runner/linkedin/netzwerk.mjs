@@ -20,11 +20,52 @@
  * Die Auswertung selbst steht in `netzwerkParse.mjs` und ist ohne Browser
  * prüfbar (`npx tsx scripts/verify-netzwerk-parse.ts`).
  */
+import { readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { gesamtzahlAus, istVollstaendig, karteZuEintrag } from './netzwerkParse.mjs'
 
 const CDP = 'http://127.0.0.1:9222'
 const HARD_TIMEOUT_MS = 120_000
+
+/**
+ * Ein Lauf zur Zeit — über Prozessgrenzen hinweg.
+ *
+ * **Warum eine Datei und nicht ein Flag.** Der Runner hält seinen Guard im
+ * Speicher; ein Handlauf im Terminal ist ein anderer Prozess und weiss davon
+ * nichts. Am 12.08. liefen genau so zwei Läufe gleichzeitig über dieselben
+ * Chrome-Tabs: beide navigierten, beide scrollten, beide ernteten Bruchstücke
+ * — 220 von 882 und 70 von 642, beide als unvollständig markiert. Nichts ging
+ * kaputt (dafür sorgt die Vollständigkeits-Regel), aber die Zeit war weg.
+ *
+ * Der Lock verfällt nach 20 Minuten: ein abgestürzter Lauf soll den nächsten
+ * nicht bis zum Neustart blockieren. Ein regulärer Lauf braucht fünf.
+ */
+const LOCK_PFAD = join(tmpdir(), 'uriel-netzwerk-sync.lock')
+const LOCK_MAX_MS = 20 * 60 * 1000
+
+function lockNehmen() {
+  try {
+    const roh = JSON.parse(readFileSync(LOCK_PFAD, 'utf8'))
+    const alter = Date.now() - Number(roh.seit ?? 0)
+    if (alter < LOCK_MAX_MS) {
+      return { ok: false, seit: roh.seit, pid: roh.pid }
+    }
+  } catch {
+    /* kein Lock da — gut */
+  }
+  writeFileSync(LOCK_PFAD, JSON.stringify({ pid: process.pid, seit: Date.now() }), 'utf8')
+  return { ok: true }
+}
+
+function lockFreigeben() {
+  try {
+    rmSync(LOCK_PFAD, { force: true })
+  } catch {
+    /* egal — er verfällt ohnehin */
+  }
+}
 
 export const SEITEN = {
   einladungen: {
@@ -368,6 +409,24 @@ export async function leseNetzwerk(optionen = {}) {
   const kontakte = await leseListe('kontakte', optionen)
   if (kontakte.loginWall) return kontakte
   return { einladungen, kontakte, elapsedMs: Date.now() - start }
+}
+
+/**
+ * Einen Lauf unter dem prozessübergreifenden Lock ausführen.
+ *
+ * Der Aufrufer bekommt `{ blockiert: true }` zurück, wenn schon einer läuft —
+ * das ist kein Fehler, sondern die richtige Antwort.
+ */
+export async function mitNetzwerkLock(fn) {
+  const lock = lockNehmen()
+  if (!lock.ok) {
+    return { blockiert: true, seit: lock.seit ? new Date(lock.seit).toISOString() : null, pid: lock.pid }
+  }
+  try {
+    return await fn()
+  } finally {
+    lockFreigeben()
+  }
 }
 
 // --- Direktaufruf: node runner/linkedin/netzwerk.mjs [--dry-run] [liste] ----
