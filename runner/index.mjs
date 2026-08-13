@@ -22,6 +22,7 @@ import { neuerLauf, nimmBrocken, protokollText } from './agentStream.mjs'
 import { bewerteTagesLaeufe, darfRoutineStarten } from './routineGuard.mjs'
 import { laufGrund } from './laufGrund.mjs'
 import { leseListe, mitNetzwerkLock } from './linkedin/netzwerk.mjs'
+import { baueMorgenbriefInput } from './morgenbriefInput.mjs'
 import { upsertNetzwerk } from './linkedin/netzwerkUpsert.mjs'
 import { installiereLogHygiene, kuerzeLogDatei } from './logHygiene.mjs'
 
@@ -2176,7 +2177,23 @@ async function maybeMorgenbrief() {
     const heute = nowStamp().slice(0, 10)
     if (!(await routineFaellig('morgenbrief', heute))) return
     console.log('[runner] morgenbrief startet (kein erfolgreicher Lauf heute)…')
-    await startRun('morgenbrief', {})
+    // Denselben Input mitgeben, den der Cockpit-Knopf liefert — sonst sagt der
+    // Brief von 7:00 jeden Morgen „Blindflug, keine Vitals durchgereicht".
+    // Scheitert der Bau (Netz, DB), läuft der Brief wie bisher ohne Daten —
+    // ein blinder Brief ist besser als gar keiner.
+    let input = {}
+    if (SNAPSHOT_ENABLED) {
+      try {
+        input = await baueMorgenbriefInput({
+          supabaseUrl: SUPABASE_URL,
+          serviceKey: SUPABASE_SERVICE_ROLE_KEY,
+          jetzt,
+        })
+      } catch (e) {
+        console.error('[runner] morgenbrief-input fehlgeschlagen — Brief läuft ohne App-Daten:', e?.message ?? e)
+      }
+    }
+    await startRun('morgenbrief', input)
   } catch (e) {
     console.error('[runner] morgenbrief übersprungen:', e?.message ?? e)
   }

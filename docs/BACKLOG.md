@@ -1,6 +1,30 @@
 # Uriel — Backlog (die eine Quelle der Wahrheit)
 
-**Stand:** 2026-08-12 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
+**Stand:** 2026-08-13 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
+
+## Runde vom 13.08., abends — **Der Morgenbrief sieht jetzt auch nachts** (nur Runner, kein Livegang nötig)
+
+Feinschliff-Audit vor dem Stresstest. Der Befund: Die Zeit-Routine startete den
+Morgenbrief mit `{}` — der Skill erwartet aber CRM-/KPI-Daten, die bisher nur
+der Cockpit-Knopf mitlieferte. Jeder 7-Uhr-Brief seit dem 31.07. sagte deshalb
+„Blindflug, keine Vitals durchgereicht".
+
+| Zug | Ergebnis | Datei |
+|---|---|---|
+| Input-Baukasten | `baueMorgenbriefInput()` liest contacts, `daily_metrics` (Woche + Monat) und `month_goals` per REST und baut denselben Input wie der Knopf-Pfad (`CockpitHome.tsx`, onRun `morgenbrief`). `sollKumuliert` bewusst weggelassen — die back-loaded Kurve bleibt in `goals.ts`, der Skill behandelt das Feld seit heute als optional | `runner/morgenbriefInput.mjs` (neu) |
+| Routine-Anschluss | `maybeMorgenbrief` reicht den gebauten Input durch; scheitert der Bau, läuft der Brief wie bisher ohne Daten | `runner/index.mjs` |
+| Drift-Wache | Ziel-Spiegel (`WOCHEN_ZIELE`/`MONATSZIELE`) gegen `goals.ts`, Vitals-Formeln gegen `metricsAggregate.ts`, Follow-up-Teilung gegen den Knopf-Pfad — 37 Fälle | `scripts/verify-morgenbrief-input.ts` (neu) |
+
+**Verifikation:** 35 verify-Skripte grün (34 + neu) · Input live gegen die
+Prod-DB gebaut (5 überfällige Follow-ups, Vitals 90/180 Anfragen — deckungsgleich
+mit der O2-Messung) · E2E: `POST /run` mit gebautem Input → Brief `done` in 20 s,
+mit Namen und Zahlen statt Blindflug (`2026-08-13-224350-morgenbrief.md`) ·
+Runner per kickstart auf dem neuen Code.
+
+**Geprüft und bewusst NICHT angefasst:** `ANFRAGEN_LIMIT_TAG = 30` vs.
+Wochenziel 180 ist **kein** Widerspruch, sondern dokumentierte Entscheidung
+(`goals.ts:26-29` — Kevin schickt in Blöcken, das Tageslimit ist eine andere
+Größe als das Wochenziel).
 
 ## Runde vom 12.08., zweiter Teil — **Der Funnel-Trichter steht** (nicht live)
 
@@ -77,11 +101,14 @@ Gegenprobe „keine Person steht in zwei Listen" als Testfall.
 
 ### Offen aus dieser Runde
 
-- **Kein Sync-Knopf in der Oberfläche.** Der Netzwerk-Sync läuft heute nur von
-  Hand (`node runner/linkedin/netzwerkUpsert.mjs`). Der Endpunkt
-  `POST /linkedin/netzwerk-sync` samt Huckepack nach dem Postfach-Sync (D10)
-  ist **nicht** gebaut — der Trichter zeigt bis dahin den Stand des letzten
-  Handlaufs.
+- ~~**Kein Sync-Knopf in der Oberfläche.**~~ ✅ **überholt — in derselben Runde
+  noch gebaut, am 13.08. gegen den Code geprüft:** Knopf in der Kachel-Leiste
+  (`FunnelStufen.tsx:99`, Desktop direkt mit 20-s-Poll; am Handy eine ehrliche
+  Ansage statt eines Timeout-Knopfs), Endpunkt `POST /linkedin/netzwerk-sync`
+  (`runner/index.mjs:1814`), Auftrags-Pfad `linkedin_netzwerk_sync` über
+  `runner_jobs` (`:1370`) und statt des Huckepacks eine **Tages-Routine ab
+  7:00** (`maybeNetzwerkSync`, `:2310` — bewusst nicht am Postfach-Sync: der
+  läuft oft und eine Minute, dieser fünf).
 - **`linkedin-inmail`-Skill** (Vault) zieht seine Namen weiter aus Chrome, nicht
   aus `linkedin_netzwerk` (D8, bewusst eigene Runde).
 - **ICP-Feinfilter** bleibt Routine-Arbeit: der Sync speichert roh, „Angenommen
