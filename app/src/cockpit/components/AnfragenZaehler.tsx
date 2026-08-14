@@ -44,6 +44,15 @@ export function AnfragenZaehler({ heute, limit, onPlus, onMinus, vollbild, onClo
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
+        /**
+         * Im Vollbild NICHT die Pille. `.ck-btn` traegt --ck-radius-pille (999px);
+         * bei 358x390 macht das aus dem Knopf eine Ellipse, und die runden Ecken
+         * sind kein Zierrat: `elementFromPoint` liefert dort den Hintergrund, nicht
+         * den Knopf. Rund ein Fuenftel der Flaeche war tot — auf genau der Flaeche,
+         * die "nicht zielen, nur druecken" heissen soll. Als Karte ist der Knopf
+         * flach und breit, dort bleibt die Pille richtig.
+         */
+        borderRadius: vollbild ? 'var(--ck-radius)' : undefined,
       }}
     >
       +1 Anfrage
