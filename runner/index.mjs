@@ -538,7 +538,11 @@ async function antwortEntwuerfeInput(now = new Date()) {
     now,
   })
   if (!threads.length) return null
-  return baueAntwortInput(threads, now)
+  const gebaut = baueAntwortInput(threads, now)
+  // Alle wartenden Threads haben bereits einen frischen Entwurf → nichts zu tun.
+  // Ein Lauf mit leerer Liste wäre nur eine Zeile Rauschen in der Freigaben-Queue.
+  if (!gebaut.input.threads.length) return null
+  return gebaut
 }
 
 /**

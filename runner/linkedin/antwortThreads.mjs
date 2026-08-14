@@ -12,8 +12,33 @@
  * gegengeprüft. Weicht eine Seite ab, schlägt das Skript fehl.
  */
 
-/** Höchstens so viele Threads gehen in einen Lauf — ein Agent, ein überschaubarer Auftrag. */
-export const ANTWORT_MAX = 20
+/**
+ * Höchstens so viele Threads gehen in einen Lauf — ein Agent, ein überschaubarer
+ * Auftrag.
+ *
+ * **Von 20 auf 10 gesenkt am 14.08.2026.** Der Lauf ist seit dem 04.08. jeden
+ * Morgen ins 10-Minuten-Limit gerannt („ZEITLIMIT ERREICHT") und hat damit gar
+ * nichts geliefert. Zehn fertige Entwürfe sind mehr als zwanzig abgebrochene.
+ */
+export const ANTWORT_MAX = 10
+
+/**
+ * Hat der Thread schon einen brauchbaren Entwurf?
+ *
+ * Das war der eigentliche Grund für den Stau: Die Auswahl kannte nur „wartet auf
+ * Kevin", nicht „ist schon entworfen". Also nahm sich der Agent jeden Morgen
+ * dieselben 20 ältesten Threads erneut vor, schrieb Entwürfe, die längst am
+ * Posten hingen, und kam nie zu den 21 dahinter.
+ *
+ * Veraltet heißt: der Lead hat NACH dem Entwurf noch einmal geschrieben — dann
+ * antwortet der alte Text auf eine überholte Nachricht und muss neu.
+ */
+export function hatFrischenEntwurf(thread) {
+  const text = typeof thread.entwurf === 'string' ? thread.entwurf.trim() : ''
+  if (!text) return false
+  if (!thread.entwurf_at || !thread.last_message_at) return true
+  return new Date(thread.entwurf_at).getTime() >= new Date(thread.last_message_at).getTime()
+}
 
 /** Endzustände: hier ist nichts mehr zu tun (Spiegel von `isTerminal`). */
 function istEndzustand(status) {
@@ -49,7 +74,9 @@ export function baueAntwortInput(threads, now = new Date(), max = ANTWORT_MAX) {
   // der am längsten Wartende. Nur so decken die entworfenen Threads exakt die
   // obersten Posten der Arbeitsliste ab — sonst hinge der Entwurf am falschen Namen.
   const dran = threads
-    .filter((t) => istDuBistDran(t, now))
+    // Wer schon einen frischen Entwurf hat, ist erledigte Arbeit — er blockiert
+    // sonst jeden Lauf und der Rückstau dahinter kommt nie dran.
+    .filter((t) => istDuBistDran(t, now) && !hatFrischenEntwurf(t))
     .sort((a, b) => {
       const stern = Number(Boolean(b.starred)) - Number(Boolean(a.starred))
       if (stern !== 0) return stern
