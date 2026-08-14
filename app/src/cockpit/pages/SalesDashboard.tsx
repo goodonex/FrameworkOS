@@ -170,14 +170,35 @@ export function KachelFenster({ kachel, onClose }: { kachel: KachelDef; onClose:
           boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
+        {/**
+         * Kopf und Fussaktion kleben, statt mitzuscrollen. Vorher lagen beide im
+         * Scrollfluss: bei „Jetzt dran" mit ~200 Posten stand „Arbeitsmodus
+         * starten" unter zweihundert Zeilen, und „Schliessen" war nach dem
+         * ersten Wisch weg. Das negative `top`/`bottom` frisst das Panel-Padding
+         * (20), sonst bliebe ein Spalt, durch den die Liste durchscheint.
+         */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'baseline',
+            justifyContent: 'space-between',
+            gap: 10,
+            position: 'sticky',
+            top: -20,
+            zIndex: 1,
+            background: 'var(--ck-panel)',
+            paddingTop: 20,
+            marginTop: -20,
+            paddingBottom: 8,
+          }}
+        >
           <div>
             <div className="ck-label">{kachel.titel}</div>
             <div style={{ fontSize: 20, fontWeight: 600, color: kachel.kennzahlFarbe ?? 'var(--ck-text-1)', marginTop: 2 }}>
               {kachel.kennzahl}
             </div>
           </div>
-          <button type="button" className="ck-btn" style={{ minHeight: 40, flexShrink: 0 }} onClick={onClose}>
+          <button type="button" className="ck-btn" style={{ minHeight: 44, flexShrink: 0 }} onClick={onClose}>
             Schließen
           </button>
         </div>
@@ -186,7 +207,14 @@ export function KachelFenster({ kachel, onClose }: { kachel: KachelDef; onClose:
           <button
             type="button"
             className="ck-btn ck-btn--primary"
-            style={{ minHeight: 48 }}
+            style={{
+              minHeight: 48,
+              position: 'sticky',
+              bottom: -20,
+              zIndex: 1,
+              marginBottom: -20,
+              marginTop: 'auto',
+            }}
             onClick={kachel.fensterAktion.onClick}
           >
             {kachel.fensterAktion.label}

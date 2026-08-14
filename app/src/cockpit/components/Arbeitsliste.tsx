@@ -283,7 +283,12 @@ export function Arbeitsliste({ posten, onErledigt, onZaehler, morgen, loom, proj
                 disabled={istErledigt}
                 aria-label={`${p.name} als erledigt abhaken`}
                 style={{
-                  minHeight: 36,
+                  // 44, nicht 36: der meistgetippte Knopf am Handy. Die Regel in
+                  // cockpit.css (`.ck-btn { min-height: 44px }` unter 900) wurde
+                  // von diesem Inline-Wert ueberstimmt — Inline schlaegt jedes
+                  // Stylesheet. Die uebrigen Inline-Hoehen bleiben bewusst, das
+                  // ist eine Frage der Zeilendichte; dieser eine ist Bedienung.
+                  minHeight: 44,
                   minWidth: 44,
                   flexShrink: 0,
                   color: istErledigt ? 'var(--ck-accent)' : undefined,

@@ -267,7 +267,16 @@ export function LoginPage() {
               borderRadius: 12,
               border: '1px solid var(--glass-border-2)',
               background: 'var(--glass-3)',
-              color: 'var(--accent-blue)',
+              /**
+               * Nicht `--accent-blue` (#4f7fff): auf dieser Fläche ergibt das
+               * 3,69 : 1 und damit weniger als die 4,5 : 1, die AA bei 13 px
+               * verlangt — der Knopf las sich wie deaktiviert. Derselbe Blauton,
+               * nur hell genug: 6,1 : 1. Lokal, weil `--accent-blue` an anderen
+               * Stellen auf anderen Hintergründen sitzt; ob der Anmelde-Knopf
+               * überhaupt blau bleibt oder ins Cockpit-Grün wandert, ist eine
+               * offene Farbentscheidung und keine Frage der Lesbarkeit.
+               */
+              color: '#8ab0ff',
               fontSize: 13,
               opacity: busy || loading ? 0.6 : 1,
             }}
