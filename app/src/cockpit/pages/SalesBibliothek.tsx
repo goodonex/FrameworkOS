@@ -239,7 +239,9 @@ export function SalesBibliothek() {
   }
 
   return (
-    <div className="ck-sales-bibliothek-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(220px, 300px) 1fr', gap: 14, alignItems: 'start' }}>
+    // Spalten stehen in cockpit.css (.ck-sales-bibliothek-grid). Als
+    // Inline-Style schlugen sie die Stapel-Regel des Mobil-Blocks.
+    <div className="ck-sales-bibliothek-grid">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <section className="ck-panel">
           <div className="ck-label" style={{ padding: '10px 12px 4px' }}>Nachrichten &amp; Skripte (Vault)</div>
