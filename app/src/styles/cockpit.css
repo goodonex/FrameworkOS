@@ -1187,6 +1187,24 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
     right: 10px;
     width: min(400px, calc(100vw - 20px)) !important;
   }
+  /**
+   * Deckel für beide Blasen — sonst ragen sie oben aus dem Bild.
+   *
+   * Die Höhe steht im TSX (`min(560px, calc(100svh - 120px))`) und war auf den
+   * Desktop-Anker `bottom: 84px` gerechnet. Mobil sitzen die Panels aber auf
+   * 130 px plus Safe-Area: bei 390x664 gemessen stand die Oberkante des
+   * Uriel-Panels auf -10 px, die Kopfzeile mit dem Schliessen-Knopf war
+   * angeschnitten. Auf einem kurzen Geraet (iPhone SE, 375x667 mit Leisten)
+   * fehlten rechnerisch die obersten ~120 px, also die ganze Kopfzeile.
+   *
+   * `max-height` schlaegt die Inline-`height`, deshalb reicht diese eine Regel.
+   * svh statt vh: mit eingeblendeter Safari-Leiste ist vh der GROSSE Viewport
+   * — genau die Falle #2 aus dem HANDOFF. 150 = 130 Anker + 20 Luft nach oben.
+   */
+  .ck-chat-panel,
+  .ck-uriel-panel {
+    max-height: calc(100svh - 150px - env(safe-area-inset-bottom));
+  }
   .ck-uriel-fab { bottom: calc(70px + env(safe-area-inset-bottom)); right: 74px; }
   /* Auf dem Homescreen steht die Uriel-Pille im Hero — der schwebende Knopf
      waere dort ein zweiter Weg zur selben Sache und lag ausgerechnet auf der

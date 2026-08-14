@@ -514,7 +514,10 @@ export function UrielDock() {
           aria-label="Uriel"
           style={{
             width: 'min(440px, calc(100vw - 40px))',
-            height: 'min(560px, calc(100vh - 120px))',
+            // svh statt vh: mit eingeblendeter Safari-Leiste misst vh den GROSSEN
+            // Viewport (HANDOFF, Falle #2). Den mobilen Deckel setzt cockpit.css —
+            // dort steht auch der Anker (bottom: 130px + Safe-Area).
+            height: 'min(560px, calc(100svh - 120px))',
             display: 'flex',
             flexDirection: 'column',
             background: 'var(--ck-panel)',
