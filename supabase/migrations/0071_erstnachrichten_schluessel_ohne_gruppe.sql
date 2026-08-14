@@ -102,7 +102,10 @@ begin
       and ns.nspname = 'public'
       and con.contype = 'u'
       and (
-        select array_agg(att.attname order by att.attname)
+        -- `attname` ist `name`, nicht `text`. Ohne den Cast gibt es keinen
+        -- `=`-Operator fuer die beiden Array-Typen und die Migration bricht mit
+        -- 42883 ab (passiert am 14.08. beim ersten Push).
+        select array_agg(att.attname::text order by att.attname::text)
         from unnest(con.conkey) k
         join pg_attribute att on att.attrelid = con.conrelid and att.attnum = k
       ) = array['brand_id', 'gruppe', 'name']
