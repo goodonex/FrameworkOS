@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { tagesStempel } from '../lib/agentenGesundheit'
 import { fetchAgents, type AgentInfo, type RunSummary } from '../lib/runnerApi'
 import type { RunnerState } from '../lib/useRunnerStatus'
 
@@ -81,7 +82,12 @@ export function AgentsPanel({
   const hasLeadResearch = source.some((a) => a.id === 'lead-research') || agents.length === 0
 
   // Dream-Vorschlag des Tages (ehem. DreamCard) — dismissbar, merkt sich die Run-Id.
-  const todayPrefix = new Date().toISOString().slice(0, 10)
+  //
+  // `toISOString()` waere hier falsch: die Run-Id traegt die LOKALE Zeit
+  // (runner/index.mjs, nowStamp). In DE laege der Prefix abends ab 22:00/23:00
+  // schon auf morgen und morgens vor 02:00 noch auf gestern — der Vorschlag
+  // fehlte dann kommentarlos. `tagesStempel` ist genau dafuer da.
+  const todayPrefix = tagesStempel(new Date())
   const dream = useMemo(
     () =>
       runs.find(

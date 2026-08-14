@@ -96,7 +96,15 @@ async function leseRunsSpiegel(): Promise<RunDetail[]> {
   return spiegel.data.runs
 }
 
-export async function fetchRuns(limit = 20): Promise<RunSummary[]> {
+/**
+ * Wie viele Laeufe die Oberflaeche betrachtet — EINE Zahl fuer alle Orte.
+ * `agentenBefund` bewertet genau die Liste, die es bekommt; mit
+ * unterschiedlichen Fenstern (12 auf /agenten, 20 auf dem Homescreen) meldete
+ * die Agenten-Seite an vollen Tagen weniger Fehlschlaege als die Startseite.
+ */
+export const RUNS_FENSTER = 20
+
+export async function fetchRuns(limit = RUNS_FENSTER): Promise<RunSummary[]> {
   if (!runnerDirekt()) {
     // Inhalt hier abstreifen — die Liste ist eine Übersicht, den Text holt
     // fetchRun. (Sonst hinge er an jeder Poll-Runde im React-State.)

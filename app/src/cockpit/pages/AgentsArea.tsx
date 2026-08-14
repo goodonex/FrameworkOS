@@ -6,6 +6,7 @@ import {
   fetchRun,
   fetchRuns,
   postRun,
+  RUNS_FENSTER,
   type AgentInfo,
   type RunDetail,
   type RunSummary,
@@ -63,7 +64,10 @@ export function AgentsArea() {
 
   const load = useCallback(async () => {
     try {
-      const [a, r] = await Promise.all([fetchAgents(), fetchRuns(12)])
+      // Dieselbe Menge wie `useRunnerData` (Homescreen/Morgen): mit 12 zeigte
+      // diese Seite an vollen Tagen weniger Fehlschlaege als der Homescreen,
+      // obwohl beide dieselbe `agentenBefund`-Bewertung fuettern.
+      const [a, r] = await Promise.all([fetchAgents(), fetchRuns(RUNS_FENSTER)])
       setAgents(a)
       setRuns(r)
       setError(null)

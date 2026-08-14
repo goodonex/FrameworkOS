@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { RunSummary } from './runnerApi'
-import { fetchRuns } from './runnerApi'
+import { fetchRuns, RUNS_FENSTER } from './runnerApi'
 import { useRunnerStatus } from './useRunnerStatus'
 
 /**
@@ -15,7 +15,7 @@ export function useRunnerData() {
   const refresh = useCallback(async () => {
     if (runner.state !== 'online') return
     try {
-      const r = await fetchRuns(20)
+      const r = await fetchRuns(RUNS_FENSTER)
       // Referenz nur wechseln, wenn sich Inhalte ändern (verhindert unnötige Re-Renders)
       setRuns((prev) => (JSON.stringify(prev) === JSON.stringify(r) ? prev : r))
     } catch {
