@@ -343,9 +343,7 @@ function Vollbild({
         >
           Rückgängig
         </button>
-        <span style={{ fontSize: 11.5, color: 'var(--ck-text-3)', textAlign: 'center', whiteSpace: 'nowrap' }}>
-          Tippen zählt · wischen wechselt
-        </span>
+        <span className="ck-zaehl-hinweis">Tippen zählt · wischen wechselt</span>
         <button
           type="button"
           className="ck-btn"

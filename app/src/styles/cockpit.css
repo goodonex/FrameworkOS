@@ -518,6 +518,26 @@
   gap: 10px;
   flex-shrink: 0;
 }
+/* Die beiden Knöpfe sind die Bedienung und dürfen nicht gequetscht werden.
+   Ohne das schob sich bei 390 px die ganze Zeile 9 px über den rechten Rand
+   und der rechte Knopf verlor seinen letzten Buchstaben („Reaktivierun|g",
+   gemessen am 14.08. bei 390×664). Beide Knopf-Beschriftungen kommen aus
+   ZAEHL_FELDER — „Reaktivierung" und „LI Vernetzung" sind die langen. */
+.ck-zaehl-fuss > .ck-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+/* Der Hinweis ist Beiwerk: er gibt als Erstes nach und kürzt mit Auslassung,
+   statt die Knöpfe daneben zu verdrängen. */
+.ck-zaehl-hinweis {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11.5px;
+  text-align: center;
+  color: var(--ck-text-3);
+}
 
 /* --- Status-Punkt --- */
 .ck-dot {
