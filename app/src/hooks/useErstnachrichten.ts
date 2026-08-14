@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { entdoppleErstnachrichten } from '../cockpit/lib/erstnachrichtenDedup'
 import { isMissingSupabaseTableError } from '../lib/supabaseErrors'
 import { supabase } from '../lib/supabase'
 import { useBrandId } from './useBrandId'
@@ -13,6 +14,8 @@ export interface Erstnachricht {
   sort_index: number
   status: 'offen' | 'gesendet' | 'uebersprungen'
   sent_at: string | null
+  /** Wann der Runner die Zeile zuletzt aus dem Vault gespiegelt hat (0060). */
+  last_synced_at?: string | null
 }
 
 interface Result {
@@ -60,7 +63,14 @@ export function useErstnachrichten(brandSlug: string | undefined): Result {
     }
     setTableMissing(false)
     setError(null)
-    setItems((data ?? []) as Erstnachricht[])
+    /**
+     * Eine Person, eine Zeile. Vor 0071 lag der Schlüssel auf
+     * `(brand_id, gruppe, name)` — eine umformulierte Gruppen-Überschrift im
+     * Vault ließ den Spiegel die ganze Gruppe erneut anlegen (145 Zeilen für
+     * 118 Leads, "144 offen"). Die Entdopplung hier hält die Liste auch mit
+     * Altbestand ehrlich; die Regel ist dieselbe wie in der Migration.
+     */
+    setItems(entdoppleErstnachrichten((data ?? []) as Erstnachricht[]))
     setLoading(false)
   }, [brandId])
 

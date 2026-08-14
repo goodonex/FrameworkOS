@@ -1,6 +1,44 @@
 # Uriel — Backlog (die eine Quelle der Wahrheit)
 
-**Stand:** 2026-08-13 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
+**Stand:** 2026-08-14 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
+
+## Runde vom 14.08. — **Die Erstnachrichten standen doppelt in der Liste** (Migration 0071 offen)
+
+Kevins Befund: Die Kachel meldete „144 offen", und im Fenster stand fast jeder
+Lead zweimal untereinander.
+
+**Ursache — nicht die Oberfläche, sondern der Schlüssel.** `0060` identifiziert
+einen Datensatz über `(brand_id, gruppe, name)`, und der Spiegel im Runner
+schreibt mit genau diesem Konflikt-Ziel. Die `gruppe` ist aber keine Identität,
+sondern eine Überschrift aus dem Vault. Am 12.08. hieß sie noch „Gruppe 1 —
+Erste Charge · 27 Kontakte (raus am 13.07., nur Sabine Keulertz noch offen)", am
+14.08. „… (raus 13./14.07.)". Kein bestehender Datensatz passte mehr auf den
+Konflikt → der Lauf legte alle 27 Leads der Gruppe erneut an. **145 Zeilen für
+118 Leads**, und Roland Wettstein — am 29.07. als gesendet abgehakt — stand als
+frischer Lead wieder in der Liste. Die Datei selbst ist sauber (Parser: 118
+Leads, 118 eindeutige Namen, 0 Doppel).
+
+| Zug | Ergebnis | Datei |
+|---|---|---|
+| Schlüssel ohne Gruppe | Unique-Index auf `(brand_id, name)`, alter gruppen-abhängiger Constraint fliegt, Fortschritts-Rettung vorab; Wächter bricht ab, solange Doppel im Bestand liegen | `supabase/migrations/0071_erstnachrichten_schluessel_ohne_gruppe.sql` (neu, **noch nicht gepusht**) |
+| Spiegel | `on_conflict=brand_id,name`; fehlt 0071 noch, weicht der Lauf auf das alte Ziel aus statt still auszufallen | `runner/index.mjs` |
+| Entdopplung in der Oberfläche | Eine Person, eine Zeile — frischester Spiegel-Stand gewinnt den Inhalt, der weiteste Status wird darauf übertragen | `app/src/cockpit/lib/erstnachrichtenDedup.ts` (neu), `app/src/hooks/useErstnachrichten.ts` |
+| Drift-Wache | 12 Fälle, u. a. „abgehakt darf nicht zurückfallen" und „ähnliche Namen bleiben getrennt" | `scripts/verify-erstnachrichten-dedup.ts` (neu) |
+
+Der Hook ist der einzige Zulauf: Kachel, Fenster, Arbeitsmodus und die
+Funnel-Stufen hängen alle an `useErstnachrichten().items`.
+
+**Verifikation:** `tsc -b` + `build` grün · neue Drift-Wache 12/12,
+`verify-funnel-stufen` weiter 38/38 · Entdopplung gegen die Prod-Zeilen
+gerechnet: **145 → 118 Zeilen, 144 → 117 offen**, 0 doppelte Namen, Roland
+Wettstein bleibt `gesendet` · Cockpit lokal: Kachel „ERSTNACHRICHTEN 117 offen",
+Fenster ohne einen einzigen doppelten Namen.
+
+**Offen — Bestandsdaten.** In der DB liegen weiterhin **27 überzählige Zeilen**
+(je Person die ältere). Sie sind nicht gelöscht worden; das Statement liegt in
+der Übergabe der Runde. Reihenfolge: erst Schritt 1 aus 0071 (Fortschritt
+retten), dann die Bereinigung, dann 0071 erneut `db push` — der Wächter in der
+Migration lässt den Schlüssel sonst nicht zu.
 
 ## Runde vom 13.08., abends — **Der Morgenbrief sieht jetzt auch nachts** (nur Runner, kein Livegang nötig)
 

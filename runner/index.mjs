@@ -1339,18 +1339,37 @@ async function spiegleErstnachrichten() {
       last_synced_at: now,
     }))
 
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/linkedin_erstnachrichten?on_conflict=brand_id,gruppe,name`,
-      {
+    /**
+     * Konflikt-Ziel OHNE `gruppe` (0071). Die Gruppen-Überschrift ist eine
+     * Beschriftung aus dem Vault, kein Schlüssel: Formuliert Kevin sie um
+     * ("Gruppe 1 — … (raus am 13.07., nur Sabine Keulertz noch offen)" →
+     * "… (raus 13./14.07.)"), passte mit dem alten Ziel kein Datensatz mehr auf
+     * den Konflikt und der Spiegel legte die ganze Gruppe erneut an — 145
+     * Zeilen für 118 Leads, "144 offen". Jetzt wandert die neue Beschriftung
+     * als Update auf den bestehenden Datensatz.
+     */
+    const spiegle = (konflikt) =>
+      fetch(`${SUPABASE_URL}/rest/v1/linkedin_erstnachrichten?on_conflict=${konflikt}`, {
         method: 'POST',
         headers: supabaseHeaders({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
         body: JSON.stringify(rows),
-      },
-    )
+      })
+
+    let res = await spiegle('brand_id,name')
     if (!res.ok) {
       const txt = await res.text().catch(() => '')
-      console.error(`[runner] Erstnachrichten-Spiegel HTTP ${res.status}: ${txt.slice(0, 200)}`)
-      return
+      // 42P10 = kein passender Unique-Index. Dann ist 0071 noch nicht gepusht;
+      // der Spiegel läuft solange auf dem alten Ziel weiter, statt still
+      // auszufallen. Die Entdopplung in der Oberfläche fängt das ab.
+      if (txt.includes('42P10')) {
+        console.warn('[runner] Erstnachrichten-Spiegel: Migration 0071 fehlt, weiche auf altes Konflikt-Ziel aus')
+        res = await spiegle('brand_id,gruppe,name')
+      }
+      if (!res.ok) {
+        const txt2 = await res.text().catch(() => '')
+        console.error(`[runner] Erstnachrichten-Spiegel HTTP ${res.status}: ${(txt2 || txt).slice(0, 200)}`)
+        return
+      }
     }
     await pushSnapshotKey('erstnachrichten_meta', async () => ({
       datei,
