@@ -153,6 +153,19 @@ export function KachelFenster({ kachel, onClose }: { kachel: KachelDef; onClose:
           display: 'flex',
           flexDirection: 'column',
           gap: 12,
+          /**
+           * DECKEND, nicht die Klassenfarbe. `.ck-panel` traegt `--ck-card`
+           * (0.55) — bewusst durchscheinend fuer Flaechen AUF der Seite. Ueber
+           * einem Backdrop bleibt davon Geistertext: 0.86 Backdrop mal 0.55
+           * Panel laesst noch ~6 % der Kacheln dahinter durch, und das
+           * Dashboard stand quer durch die Namensliste ("KUNDENARBEIT 0 offen"
+           * mitten zwischen den Leads, der Kopf ueber der Unter-Navigation).
+           * `--ck-panel` ist die deckende Entsprechung derselben Farbe und
+           * laut tokens.css genau fuer "alles, was ueber Canvas, Foto oder
+           * Backdrop liegt" da — jedes andere Overlay im Cockpit macht es so
+           * (RunDrawer, OsDetailPanel, FunnelStufen, Arbeitsmodus).
+           */
+          background: 'var(--ck-panel)',
           borderColor: 'var(--ck-border-strong)',
           boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
         }}
@@ -437,6 +450,13 @@ export function SalesDashboard() {
 
   const projektLink = useCallback(
     (p: Posten) => {
+      // `kunde_liegt` traegt die Projekt-Id schon in der Posten-Id
+      // (`liegt:<projektId>`, kundenarbeit.ts). Der Umweg ueber `tasks` fand
+      // dafuer nie etwas — dort steht eine Aufgaben-Id, keine Projekt-Id.
+      if (p.spur === 'kunde_liegt') {
+        const projektId = zeilenId(p.id)
+        return projektId ? `/projekte/${projektId}` : null
+      }
       const task = tasks.items.find((t) => t.id === zeilenId(p.id))
       // Die Projekte leben im Cockpit; die alte /brand/…/deliver-Welt ist weg.
       return task?.project_id ? `/projekte/${task.project_id}` : null

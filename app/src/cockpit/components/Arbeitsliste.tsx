@@ -131,7 +131,15 @@ export function Arbeitsliste({ posten, onErledigt, onZaehler, morgen, loom, proj
         const istErledigt = erledigt.has(p.id)
         const kopierbar = p.spur === 'erstnachricht' || Boolean(p.entwurf)
         const skriptUrl = p.spur === 'loom' ? (loom?.skriptUrl(p) ?? null) : null
-        const projekt = p.spur === 'kundenaufgabe' ? (projektLink?.(p) ?? null) : null
+        /**
+         * „Ins Projekt" gilt fuer beide Kunden-Spuren. `kunde_liegt` war
+         * ausgeschlossen — ausgerechnet die Spur, deren einziger Text
+         * „Seit 87 Tagen keine Bewegung — Follow-up entwerfen" lautet und
+         * deren einzige sinnvolle Aktion damit im Projekt liegt. Kevin musste
+         * das Fenster schliessen und ueber PROJEKTE neu suchen.
+         */
+        const projekt =
+          p.spur === 'kundenaufgabe' || p.spur === 'kunde_liegt' ? (projektLink?.(p) ?? null) : null
         return (
           <div key={p.id} style={{ borderBottom: '1px solid var(--ck-border)' }}>
             {mobil ? (
@@ -220,6 +228,18 @@ export function Arbeitsliste({ posten, onErledigt, onZaehler, morgen, loom, proj
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
+                    /**
+                     * Der Name schrumpft ZULETZT. Name und Firma waren beide
+                     * frei schrumpfende Flex-Kinder — Flexbox verteilt den
+                     * Mangel nach Basisbreite, und die LinkedIn-Headline
+                     * daneben ist oft 120 Zeichen lang. Also wurde ausgerechnet
+                     * die wichtigste Information gekuerzt: aus "Michael …"
+                     * wurde "Micha…", aus "MAKLERZENTRALE …" ein "MA…".
+                     * Die Deckelung bei 55 % haelt die Zeile heil, wenn der
+                     * Name selbst zu lang ist.
+                     */
+                    flexShrink: 0,
+                    maxWidth: '55%',
                   }}
                 >
                   {p.name}
@@ -232,6 +252,8 @@ export function Arbeitsliste({ posten, onErledigt, onZaehler, morgen, loom, proj
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
+                      // Gibt als Erstes nach — die Headline ist Kontext, kein Schlüssel.
+                      minWidth: 0,
                     }}
                   >
                     {p.firma}
