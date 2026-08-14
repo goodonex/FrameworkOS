@@ -367,7 +367,14 @@ function ContentPostsView() {
   const direkt = runnerDirekt()
 
   const brandName = activeBrand?.name ?? activeSlug
-  const openPost = manifest?.posts.find((p) => p.id === openId) ?? null
+  /**
+   * Dieser Kanal ist Instagram — LinkedIn hat seit Phase 2 einen eigenen Tab
+   * (`LinkedinKanal`, filtert auf `channel === 'linkedin'`). Ungefiltert stand
+   * jeder LinkedIn-Beitrag zweimal in der App und blaehte die Instagram-Zahl
+   * in der Kopfzeile auf.
+   */
+  const posts = (manifest?.posts ?? []).filter((p) => p.channel !== 'linkedin')
+  const openPost = posts.find((p) => p.id === openId) ?? null
 
   const buildBatch = async () => {
     setBuilding(true)
@@ -395,7 +402,7 @@ function ContentPostsView() {
         <div>
           <div style={{ fontSize: 16, fontWeight: 600 }}>Content · Posts</div>
           <div className="ck-label" style={{ marginTop: 2 }}>
-            {manifest ? `${manifest.posts.length} Post${manifest.posts.length === 1 ? '' : 's'} · ${brandName}` : brandName}
+            {manifest ? `${posts.length} Post${posts.length === 1 ? '' : 's'} · ${brandName}` : brandName}
           </div>
         </div>
         <button className="ck-btn ck-btn--primary" style={{ fontSize: 12 }} onClick={buildBatch} disabled={building}>
@@ -420,10 +427,12 @@ function ContentPostsView() {
         />
       ) : loading || !manifest ? (
         <p className="ck-label">Lade…</p>
-      ) : manifest.posts.length === 0 ? (
+      ) : posts.length === 0 ? (
         <div className="ck-panel" style={{ padding: 20, textAlign: 'center' }}>
           <p style={{ fontSize: 13, color: 'var(--ck-text-2)', margin: 0 }}>
-            Noch keine Posts im Manifest ({activeSlug}/content-engine/content.json).
+            {manifest.posts.length > 0
+              ? 'Alle Beiträge im Manifest sind LinkedIn — sie stehen im Kanal daneben.'
+              : `Noch keine Posts im Manifest (${activeSlug}/content-engine/content.json).`}
           </p>
           <p className="ck-label" style={{ marginTop: 8, color: 'var(--ck-text-3)' }}>
             „Neue Beiträge bauen" startet den wöchentlichen Content-Batch.
@@ -431,7 +440,7 @@ function ContentPostsView() {
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
-          {manifest.posts.map((post) => (
+          {posts.map((post) => (
             <ContentCard key={post.id} post={post} onOpen={() => setOpenId(post.id)} />
           ))}
         </div>
