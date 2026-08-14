@@ -222,9 +222,17 @@ export function sumMetrics(list: DerivedMetrics[]): DerivedMetrics {
   }
 }
 
-/** Neueste Version einer Ad (Reviews/Metriken hängen an der höchsten v). */
+/**
+ * Neueste Version einer Ad (Reviews/Metriken hängen an der höchsten v).
+ *
+ * Wirklich die höchste `v`, nicht das letzte Array-Element: `ads.json` wird
+ * von Hand bzw. von Claude geschrieben, und eine nachgetragene ältere Version
+ * am Ende der Liste hätte sonst Vorschau, Checkliste UND Spend/CPL im
+ * Dashboard auf den falschen Stand gezogen.
+ */
 export function latestVersion(ad: Ad): AdVersion | undefined {
-  return ad.versions[ad.versions.length - 1]
+  if (ad.versions.length === 0) return undefined
+  return ad.versions.reduce((hoechste, kandidat) => (kandidat.v > hoechste.v ? kandidat : hoechste))
 }
 
 export const ACTIVE_STATUSES: AdStatus[] = ['live', 'approved']
