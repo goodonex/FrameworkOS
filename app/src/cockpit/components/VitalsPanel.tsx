@@ -10,7 +10,8 @@ export interface Vital {
 }
 
 function VitalRow({ vital }: { vital: Vital }) {
-  const pct = Math.min(1, vital.current / vital.target)
+  // Ohne Ziel gibt es keinen Fortschritt — `0 / 0` ergaebe sonst `width: NaN%`.
+  const pct = vital.target > 0 ? Math.min(1, vital.current / vital.target) : 0
   const done = vital.current >= vital.target
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 5, padding: '10px 12px', borderBottom: '1px solid var(--ck-border)' }}>

@@ -6,7 +6,9 @@ import { VitalsPanel } from '../components/VitalsPanel'
 import { channelRates, funnelKpis, sumField, termineAttribution, weekVitals } from '../lib/metricsAggregate'
 import type { MetricField } from '../lib/useDailyMetrics'
 import { toIsoDate, useDailyMetrics } from '../lib/useDailyMetrics'
-import { formatEuro } from '../lib/goals'
+import { formatEuro, monthKeyOf } from '../lib/goals'
+import { useActiveBrand } from '../lib/activeBrand'
+import { useMonthGoal } from '../lib/useMonthGoal'
 import { AUTO_METRIK_FELDER } from '../lib/arbeitsmodusTracking'
 
 /** Aktivitäten-Eingabe, gruppiert nach Plattform (Kevins realer Akquise-Tag). */
@@ -219,6 +221,12 @@ function RatesTable({ rates }: { rates: ReturnType<typeof channelRates> }) {
 export function TrackingArea() {
   const navigate = useNavigate()
   const metrics = useDailyMetrics()
+  // Dasselbe Monatsziel wie auf dem Homescreen (GoalCard). Ohne diesen Wert
+  // rechnete die Kurve hier mit dem Planungs-Default (40.000 €), waehrend die
+  // Home das gesetzte Ziel aus `month_goals` zeigt — ab September 2026 (kein
+  // hartverdrahteter Monat mehr) waeren das zwei Zahlen fuer dieselbe Sache.
+  const { activeBrand } = useActiveBrand()
+  const monthGoal = useMonthGoal(activeBrand?.id, monthKeyOf(new Date()))
   const vitals = useMemo(
     () => weekVitals(metrics.weekRows, metrics.windowRows),
     [metrics.weekRows, metrics.windowRows],
@@ -397,7 +405,7 @@ export function TrackingArea() {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 }}>
           <section className="ck-panel" style={{ padding: '10px 12px' }} aria-label="Monatskurve">
-            <MonthCurve monthRows={metrics.monthRows} />
+            <MonthCurve monthRows={metrics.monthRows} overrideTotal={monthGoal.total} />
           </section>
           {/* Funnel-Conversions (von der Home hierher gezogen — Monats-Analyse, kein Tagessteuerungs-Instrument) */}
           <ConversionPanel kpis={funnel} />
