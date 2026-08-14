@@ -497,21 +497,35 @@ export function SalesDashboard() {
     [isMobile, oeffneArbeitsmodus],
   )
 
+  /**
+   * Solange die Quellen laden, steht auf jeder Kachel ein Platzhalter statt
+   * einer Zahl. „0 offen" und „Alles abgearbeitet" sind sonst schlicht falsch —
+   * und „alles erledigt" ist die teuerste falsche Zahl, die hier stehen kann.
+   */
+  const zahl = (text: string) => (postenLaedt ? '…' : text)
+
+  /**
+   * Die Ansage trägt nur, wenn sie mehr sagt als die Kennzahl. Ohne genug
+   * Messwerte in `arbeits_dauern` liefert `tagesansage` genau „185 offen" —
+   * dieselbe Zeichenkette, die schon groß darüber steht.
+   */
+  const ansage = geordnetMitAnfrage.length ? tagesansage(geordnetMitAnfrage, dauern, jetzt) : undefined
+
   const kacheln: KachelDef[] = [
     {
       id: 'jetzt-dran',
       titel: 'Jetzt dran',
-      kennzahl: geordnetMitAnfrage.length ? `${geordnetMitAnfrage.length} offen` : 'Alles abgearbeitet',
+      kennzahl: zahl(geordnetMitAnfrage.length ? `${geordnetMitAnfrage.length} offen` : 'Alles abgearbeitet'),
       // Kevins Morgen-Frage, aus seinen eigenen Messdaten (arbeits_dauern):
       // „12 offen · ≈ 1 h 40 · um 13:25 durch".
-      unterzeile: geordnet.length ? tagesansage(geordnet, dauern, jetzt) : undefined,
+      unterzeile: !postenLaedt && ansage && ansage !== `${geordnetMitAnfrage.length} offen` ? ansage : undefined,
       inhalt: liste(geordnetMitAnfrage),
       fensterAktion: mobilArbeitsmodus('alle', geordnet),
     },
     {
       id: 'kundenarbeit',
       titel: 'Kundenarbeit',
-      kennzahl: `${kundenaufgabePosten.length} offen`,
+      kennzahl: zahl(`${kundenaufgabePosten.length} offen`),
       unterzeile: kundenaufgabePosten[0]
         ? `zuerst: ${kundenaufgabePosten[0].firma ? `${kundenaufgabePosten[0].firma} — ` : ''}${kundenaufgabePosten[0].name}`
         : undefined,
@@ -521,8 +535,10 @@ export function SalesDashboard() {
     {
       id: 'liegt-zu-lange',
       titel: 'Liegt zu lange',
-      kennzahl: liegend.length ? `${liegend.length} Projekt${liegend.length === 1 ? '' : 'e'} > 14 Tage` : 'Keins liegt',
-      kennzahlFarbe: liegend.length ? 'var(--ck-warn)' : undefined,
+      kennzahl: zahl(
+        liegend.length ? `${liegend.length} Projekt${liegend.length === 1 ? '' : 'e'} > 14 Tage` : 'Keins liegt',
+      ),
+      kennzahlFarbe: !postenLaedt && liegend.length ? 'var(--ck-warn)' : undefined,
       inhalt: liste(kundeLiegtListe),
       fensterAktion: mobilArbeitsmodus('kunde_liegt', kundeLiegtListe),
     },
@@ -531,7 +547,7 @@ export function SalesDashboard() {
       titel: 'Antworten',
       kennzahl: linkedinThreads.tableMissing
         ? 'Migration 0058 ausstehend'
-        : `${antwortListe.length} warten · ${antwortListe.filter((p) => p.starred).length} mit Stern`,
+        : zahl(`${antwortListe.length} warten · ${antwortListe.filter((p) => p.starred).length} mit Stern`),
       inhalt: liste(antwortListe),
       fensterAktion: mobilArbeitsmodus('antwort', antwortListe),
     },
@@ -540,15 +556,18 @@ export function SalesDashboard() {
       titel: 'Looms',
       kennzahl: linkedinThreads.tableMissing
         ? 'Migration 0061 ausstehend'
-        : `${loomVerschicktGesamt} von ${loomStarredGesamt} verschickt`,
-      unterzeile: loomListe.length ? `${loomListe.length} offen — Skript generieren & aufnehmen` : undefined,
+        : zahl(`${loomVerschicktGesamt} von ${loomStarredGesamt} verschickt`),
+      unterzeile:
+        !postenLaedt && loomListe.length ? `${loomListe.length} offen — Skript generieren & aufnehmen` : undefined,
       inhalt: liste(loomListe),
       fensterAktion: mobilArbeitsmodus('loom', loomListe),
     },
     {
       id: 'erstnachrichten',
       titel: 'Erstnachrichten',
-      kennzahl: erstnachrichten.tableMissing ? 'Migration 0060 ausstehend' : `${erstnachrichtListe.length} offen`,
+      kennzahl: erstnachrichten.tableMissing
+        ? 'Migration 0060 ausstehend'
+        : zahl(`${erstnachrichtListe.length} offen`),
       inhalt: liste(erstnachrichtListe),
       fensterAktion: mobilArbeitsmodus('erstnachricht', erstnachrichtListe),
     },
@@ -557,7 +576,7 @@ export function SalesDashboard() {
       titel: 'Follow-ups',
       kennzahl: linkedinThreads.tableMissing
         ? 'Migration 0058 ausstehend'
-        : `${followupListe.length} fällig · ${verwaistAnzahl} Altlasten`,
+        : zahl(`${followupListe.length} fällig · ${verwaistAnzahl} Altlasten`),
       inhalt: liste(followupListe),
       fensterAktion: mobilArbeitsmodus('followup', followupListe),
     },

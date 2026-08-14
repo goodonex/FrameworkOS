@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { entdoppleErstnachrichten } from '../cockpit/lib/erstnachrichtenDedup'
 import { isMissingSupabaseTableError } from '../lib/supabaseErrors'
 import { supabase } from '../lib/supabase'
-import { useBrandId } from './useBrandId'
+import { useBrandIdStatus } from './useBrandId'
 
 export interface Erstnachricht {
   id: string
@@ -31,7 +31,7 @@ interface Result {
 
 /** Versandfertige LinkedIn-Erstnachrichten aus dem Vault (Migration 0060). */
 export function useErstnachrichten(brandSlug: string | undefined): Result {
-  const brandId = useBrandId(brandSlug)
+  const { brandId, pending: brandPending } = useBrandIdStatus(brandSlug)
   const [items, setItems] = useState<Erstnachricht[]>([])
   const [loading, setLoading] = useState(true)
   const [tableMissing, setTableMissing] = useState(false)
@@ -40,7 +40,9 @@ export function useErstnachrichten(brandSlug: string | undefined): Result {
   const reload = useCallback(async () => {
     if (!supabase || !brandId) {
       setItems([])
-      setLoading(false)
+      // Solange die Brand noch gesucht wird, ist die Liste nicht leer, sondern
+      // unbekannt — sonst blitzt „Noch keine Erstnachrichten gespiegelt" auf.
+      setLoading(brandPending)
       return
     }
     setLoading(true)
@@ -72,7 +74,7 @@ export function useErstnachrichten(brandSlug: string | undefined): Result {
      */
     setItems(entdoppleErstnachrichten((data ?? []) as Erstnachricht[]))
     setLoading(false)
-  }, [brandId])
+  }, [brandId, brandPending])
 
   useEffect(() => {
     void reload()

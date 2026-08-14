@@ -17,7 +17,7 @@ import { useKundenPosteingang } from '../lib/useKundenPosteingang'
 function ProjekteList() {
   const navigate = useNavigate()
   const { show } = useToast()
-  const { activeBrand } = useActiveBrand()
+  const { activeBrand, loading: brandsLaden } = useActiveBrand()
   const projects = useDeliverProjects(activeBrand?.slug)
   // „An diesem Projekt liegt etwas" — offene Kundennachrichten und eingereichte
   // Website-Änderungen, gezählt aus derselben Quelle wie /freigaben.
@@ -26,10 +26,15 @@ function ProjekteList() {
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
 
-  const brandBroken = !activeBrand || activeBrand.id.startsWith('local-fallback-')
+  // Solange die Brands laden, ist „keine Brand verbunden" keine Diagnose,
+  // sondern nur ein Zwischenstand — die Warnung stand bei jedem Seitenaufruf
+  // ein bis zwei Sekunden da, obwohl alles in Ordnung war.
+  const brandBroken = !brandsLaden && (!activeBrand || activeBrand.id.startsWith('local-fallback-'))
 
   const create = async () => {
-    if (brandBroken) {
+    // Anlegen braucht die echte Brand — hier zählt der Rohzustand, nicht die
+    // (bewusst geduldige) Banner-Bedingung oben.
+    if (!activeBrand || activeBrand.id.startsWith('local-fallback-')) {
       show('Keine Brand verbunden — Projekt kann nicht angelegt werden (Brands laden nicht).', 'error')
       return
     }

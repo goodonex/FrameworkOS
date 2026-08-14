@@ -38,7 +38,15 @@ function greeting(): string {
 
 export function HeuteDeck({ slug }: { slug: string | undefined }) {
   const navigate = useNavigate()
-  const { geordnet, jetzt, contacts } = usePosten(slug)
+  const posten = usePosten(slug)
+  const { geordnet, jetzt, contacts } = posten
+  /** Quellen noch unterwegs → weder „Liste leer" noch eine Zahl behaupten (O18). */
+  const postenLaedt =
+    posten.contacts.loading ||
+    posten.tasks.loading ||
+    posten.projekte.loading ||
+    posten.linkedinThreads.loading ||
+    posten.erstnachrichten.loading
   const dauern = useArbeitsDauern(slug)
   const bookings = useBookings(slug)
   const content = useContentPieces(slug)
@@ -77,7 +85,10 @@ export function HeuteDeck({ slug }: { slug: string | undefined }) {
   }, [bookings.items, contacts.items, content.items, cal.events, jetzt])
 
   const offeneEntwuerfe = useMemo(() => entwuerfeOffen(geordnet), [geordnet])
-  const ansage = useMemo(() => tagesansage(geordnet, dauern, jetzt), [geordnet, dauern, jetzt])
+  const ansage = useMemo(
+    () => (postenLaedt ? '…' : tagesansage(geordnet, dauern, jetzt)),
+    [postenLaedt, geordnet, dauern, jetzt],
+  )
 
   const oeffnePosten = useCallback(
     (p: Posten) => navigate(`/sales?kachel=${KACHEL_JE_SPUR[p.spur]}`),
@@ -237,7 +248,7 @@ export function HeuteDeck({ slug }: { slug: string | undefined }) {
           {/* Top-5 der Posten-Engine — Klick springt ins zuständige Kachel-Fenster. */}
           {top.length === 0 ? (
             <div style={{ padding: '12px 14px', fontSize: 12.5, color: 'var(--ck-text-3)' }}>
-              Liste leer. Für heute ist alles abgearbeitet.
+              {postenLaedt ? 'Lädt …' : 'Liste leer. Für heute ist alles abgearbeitet.'}
             </div>
           ) : (
             <div style={{ paddingBottom: 6 }}>

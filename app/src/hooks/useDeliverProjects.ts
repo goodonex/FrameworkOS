@@ -10,7 +10,7 @@ import {
 import { generateId } from '../lib/storage'
 import { supabase } from '../lib/supabase'
 import type { DeliverProject } from '../types/db'
-import { useBrandId } from './useBrandId'
+import { useBrandIdStatus } from './useBrandId'
 
 interface UseDeliverProjectsResult {
   items: DeliverProject[]
@@ -28,7 +28,7 @@ interface UseDeliverProjectsResult {
 }
 
 export function useDeliverProjects(brandSlug: string | undefined): UseDeliverProjectsResult {
-  const brandId = useBrandId(brandSlug)
+  const { brandId, pending: brandPending } = useBrandIdStatus(brandSlug)
   const [items, setItems] = useState<DeliverProject[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -38,14 +38,15 @@ export function useDeliverProjects(brandSlug: string | undefined): UseDeliverPro
   const reload = useCallback(async () => {
     if (!brandSlug) {
       setItems([])
-      setLoading(false)
+      // Solange die Brands laden, ist „keine Projekte" eine Lüge.
+      setLoading(brandPending)
       setError(null)
       return
     }
     if (!supabase || !brandId) {
       setItems([])
-      setLoading(false)
-      setError('Supabase nicht konfiguriert')
+      setLoading(brandPending)
+      setError(brandPending ? null : 'Supabase nicht konfiguriert')
       return
     }
     setLoading(true)
@@ -67,7 +68,7 @@ export function useDeliverProjects(brandSlug: string | undefined): UseDeliverPro
       (data ?? []).map((r) => rowRecordToDeliverProject(r as Record<string, unknown>)),
     )
     setLoading(false)
-  }, [brandId, brandSlug])
+  }, [brandId, brandSlug, brandPending])
 
   useEffect(() => {
     void reload()
