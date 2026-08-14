@@ -74,12 +74,26 @@ export type CrmFilterContext = {
   memberListIdsByContact: Map<string, string[]>
 }
 
+/**
+ * Wer in der Pipeline als eigene Karte zaehlt: Firmen und freistehende
+ * Personen. Ansprechpartner (Person MIT `parent_company_id`) erscheinen bei
+ * ihrer Firma, nicht daneben — sonst stuende jeder Kunde doppelt im Kanban.
+ *
+ * Ist bewusst exportiert: die Regel lag nur in `applyCrmFilters`, waehrend die
+ * Kennzahl-Kacheln darueber auf der ungefilterten Liste rechneten. Ergebnis war
+ * "Gesamt in Pipeline 44" ueber Spalten, die zusammen 37 ergaben — Kevins
+ * sieben Ansprechpartner (5x Erstkontakt, 2x Deal).
+ */
+export function nurPipelineKontakte(items: Contact[]): Contact[] {
+  return items.filter((c) => isCompany(c) || !c.parent_company_id)
+}
+
 export function applyCrmFilters(
   items: Contact[],
   filters: CrmFilterState,
   ctx?: CrmFilterContext,
 ): Contact[] {
-  const pipelineOnly = items.filter((c) => isCompany(c) || !c.parent_company_id)
+  const pipelineOnly = nurPipelineKontakte(items)
   return pipelineOnly.filter((c) => {
     if (filters.statuses.length > 0 && !filters.statuses.includes(c.contact_status)) return false
     if (filters.stages.length > 0 && !filters.stages.includes(c.pipeline_stage)) return false

@@ -34,8 +34,26 @@ async function copyText(text: string): Promise<boolean> {
 }
 
 /** Splittet eine Vault-MD an `### `-Headings: Prolog als Intro, danach eine Karte je Abschnitt. */
+/**
+ * YAML-Frontmatter abschneiden. Die Vault-Notizen beginnen mit einem
+ * `---`-Block (tags, status, erstellt, übergeordnet) — reine Ablage-Metadaten,
+ * die im Skript-Fenster oben als erster Absatz standen und beim „Nachricht
+ * kopieren" des ersten Abschnitts mit in der Zwischenablage landeten.
+ *
+ * Nur der Block ganz am Anfang, und nur mit schliessender Zeile: ein Dokument,
+ * das mit einer Trennlinie arbeitet, wird nicht angeschnitten.
+ */
+export function ohneFrontmatter(content: string): string {
+  if (!content.startsWith('---')) return content
+  const zeilen = content.split('\n')
+  if (zeilen[0].trim() !== '---') return content
+  const ende = zeilen.findIndex((z, i) => i > 0 && z.trim() === '---')
+  if (ende === -1) return content
+  return zeilen.slice(ende + 1).join('\n').replace(/^\n+/, '')
+}
+
 function splitSections(content: string): Array<{ heading: string | null; body: string }> {
-  const lines = content.split('\n')
+  const lines = ohneFrontmatter(content).split('\n')
   const sections: Array<{ heading: string | null; body: string }> = []
   let current: { heading: string | null; body: string[] } = { heading: null, body: [] }
   for (const line of lines) {

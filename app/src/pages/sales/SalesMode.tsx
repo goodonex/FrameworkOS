@@ -67,7 +67,12 @@ import { CrmFilterPanel } from '../../components/sales/CrmFilterPanel'
 import { PipelineCarouselView } from '../../components/sales/PipelineCarouselView'
 import { PipelineListView } from '../../components/sales/PipelineListView'
 import { PipelineTableView } from '../../components/sales/PipelineTableView'
-import { applyCrmFilters, EMPTY_CRM_FILTERS, type CrmFilterState } from '../../lib/crmFilters'
+import {
+  applyCrmFilters,
+  EMPTY_CRM_FILTERS,
+  nurPipelineKontakte,
+  type CrmFilterState,
+} from '../../lib/crmFilters'
 import {
   loadCrmFilters,
   loadKanbanColumnSort,
@@ -1783,7 +1788,12 @@ export function SalesMode({
   const quickLead = useSalesQuickLead(slug ?? '', callModeSearch)
 
   const pipelineStats = useMemo(() => {
-    const items = contacts.items
+    // Dieselbe Grundmenge wie das Kanban darunter (`applyCrmFilters`):
+    // Ansprechpartner sind keine eigene Karte. Ohne diese Zeile stand
+    // "Gesamt in Pipeline 44" ueber Spalten, die zusammen 37 ergaben — und die
+    // Kachel ist zugleich der "Filter zuruecksetzen"-Knopf, versprach also
+    // sieben Karten, die es nie zu sehen gab.
+    const items = nurPipelineKontakte(contacts.items)
     const active = items.filter((c) => c.pipeline_stage !== 'paused')
     const dueToday = active.filter((c) => isFollowUpDueTodayOrBefore(c.next_follow_up_at))
     const wk0 = startOfWeekMondayMs()
