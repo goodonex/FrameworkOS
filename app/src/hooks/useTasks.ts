@@ -13,7 +13,7 @@ import {
 } from '../lib/supabaseErrors'
 import { supabase } from '../lib/supabase'
 import type { Task, TaskPriority, TaskSource, TaskStatus } from '../types/db'
-import { useBrandId } from './useBrandId'
+import { useBrandIdStatus } from './useBrandId'
 
 const STORAGE_KEY = 'tasks' as const
 
@@ -178,7 +178,7 @@ function sortTasks(list: Task[]): Task[] {
 }
 
 export function useTasks(brandSlug: string | undefined): UseTasksResult {
-  const brandId = useBrandId(brandSlug)
+  const { brandId, pending: brandPending } = useBrandIdStatus(brandSlug)
   const [items, setItems] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -188,6 +188,12 @@ export function useTasks(brandSlug: string | undefined): UseTasksResult {
   const saveStatus = useSaveStatus()
 
   const reload = useCallback(async () => {
+    // Brand noch nicht aufgelöst: warten. Würde hier `localOnlyRef` gesetzt,
+    // liefe der erste Klick nach dem Laden ins localStorage statt in die DB.
+    if (brandPending) {
+      setLoading(true)
+      return
+    }
     if (!brandSlug) {
       setItems([])
       setLoading(false)
@@ -202,12 +208,29 @@ export function useTasks(brandSlug: string | undefined): UseTasksResult {
       return
     }
     setLoading(true)
-    const { data, error: err } = await supabase
-      .from('foundation_tasks')
-      .select('*')
-      .eq('brand_id', brandId)
-      .order('updated_at', { ascending: false })
-      .limit(500)
+
+    // Seitenweise statt `.limit(500)`: gekappt würde ausgerechnet das
+    // am längsten Liegengebliebene (Sortierung nach `updated_at` absteigend) —
+    // also genau das, was „Kundenarbeit" und „liegt zu lange" finden sollen.
+    const rows: Record<string, unknown>[] = []
+    const SEITE = 1000
+    let ladeFehler: { message: string } | null = null
+    for (let von = 0; ; von += SEITE) {
+      const { data, error: err } = await supabase
+        .from('foundation_tasks')
+        .select('*')
+        .eq('brand_id', brandId)
+        .order('updated_at', { ascending: false })
+        .range(von, von + SEITE - 1)
+      if (err) {
+        ladeFehler = err
+        break
+      }
+      const stapel = (data ?? []) as Record<string, unknown>[]
+      rows.push(...stapel)
+      if (stapel.length < SEITE) break
+    }
+    const err = ladeFehler
 
     if (err && isMissingSupabaseTableError(err.message)) {
       localOnlyRef.current = true
@@ -222,7 +245,7 @@ export function useTasks(brandSlug: string | undefined): UseTasksResult {
       return
     }
     localOnlyRef.current = false
-    const serverRows = (data ?? []).map((r) => rowToTask(r as Record<string, unknown>, brandId))
+    const serverRows = rows.map((r) => rowToTask(r, brandId))
     const localRows = readLocal(brandSlug)
     const byId = new Map<string, Task>()
     for (const r of serverRows) byId.set(r.id, r)
@@ -241,7 +264,7 @@ export function useTasks(brandSlug: string | undefined): UseTasksResult {
     setItems(sortTasks(Array.from(byId.values())))
     setLoading(false)
     setError(null)
-  }, [brandId, brandSlug])
+  }, [brandId, brandSlug, brandPending])
 
   useEffect(() => {
     void reload()

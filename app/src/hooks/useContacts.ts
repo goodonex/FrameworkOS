@@ -15,7 +15,7 @@ import type {
   PipelineStage,
   PotenzialTyp,
 } from '../types/db'
-import { useBrandId } from './useBrandId'
+import { useBrandIdStatus } from './useBrandId'
 
 export type CreateContactResult =
   | { ok: true; contact: Contact }
@@ -376,7 +376,7 @@ export function readContactsLocal(brandSlug: string): Contact[] {
 }
 
 export function useContacts(brandSlug: string | undefined): UseContactsResult {
-  const brandId = useBrandId(brandSlug)
+  const { brandId, pending: brandPending } = useBrandIdStatus(brandSlug)
   const [items, setItems] = useState<Contact[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -429,16 +429,40 @@ export function useContacts(brandSlug: string | undefined): UseContactsResult {
       return
     }
     if (!supabase || !brandId) {
+      // Brand noch unterwegs: nicht auf „schreibgeschützt" schalten — das ist
+      // eine Diagnose, keine Ladeanzeige.
+      if (brandPending) {
+        setLoading(true)
+        return
+      }
       zeigeCache('Keine Verbindung zu Supabase — Kontakte sind schreibgeschützt.')
       setLoading(false)
       return
     }
     setLoading(true)
-    const { data, error: err } = await supabase
-      .from('contacts')
-      .select('*')
-      .eq('brand_id', brandId)
-      .order('updated_at', { ascending: false })
+
+    // Seitenweise — PostgREST deckelt still bei 1.000 Zeilen, und absteigend
+    // nach `updated_at` fielen die am längsten unangetasteten Kontakte weg:
+    // ausgerechnet der Retainer-Bestand hinter der Nordstern-Zahl.
+    const rohZeilen: unknown[] = []
+    const SEITE = 1000
+    let ladeFehler: { message: string } | null = null
+    for (let von = 0; ; von += SEITE) {
+      const { data, error: e } = await supabase
+        .from('contacts')
+        .select('*')
+        .eq('brand_id', brandId)
+        .order('updated_at', { ascending: false })
+        .range(von, von + SEITE - 1)
+      if (e) {
+        ladeFehler = e
+        break
+      }
+      const stapel = data ?? []
+      rohZeilen.push(...stapel)
+      if (stapel.length < SEITE) break
+    }
+    const err = ladeFehler
 
     if (err) {
       const grund = isMissingSupabaseTableError(err.message)
@@ -450,7 +474,7 @@ export function useContacts(brandSlug: string | undefined): UseContactsResult {
       return
     }
 
-    const serverRows = (data ?? []).map(rowToContact)
+    const serverRows = rohZeilen.map((r) => rowToContact(r as Record<string, unknown>))
     const cache = readContactsLocal(brandSlug)
 
     // 0 Zeilen bei gefülltem Cache ist fast immer RLS oder ein halb aufgebauter
@@ -470,7 +494,7 @@ export function useContacts(brandSlug: string | undefined): UseContactsResult {
     setItems(serverRows)
     persistLocal(serverRows)
     setLoading(false)
-  }, [brandId, brandSlug, persistLocal, setzeReadOnly, zeigeCache])
+  }, [brandId, brandSlug, brandPending, persistLocal, setzeReadOnly, zeigeCache])
 
   useEffect(() => {
     void reload()

@@ -3,7 +3,7 @@ import { markDonePatch } from '../cockpit/lib/linkedinFollowups'
 import { isMissingSupabaseTableError } from '../lib/supabaseErrors'
 import { supabase } from '../lib/supabase'
 import type { LinkedinThread } from '../types/db'
-import { useBrandId } from './useBrandId'
+import { useBrandIdStatus } from './useBrandId'
 
 interface UseLinkedinThreadsResult {
   items: LinkedinThread[]
@@ -26,7 +26,7 @@ interface UseLinkedinThreadsResult {
 
 /** Liest linkedin_threads für die aktive Brand (Wargame Zug 7, docs/wargames/linkedin-followups.md). */
 export function useLinkedinThreads(brandSlug: string | undefined): UseLinkedinThreadsResult {
-  const brandId = useBrandId(brandSlug)
+  const { brandId, pending: brandPending } = useBrandIdStatus(brandSlug)
   const [items, setItems] = useState<LinkedinThread[]>([])
   const [loading, setLoading] = useState(true)
   const [tableMissing, setTableMissing] = useState(false)
@@ -35,32 +35,51 @@ export function useLinkedinThreads(brandSlug: string | undefined): UseLinkedinTh
   const reload = useCallback(async () => {
     if (!supabase || !brandId) {
       setItems([])
-      setLoading(false)
+      // Brand noch nicht aufgelöst → „unbekannt", nicht „keine Threads". Sonst
+      // stünde auf dem Dashboard kurz „0 warten" statt der echten Zahl.
+      setLoading(brandPending)
       return
     }
     setLoading(true)
-    const { data, error: err } = await supabase
-      .from('linkedin_threads')
-      .select('*')
-      .eq('brand_id', brandId)
-      .order('last_message_at', { ascending: true })
 
-    if (err) {
-      if (isMissingSupabaseTableError(err.message)) {
-        setTableMissing(true)
-        setItems([])
-        setError(null)
-      } else {
-        setError(err.message)
+    /**
+     * Seitenweise laden — PostgREST deckelt still bei 1.000 Zeilen (am 12.08.
+     * an `linkedin_netzwerk` gemessen: 370 statt 876). Hier wäre der Schaden
+     * größer als dort: aufsteigend nach `last_message_at` fielen ausgerechnet
+     * die **neuesten** Threads weg — also die, aus denen „Antworten" und
+     * „Follow-ups fällig" entstehen.
+     */
+    const alle: LinkedinThread[] = []
+    const SEITE = 1000
+    for (let von = 0; ; von += SEITE) {
+      const { data, error: err } = await supabase
+        .from('linkedin_threads')
+        .select('*')
+        .eq('brand_id', brandId)
+        .order('last_message_at', { ascending: true })
+        .range(von, von + SEITE - 1)
+
+      if (err) {
+        if (isMissingSupabaseTableError(err.message)) {
+          setTableMissing(true)
+          setItems([])
+          setError(null)
+        } else {
+          setError(err.message)
+        }
+        setLoading(false)
+        return
       }
-      setLoading(false)
-      return
+      const stapel = (data ?? []) as LinkedinThread[]
+      alle.push(...stapel)
+      if (stapel.length < SEITE) break
     }
+
     setTableMissing(false)
     setError(null)
-    setItems((data ?? []) as LinkedinThread[])
+    setItems(alle)
     setLoading(false)
-  }, [brandId])
+  }, [brandId, brandPending])
 
   useEffect(() => {
     void reload()
