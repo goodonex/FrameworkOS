@@ -16,10 +16,19 @@ export type Spur =
   | 'loom'
   | 'erstnachricht'
   | 'followup'
+  | 'aufgabe'
   | 'anfrage'
   | 'inmail'
 
-/** Fest verdrahtete Rangfolge — Rang 1 zuerst. Kein Ermessen für den Executor. */
+/**
+ * Fest verdrahtete Rangfolge — Rang 1 zuerst. Kein Ermessen für den Executor.
+ *
+ * `aufgabe` (eigene Aufgabe ohne Projekt) steht bewusst HINTER allen
+ * LinkedIn-Spuren: Kevin am 14.08.2026 — „Priorität hat jetzt LinkedIn." Vorher
+ * tauchten diese Aufgaben überhaupt nicht auf, weil `kundenaufgabenPosten` auf
+ * `project_id` filtert; eine seit 73 Tagen überfällige lag damit unsichtbar im
+ * System. Sichtbar ja, aber nicht vor dem Vertrieb.
+ */
 export const RANGFOLGE: Spur[] = [
   'kundenaufgabe',
   'kunde_liegt',
@@ -27,6 +36,7 @@ export const RANGFOLGE: Spur[] = [
   'loom',
   'erstnachricht',
   'followup',
+  'aufgabe',
   'anfrage',
   'inmail',
 ]

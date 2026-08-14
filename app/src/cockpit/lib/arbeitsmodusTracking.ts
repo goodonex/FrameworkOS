@@ -28,6 +28,7 @@ export function metrikFeldFuer(spur: Spur): MetricField | null {
       return 'inmails'
     case 'antwort':
     case 'kundenaufgabe':
+    case 'aufgabe':
     case 'kunde_liegt':
       return null
   }
@@ -42,6 +43,7 @@ const ALLE_SPUREN = [
   'inmail',
   'antwort',
   'kundenaufgabe',
+  'aufgabe',
   'kunde_liegt',
 ] as const satisfies readonly Spur[]
 
@@ -98,12 +100,22 @@ export async function erledigePosten(
       await deps.loomVerschickt(rowId)
       break
     case 'kundenaufgabe':
+    case 'aufgabe':
+      // Beides sind Zeilen in `foundation_tasks` — der Haken schließt sie
+      // wirklich. Genau das meint „wegklicken können".
       deps.taskErledigt(rowId)
       break
-    // 'antwort' und 'kunde_liegt' sind abgeleitete Signale ohne eigene Zeile
-    // zum Abhaken — die reale Aktion (Antwort schreiben, Follow-up senden)
-    // passiert außerhalb; der nächste Sync/Stage-Wechsel räumt sie selbst weg.
+    // Eine Antwort HAT eine Zeile: den Thread. Bis zum 14.08.2026 lief dieser
+    // Zweig leer, der Haken war rein optisch und nach dem Neuladen stand der
+    // Lead wieder da — deshalb lag von 160 Threads keiner in `wartet`.
+    // `markDonePatch` hat für genau diesen Fall längst den richtigen Zweig
+    // (Antwort → Leiter zurück auf 0, Thread lebt weiter, nie archivieren);
+    // er war vom Sales-Dashboard aus nur nicht erreichbar.
     case 'antwort':
+      await deps.followupErledigt(rowId)
+      break
+    // 'kunde_liegt' bleibt ein abgeleitetes Signal ohne eigene Zeile — die
+    // reale Aktion passiert im Projekt, der nächste Stage-Wechsel räumt es weg.
     case 'kunde_liegt':
     case 'anfrage':
     case 'inmail':

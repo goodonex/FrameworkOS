@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { antwortPosten, erstnachrichtPosten, followupPosten, loomPosten } from '../cockpit/lib/arbeitsmodusQuellen'
-import { kundeLiegtPosten, kundenaufgabenPosten, liegendeProjekte } from '../cockpit/lib/kundenarbeit'
+import {
+  eigeneAufgabenPosten,
+  kundeLiegtPosten,
+  kundenaufgabenPosten,
+  liegendeProjekte,
+} from '../cockpit/lib/kundenarbeit'
 import { ordnePosten, type Posten, type PostenQuellen } from '../cockpit/lib/prioritaet'
 import { useContacts, type UseContactsResult } from './useContacts'
 import { useDeliverProjects } from './useDeliverProjects'
@@ -51,6 +56,10 @@ export function usePosten(slug: string | undefined): UsePostenResult {
     () => kundenaufgabenPosten(tasks.items, projekte.items, contacts.items),
     [tasks.items, projekte.items, contacts.items],
   )
+  const eigeneAufgaben = useMemo(
+    () => eigeneAufgabenPosten(tasks.items, contacts.items),
+    [tasks.items, contacts.items],
+  )
   const liegend = useMemo(
     () => liegendeProjekte(projekte.items, tasks.items, contacts.items, jetzt),
     [projekte.items, tasks.items, contacts.items, jetzt],
@@ -72,10 +81,19 @@ export function usePosten(slug: string | undefined): UsePostenResult {
       loom: loomListe,
       erstnachricht: erstnachrichtListe,
       followup: followupListe,
+      aufgabe: eigeneAufgaben,
       anfrage: [],
       inmail: [],
     }),
-    [kundenaufgabePosten, kundeLiegtListe, antwortListe, loomListe, erstnachrichtListe, followupListe],
+    [
+      kundenaufgabePosten,
+      kundeLiegtListe,
+      antwortListe,
+      loomListe,
+      erstnachrichtListe,
+      followupListe,
+      eigeneAufgaben,
+    ],
   )
 
   const geordnet = useMemo(() => ordnePosten(quellen, jetzt), [quellen, jetzt])

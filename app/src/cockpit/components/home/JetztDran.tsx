@@ -22,6 +22,7 @@ const SPUR_AKTION: Record<Posten['spur'], string> = {
   loom: 'Aufnehmen',
   erstnachricht: 'Schreiben',
   followup: 'Follow-up',
+  aufgabe: 'Erledigen',
   anfrage: 'Anfragen',
   inmail: 'InMail',
 }

@@ -76,6 +76,34 @@ export function kundenaufgabenPosten(
     })
 }
 
+/**
+ * Aufgaben OHNE `project_id` — die Gegenmenge zu {@link kundenaufgabenPosten}.
+ *
+ * Bis zum 14.08.2026 fielen sie überall durch: das Sales-Dashboard filtert auf
+ * `project_id`, also meldete „Kundenarbeit" 0 offen, während unter `/aufgaben`
+ * ein seit 73 Tagen überfälliger Anruf lag. Kevins Entscheidung: sichtbar
+ * machen, aber hinter LinkedIn einsortieren (Spur `aufgabe`, siehe RANGFOLGE) —
+ * und abhakbar, damit er sie wegklicken kann, statt sie zu verwalten.
+ */
+export function eigeneAufgabenPosten(tasks: Task[], kontakte: Contact[]): Posten[] {
+  const kontaktById = new Map(kontakte.map((c) => [c.id, c]))
+
+  return tasks
+    .filter((t) => isOffen(t) && !t.project_id)
+    .map((t): Posten => {
+      const kontakt = t.contact_id ? kontaktById.get(t.contact_id) : undefined
+      return {
+        id: `task:${t.id}`,
+        spur: 'aufgabe',
+        name: kontakt?.name?.trim() || t.title,
+        firma: kontakt?.company?.trim() || undefined,
+        website: kontakt?.website?.trim() || undefined,
+        text: [t.title, t.notes].filter((s) => s && s.trim()).join('\n\n') || t.title,
+        timestamp: t.due_at ?? t.created_at,
+      }
+    })
+}
+
 export interface LiegendesProjekt {
   projekt: DeliverProject
   kontakt: Contact | undefined

@@ -14,7 +14,7 @@ import { WerkzeugePanel } from '../components/WerkzeugePanel'
 import { useActiveBrand } from '../lib/activeBrand'
 import { zeilenId } from '../lib/arbeitsmodusQuellen'
 import { erledigePosten } from '../lib/arbeitsmodusTracking'
-import { bucketOf } from '../lib/linkedinFollowups'
+import { istAltlast } from '../lib/linkedinFollowups'
 import { funnelKpis, sumField } from '../lib/metricsAggregate'
 import { INMAIL_CREDITS_STAND, RANGFOLGE, tagesstand, type Posten, type Spur } from '../lib/prioritaet'
 import { useUiSetting } from '../lib/uiSettings'
@@ -229,14 +229,24 @@ export function SalesDashboard() {
   const [anfragenVollbild, setAnfragenVollbild] = useState(false)
 
   const kundenaufgabePosten = quellen.kundenaufgabe ?? []
+  // Kundenaufgaben (mit Projekt) und eigene Aufgaben (ohne) landen in derselben
+  // Kachel — für Kevin ist beides „was ich noch schulde". Die Rangfolge trennt
+  // sie trotzdem: `aufgabe` steht hinter LinkedIn.
+  const kundenarbeitPosten = useMemo(
+    () => [...kundenaufgabePosten, ...(quellen.aufgabe ?? [])],
+    [kundenaufgabePosten, quellen.aufgabe],
+  )
   const kundeLiegtListe = quellen.kunde_liegt ?? []
   const antwortListe = quellen.antwort ?? []
   const loomListe = quellen.loom ?? []
   const followupListe = quellen.followup ?? []
   const erstnachrichtListe = quellen.erstnachricht ?? []
 
-  const verwaistAnzahl = useMemo(
-    () => linkedinThreads.items.filter((t) => bucketOf(t, jetzt) === 'verwaist').length,
+  // Altlasten sind kein eigener Eimer mehr, sondern die ältesten unter den
+  // fälligen (14.08.2026). Die Zahl bleibt als Hinweis stehen — sie sagt jetzt
+  // „so viel davon liegt schon über 30 Tage", nicht mehr „so viel ist aussortiert".
+  const altlastAnzahl = useMemo(
+    () => linkedinThreads.items.filter((t) => istAltlast(t, jetzt)).length,
     [linkedinThreads.items, jetzt],
   )
   const loomStarredGesamt = useMemo(() => linkedinThreads.items.filter((t) => t.starred).length, [linkedinThreads.items])
@@ -545,12 +555,15 @@ export function SalesDashboard() {
     {
       id: 'kundenarbeit',
       titel: 'Kundenarbeit',
-      kennzahl: zahl(`${kundenaufgabePosten.length} offen`),
-      unterzeile: kundenaufgabePosten[0]
-        ? `zuerst: ${kundenaufgabePosten[0].firma ? `${kundenaufgabePosten[0].firma} — ` : ''}${kundenaufgabePosten[0].name}`
+      // Seit 14.08.2026 stehen hier auch Aufgaben OHNE Projekt (Spur `aufgabe`).
+      // Vorher meldete die Kachel 0 offen, während unter /aufgaben eine seit
+      // 73 Tagen überfällige lag — unsichtbar, weil ihr ein Projekt fehlte.
+      kennzahl: zahl(`${kundenarbeitPosten.length} offen`),
+      unterzeile: kundenarbeitPosten[0]
+        ? `zuerst: ${kundenarbeitPosten[0].firma ? `${kundenarbeitPosten[0].firma} — ` : ''}${kundenarbeitPosten[0].name}`
         : undefined,
-      inhalt: liste(kundenaufgabePosten),
-      fensterAktion: mobilArbeitsmodus('kundenaufgabe', kundenaufgabePosten),
+      inhalt: liste(kundenarbeitPosten),
+      fensterAktion: mobilArbeitsmodus('kundenaufgabe', kundenarbeitPosten),
     },
     {
       id: 'liegt-zu-lange',
@@ -596,7 +609,7 @@ export function SalesDashboard() {
       titel: 'Follow-ups',
       kennzahl: linkedinThreads.tableMissing
         ? 'Migration 0058 ausstehend'
-        : zahl(`${followupListe.length} fällig · ${verwaistAnzahl} Altlasten`),
+        : zahl(`${followupListe.length} fällig · davon ${altlastAnzahl} Altlasten`),
       inhalt: liste(followupListe),
       fensterAktion: mobilArbeitsmodus('followup', followupListe),
     },

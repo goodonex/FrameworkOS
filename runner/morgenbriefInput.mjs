@@ -35,7 +35,10 @@ export const WOCHEN_ZIELE = {
 /** Spiegel der `MONTH_TARGETS`-Totals (goals.ts). */
 export const MONATSZIELE = {
   '2026-07': 30000,
-  '2026-08': 50000,
+  // 14.08.2026 auf Kevins Wort von 50.000 auf 15.000 gesenkt — muss mit
+  // `MONTH_TARGETS` in goals.ts deckungsgleich bleiben, `verify-morgenbrief-input`
+  // prueft genau das.
+  '2026-08': 15000,
 }
 
 /** Spiegel von `LIFE_TARGET.umsatzMonat` (goals.ts) — Default ab September. */

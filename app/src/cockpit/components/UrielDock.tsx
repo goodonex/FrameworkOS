@@ -330,7 +330,7 @@ export function UrielDock() {
         case 'get_linkedin_postfach': {
           const jetzt = new Date()
           const eimer: Record<FollowupBucket, number> = {
-            faellig: 0, du_bist_dran: 0, wartet: 0, pruefen: 0, abschluss: 0, verwaist: 0, ruht: 0,
+            faellig: 0, du_bist_dran: 0, wartet: 0, pruefen: 0, abschluss: 0, ruht: 0,
           }
           for (const t of linkedinThreads.items) eimer[bucketOf(t, jetzt)] += 1
           const zuletzt = linkedinThreads.items

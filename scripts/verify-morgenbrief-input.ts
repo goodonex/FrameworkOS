@@ -165,9 +165,9 @@ function check(label: string, ok: boolean, hinweis = '') {
 // --- 5. Monatsziel-Staffelung -------------------------------------------
 {
   check('Kevin-Override schlägt die Kurve', monatszielFuer('2026-08', 60000) === 60000)
-  check('bekannter Monat nimmt die Kurve', monatszielFuer('2026-08', null) === 50000)
+  check('bekannter Monat nimmt die Kurve', monatszielFuer('2026-08', null) === 15000)
   check('unbekannter Monat fällt auf den Default', monatszielFuer('2027-01', undefined) === MONATSZIEL_STANDARD)
-  check('Override 0/negativ zählt nicht', monatszielFuer('2026-08', 0) === 50000)
+  check('Override 0/negativ zählt nicht', monatszielFuer('2026-08', 0) === 15000)
 }
 
 console.log(`verify-morgenbrief-input: ${pass} ok, ${fail} fehlgeschlagen`)

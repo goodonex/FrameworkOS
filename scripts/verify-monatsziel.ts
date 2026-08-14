@@ -55,16 +55,25 @@ function check(label: string, actual: unknown, expected: unknown) {
   const juli = monthTargetFor('2026-07')
   check('3a Juli bleibt 30k', juli?.total, 30000)
   check('3b Juli-Kurve unveraendert', juli?.curve.map((w) => w.sollKumuliert), [3000, 11000, 20000, 30000])
-  check('3c August bleibt 50k', monthTargetFor('2026-08')?.total, 50000)
+  // 14.08.2026 auf Kevins Wort: 50k war zur Monatsmitte bei 0 EUR Ist nicht mehr
+  // erreichbar. Fuenf Montage statt vier — der 31.08. fehlte vorher.
+  check('3c August steht auf 15k', monthTargetFor('2026-08')?.total, 15000)
+  check(
+    '3d August-Kurve endet am 31.08.',
+    monthTargetFor('2026-08')?.curve.map((w) => w.weekStart),
+    ['2026-08-03', '2026-08-10', '2026-08-17', '2026-08-24', '2026-08-31'],
+  )
 }
 
 // 4. Ein gesetztes Ziel schlaegt auch einen hartverdrahteten Monat — die Kurve
 //    skaliert proportional mit, sonst zeigte „Soll bis heute" das alte Niveau.
 {
-  const aug = monthTargetFor('2026-08', 25000) // Haelfte von 50k
+  const aug = monthTargetFor('2026-08', 25000) // Faktor 25000/15000
   check('4a August-Ziel uebernommen', aug?.total, 25000)
-  check('4b Kurve halbiert sich mit', aug?.curve.map((w) => w.sollKumuliert), [2500, 9150, 16650, 25000])
-  check('4c Soll bis Monatsende trifft das Ziel', currentSoll(aug!.curve, new Date(2026, 8, 5)), 25000)
+  check('4b Kurve skaliert mit', aug?.curve.map((w) => w.sollKumuliert), [1905, 5770, 11043, 17493, 25000])
+  // Die letzte Woche beginnt am 31.08. und endet am 07.09. — `currentSoll` gibt
+  // den vollen Wert erst danach frei, wie bei jeder anderen Monatskurve auch.
+  check('4c Soll nach Kurvenende trifft das Ziel', currentSoll(aug!.curve, new Date(2026, 8, 8)), 25000)
 }
 
 // 5. null/undefined heisst „nichts gesetzt" — nicht „Ziel 0".
@@ -73,7 +82,7 @@ function check(label: string, actual: unknown, expected: unknown) {
   check('5b null -> Default', monthTargetFor('2026-10', null)?.total, DEFAULT_MONTH_TOTAL)
   check('5c null bleibt „geplant"', monthTargetFor('2026-10', null)?.generated, true)
   // 0 darf den Default nicht auf 0 ziehen (kaputter Wert aus der DB).
-  check('5d 0 -> Default statt Division durch 0', monthTargetFor('2026-08', 0)?.total, 50000)
+  check('5d 0 -> Default statt Division durch 0', monthTargetFor('2026-08', 0)?.total, 15000)
 }
 
 // 6. monthKeyOf liefert denselben Schluessel wie die Aufrufer erwarten.

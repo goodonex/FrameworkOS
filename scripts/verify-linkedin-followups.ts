@@ -6,6 +6,7 @@ import {
   bucketOf,
   coverage,
   isDue,
+  istAltlast,
   istWeckbar,
   markDonePatch,
 } from '../app/src/cockpit/lib/linkedinFollowups'
@@ -162,10 +163,13 @@ check(
 check('10k bucket ruht (won)', bucketOf(makeThread({ status: 'won', last_from: 'them' }), NOW), 'ruht')
 check('10l bucket ruht (lost)', bucketOf(makeThread({ status: 'lost', last_from: 'them' }), NOW), 'ruht')
 
-// Altlast: selbst geschrieben, > 30 Tage her, nie nachgefasst → eigener Bucket,
-// damit der Rückstau die tatsächlich heute fälligen Threads nicht ertränkt.
-check('10m verwaist (40 Tage, Stufe 0)', bucketOf(makeThread({ last_from: 'me', last_message_at: dayAgo(40) }), NOW), 'verwaist')
-// Wer schon nachgefasst hat, ist nicht verwaist, sondern im Prozess.
+// Altlast: selbst geschrieben, > 30 Tage her, nie nachgefasst. Seit 14.08.2026
+// KEIN eigener Bucket mehr — Kevins Regel „alles aus LinkedIn wird abgearbeitet".
+// Ein alter Thread ist fällig, nur eben am längsten überfällig.
+check('10m Altlast (40 Tage, Stufe 0) ist faellig', bucketOf(makeThread({ last_from: 'me', last_message_at: dayAgo(40) }), NOW), 'faellig')
+check('10m2 Altlast wird erkannt', istAltlast(makeThread({ last_from: 'me', last_message_at: dayAgo(40) }), NOW), true)
+check('10m3 29 Tage ist keine Altlast', istAltlast(makeThread({ last_from: 'me', last_message_at: dayAgo(29) }), NOW), false)
+// Wer schon nachgefasst hat, ist ebenfalls faellig — nie aussortiert.
 check('10n stufe 1 trotz 40 Tagen faellig', bucketOf(makeThread({ last_from: 'me', last_message_at: dayAgo(40), followup_stage: 1 }), NOW), 'faellig')
 // Knapp unter der Grenze bleibt normale Tagesarbeit.
 check('10o 29 Tage bleibt faellig', bucketOf(makeThread({ last_from: 'me', last_message_at: dayAgo(29) }), NOW), 'faellig')
@@ -195,7 +199,7 @@ check('11b knapp über Schwelle', isDue(makeThread({ followup_stage: 0, last_mes
       last_message_at: dayAgo(40),
       followup_stage: 0,
       status: 'active',
-    }), // > 30 Tage, stufe unveraendert -> verwaist; auch faellig (stufe0, 40>3)
+    }), // > 30 Tage, Stufe unveraendert -> faellig (und zusaetzlich Altlast)
   ]
   const contacts: Contact[] = [
     makeContact({ id: 'c1', pipeline_stage: 'conversation', linkedin: 'https://linkedin.com/in/c1' }),
@@ -204,17 +208,18 @@ check('11b knapp über Schwelle', isDue(makeThread({ followup_stage: 0, last_mes
     makeContact({ id: 'c4', pipeline_stage: 'paused', linkedin: '' }), // kein ICP, zaehlt nicht
   ]
   const cov = coverage(threads, contacts, NOW)
-  // t3 ist 40 Tage alt und nie nachgefasst → zaehlt als Altlast, nicht als heute faellig.
-  check('12a coverage.faellig', cov.faellig, 1)
+  // t1 und t3 sind beide faellig — t3 zusaetzlich eine Altlast (40 Tage).
+  check('12a coverage.faellig', cov.faellig, 2)
   check('12b coverage.du_bist_dran', cov.du_bist_dran, 1)
   check(
     '12f coverage zaehlt alle Threads',
-    cov.faellig + cov.du_bist_dran + cov.wartet + cov.pruefen + cov.abschluss + cov.verwaist + cov.ruht,
+    cov.faellig + cov.du_bist_dran + cov.wartet + cov.pruefen + cov.abschluss + cov.ruht,
     threads.length,
   )
   check('12c coverage.ohne_kontakt', cov.ohne_kontakt, 1)
   check('12d coverage.nie_angeschrieben', cov.nie_angeschrieben, 1)
-  check('12e coverage.verwaist', cov.verwaist, 1)
+  // Altlast zaehlt ZUSAETZLICH, nicht statt `faellig` — sonst waere die Summe oben falsch.
+  check('12e coverage.altlast', cov.altlast, 1)
 }
 
 // 13. markDonePatch — die Ratsche darf antwortende Leads nicht archivieren

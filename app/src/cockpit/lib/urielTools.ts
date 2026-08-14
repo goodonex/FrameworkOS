@@ -175,7 +175,8 @@ export const URIEL_TOOLS: UrielTool[] = [
       '`faellig` = Kevin hat zuletzt geschrieben und das Follow-up ist ueberfaellig ' +
       '(3/7/14 Tage je Stufe); `du_bist_dran` = der Lead hat geantwortet, Kevin ist am Zug; ' +
       '`wartet` = Kevin hat geschrieben, die Frist laeuft noch; ' +
-      '`verwaist` = Kevin hat vor ueber 30 Tagen geschrieben und nie nachgefasst; ' +
+      '(einen Eimer `verwaist` gibt es seit dem 14.08.2026 NICHT mehr — was ueber ' +
+      '30 Tage liegt, steht als aeltester Eintrag in `faellig`, nichts wird aussortiert); ' +
       '`abschluss` = drei Follow-ups durch, Break-up faellig; ' +
       '`pruefen` = Sync unsicher, wer zuletzt schrieb; `ruht` = archiviert, gewonnen, ' +
       'verloren oder schlafen gelegt. ' +

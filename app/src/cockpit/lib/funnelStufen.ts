@@ -177,9 +177,10 @@ export function ohneAntwort(
 
   for (const t of threads) {
     const bucket = bucketOf(t, jetzt)
-    // Nur wo Kevin geschrieben hat und nichts zurückkam. `verwaist` ist
-    // bewusst dabei: eine Altlast wartet am längsten von allen.
-    if (bucket !== 'wartet' && bucket !== 'faellig' && bucket !== 'verwaist') continue
+    // Nur wo Kevin geschrieben hat und nichts zurückkam. Altlasten sind seit
+    // dem 14.08.2026 kein eigener Eimer mehr, sondern stecken in `faellig` —
+    // sie waren hier immer schon mitgemeint.
+    if (bucket !== 'wartet' && bucket !== 'faellig') continue
     if (t.last_from !== 'me') continue
     ;(t.followup_stage === 0 ? erstkontakt : nachgefasst).push(personAusThread(t, jetzt))
   }

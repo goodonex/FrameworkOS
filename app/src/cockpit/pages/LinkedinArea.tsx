@@ -399,7 +399,6 @@ export function LinkedinArea({ eingebettet = false }: { eingebettet?: boolean } 
     const faellig: LinkedinThread[] = []
     const duBistDran: LinkedinThread[] = []
     const abschluss: LinkedinThread[] = []
-    const verwaist: LinkedinThread[] = []
     const pruefen: LinkedinThread[] = []
     const ruht: LinkedinThread[] = []
     for (const t of threadsQuery.items) {
@@ -410,7 +409,6 @@ export function LinkedinArea({ eingebettet = false }: { eingebettet?: boolean } 
       if (b === 'faellig') faellig.push(t)
       else if (b === 'du_bist_dran') duBistDran.push(t)
       else if (b === 'abschluss') abschluss.push(t)
-      else if (b === 'verwaist') verwaist.push(t)
       else if (b === 'pruefen') pruefen.push(t)
     }
     // Ältestes zuerst — was am längsten liegt, ist am dringendsten.
@@ -423,7 +421,6 @@ export function LinkedinArea({ eingebettet = false }: { eingebettet?: boolean } 
       faellig: faellig.sort(byAge),
       duBistDran: duBistDran.sort(bySternDannAlter),
       abschluss: abschluss.sort(byAge),
-      verwaist: verwaist.sort(byAge),
       pruefen,
       // Wer als Nächstes aufwacht, steht oben.
       ruht: ruht.sort((a, b) => (a.snoozed_until ?? '').localeCompare(b.snoozed_until ?? '')),
@@ -586,9 +583,9 @@ export function LinkedinArea({ eingebettet = false }: { eingebettet?: boolean } 
               <div style={{ fontSize: 20, fontWeight: 600, color: 'var(--ck-text-1)' }}>{buckets.faellig.length}</div>
             </div>
             <div className="ck-panel" style={{ padding: '10px 14px', flex: 1, minWidth: 140 }}>
-              <div className="ck-label" style={{ fontSize: 9 }}>Altlasten</div>
-              <div style={{ fontSize: 20, fontWeight: 600, color: buckets.verwaist.length ? 'var(--ck-warn)' : 'var(--ck-text-1)' }}>
-                {buckets.verwaist.length}
+              <div className="ck-label" style={{ fontSize: 9 }}>davon Altlasten</div>
+              <div style={{ fontSize: 20, fontWeight: 600, color: cov.altlast ? 'var(--ck-warn)' : 'var(--ck-text-1)' }}>
+                {cov.altlast}
               </div>
             </div>
             <div className="ck-panel" style={{ padding: '10px 14px', flex: 1, minWidth: 140 }}>
@@ -623,8 +620,8 @@ export function LinkedinArea({ eingebettet = false }: { eingebettet?: boolean } 
           />
 
           <ThreadSection
-            titel="Fällig heute"
-            hinweis="älteste zuerst"
+            titel="Fällig"
+            hinweis="älteste zuerst — Altlasten stehen oben"
             entwurfMoeglich={!isOffline}
             threads={buckets.faellig}
             leerText="Keine fälligen Follow-ups."
@@ -647,17 +644,9 @@ export function LinkedinArea({ eingebettet = false }: { eingebettet?: boolean } 
             onLoomVerschickt={(th) => void threadsQuery.markLoomVerschickt(th.id)}
           />
 
-          <ThreadSection
-            titel="Altlasten"
-            hinweis="über 30 Tage liegen geblieben, nie nachgefasst — wiederbeleben oder schließen"
-            entwurfMoeglich={!isOffline}
-            threads={buckets.verwaist}
-            now={now}
-            onSnoozeTomorrow={snoozeTomorrow}
-            onMarkDone={(th) => void threadsQuery.markDone(th)}
-            onGenerateDraft={(th) => void generateDraft(th)}
-            onLoomVerschickt={(th) => void threadsQuery.markLoomVerschickt(th.id)}
-          />
+          {/* Der eigene Altlasten-Abschnitt ist am 14.08.2026 entfallen: was über
+              30 Tage liegt, ist nicht mehr ein Sonderfall neben der Arbeit,
+              sondern steht als ältester Eintrag oben in „Fällig". */}
 
           <RuhtSection
             threads={buckets.ruht}
@@ -678,7 +667,9 @@ export function LinkedinArea({ eingebettet = false }: { eingebettet?: boolean } 
                 Nie angeschrieben: {cov.nie_angeschrieben}
               </div>
               <div>Ohne Kontakt: {cov.ohne_kontakt}</div>
-              <div style={{ color: cov.verwaist > 0 ? 'var(--ck-warn)' : undefined }}>Verwaist: {cov.verwaist}</div>
+              <div style={{ color: cov.altlast > 0 ? 'var(--ck-warn)' : undefined }}>
+                davon Altlasten (&gt; 30 Tage): {cov.altlast}
+              </div>
             </div>
             <div style={{ fontSize: 10, color: 'var(--ck-text-3)', marginTop: 8 }}>
               Follow-up-Schwellen: {FOLLOWUP_THRESHOLDS_DAYS.join(' / ')} Tage (Stufe 0/1/2)

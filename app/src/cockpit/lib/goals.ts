@@ -53,17 +53,29 @@ export const JULY_2026_CURVE: WeekTarget[] = [
   { kw: 31, weekStart: '2026-07-27', sollKumuliert: 30000 },
 ]
 
-/** August-Ziel 50k, gleiche back-loaded Verteilung (10% / 36.7% / 66.7% / 100%). */
+/**
+ * **August-Ziel 15.000 € — auf Kevins Wort neu gesetzt am 14.08.2026.**
+ *
+ * Die alten 50.000 € waren zur Monatsmitte bei 0 € Ist nicht mehr erreichbar;
+ * 15.000 € sind drei Erstaufträge à 5.000 € und damit eine Zahl, an der man
+ * ablesen kann, ob der Monat läuft.
+ *
+ * Zweiter Fehler, der hier lag: die Kurve endete am **24.08.** — der Montag
+ * 31.08. fehlte, obwohl er noch im August liegt. Das Ziel musste also faktisch
+ * eine Woche früher stehen. Jetzt fünf ISO-Montage, back-loaded mit demselben
+ * Exponenten wie `backLoadedCurve` (1.6), letzter Montag trifft den Total exakt.
+ */
 export const AUGUST_2026_CURVE: WeekTarget[] = [
-  { kw: 32, weekStart: '2026-08-03', sollKumuliert: 5000 },
-  { kw: 33, weekStart: '2026-08-10', sollKumuliert: 18300 },
-  { kw: 34, weekStart: '2026-08-17', sollKumuliert: 33300 },
-  { kw: 35, weekStart: '2026-08-24', sollKumuliert: 50000 },
+  { kw: 32, weekStart: '2026-08-03', sollKumuliert: 1143 },
+  { kw: 33, weekStart: '2026-08-10', sollKumuliert: 3462 },
+  { kw: 34, weekStart: '2026-08-17', sollKumuliert: 6626 },
+  { kw: 35, weekStart: '2026-08-24', sollKumuliert: 10496 },
+  { kw: 36, weekStart: '2026-08-31', sollKumuliert: 15000 },
 ]
 
 export const MONTH_TARGETS: Record<string, { label: string; total: number; curve: WeekTarget[] }> = {
   '2026-07': { label: 'Juli 2026', total: 30000, curve: JULY_2026_CURVE },
-  '2026-08': { label: 'August 2026', total: 50000, curve: AUGUST_2026_CURVE },
+  '2026-08': { label: 'August 2026', total: 15000, curve: AUGUST_2026_CURVE },
 }
 
 // CHANNEL_BENCHMARKS entfernt (ohne Importeur): die Benchmark-Bänder leben

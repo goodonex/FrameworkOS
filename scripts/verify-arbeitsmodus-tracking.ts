@@ -84,12 +84,15 @@ check('1h kunde_liegt -> keins', metrikFeldFuer('kunde_liegt'), null)
   check('2d dauer immer geschrieben', aufrufe[2]?.dauerSekunden, 12)
 }
 
-// 3. antwort: KEIN Feld-Bump, keine Statusaktion — nur die Dauer wird geschrieben (zählt für ALLE Posten).
+// 3. antwort: KEIN Feld-Bump (die Antwort zaehlt nicht als Erstnachricht), aber
+//    seit 14.08.2026 SEHR WOHL eine Statusaktion — der Haken schreibt den Thread
+//    fort, statt ihn nur optisch durchzustreichen.
 {
   const { deps, aufrufe } = makeDeps()
   await erledigePosten({ posten: makePosten({ id: 'thread:t1', spur: 'antwort' }), sekunden: 5 }, deps)
-  check('3a nur die dauer', aufrufe.length, 1)
-  check('3b dauer korrekt', aufrufe[0]?.dauerSekunden, 5)
+  check('3a status + dauer', aufrufe.length, 2)
+  check('3a2 followup auf der thread-id ohne praefix', aufrufe[0]?.followup, 't1')
+  check('3b dauer korrekt', aufrufe[1]?.dauerSekunden, 5)
 }
 
 // 4. kundenaufgabe: Task wird erledigt, aber KEIN Metrik-Bump.

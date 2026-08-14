@@ -13,6 +13,7 @@ export const SPUR_LABEL: Record<Spur, string> = {
   loom: 'Loom',
   erstnachricht: 'Erstnachricht',
   followup: 'Follow-up',
+  aufgabe: 'Eigene Aufgabe',
   anfrage: 'Anfrage',
   inmail: 'InMail',
 }
@@ -25,6 +26,9 @@ export const KACHEL_JE_SPUR: Record<Spur, string> = {
   loom: 'looms',
   erstnachricht: 'erstnachrichten',
   followup: 'followups',
+  // Eigene Aufgaben haben keine eigene Kachel — sie werden in „Kundenarbeit"
+  // mitgeführt, das ist die Kachel für „was schulde ich noch jemandem".
+  aufgabe: 'kundenarbeit',
   anfrage: 'vernetzungsanfragen',
   inmail: 'inmails',
 }

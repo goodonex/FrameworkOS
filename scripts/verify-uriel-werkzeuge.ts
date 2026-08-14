@@ -87,7 +87,7 @@ check(
  * handelt, schickt 61 zweite „erste" Nachrichten.
  */
 const beschreibung = postfach?.description ?? ''
-for (const eimer of ['faellig', 'du_bist_dran', 'wartet', 'verwaist', 'abschluss', 'pruefen', 'ruht']) {
+for (const eimer of ['faellig', 'du_bist_dran', 'wartet', 'abschluss', 'pruefen', 'ruht']) {
   check(
     `die Beschreibung erklärt den Eimer ${eimer}`,
     // Bewusst `includes` statt einer zusammengebauten RegExp: die erste Fassung
