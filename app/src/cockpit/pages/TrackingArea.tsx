@@ -301,7 +301,11 @@ export function TrackingArea() {
             padding: '10px 12px 6px',
           }}
         >
-          <span className="ck-label" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+          {/* `flexWrap` ist hier kein Schoenheits-Detail: bei 390 px hat die Zeile
+              340 px Platz, und sobald der „Heute"-Knopf erscheint (also an jedem
+              Tag ausser heute) braucht sie 355. Ohne Umbruch schob die
+              Datums-Navigation die Karte ueber den rechten Rand. */}
+          <span className="ck-label" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <button
               className="ck-btn ck-counter-btn"
               style={{ padding: '2px 9px' }}
