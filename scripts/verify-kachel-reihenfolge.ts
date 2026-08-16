@@ -60,7 +60,11 @@ for (const stunde of [0, 8, 10, 11, 14, 17, 18, 23]) {
   check(`${stunde} Uhr: drei Ziele`, front.length, 3)
   check(`${stunde} Uhr: alle Ziele existieren`, front.filter((p) => !bekannt.has(p)), [])
 }
-check('morgens stehen die Freigaben vorn', kontextReihenfolge(7)[0], '/freigaben')
+// Seit dem Identity-OS (16.08.) steht morgens die Morgenlese ganz vorn —
+// Visionmap-Regel 1 („Jeden Morgen die ☀️ Morgenlese"). Die Freigaben sind
+// dahinter gerutscht, nicht gefallen.
+check('morgens steht die Morgenlese vorn', kontextReihenfolge(7)[0], '/identitaet')
+check('morgens folgen Freigaben und Sales', kontextReihenfolge(7).slice(1), ['/freigaben', '/sales'])
 check('tagsüber steht Sales vorn', kontextReihenfolge(13)[0], '/sales')
 check('abends steht Tracking vorn', kontextReihenfolge(20)[0], '/tracking')
 

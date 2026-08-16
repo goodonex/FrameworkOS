@@ -2,6 +2,79 @@
 
 **Stand:** 2026-08-16 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
 
+## Runde vom 16.08., abends — **Das Identity-OS steht** (gebaut, nicht live · Migration 0072 offen)
+
+Der Punkt aus §4 ist gebaut: `/identitaet` trägt die ☀️ Morgenlese aus
+`Visionmap 2.0`, den täglichen Check-in, die Serien und das Visionboard.
+**Nicht live** — der Fast-Forward bleibt Kevins Wort. Anzusehen unter
+`/identitaet` (mit Sitzung) oder ohne Login unter
+`/dev/identitaet-vorschau` (`npm run cockpit`).
+
+| Zug | Ergebnis | Datei |
+|---|---|---|
+| Inhalte | Morgenlese, Verhaltens-Identität, Anti-Vision, Warum und die drei Stufen als Konstanten — im Wortlaut aus dem Vault. Der Vault wird nicht mitdeployt; eine Morgenlese, die vom eingeschalteten Mac abhängt, wäre an genau den Morgen kaputt, an denen sie zählt | `cockpit/lib/identityInhalte.ts` (neu) |
+| Board | 14 Bilder in vier Gruppen, Uhren aufsteigend nach Preis — Titel, Notizen und Reihenfolge aus `identity-os-bilder/board-final.html` | `cockpit/lib/visionboard.ts` (neu), `app/public/identity/` |
+| Check-in | Drei Haken (Vertriebsblock · Clean · Sport), Energie-Regler 1–10, drei Dankbarkeitszeilen. Ganze Zeile = Knopf, kein Speichern-Knopf | `components/identitaet/CheckinKarte.tsx` (neu) |
+| Serien | Clean-Tage und Vertriebsblock-Werktage, je mit Rekord und Sieben-Tage-Punktreihe | `cockpit/lib/identityStreak.ts`, `components/identitaet/StreakBand.tsx` (neu) |
+| Daten | Eigene Tabelle statt neuer `daily_metrics`-Spalten — Begründung im Migrations-Kopf. Gleiche Tages-Achse, gleicher Schlüssel `(user_id, brand_id, datum)`, gleiches RLS-Muster wie 0049 | `supabase/migrations/0072_identity_checkins.sql` (neu, **noch nicht gepusht**) |
+| Weg dorthin | Registry-Eintrag `/identitaet`, neues Zeichen „Horizont", Desktop-Rail unter Nachschlagen. **Morgens steht die Kachel auf dem Homescreen vorn** (`kontextReihenfolge`) — ein Tipp zur Seite, der zweite setzt den ersten Haken | `lib/bereiche.ts`, `components/BereichIcon.tsx`, `lib/kachelReihenfolge.ts`, `components/NavRail.tsx` |
+| Drift-Wache | 78 Fälle: Serien-Regeln, Board gegen den Bilder-Ordner in **beiden** Richtungen, Check-in-Felder gegen die Migration, Touch-Ziele, Verdrahtung | `scripts/verify-identitaet.ts` (neu) |
+
+### Die zwei Fachregeln, an denen die Serien hängen
+
+1. **Der laufende Tag bricht nichts.** Eine Serie darf heute ODER gestern
+   enden. Zählte sie nur bis „heute abgehakt", stünde jeden Morgen eine 0 auf
+   dem Bildschirm — die Zahl wäre genau dann am kleinsten, wenn sie tragen
+   soll. Erst wenn gestern fehlt, ist sie gerissen.
+2. **Der Vertriebsblock kennt Werktage, Clean kennt jeden Tag.** Ein Samstag
+   ohne Block ist kein Rückschlag, sondern Samstag — Wochenenden werden
+   übersprungen, nicht gewertet. „Clean" gilt lückenlos an jedem Kalendertag.
+
+**Clean-Streak startet bei 0** (Baseline 16.08.: täglich ab mittags 3–7
+Joints). Die Anzeige sagt bis zum ersten Haken „Noch keine Serie — der erste
+Haken startet sie."
+
+### Zwei Befunde aus dieser Runde
+
+1. **Die Bilder waren so nicht ausspielbar.** Die 14 Originale wiegen zusammen
+   **51 MB** (3–5 MB je Auto/Yacht) — ein Vielfaches des ganzen App-Bundles.
+   Verkleinert auf 1.100 px lange Kante bei Qualität 72 sind es **2,1 MB**, und
+   sie laden `lazy`. Die Yacht-Master ist freigestellt und bleibt PNG, sonst
+   wird ihr transparenter Grund schwarz.
+2. **Der Energie-Regler war das einzige Touch-Ziel unter 44 px** (34 px, im
+   laufenden Cockpit gemessen). Behoben und als Testfall festgenagelt.
+
+**Der Bilder-Ordner war beim Bauen in Bewegung:** um 20:01 lagen dort 19
+Dateien, um 20:08 waren es 14 (je Auto nur noch eine Variante, neu das GLE
+Coupé). Gebaut ist gegen den Stand von 20:08. `board-final.html` nennt sich
+selbst „Final-Entwurf" und führt **offene Plätze**: Patek Nautilus 5712G,
+Blackout-Nautilus 5726 und die Statuen-/Deko-Bilder aus Notion. Nachtragen ist
+eine Zeile in `visionboard.ts` plus die verkleinerte Datei — die Drift-Wache
+zeigt sofort an, wenn eins von beidem fehlt.
+
+**Verifikation:** `tsc -b` + `build` grün · **39 verify-Skripte grün** (38
+vorher, neu `verify-identitaet` mit 78 Fällen; `verify-kachel-reihenfolge` von
+31 auf 33 gewachsen, weil morgens jetzt die Morgenlese vorn steht) · im
+laufenden Cockpit bei **390×664** abgenommen: kein Querscrollen (390 == 390),
+alle 14 Bilder geladen (7 davon erst beim Scrollen), Konsole beim Laden sauber,
+alle Touch-Ziele ≥ 44 px · Desktop 1280 mit zweispaltigem Board geprüft.
+
+**Ehrlich dazu:** Der Check-in ist **noch nie gegen die echte Datenbank
+gelaufen** — Migration 0072 ist geschrieben und der Trockenlauf will genau
+diese eine, der `db push` selbst wurde in dieser Session blockiert. Bis er
+läuft, zeigt die Seite einen Hinweis statt still zu schlucken: lesen geht,
+Haken bleiben nicht erhalten. Die Abnahme lief deshalb über die Dev-Vorschau
+mit erfundenen Serien-Zahlen.
+
+**Offen aus dieser Runde:**
+
+- **Migration 0072 einspielen** — `supabase db push` (Trockenlauf sagt: genau
+  diese eine). Danach den Check-in einmal echt durchklicken.
+- **Board vervollständigen**, sobald die drei offenen Plätze entschieden sind.
+- **Kein Weg vom Morgen-Push zur Morgenlese.** `/morgen` (O3) führt heute nur
+  in den Arbeitsmodus. Ob der Push morgens zuerst die Morgenlese anbieten soll,
+  ist eine Entscheidung, keine Aufräumarbeit.
+
 ## Runde vom 16.08. — **Marken-Kompass geplant** (Planung, kein App-Code)
 
 Kevins Auftrag: Der Discovery-/Klarheitsprozess (KLAR-Kennenlernen) soll ein
@@ -1595,6 +1668,7 @@ Nicht verworfen. Je mit der Bedingung, unter der es wieder aufwacht.
 | **Uriel-MCP-Server** (IDEAS A5), **Event-Trigger** (A3), **Runner-Observability** (A4), **Skills-Registry** (A7) | Strukturell richtig, aber kein benannter Alltagsschmerz. | Ein konkreter Fall auftaucht — nicht vorher bauen (Foundation-Lektion) |
 | **Booking-Anzahlung**, **Google-Calendar-Sync über iCal hinaus**, **wiederkehrende Tasks** | Kein Schmerz benannt; der iCal-Spiegel deckt den Kalender heute ab | No-Shows wirklich wehtun bzw. der iCal-Weg nicht mehr reicht |
 | **MCP Apps, Agent-Payments, A2A** (IDEAS §3.7) | Beobachten, nichts bauen | — |
+| ~~**Identity-OS-Modul im Cockpit**~~ (Visionmap-2.0-Morgenlese als schöne Ansicht mit Bildern + Daily-Check-in: Vertriebsblock ✓, Clean-Streak, Sport, Energielevel 1–10, Dankbarkeitstagebuch; Streak-/Wochenblick, andockend an `daily_metrics`; Quelle der Inhalte: Vault `00 Kontext/Visionmap 2.0.md`) | Von Kevin gewünscht (16.08.), aber laut Blocker-Diagnose exakt die Sorte verführerisches Bau-Projekt, die den Vertrieb verdrängt. Deshalb: Claude baut, Kevin reviewt nur — und erst nach Belohnungs-Logik (Grundsatz 3: erst zahlen, dann Belohnung). | ✅ **gebaut am 16.08. abends** — `/identitaet`, Runde ganz oben. Nicht live, Migration 0072 noch nicht eingespielt. Statt neuer `daily_metrics`-Spalten eine eigene Tabelle mit derselben Tages-Achse (Begründung im Migrations-Kopf) |
 
 ---
 
