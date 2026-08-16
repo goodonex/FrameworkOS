@@ -286,6 +286,12 @@ wahr('die Energie-Skala ist in der DB begrenzt', /energie\s*>=\s*1\s*and\s*energ
 // Der Hook schreibt genau die Felder, die es gibt — kein Tippfehler-Feld.
 const hook = lies('app/src/cockpit/lib/useIdentityCheckin.ts')
 wahr('der Hook schreibt auf identity_checkins', /from\('identity_checkins'\)/.test(hook))
+// „Heute" muss aus derselben LOKALEN Uhr kommen wie daily_metrics
+// (metricsDates.toIsoDate). isoTag rechnet UTC: zwischen 0 und 2 Uhr deutscher
+// Zeit wäre der Abend-Check-in sonst auf dem Vortag gelandet — gefunden beim
+// Review am 17.08. um kurz nach Mitternacht, als die Vorschau „16. August" zeigte.
+wahr('der Hook nimmt das Datum aus toIsoDate (lokal)', /toIsoDate\(new Date\(\)\)/.test(hook))
+wahr('der Hook nimmt das Datum NICHT aus isoTag (UTC)', !/isoTag\(new Date\(\)\)/.test(hook))
 wahr(
   'der Hook nutzt denselben Konflikt-Schlüssel',
   /onConflict:\s*'user_id,brand_id,datum'/.test(hook),
@@ -314,6 +320,24 @@ wahr('die Route liegt in der Cockpit-Shell', app.indexOf('path="/identitaet"') <
 // Die Seite muss pointer-events setzen (#app-ui-overlay-Falle vom 08.07.).
 const css = lies('app/src/styles/cockpit.css')
 wahr('.ck-ident setzt pointer-events', /\.ck-ident\s*\{[^}]*pointer-events:\s*auto/.test(css))
+
+// Das Randlos-Margin muss zum .ck-main-Innenabstand passen: 12px mobil,
+// 18px Desktop (cockpit.css:660 vs. :1192). Mit nur -12px stünde am Desktop
+// ein 6px-Streifen Seitenverlauf um Hero und Banner — Review-Fund vom 17.08.
+wahr('mobil: Randlos-Margin -12px', /\.ck-ident\s*\{[^}]*margin:\s*-12px -12px 0/.test(css))
+wahr(
+  'Desktop: Randlos-Margin -18px im 901px-Block',
+  /@media \(min-width: 901px\)[\s\S]{0,400}\.ck-ident\s*\{\s*margin:\s*-18px -18px 0/.test(css),
+)
+
+// Der Ein-Klick-Weg morgens: Homescreen-Zeile (vor 11 Uhr) und der Knopf auf
+// /morgen (Ziel des Push) führen beide nach /identitaet.
+const home = lies('app/src/cockpit/pages/UrielHome.tsx')
+wahr('Homescreen: Morgenlese-Zeile navigiert nach /identitaet', /ck-morgenlese-zeile/.test(home) && /navigate\('\/identitaet'\)/.test(home))
+wahr('Homescreen: die Zeile ist zeitgebunden (vor 11 Uhr)', /getHours\(\) < 11/.test(home))
+const morgen = lies('app/src/cockpit/pages/MorgenArea.tsx')
+wahr('/morgen hat den Morgenlese-Knopf', /navigate\('\/identitaet'\)/.test(morgen))
+wahr('die Morgenlese-Zeile ist gestylt', /\.ck-morgenlese-zeile\s*\{[^}]*min-height:\s*(4[4-9]|5\d)px/.test(css))
 
 // Touch-Ziele: die Check-in-Zeile und der Aufklapper müssen ≥ 44px hoch sein.
 const zeileHoehe = css.match(/\.ck-ident-zeile\s*\{[^}]*min-height:\s*(\d+)px/)

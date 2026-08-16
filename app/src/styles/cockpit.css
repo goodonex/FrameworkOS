@@ -1994,9 +1994,39 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
 .ck-ident-schluss { text-align: center; padding-top: 44px; gap: 12px; }
 .ck-ident-quelle { margin: 18px 0 0; font-size: 11px; color: var(--ck-text-3); }
 
+/* --- Morgenlese-Zeile auf dem Homescreen --------------------------------- */
+/* Der Ein-Klick-Weg morgens (UrielHome, vor 11 Uhr). Volle Breite, 52px hoch,
+   Zeichen im Akzent — sichtbar als DER erste Handgriff des Tages, ohne wie
+   eine zweite Hero-Fläche zu schreien. */
+
+.ck-morgenlese-zeile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  width: 100%;
+  padding: 8px 14px;
+  border-radius: var(--ck-radius-innen);
+  border: 1px solid color-mix(in srgb, var(--ck-accent) 30%, transparent);
+  background: var(--ck-accent-dim);
+  color: var(--ck-text-1);
+  font-family: var(--ck-font);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 120ms ease;
+}
+.ck-morgenlese-zeile:hover { border-color: var(--ck-accent); }
+.ck-morgenlese-zeichen { display: flex; color: var(--ck-accent); flex: 0 0 auto; }
+.ck-morgenlese-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ck-morgenlese-titel { font-size: 13.5px; font-weight: 600; }
+.ck-morgenlese-unter { font-size: 11.5px; color: var(--ck-text-2); }
+
 /* --- Desktop ------------------------------------------------------------- */
 /* Eine Mobil-Grenze, und zwar 900 (MOBILE_MAX_WIDTH, verify-breakpoint.ts). */
 @media (min-width: 901px) {
+  /* Am Desktop hat .ck-main 18px Innenabstand (mobil 12) — das Randlos-Margin
+     muss mitwachsen, sonst steht ein 6px-Streifen Seitenverlauf um die Fläche. */
+  .ck-ident { margin: -18px -18px 0; }
   .ck-ident-hero { min-height: 56vh; }
   .ck-ident-hero-inhalt { padding: 0 24px 34px; }
   .ck-ident-leitsatz { font-size: 40px; max-width: 22ch; }

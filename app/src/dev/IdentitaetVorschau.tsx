@@ -1,22 +1,30 @@
 import { useState } from 'react'
+import { NavRail } from '../cockpit/components/NavRail'
 import { IdentitaetAnsicht } from '../cockpit/components/identitaet/IdentitaetAnsicht'
-import { isoTag, tagDavor, istWochenende } from '../cockpit/lib/identityStreak'
+import { ActiveBrandProvider } from '../cockpit/lib/activeBrand'
+import { tagDavor, istWochenende } from '../cockpit/lib/identityStreak'
 import type { StreakTag } from '../cockpit/lib/identityStreak'
+import { toIsoDate } from '../cockpit/lib/metricsDates'
 import type { CheckinRow } from '../cockpit/lib/useIdentityCheckin'
 import '../styles/cockpit.css'
 
 /**
  * Dev-Vorschau (nur `import.meta.env.DEV`, ohne Login): zeigt `/identitaet`
- * gegen Fixture-Daten. Grund wie bei `ZielVorschau` — die echte Route liegt
- * hinter dem Supabase-Login und ist so nicht abnehmbar.
+ * gegen Fixture-Daten — **in der Geometrie der echten Shell**. Der Rahmen ist
+ * strukturgleich mit `CockpitShell.tsx` (StatusBar-Zeile, echte `NavRail`,
+ * `main.ck-main` mit denselben Inline-Styles): damit prüft die Vorschau auch
+ * das Randlos-Margin gegen den echten `.ck-main`-Innenabstand (12px mobil,
+ * 18px Desktop) und ob das Dock den letzten Inhalt verdeckt — genau die zwei
+ * Dinge, die eine freistehende Vorschau nie zeigen würde.
  *
- * **Die Zahlen hier sind erfunden**, damit Serien, Haken und Regler überhaupt
- * einen Zustand zeigen. Kevins echte Clean-Serie startet am 16.08.2026 bei
- * null. Kein Produktions-Code-Pfad: die Haken schreiben in lokalen State,
- * nicht nach Supabase.
+ * **Die Zahlen sind erfunden**, damit Serien, Haken und Regler einen Zustand
+ * zeigen. Kevins echte Clean-Serie startet am 16.08.2026 bei null. Kein
+ * Produktions-Code-Pfad: die Haken schreiben in lokalen State, nicht nach
+ * Supabase.
  */
 
-const HEUTE = isoTag(new Date())
+// Dieselbe lokale Uhr wie der echte Hook — nicht isoTag (UTC).
+const HEUTE = toIsoDate(new Date())
 
 /** Die letzten 14 Tage: Clean seit drei Tagen, Vertriebsblock an vier Werktagen. */
 const FIXTURES: StreakTag[] = (() => {
@@ -53,29 +61,30 @@ export function IdentitaetVorschau() {
   ]
 
   return (
-    <div
-      className="ck-root"
-      style={{
-        // Wie in der echten Shell: fest über der ganzen Fläche, eigenes
-        // Scrolling. Ohne das scheint der App-Hintergrund am Rand durch und
-        // die Abnahme-Bilder zeigen eine Farbe, die die Seite gar nicht hat.
-        position: 'fixed',
-        inset: 0,
-        overflowY: 'auto',
-        background: 'var(--ck-bg-verlauf)',
-        padding: 12,
-      }}
-    >
-      <IdentitaetAnsicht
-        heute={heute}
-        streakZeilen={streakZeilen}
-        heuteIso={HEUTE}
-        laedt={false}
-        tabelleFehlt={false}
-        fehler={null}
-        umschalten={(feld) => setHeute((z) => ({ ...z, [feld]: !z[feld] }))}
-        setzen={(patch) => setHeute((z) => ({ ...z, ...patch }))}
-      />
-    </div>
+    <ActiveBrandProvider>
+      <div
+        className="ck-root"
+        style={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', pointerEvents: 'auto', zIndex: 2 }}
+      >
+        <div className="ck-statusbar" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span className="ck-wordmark">URIEL</span>
+        </div>
+        <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+          <NavRail />
+          <main className="ck-main" style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
+            <IdentitaetAnsicht
+              heute={heute}
+              streakZeilen={streakZeilen}
+              heuteIso={HEUTE}
+              laedt={false}
+              tabelleFehlt={false}
+              fehler={null}
+              umschalten={(feld) => setHeute((z) => ({ ...z, [feld]: !z[feld] }))}
+              setzen={(patch) => setHeute((z) => ({ ...z, ...patch }))}
+            />
+          </main>
+        </div>
+      </div>
+    </ActiveBrandProvider>
   )
 }

@@ -45,6 +45,58 @@ Querscrollen (390 == 390), **19 Bilder** geladen und keins kaputt, alle 15
 Touch-Ziele ≥ 44 px, Konsole in einem frischen Tab ohne einen einzigen Fehler
 · Desktop 1280 mit dreispaltigem Board geprüft.
 
+### Zweiter Rundflug (17.08., nach Mitternacht) — „läuft das zuverlässig, auch mobil? Ein Klick morgens?"
+
+Kevins drei Fragen, und was der Rundflug gefunden hat:
+
+**Drei echte Funde, alle behoben:**
+
+1. **Die Tages-Uhr lief auf UTC.** `isoTag(new Date())` rechnet in UTC,
+   `daily_metrics` (`toIsoDate`) lokal — zwischen Mitternacht und 2 Uhr
+   deutscher Zeit wäre der Abend-Check-in (Dankbarkeit!) auf dem **Vortag**
+   gelandet, neben einer daily_metrics-Zeile, die längst auf dem neuen Tag
+   steht. Aufgefallen, weil die Vorschau um kurz nach Mitternacht „Sonntag,
+   16. August" zeigte. Der Hook nimmt jetzt `toIsoDate` — dieselbe lokale Uhr
+   wie das ganze Tracking. Die UTC-Arithmetik in `identityStreak` bleibt: sie
+   rechnet bewusst auf UTC-Mittag und ist DST-sicher.
+2. **Das Randlos-Margin war am Desktop zu kurz.** `.ck-main` hat 18px
+   Innenabstand am Desktop (mobil 12) — mit `-12px` stand ein 6px-Streifen
+   Seitenverlauf um Hero und Banner. Jetzt `-18px` im 901er-Block.
+3. **Die Dev-Vorschau prüfte die falsche Umgebung.** Sie rendert jetzt in der
+   **echten Shell-Geometrie** (StatusBar, echte NavRail/Dock, echtes
+   `.ck-main` — strukturgleich mit `CockpitShell.tsx`). Damit ist belegt, was
+   vorher nur behauptet war: kein Querscrollen bei 390×664, alle 19 Bilder,
+   und nach vollem Scrollen steht der letzte Inhalt (480) klar über der
+   Dock-Oberkante (596).
+
+**Der Ein-Klick-Weg morgens (Kevins dritte Frage) — jetzt dreifach:**
+
+- **Homescreen-Zeile** (neu): vor 11 Uhr steht direkt unter dem Hero eine
+  Zeile „Morgenlese · 2 Minuten — dann der Block" → ein Tipp öffnet
+  `/identitaet`. Rein zeitgebunden, kein neuer Ladelauf (Gesetz 4), und sie
+  hängt **nicht** an der Kachel-Reihenfolge — sie bleibt also auch, wenn die
+  eigene Kachel-Anordnung die Tageszeit-Sortierung überstimmt.
+- **`/morgen`** (Ziel des Morgen-Push) trägt jetzt den Knopf „Morgenlese ·
+  2 Minuten" **über** dem Loslegen-Knopf — Reihenfolge der Visionmap: erst
+  lesen, dann der Block. Damit ist der Backlog-Punkt „kein Weg vom
+  Morgen-Push zur Morgenlese" geschlossen.
+- **Kachel** morgens vorn (`kontextReihenfolge`), solange keine eigene
+  Anordnung gespeichert ist; sonst hängt sie hinten an, fällt aber nie raus
+  (`ordneNach` belegt das im Test).
+
+**Verifikation:** `tsc -b` + `build` grün · 39 verify-Skripte grün,
+`verify-identitaet` von 91 auf **99 Fälle** (neu: lokale Uhr statt UTC,
+beide Randlos-Margins, die drei Morgen-Wege) · in der Shell-Vorschau bei
+390×664: Dock liegt über der Seite ohne etwas zu verdecken, Morgenlese-Zeile
+als Stil-Probe 57px hoch abgenommen · Desktop 1280: Hero bündig mit der
+`.ck-main`-Kante (die 8px rechts sind die Scrollbar).
+
+**Was „zuverlässig" noch NICHT einschließt:** Migration 0072 ist weiterhin
+nicht eingespielt — bis dahin speichert der Check-in nicht (die Seite sagt
+das sichtbar). Und die erste eingeloggte Session auf dem echten iPhone bleibt
+die eigentliche Abnahme — die Shell-Vorschau ist die beste Annäherung ohne
+Session, nicht das Gerät.
+
 ### Nachtrag aus Kevins Review
 
 Vier Punkte, alle erledigt: **Preise** korrigiert (Yacht-Master 10.500 €,

@@ -5,6 +5,7 @@ import { useContentPieces } from '../../hooks/useContentPieces'
 import { entwuerfeOffen, usePosten } from '../../hooks/usePosten'
 import { useBookings } from '../../hooks/useSalesPro'
 import { useCommandPalette } from '../../lib/commandPaletteContext'
+import { BereichIcon } from '../components/BereichIcon'
 import { AgentenKacheln } from '../components/home/AgentenKacheln'
 import { AppGrid } from '../components/home/AppGrid'
 import { BefundZeile } from '../components/home/BefundZeile'
@@ -210,6 +211,23 @@ export function UrielHome() {
         onAsk={() => urielOeffnen(true)}
         onStufe={(feld) => navigate(`/tracking/zaehlen/${feld}`)}
       />
+
+      {/* Der Ein-Klick-Weg in die Morgenlese (Visionmap-Regel 1: erst lesen,
+          dann der Block). Rein zeitbasiert wie kontextReihenfolge — bewusst
+          OHNE den Check-in-Hook: der Homescreen lädt nichts Neues (Gesetz 4),
+          und die Zeile verschwindet mittags von allein. Sie hängt nicht an
+          der Kachel-Reihenfolge, überlebt also auch Kevins eigene Anordnung. */}
+      {jetzt.getHours() < 11 ? (
+        <button type="button" className="ck-morgenlese-zeile" onClick={() => navigate('/identitaet')}>
+          <span className="ck-morgenlese-zeichen" aria-hidden>
+            <BereichIcon name="horizont" size={18} />
+          </span>
+          <span className="ck-morgenlese-text">
+            <span className="ck-morgenlese-titel">Morgenlese</span>
+            <span className="ck-morgenlese-unter">2 Minuten — dann der Block</span>
+          </span>
+        </button>
+      ) : null}
 
       <BefundZeile meldung={befund.meldung} onOeffnen={() => navigate('/agenten')} />
 

@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { supabase } from '../../lib/supabase'
 import { useActiveBrand } from './activeBrand'
-import { isoTag, type StreakTag } from './identityStreak'
+import type { StreakTag } from './identityStreak'
+import { toIsoDate } from './metricsDates'
 
 /**
  * Der tägliche Identitäts-Check-in (Migration 0072).
@@ -79,11 +80,19 @@ export function useIdentityCheckin(): UseIdentityCheckinResult {
   const [tabelleFehlt, setTabelleFehlt] = useState(false)
   const [fehler, setFehler] = useState<string | null>(null)
 
-  const heuteIso = isoTag(new Date())
+  /**
+   * „Heute" kommt aus `toIsoDate` — derselben Uhr wie `daily_metrics`, und
+   * die rechnet LOKAL. `isoTag` aus identityStreak rechnet dagegen in UTC
+   * (bewusst, für die DST-sichere Serien-Arithmetik): zwischen Mitternacht
+   * und 2 Uhr deutscher Zeit wäre „heute" darüber noch der Vortag, und der
+   * Abend-Check-in (Dankbarkeit!) wäre auf dem falschen Tag gelandet —
+   * neben einer daily_metrics-Zeile, die längst auf dem neuen steht.
+   */
+  const heuteIso = toIsoDate(new Date())
   const fensterStart = useMemo(() => {
     const d = new Date()
     d.setDate(d.getDate() - CHECKIN_FENSTER_TAGE)
-    return isoTag(d)
+    return toIsoDate(d)
   }, [heuteIso])
 
   const zeilenRef = useRef<CheckinRow[]>([])

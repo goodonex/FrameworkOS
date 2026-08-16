@@ -149,6 +149,19 @@ export function MorgenArea() {
         Vernetzungsanfragen {anfragen}/{ANFRAGEN_ZIEL} — am Laptop.
       </p>
 
+      {/* Die Morgenlese steht VOR dem Loslegen — dieselbe Reihenfolge wie in
+          der Visionmap (Regel 1: erst lesen, dann der Block). Damit führt der
+          Push-Tipp in zwei Tipps zur Morgenlese, ohne den Arbeitsweg darunter
+          zu verstellen. */}
+      <button
+        type="button"
+        className="ck-btn"
+        onClick={() => navigate('/identitaet')}
+        style={{ minHeight: 48, fontSize: 13, justifyContent: 'center' }}
+      >
+        Morgenlese · 2 Minuten
+      </button>
+
       {/* Ein Knopf, ein Ziel: ≤ 2 Interaktionen bis zur ersten erledigten
           Einheit (Push-Tipp → Loslegen → erster Posten steht). */}
       <button
@@ -156,7 +169,7 @@ export function MorgenArea() {
         className="ck-btn ck-btn--primary"
         onClick={() => navigate('/sales?kachel=jetzt-dran&modus=arbeit')}
         disabled={geordnet.length === 0}
-        style={{ minHeight: 54, fontSize: 15, marginTop: 4 }}
+        style={{ minHeight: 54, fontSize: 15 }}
       >
         {geordnet.length === 0 ? 'Nichts offen' : 'Loslegen'}
       </button>
