@@ -136,6 +136,27 @@ export function IdentitaetAnsicht({
       <section className="ck-ident-abschnitt">
         {/* Der Visionstext steht zwischen Check-in und Board: die Brücke von
             „was tue ich heute" zu „wer wird davon". */}
+        {/* Erst das Verhalten, dann der Visionstext — dieselbe Folge wie in
+            der Vorlage. Sie hat auch den praktischen Grund: stünde der
+            Visionstext direkt unter dem Kapitel-Banner, kämen zwei Statuen
+            unmittelbar hintereinander. */}
+        <div className="ck-ident-zwei">
+          <Spalte titel="Die Soll-Version von mir" art="akzent">
+            <ul className="ck-ident-liste">
+              {VERHALTEN.map((v) => (
+                <li key={v.auftakt}>
+                  <b>{v.auftakt}:</b> {v.text}
+                </li>
+              ))}
+            </ul>
+          </Spalte>
+          <Spalte titel="Nie mehr" art="abgrenzung">
+            <Liste punkte={NICHT_MEHR} />
+            <h4 className="ck-ident-spalte-titel ck-ident-spalte-titel--zweit">Jeden Tag</h4>
+            <Liste punkte={JEDEN_TAG} />
+          </Spalte>
+        </div>
+
         <div className="ck-ident-bildtext">
           <img src={boardPfad(PORTRAET_BILD)} alt="" loading="lazy" decoding="async" />
           <div>
@@ -157,23 +178,6 @@ export function IdentitaetAnsicht({
               ))}
             </Aufklapper>
           </div>
-        </div>
-
-        <div className="ck-ident-zwei">
-          <Spalte titel="Die Soll-Version von mir" art="akzent">
-            <ul className="ck-ident-liste">
-              {VERHALTEN.map((v) => (
-                <li key={v.auftakt}>
-                  <b>{v.auftakt}:</b> {v.text}
-                </li>
-              ))}
-            </ul>
-          </Spalte>
-          <Spalte titel="Nie mehr" art="abgrenzung">
-            <Liste punkte={NICHT_MEHR} />
-            <h4 className="ck-ident-spalte-titel ck-ident-spalte-titel--zweit">Jeden Tag</h4>
-            <Liste punkte={JEDEN_TAG} />
-          </Spalte>
         </div>
       </section>
 

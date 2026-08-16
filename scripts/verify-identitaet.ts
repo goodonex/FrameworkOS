@@ -249,7 +249,7 @@ check(
   'die Uhren stehen in Preisreihenfolge',
   uhren?.bilder.map((b) => b.datei),
   [
-    'uhr-yachtmaster-126622.png',
+    'uhr-yachtmaster-126622.jpg',
     'uhr-rolex-daydate-228239.jpg',
     'uhr-ap-royaloak-26735SG.jpg',
     'uhr-adg-honey-pearl.jpg',

@@ -1892,6 +1892,13 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
 .ck-ident-board-grid--voll .ck-ident-bild { aspect-ratio: 1 / 1; }
 .ck-ident-board-grid--voll .ck-ident-bild img { object-fit: contain; padding: 10px; }
 
+/* Yacht-Master und RM 88 kamen als Pressefotos auf weißem Studio-Grund und
+   standen damit als helle Kästen in der dunklen Seite (Kevins Beanstandung
+   vom 16.08.). Beide sind jetzt auf --ck-bg freigestellt — gerechnet im
+   Browser-Canvas per Flood-Fill von den Bildrändern, weil auf diesem Mac
+   weder ImageMagick noch PIL vorhanden ist. Deshalb braucht hier keine
+   Kachel mehr eine Sonderbehandlung. */
+
 .ck-ident-karte-text {
   padding: 8px 2px 0;
   font-size: 12px;

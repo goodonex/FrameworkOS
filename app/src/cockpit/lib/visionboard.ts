@@ -49,8 +49,8 @@ export const VISIONBOARD: BoardGruppe[] = [
     hinweis: 'aufsteigend nach Preis',
     vollstaendig: true,
     bilder: [
-      { datei: 'uhr-yachtmaster-126622.png', titel: 'Yacht-Master 40', notiz: 'der Daily · 12.700 €' },
-      { datei: 'uhr-rolex-daydate-228239.jpg', titel: 'Day-Date 40 Meteorit', notiz: 'Herzens-Uhr · 61.550 €' },
+      { datei: 'uhr-yachtmaster-126622.jpg', titel: 'Yacht-Master 40', notiz: 'der Daily · 10.500 €' },
+      { datei: 'uhr-rolex-daydate-228239.jpg', titel: 'Day-Date 40 Meteorit', notiz: 'Herzens-Uhr · 55.000 €' },
       {
         datei: 'uhr-ap-royaloak-26735SG.jpg',
         titel: 'Royal Oak Openworked Sandgold',
