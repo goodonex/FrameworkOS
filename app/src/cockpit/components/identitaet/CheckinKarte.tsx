@@ -40,7 +40,7 @@ export function CheckinKarte({ heute, laedt, umschalten, setzen }: Props) {
   const energieGesetzt = heute.energie !== null && heute.energie !== undefined
 
   return (
-    <section className="ck-panel ck-ident-checkin" id="checkin" aria-labelledby="checkin-titel">
+    <section className="ck-ident-checkin" id="checkin" aria-labelledby="checkin-titel">
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
         <span className="ck-label" id="checkin-titel">
           Check-in heute

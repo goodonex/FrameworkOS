@@ -1462,100 +1462,264 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
 
 /* ============================================================
    IDENTITY-OS — /identitaet (16.08.2026)
-   Morgenlese, Check-in, Serien, Visionboard.
+   Morgenlese, Check-in, Serien, Visionboard, Nachschlagewerk.
 
-   Die einzige Fläche außer dem Home-Hero, auf der Fotos stehen.
-   DESIGN-TOKENS verbietet Bilder auf *Arbeitsflächen* (Sales, Listen,
-   Tracking, Ads) — das hier ist eine Lesefläche. Die Scrim-Regel bleibt
-   trotzdem eingehalten: kein Text liegt über einem Bild, alle
-   Beschriftungen stehen darunter auf der Kartenfläche.
+   Aufbau und Bildsprache folgen Kevins Design-Vorlage
+   (`visionmap-2.0.html`, Fußzeile: „Diese Seite ist die Design-Vorlage
+   für das Identity OS in Uriel"): Bild-Hero, Kapitel-Banner, zwei
+   Spalten mit farbiger Oberkante, Stufen-Kacheln, nummerierte Regeln.
+   NICHT übernommen ist ihre Palette — Gold auf Schwarz und
+   Monospace-Versalien gehören der Vorlage; hier tragen --ck-accent und
+   die Serifen-Display-Schrift dieselbe Rolle. Alle Farben kommen aus
+   den eingefrorenen Tokens (DESIGN-TOKENS.md).
+
+   Dies ist neben dem Cockpit-Home die einzige Fläche mit Fotos. Die
+   Regel verbietet Bilder auf *Arbeitsflächen*; das hier ist eine
+   Lesefläche. Die Scrim-Pflicht gilt: über jedem Bild mit Text liegt
+   ein Verlauf, der unten in die Grundfläche ausläuft.
    ============================================================ */
 
 .ck-ident {
   pointer-events: auto; /* #app-ui-overlay setzt global none (Falle vom 08.07.) */
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  /* Unten Luft für Dock und Uriel-Blase — bei 390×664 geprüft. */
-  padding: 4px 0 96px;
-  max-width: 760px;
+  /* Randlos bis an die Kanten, obwohl .ck-main 12px Innenabstand hat —
+     Hero und Kapitel-Banner sollen die volle Breite tragen. */
+  margin: -12px -12px 0;
+  padding-bottom: 96px;
+  /* Ruhiger, durchgehender Grund statt des Seitenverlaufs: die Scrims von
+     Hero und Bannern laufen in genau diesen Ton aus. Gegen den helleren
+     Verlauf stünde am Scrim-Ende eine sichtbare Kante. */
+  background: var(--ck-bg);
 }
 
-.ck-ident-kopf { display: flex; flex-direction: column; gap: 3px; }
-.ck-ident-datum { margin: 0; font-size: 13px; color: var(--ck-text-2); }
+.ck-ident-abschnitt {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 26px 16px 8px;
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+/* Lesespalte für Fließtext — 720px ist die Grenze, ab der Zeilen zu lang
+   werden, um sie ohne Sprung zurückzufinden. */
+.ck-ident-schmal { max-width: 720px; }
 
-/* --- Die Morgenlese ------------------------------------------------------ */
+/* --- Hero ---------------------------------------------------------------- */
 
-.ck-ident-lese { display: flex; flex-direction: column; gap: 14px; }
+.ck-ident-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 62vh;
+  display: flex;
+  align-items: flex-end;
+}
+/* Gestapelt wird mit POSITIVEN z-index (0/1/2), nicht mit negativen: ein
+   `z-index: -2` rutscht hinter den Hintergrund des nächsten Stacking-Context
+   — hier `.ck-root`, das als `position: fixed` einen bildet — und das Bild
+   war unsichtbar, obwohl es geladen war. Im laufenden Cockpit gemessen. */
+.ck-ident-hero img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
+/* Läuft unten in --ck-bg aus, damit kein sichtbarer Schnitt entsteht. */
+.ck-ident-hero-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(
+    180deg,
+    rgba(12, 19, 14, 0.3) 0%,
+    rgba(12, 19, 14, 0.5) 52%,
+    rgba(12, 19, 14, 0.94) 88%,
+    var(--ck-bg) 100%
+  );
+}
+.ck-ident-hero-inhalt {
+  position: relative;
+  z-index: 2;
+  padding: 0 16px 26px;
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 
-/* Editorial-Moment (DESIGN-TOKENS: Serif nur an gesetzten Stellen). */
 .ck-ident-leitsatz {
   margin: 0;
-  font-size: 25px;
-  line-height: 1.28;
+  font-size: 27px;
+  line-height: 1.24;
   color: var(--ck-text-1);
-  letter-spacing: 0.1px;
+  /* Scrim-Pflicht: auch über dem Verlauf trägt jeder Text seinen Schatten. */
+  text-shadow: 0 1px 12px rgba(8, 13, 9, 0.75);
 }
 .ck-ident-leitsatz-folge {
-  margin: -6px 0 0;
+  margin: 0;
   font-size: 14.5px;
   line-height: 1.55;
   color: var(--ck-text-2);
+  max-width: 46ch;
+  text-shadow: 0 1px 10px rgba(8, 13, 9, 0.7);
 }
 
-.ck-ident-saetze { display: flex; flex-direction: column; gap: 10px; }
-.ck-ident-saetze p {
+/* --- Kapitel-Banner ------------------------------------------------------ */
+
+.ck-ident-banner {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  height: 34vh;
+  min-height: 220px;
+  display: flex;
+  align-items: flex-end;
+  margin-top: 44px;
+}
+.ck-ident-banner img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
+.ck-ident-banner-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(
+    180deg,
+    rgba(12, 19, 14, 0.58) 0%,
+    rgba(12, 19, 14, 0.2) 42%,
+    rgba(12, 19, 14, 0.95) 88%,
+    var(--ck-bg) 100%
+  );
+}
+.ck-ident-banner-titel {
+  position: relative;
+  z-index: 2;
+  margin: 0 auto;
+  width: 100%;
+  max-width: 1000px;
+  padding: 0 16px 20px;
+  font-size: 30px;
+  line-height: 1.1;
+  color: var(--ck-text-1);
+  text-shadow: 0 1px 14px rgba(8, 13, 9, 0.8);
+}
+
+/* --- Fließtext ----------------------------------------------------------- */
+
+.ck-ident-saetze { display: flex; flex-direction: column; gap: 12px; }
+.ck-ident-gross {
   margin: 0;
-  font-size: 14.5px;
+  font-size: 16.5px;
   line-height: 1.6;
-  color: var(--ck-text-2);
-  /* Die drei Sätze sind Behauptungen über die eigene Person — die Linie links
-     macht sie zum Zitat statt zum Fließtext. */
-  border-left: 2px solid var(--ck-border-strong);
-  padding-left: 12px;
+  color: var(--ck-text-1);
 }
+.ck-ident-absatz {
+  margin: 0 0 12px;
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: var(--ck-text-2);
+}
+.ck-ident-absatz:last-child { margin-bottom: 0; }
+.ck-ident-absatz--stark { color: var(--ck-text-1); }
+.ck-ident-absatz b, .ck-ident-gross b { color: var(--ck-text-1); }
 
-.ck-ident-routine { padding: 14px 16px; display: flex; flex-direction: column; gap: 5px; }
+/* Die eine Routine — Linie im Akzent statt Karte (Vorlage). */
+.ck-ident-routine {
+  border-left: 2px solid var(--ck-accent);
+  padding: 4px 0 4px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
 .ck-ident-routine-kern {
   margin: 0;
-  font-size: 17px;
+  font-size: 17.5px;
   font-weight: 600;
-  line-height: 1.35;
+  line-height: 1.4;
   color: var(--ck-accent-text);
 }
 .ck-ident-routine-zusatz { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--ck-text-2); }
 
-.ck-ident-standards { display: flex; flex-direction: column; gap: 7px; }
-.ck-ident-pillen { display: flex; flex-wrap: wrap; gap: 7px; }
+.ck-ident-pillen { display: flex; flex-wrap: wrap; gap: 8px; }
 .ck-ident-pille {
   border-radius: var(--ck-radius-pille);
   border: 1px solid var(--ck-border-strong);
-  padding: 6px 13px;
+  padding: 6px 15px;
   font-size: 12.5px;
   font-weight: 600;
-  color: var(--ck-text-1);
+  color: var(--ck-accent-text);
 }
+.ck-ident-pillen--schritte .ck-ident-pille { color: var(--ck-text-2); font-weight: 500; }
 
-.ck-ident-warum-satz {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.6;
-  color: var(--ck-text-2);
-}
-
-.ck-ident-afform { display: flex; flex-direction: column; gap: 4px; }
-.ck-ident-afform p {
+.ck-ident-afform {
   margin: 0;
   font-size: 13px;
-  line-height: 1.55;
+  line-height: 1.6;
   font-style: italic;
   color: var(--ck-text-2);
 }
 
+/* --- Zwei Spalten -------------------------------------------------------- */
+
+.ck-ident-zwei { display: grid; grid-template-columns: 1fr; gap: 26px; }
+.ck-ident-spalte { border-top: 2px solid var(--ck-border-strong); padding-top: 14px; }
+.ck-ident-spalte--akzent { border-top-color: var(--ck-accent); }
+/* Die Vorlage nimmt hier Rot. Im Cockpit ist Rot für echte Fehler
+   reserviert (DESIGN-TOKENS) — eine Anti-Liste ist eine Abgrenzung, kein
+   Systemfehler. Deshalb das gedämpfte Warn-Gold. */
+.ck-ident-spalte--abgrenzung { border-top-color: var(--ck-warn); }
+.ck-ident-spalte-titel {
+  margin: 0 0 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ck-text-1);
+}
+.ck-ident-spalte-titel--zweit { margin-top: 22px; }
+
+.ck-ident-liste { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 9px; }
+.ck-ident-liste li { font-size: 13.5px; line-height: 1.55; color: var(--ck-text-2); }
+.ck-ident-liste li b { color: var(--ck-text-1); }
+
+/* --- Visionstext mit Porträt --------------------------------------------- */
+
+.ck-ident-bildtext { display: grid; grid-template-columns: 1fr; gap: 18px; align-items: start; }
+.ck-ident-bildtext img {
+  width: 100%;
+  border-radius: var(--ck-radius-innen);
+  display: block;
+  /* Am Handy als Ausschnitt statt in voller Höhe: das Porträt ist ein
+     Hochformat und füllte sonst allein einen ganzen Bildschirm, bevor der
+     Text überhaupt beginnt. */
+  max-height: 300px;
+  object-fit: cover;
+  object-position: center 22%;
+}
+.ck-ident-bildtext .ck-label { display: block; margin-bottom: 8px; }
+
 /* --- Serien -------------------------------------------------------------- */
 
 .ck-ident-streak-band { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.ck-ident-streak { padding: 13px 15px 12px; display: flex; flex-direction: column; }
+.ck-ident-streak {
+  padding: 13px 15px 12px;
+  display: flex;
+  flex-direction: column;
+  background: var(--ck-card);
+  border: 1px solid var(--ck-card-border);
+  border-radius: var(--ck-radius);
+}
 
 .ck-ident-punkte { display: flex; gap: 5px; margin-top: 10px; }
 .ck-ident-punkt {
@@ -1568,16 +1732,19 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
 .ck-ident-punkt--voll { background: var(--ck-accent); border-color: var(--ck-accent); }
 .ck-ident-punkt--heute { box-shadow: 0 0 0 2px color-mix(in srgb, var(--ck-accent) 32%, transparent); }
 
-.ck-ident-streak-fuss {
-  margin: 9px 0 0;
-  font-size: 11.5px;
-  line-height: 1.4;
-  color: var(--ck-text-2);
-}
+.ck-ident-streak-fuss { margin: 9px 0 0; font-size: 11.5px; line-height: 1.4; color: var(--ck-text-2); }
 
 /* --- Check-in ------------------------------------------------------------ */
 
-.ck-ident-checkin { padding: 15px 16px 17px; display: flex; flex-direction: column; gap: 15px; }
+.ck-ident-checkin {
+  padding: 15px 16px 17px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  background: var(--ck-card);
+  border: 1px solid var(--ck-card-border);
+  border-radius: var(--ck-radius);
+}
 .ck-ident-checkin-stand { font-size: 12px; color: var(--ck-text-2); }
 
 .ck-ident-einheiten { display: flex; flex-direction: column; gap: 8px; }
@@ -1624,7 +1791,6 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
 .ck-ident-zeile-titel { font-size: 14.5px; font-weight: 600; }
 .ck-ident-zeile-mass { font-size: 12px; color: var(--ck-text-2); }
 
-/* Energie */
 .ck-ident-energie { display: flex; flex-direction: column; gap: 7px; }
 .ck-ident-energie-wert { font-size: 26px; line-height: 1; color: var(--ck-text-1); }
 
@@ -1632,22 +1798,14 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  /* 44px Trefferfläche (Repo-Standard für Touch-Ziele), die Bahn darin ist 4px.
-     Der Griff bleibt über `margin-top` an der Bahn hängen, nicht an der Box. */
+  /* 44px Trefferfläche (Repo-Standard), die Bahn darin ist 4px. Der Griff
+     hängt über margin-top an der Bahn, nicht an der Box. */
   height: 44px;
   background: transparent;
   cursor: pointer;
 }
-.ck-ident-regler::-webkit-slider-runnable-track {
-  height: 4px;
-  border-radius: 999px;
-  background: var(--ck-border-strong);
-}
-.ck-ident-regler::-moz-range-track {
-  height: 4px;
-  border-radius: 999px;
-  background: var(--ck-border-strong);
-}
+.ck-ident-regler::-webkit-slider-runnable-track { height: 4px; border-radius: 999px; background: var(--ck-border-strong); }
+.ck-ident-regler::-moz-range-track { height: 4px; border-radius: 999px; background: var(--ck-border-strong); }
 .ck-ident-regler::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
@@ -1665,7 +1823,6 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
   background: var(--ck-accent);
   border: none;
 }
-/* Ungesetzt: der Griff steht in der Mitte, sagt aber nichts aus. */
 .ck-ident-regler--leer::-webkit-slider-thumb { background: var(--ck-text-3); }
 .ck-ident-regler--leer::-moz-range-thumb { background: var(--ck-text-3); }
 
@@ -1678,7 +1835,6 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
   font-variant-numeric: tabular-nums;
 }
 
-/* Dankbarkeit */
 .ck-ident-dankbar { display: flex; flex-direction: column; gap: 8px; }
 .ck-ident-dankbar-zeile { width: 100%; min-height: 44px; }
 
@@ -1693,114 +1849,165 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
   color: var(--ck-text-1);
 }
 
+/* --- Stufen -------------------------------------------------------------- */
+
+.ck-ident-stufen {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1px;
+  background: var(--ck-border);
+  border-radius: var(--ck-radius-innen);
+  overflow: hidden;
+}
+.ck-ident-stufe {
+  background: var(--ck-card);
+  padding: 18px 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.ck-ident-stufe-zahl { font-size: 30px; line-height: 1.05; color: var(--ck-accent-text); }
+.ck-ident-stufe-name { font-size: 13px; font-weight: 600; color: var(--ck-text-1); }
+.ck-ident-stufe-text { font-size: 12.5px; line-height: 1.45; color: var(--ck-text-2); }
+
 /* --- Visionboard --------------------------------------------------------- */
 
-.ck-ident-board-kopfzeile,
-.ck-ident-board-kopf {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin-bottom: 8px;
-}
+.ck-ident-board { display: flex; flex-direction: column; gap: 22px; }
+.ck-ident-board-kopf { display: flex; align-items: baseline; gap: 8px; margin-bottom: 9px; }
 .ck-ident-board-hinweis { font-size: 11.5px; color: var(--ck-text-2); }
 
-.ck-ident-board { display: flex; flex-direction: column; gap: 20px; }
-.ck-ident-board-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.ck-ident-board-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
 
-.ck-ident-karte { margin: 0; overflow: hidden; }
+.ck-ident-karte { margin: 0; }
 .ck-ident-bild {
   /* Festes Verhältnis: sonst springt das Layout, während die Bilder lazy
-     nachladen (die Karten darunter wandern beim Scrollen weg). */
+     nachladen und die Karten darunter beim Scrollen wegwandern. */
   aspect-ratio: 3 / 2;
   background: var(--ck-bg);
+  border-radius: var(--ck-radius-innen);
+  overflow: hidden;
 }
 .ck-ident-bild img { width: 100%; height: 100%; object-fit: cover; display: block; }
-/* Freigestellte Produktfotos: nicht beschneiden, eigene helle Fläche. */
-.ck-ident-bild--frei { background: var(--ck-medien-bg); }
-.ck-ident-bild--frei img { object-fit: contain; padding: 10px; }
+/* Uhren vollständig statt beschnitten (Vorlage). */
+.ck-ident-board-grid--voll .ck-ident-bild { aspect-ratio: 1 / 1; }
+.ck-ident-board-grid--voll .ck-ident-bild img { object-fit: contain; padding: 10px; }
 
-.ck-ident-karte-text { padding: 11px 14px 13px; display: flex; flex-direction: column; gap: 2px; }
-.ck-ident-karte-titel { font-size: 13.5px; font-weight: 600; color: var(--ck-text-1); line-height: 1.35; }
-.ck-ident-karte-notiz { font-size: 12px; color: var(--ck-text-2); }
+.ck-ident-karte-text {
+  padding: 8px 2px 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--ck-text-2);
+}
+.ck-ident-karte-text b { color: var(--ck-text-1); font-weight: 600; }
+.ck-ident-karte-notiz { color: var(--ck-text-2); }
 
-/* --- Nachschlagewerk ----------------------------------------------------- */
+/* --- Anti-Vision und das Warum ------------------------------------------- */
 
-.ck-ident-sektionen { display: flex; flex-direction: column; gap: 10px; }
-.ck-ident-details { overflow: hidden; }
+.ck-ident-anti { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 14px; }
+.ck-ident-anti li { font-size: 15px; line-height: 1.6; color: var(--ck-text-2); }
+.ck-ident-anti li b { color: var(--ck-text-1); }
+
+.ck-ident-warum { text-align: center; padding: 30px 0 8px; display: flex; flex-direction: column; gap: 14px; }
+.ck-ident-warum-linie {
+  width: 56px;
+  height: 2px;
+  background: var(--ck-accent);
+  margin: 0 auto 6px;
+  display: block;
+}
+.ck-ident-warum-kern {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.55;
+  color: var(--ck-text-1);
+}
+.ck-ident-warum-schluss { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--ck-text-2); }
+
+/* --- Regeln -------------------------------------------------------------- */
+
+.ck-ident-sektionen { display: flex; flex-direction: column; gap: 24px; }
+
+.ck-ident-regeln { list-style: none; margin: 0; padding: 0; }
+.ck-ident-regeln li {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: 14px;
+  padding: 14px 0;
+  border-top: 1px solid var(--ck-border);
+  align-items: baseline;
+}
+.ck-ident-regel-nr { font-size: 17px; color: var(--ck-text-3); }
+.ck-ident-regel-text { font-size: 13.5px; line-height: 1.55; color: var(--ck-text-2); }
+.ck-ident-regel-text b { color: var(--ck-text-1); }
+.ck-ident-regel--betont .ck-ident-regel-nr,
+.ck-ident-regel--betont .ck-ident-regel-text b { color: var(--ck-accent-text); }
+
+/* --- Aufklapper ---------------------------------------------------------- */
+
+.ck-ident-aufklapper { display: flex; flex-direction: column; }
+.ck-ident-details { border-top: 1px solid var(--ck-border); }
+.ck-ident-details:last-child { border-bottom: 1px solid var(--ck-border); }
 .ck-ident-details summary::-webkit-details-marker { display: none; }
 
 .ck-ident-summary {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
-  min-height: 58px;
-  padding: 12px 16px;
+  min-height: 56px;
+  padding: 12px 2px;
   cursor: pointer;
   list-style: none;
 }
+/* Plus/Minus wie in der Vorlage — gezeichnet, damit kein Zeichen-Font nötig ist. */
+.ck-ident-summary-zeichen {
+  position: relative;
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+}
+.ck-ident-summary-zeichen::before,
+.ck-ident-summary-zeichen::after {
+  content: '';
+  position: absolute;
+  background: var(--ck-accent);
+  border-radius: 2px;
+}
+.ck-ident-summary-zeichen::before { inset: 6px 0; height: 2px; }
+.ck-ident-summary-zeichen::after { inset: 0 6px; width: 2px; transition: opacity 140ms ease; }
+.ck-ident-details[open] .ck-ident-summary-zeichen::after { opacity: 0; }
+
 .ck-ident-summary-text { display: flex; flex-direction: column; gap: 2px; }
 .ck-ident-summary-titel { font-size: 14.5px; font-weight: 600; color: var(--ck-text-1); }
 .ck-ident-summary-unter { font-size: 12px; color: var(--ck-text-2); }
-.ck-ident-chevron { color: var(--ck-text-2); display: flex; transition: transform 140ms ease; }
-.ck-ident-details[open] .ck-ident-chevron { transform: rotate(180deg); }
 
-.ck-ident-details-inhalt {
-  padding: 0 16px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  border-top: 1px solid var(--ck-border);
-  padding-top: 14px;
-}
+.ck-ident-details-inhalt { padding: 0 0 20px 26px; display: flex; flex-direction: column; gap: 12px; }
 
-.ck-ident-liste { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 9px; }
-.ck-ident-liste li { font-size: 13.5px; line-height: 1.55; color: var(--ck-text-2); }
-.ck-ident-liste--knapp li { font-size: 13px; }
-.ck-ident-liste-marke { color: var(--ck-text-1); font-weight: 600; }
+/* --- Schluss ------------------------------------------------------------- */
 
-.ck-ident-unter-label { margin-top: 4px; }
-
-.ck-ident-zitat {
-  margin: 0;
-  font-size: 13.5px;
-  line-height: 1.55;
-  font-style: italic;
-  color: var(--ck-text-2);
-  border-left: 2px solid var(--ck-border-strong);
-  padding-left: 12px;
-}
-
-.ck-ident-warum-auftakt { margin: 0; font-size: 12.5px; color: var(--ck-text-2); }
-.ck-ident-warum-kern { margin: 0; font-size: 19px; line-height: 1.35; color: var(--ck-text-1); }
-.ck-ident-warum-schluss { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--ck-text-2); }
-
-.ck-ident-stufen { display: flex; flex-direction: column; gap: 8px; }
-.ck-ident-stufe {
-  display: grid;
-  grid-template-columns: auto auto 1fr;
-  align-items: baseline;
-  gap: 10px;
-  padding: 9px 0;
-  border-bottom: 1px solid var(--ck-border);
-}
-.ck-ident-stufe:last-child { border-bottom: none; }
-.ck-ident-stufe-name { font-size: 13px; font-weight: 600; color: var(--ck-text-1); }
-.ck-ident-stufe-zahl { font-size: 17px; color: var(--ck-accent-text); }
-.ck-ident-stufe-text { font-size: 12px; color: var(--ck-text-2); }
-
-.ck-ident-quelle { margin: 4px 0 0; font-size: 11px; color: var(--ck-text-3); }
+.ck-ident-schluss { text-align: center; padding-top: 44px; gap: 12px; }
+.ck-ident-quelle { margin: 18px 0 0; font-size: 11px; color: var(--ck-text-3); }
 
 /* --- Desktop ------------------------------------------------------------- */
 /* Eine Mobil-Grenze, und zwar 900 (MOBILE_MAX_WIDTH, verify-breakpoint.ts). */
 @media (min-width: 901px) {
-  .ck-ident { gap: 22px; padding-bottom: 40px; }
-  .ck-ident-leitsatz { font-size: 30px; }
-  .ck-ident-board-grid { grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  .ck-ident-hero { min-height: 56vh; }
+  .ck-ident-hero-inhalt { padding: 0 24px 34px; }
+  .ck-ident-leitsatz { font-size: 40px; max-width: 22ch; }
+  .ck-ident-banner { height: 30vh; }
+  .ck-ident-banner-titel { font-size: 42px; padding: 0 24px 26px; }
+  .ck-ident-abschnitt { padding: 34px 24px 10px; gap: 22px; }
+  .ck-ident-zwei { grid-template-columns: repeat(2, 1fr); gap: 40px; }
+  .ck-ident-stufen { grid-template-columns: repeat(3, 1fr); }
+  .ck-ident-board-grid { grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .ck-ident-bildtext { grid-template-columns: 300px 1fr; gap: 36px; }
+  /* Am Rechner steht das Porträt neben dem Text und darf seine volle Höhe
+     haben — es füllt dort die Spalte, statt die Seite zu blockieren. */
+  .ck-ident-bildtext img { max-height: none; }
   .ck-ident-streak-band { max-width: 520px; }
+  .ck-ident-gross { font-size: 18px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .ck-ident-chevron,
+  .ck-ident-summary-zeichen::after,
   .ck-ident-zeile { transition: none; }
 }

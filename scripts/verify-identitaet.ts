@@ -18,7 +18,18 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import { CHECKIN_EINHEITEN, MORGENLESE, VERHALTEN, ANTI_VISION, WARUM } from '../app/src/cockpit/lib/identityInhalte'
+import {
+  ANTI_VISION,
+  CHECKIN_EINHEITEN,
+  HERO_BILD,
+  KAPITEL,
+  MORGENLESE,
+  PORTRAET_BILD,
+  REGELN,
+  VERHALTEN,
+  VISIONSTEXT,
+  WARUM,
+} from '../app/src/cockpit/lib/identityInhalte'
 import { VISIONBOARD, alleBoardBilder, boardPfad } from '../app/src/cockpit/lib/visionboard'
 import {
   istWochenende,
@@ -206,6 +217,10 @@ check(
 const bilderOrdner = 'app/public/identity'
 const dateienImOrdner = readdirSync(join(wurzel, bilderOrdner)).filter((f) => !f.startsWith('.'))
 const dateienImBoard = alleBoardBilder().map((b) => b.datei)
+// Neben dem Board benutzt die Seite sechs weitere Bilder: den Hero, vier
+// Kapitel-Banner und das Porträt neben dem Visionstext.
+const dateienDrumherum = [HERO_BILD, PORTRAET_BILD, ...Object.values(KAPITEL).map((k) => k.bild)]
+const alleBenutzten = [...dateienImBoard, ...dateienDrumherum]
 
 check(
   'jedes Board-Bild liegt als Datei vor',
@@ -213,15 +228,23 @@ check(
   [],
 )
 check(
-  'jede Datei im Ordner steht auch im Board',
-  dateienImOrdner.filter((d) => !dateienImBoard.includes(d)),
+  'Hero, Kapitel-Banner und Porträt liegen als Datei vor',
+  dateienDrumherum.filter((d) => !dateienImOrdner.includes(d)),
   [],
 )
-check('kein Bild steht doppelt im Board', dateienImBoard.length, new Set(dateienImBoard).size)
+check(
+  'jede Datei im Ordner wird auch benutzt',
+  dateienImOrdner.filter((d) => !alleBenutzten.includes(d)),
+  [],
+)
+check('kein Bild wird doppelt eingebunden', alleBenutzten.length, new Set(alleBenutzten).size)
 wahr('das Board ist nicht leer', dateienImBoard.length > 0)
+check('vier Kapitel mit Bild', Object.keys(KAPITEL).length, 4)
 
 // Die Uhren stehen aufsteigend nach Preis — Kevins Kuration aus board-final.html.
 const uhren = VISIONBOARD.find((g) => g.id === 'uhren')
+// Uhren werden vollständig gezeigt, nicht beschnitten (Vorlage).
+wahr('die Uhren-Gruppe steht auf „vollständig"', uhren?.vollstaendig === true)
 check(
   'die Uhren stehen in Preisreihenfolge',
   uhren?.bilder.map((b) => b.datei),
@@ -315,6 +338,21 @@ check('drei Check-in-Einheiten', CHECKIN_EINHEITEN.length, 3)
 wahr('die Verhaltens-Identität ist gefüllt', VERHALTEN.length >= 5)
 wahr('die Anti-Vision ist gefüllt', ANTI_VISION.length >= 5)
 wahr('das Warum hat einen Kern', WARUM.kern.length > 20)
+wahr('der Visionstext ist vollständig', VISIONSTEXT.length >= 9)
+wahr('der Visionstext beginnt mit dem Namen', VISIONSTEXT[0].startsWith('Kevin Herrmann'))
+check('neun Regeln', REGELN.length, 9)
+check('genau eine Regel ist betont', REGELN.filter((r) => r.betont).length, 1)
+wahr('betont ist die Vertriebsregel', REGELN.find((r) => r.betont)?.titel === 'Vertrieb')
+
+// Scrim-Pflicht: über jedem Bild mit Text liegt ein Verlauf, und der Text
+// darüber trägt zusätzlich einen Schatten (DESIGN-TOKENS, Foto-Ambiente).
+wahr('der Hero hat einen Scrim', /\.ck-ident-hero-scrim\s*\{[^}]*linear-gradient/.test(css))
+wahr('der Kapitel-Banner hat einen Scrim', /\.ck-ident-banner-scrim\s*\{[^}]*linear-gradient/.test(css))
+wahr('der Hero-Leitsatz trägt einen Textschatten', /\.ck-ident-leitsatz\s*\{[^}]*text-shadow/.test(css))
+wahr('der Banner-Titel trägt einen Textschatten', /\.ck-ident-banner-titel\s*\{[^}]*text-shadow/.test(css))
+// Gestapelt wird mit positiven z-index — negative rutschen hinter den
+// Hintergrund von .ck-root (position: fixed) und das Bild verschwindet.
+wahr('kein negativer z-index in der Identity-Sektion', !/\.ck-ident-[a-z-]*\s*\{[^}]*z-index:\s*-/.test(css))
 
 console.log(`${pass} bestanden, ${fail} fehlgeschlagen`)
 process.exit(fail === 0 ? 0 : 1)

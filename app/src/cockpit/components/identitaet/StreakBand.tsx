@@ -33,7 +33,7 @@ function SerienKachel({ feld, titel, einheit, zeilen, heute, laedt }: KachelProp
   const tage = letzteTage(zeilen, feld, heute, 7)
 
   return (
-    <div className="ck-panel ck-ident-streak">
+    <div className="ck-ident-streak">
       <span className="ck-label">{titel}</span>
 
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 6 }}>

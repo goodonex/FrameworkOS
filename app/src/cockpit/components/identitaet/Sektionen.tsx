@@ -1,40 +1,30 @@
 import type { ReactNode } from 'react'
-import {
-  ANTI_VISION,
-  ANTI_VISION_GRUNDSATZ,
-  JEDEN_TAG,
-  NICHT_MEHR,
-  STUFEN,
-  VERHALTEN,
-  WARUM,
-} from '../../lib/identityInhalte'
+import { ACHT_SCHRITTE, HERO_STORY, LEHREN, REGELN, THEATER } from '../../lib/identityInhalte'
+import { Spalte } from './Bausteine'
 
 /**
- * Das Nachschlagewerk unter dem Board: Verhaltens-Identität, Anti-Vision,
- * Warum.
+ * Das Kapitel „Regeln & Lehren" — die neun Regeln offen, alles Weitere
+ * zugeklappt.
  *
  * Die Map sagt selbst, wie sie benutzt wird: „Morgens nur die ☀️ Morgenlese
  * (2 Minuten). Der Rest ist Nachschlagewerk und wird gelesen, wenn gefühlt
- * werden muss, wohin das führt." Genau deshalb sind diese drei Bereiche
- * zugeklappt — sichtbar, aber nicht im Weg.
+ * werden muss, wohin das führt." Die Regeln sind kurz genug, um zu stehen;
+ * Grundsätze, Lehren und die beiden Erzähltexte würden die Seite sonst in eine
+ * Textwand verwandeln.
  *
  * Gebaut mit `<details>`/`<summary>`: das Aufklappen kann der Browser besser
  * als jeder eigene State — mit Tastatur, mit Vorleseprogramm und mit der
- * Seitensuche des Browsers (Strg+F findet auch zugeklappten Text).
+ * Seitensuche (Strg+F findet auch zugeklappten Text).
  */
 
-function Aufklapper({ titel, unterzeile, children }: { titel: string; unterzeile: string; children: ReactNode }) {
+export function Aufklapper({ titel, unterzeile, children }: { titel: string; unterzeile?: string; children: ReactNode }) {
   return (
-    <details className="ck-panel ck-ident-details">
+    <details className="ck-ident-details">
       <summary className="ck-ident-summary">
+        <span className="ck-ident-summary-zeichen" aria-hidden />
         <span className="ck-ident-summary-text">
           <span className="ck-ident-summary-titel">{titel}</span>
-          <span className="ck-ident-summary-unter">{unterzeile}</span>
-        </span>
-        <span className="ck-ident-chevron" aria-hidden>
-          <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round">
-            <path d="m8 10 4 4 4-4" />
-          </svg>
+          {unterzeile ? <span className="ck-ident-summary-unter">{unterzeile}</span> : null}
         </span>
       </summary>
       <div className="ck-ident-details-inhalt">{children}</div>
@@ -42,65 +32,71 @@ function Aufklapper({ titel, unterzeile, children }: { titel: string; unterzeile
   )
 }
 
-export function IdentitaetSektionen() {
+export function RegelnUndLehren() {
   return (
     <div className="ck-ident-sektionen">
-      <Aufklapper titel="Verhaltens-Identität" unterzeile="Die Soll-Version von mir — Verhalten, keine Ziele">
-        <ul className="ck-ident-liste">
-          {VERHALTEN.map((v) => (
-            <li key={v.auftakt}>
-              <span className="ck-ident-liste-marke">{v.auftakt}:</span> {v.text}
-            </li>
-          ))}
-        </ul>
+      {/* Die neun Regeln — durchnummeriert wie in der Vorlage, die
+          Vertriebsregel im Akzent, weil sie den Tag entscheidet. */}
+      <ol className="ck-ident-regeln">
+        {REGELN.map((r, i) => (
+          <li key={r.titel} className={r.betont ? 'ck-ident-regel--betont' : undefined}>
+            <span className="ck-ident-regel-nr ck-zahl" aria-hidden>
+              {String(i + 1).padStart(2, '0')}
+            </span>
+            <span className="ck-ident-regel-text">
+              <b>{r.titel}</b> — {r.text}
+            </span>
+          </li>
+        ))}
+      </ol>
 
-        <span className="ck-label ck-ident-unter-label">Entscheidungen, die diese Person nicht mehr trifft</span>
-        <ul className="ck-ident-liste ck-ident-liste--knapp">
-          {NICHT_MEHR.map((z) => (
-            <li key={z}>{z}</li>
-          ))}
-        </ul>
+      <div className="ck-ident-pillen ck-ident-pillen--schritte">
+        {ACHT_SCHRITTE.map((s) => (
+          <span key={s} className="ck-ident-pille">
+            {s}
+          </span>
+        ))}
+      </div>
 
-        <span className="ck-label ck-ident-unter-label">Entscheidungen, die diese Person jeden Tag trifft</span>
-        <ul className="ck-ident-liste ck-ident-liste--knapp">
-          {JEDEN_TAG.map((z) => (
-            <li key={z}>{z}</li>
+      <div className="ck-ident-aufklapper">
+        <Aufklapper titel="Hero Story" unterzeile="Wo das hier angefangen hat">
+          <p className="ck-ident-gross">{HERO_STORY.auftakt}</p>
+          {HERO_STORY.absaetze.map((a) => (
+            <p key={a} className="ck-ident-absatz">
+              {a}
+            </p>
           ))}
-        </ul>
-      </Aufklapper>
+        </Aufklapper>
 
-      <Aufklapper titel="Anti-Vision" unterzeile="Was ich nicht mehr toleriere">
-        <p className="ck-ident-zitat">„{ANTI_VISION_GRUNDSATZ}"</p>
-        <ul className="ck-ident-liste">
-          {ANTI_VISION.map((a) => (
-            <li key={a.titel}>
-              <span className="ck-ident-liste-marke">{a.titel}.</span> {a.text}
-            </li>
-          ))}
-        </ul>
-      </Aufklapper>
+        <Aufklapper titel="Theater of the Mind" unterzeile="Der Tag, wie er sich anfühlen soll">
+          <div className="ck-ident-zwei">
+            <Spalte titel="Morgens">
+              {THEATER.morgens.map((a) => (
+                <p key={a} className="ck-ident-absatz">
+                  {a}
+                </p>
+              ))}
+            </Spalte>
+            <Spalte titel="Abends">
+              {THEATER.abends.map((a) => (
+                <p key={a} className="ck-ident-absatz">
+                  {a}
+                </p>
+              ))}
+            </Spalte>
+          </div>
+        </Aufklapper>
 
-      <Aufklapper titel="Warum" unterzeile="Wofür das alles">
-        <p className="ck-ident-warum-auftakt">{WARUM.auftakt}</p>
-        <p className="ck-serif ck-ident-warum-kern">{WARUM.kern}</p>
-        <ul className="ck-ident-liste">
-          {WARUM.punkte.map((p) => (
-            <li key={p}>{p}</li>
-          ))}
-        </ul>
-        <p className="ck-ident-warum-schluss">{WARUM.schluss}</p>
-
-        <span className="ck-label ck-ident-unter-label">Die Stufen</span>
-        <div className="ck-ident-stufen">
-          {STUFEN.map((s) => (
-            <div key={s.stufe} className="ck-ident-stufe">
-              <span className="ck-ident-stufe-name">{s.stufe}</span>
-              <span className="ck-serif ck-zahl ck-ident-stufe-zahl">{s.netto}</span>
-              <span className="ck-ident-stufe-text">{s.bedeutung}</span>
-            </div>
-          ))}
-        </div>
-      </Aufklapper>
+        {LEHREN.map((block) => (
+          <Aufklapper key={block.titel} titel={block.titel}>
+            <ul className="ck-ident-liste">
+              {block.absaetze.map((a) => (
+                <li key={a}>{a}</li>
+              ))}
+            </ul>
+          </Aufklapper>
+        ))}
+      </div>
     </div>
   )
 }
