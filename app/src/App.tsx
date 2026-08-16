@@ -24,6 +24,7 @@ import { OnboardingPublicPage } from './pages/onboarding/OnboardingPublicPage'
 import { CockpitShell } from './cockpit/CockpitShell'
 import { CockpitHome } from './cockpit/pages/CockpitHome'
 import { MorgenArea } from './cockpit/pages/MorgenArea'
+import { IdentitaetArea } from './cockpit/pages/IdentitaetArea'
 import { SalesArea } from './cockpit/pages/SalesArea'
 import { ProjekteArea } from './cockpit/pages/ProjekteArea'
 import { ZaehlModus } from './cockpit/pages/ZaehlModus'
@@ -39,6 +40,7 @@ import { SalesVorschau } from './dev/SalesVorschau'
 import { ZielVorschau } from './dev/ZielVorschau'
 import { NavVorschau } from './dev/NavVorschau'
 import { ShellVorschau } from './dev/ShellVorschau'
+import { IdentitaetVorschau } from './dev/IdentitaetVorschau'
 import { PosteingangVorschau } from './dev/PosteingangVorschau'
 
 
@@ -222,6 +224,7 @@ function App() {
             {import.meta.env.DEV ? <Route path="/dev/ziel-vorschau" element={<ZielVorschau />} /> : null}
             {import.meta.env.DEV ? <Route path="/dev/nav-vorschau" element={<NavVorschau />} /> : null}
             {import.meta.env.DEV ? <Route path="/dev/shell-vorschau" element={<ShellVorschau />} /> : null}
+            {import.meta.env.DEV ? <Route path="/dev/identitaet-vorschau" element={<IdentitaetVorschau />} /> : null}
             {import.meta.env.DEV ? <Route path="/dev/posteingang-vorschau" element={<PosteingangVorschau />} /> : null}
             <Route element={<OwnerWorkspaceShell />}>
               {/* Neue Cockpit-Shell (REBUILD-PLAN §5) */}
@@ -245,6 +248,10 @@ function App() {
                     Komponente — mit :feld ist es das Vollbild, ohne das Raster. */}
                 <Route path="/tracking/zaehlen" element={<ZaehlModus />} />
                 <Route path="/tracking/zaehlen/:feld" element={<ZaehlModus />} />
+                {/* Identity-OS (16.08.): Morgenlese, Check-in, Serien und das
+                    Visionboard. Keine eigene Vollbild-Variante — die Seite ist
+                    eine Lesefläche und lebt in der Shell. */}
+                <Route path="/identitaet" element={<IdentitaetArea />} />
               </Route>
               {/* Phase 6: Universe + Denk-Modi abgerissen → Cockpit ist Home */}
               <Route path="/" element={<Navigate to="/cockpit" replace />} />

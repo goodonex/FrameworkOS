@@ -25,6 +25,7 @@ export type BereichIconName =
   | 'bild'
   | 'agent'
   | 'balken'
+  | 'horizont'
   | 'mehr'
 
 /** Die Pfade. Ein Eintrag = ein Zeichen, gezeichnet auf 24×24. */
@@ -81,6 +82,16 @@ const PFADE: Record<BereichIconName, React.ReactNode> = {
   ),
   // Tracking — Balken
   balken: <path d="M4 20h16M7.5 20v-6M12 20V7M16.5 20v-9" />,
+  // Identität — Sonne über dem Horizont. Nimmt den Namen der Welt 1 („Horizont")
+  // beim Wort und bleibt vom Agenten-Zeichen unterscheidbar: dort ein voller
+  // Kreis mit acht Strahlen, hier ein Halbkreis auf einer Linie.
+  horizont: (
+    <>
+      <path d="M4 17.5h16" />
+      <path d="M7.5 17.5a4.5 4.5 0 0 1 9 0" />
+      <path d="M12 5v2.2M5.6 8.1l1.5 1.5M18.4 8.1l-1.5 1.5" />
+    </>
+  ),
   // Mehr — drei Punkte (aus dem Mock)
   mehr: (
     <>

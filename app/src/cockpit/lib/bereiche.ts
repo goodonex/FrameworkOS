@@ -51,6 +51,12 @@ export const COCKPIT_BEREICHE: CockpitBereich[] = [
   { path: '/content', label: 'Content', icon: 'bild', keywords: ['social', 'instagram', 'posts', 'batch'] },
   { path: '/agenten', label: 'Agenten', icon: 'agent', keywords: ['runs', 'automation', 'runner'] },
   { path: '/tracking', label: 'Tracking', icon: 'balken', keywords: ['kpi', 'zahlen', 'umsatz', 'ziele', 'vitals'] },
+  {
+    path: '/identitaet',
+    label: 'Identität',
+    icon: 'horizont',
+    keywords: ['morgenlese', 'vision', 'visionboard', 'check-in', 'clean', 'streak', 'dankbarkeit', 'energie'],
+  },
   // Redirect auf /sales — als Bereich gäbe es ihn zweimal in der Liste.
   { path: '/crm', label: 'CRM', keywords: [], nurRoute: true },
 ]

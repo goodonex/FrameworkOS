@@ -45,8 +45,11 @@ export function ordneNach<T extends { path: string }>(bereiche: T[], reihenfolge
  * Reine Funktion der Stunde — keine Daten, keine Abfrage.
  */
 export function kontextReihenfolge(stunde: number): string[] {
-  // Morgens liegen die Entwürfe der Nacht da und die Akquise steht an.
-  if (stunde < 11) return ['/freigaben', '/sales', '/linkedin']
+  // Morgens zuerst die Morgenlese (Visionmap-Regel 1: „Jeden Morgen die ☀️
+  // Morgenlese"), dann die Entwürfe der Nacht und die Akquise. Damit steht die
+  // Kachel genau dann vorn, wenn sie gelesen wird — ein Tipp zur Seite, der
+  // zweite setzt den ersten Haken.
+  if (stunde < 11) return ['/identitaet', '/freigaben', '/sales']
   // Tagsüber: Termine stehen fest, dazwischen Kundenarbeit.
   if (stunde < 18) return ['/sales', '/termine', '/projekte']
   // Abends wird eingetragen und der nächste Content vorbereitet.

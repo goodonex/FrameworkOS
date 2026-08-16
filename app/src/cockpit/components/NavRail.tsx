@@ -37,6 +37,11 @@ const ARBEIT: NavItem[] = [
 ]
 
 const NACHSCHLAGEN: NavItem[] = [
+  // Identität steht am Desktop hier, nicht in ARBEIT: die Morgenlese wird am
+  // Handy gelesen, und ARBEIT ist zugleich die mobile Dock-Belegung — ein
+  // fünfter Eintrag dort hätte Sales aus dem Daumenbereich gedrängt. Mobil
+  // führen der Homescreen (Kachel, morgens vorn) und „Mehr" hierher.
+  { to: '/identitaet', label: 'Identität', icon: bereichIcon('/identitaet') },
   { to: '/ads', label: 'Ads', icon: bereichIcon('/ads') },
   { to: '/content', label: 'Content', icon: bereichIcon('/content') },
   { to: '/agenten', label: 'Agenten', icon: bereichIcon('/agenten') },
