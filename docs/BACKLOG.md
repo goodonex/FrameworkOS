@@ -2,6 +2,54 @@
 
 **Stand:** 2026-08-16 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
 
+## Runde vom 16.08., nachts — **Identity-OS nach Kevins Design-Vorlage umgebaut**
+
+Kevins Befund am ersten Stand: „visuell find ich's noch sehr textlastig" —
+dazu der Auftrag, den Visionstext zwischen Check-in und Board zu setzen. In
+der Zwischenzeit war `visionmap-2.0.html` entstanden (16.08., 21:04), deren
+Fußzeile wörtlich sagt: **„Diese Seite ist die Design-Vorlage für das Identity
+OS in Uriel."** Damit ist sie für Aufbau und Wortlaut maßgeblich, und die
+Runde richtet die Seite daran aus.
+
+| Zug | Ergebnis |
+|---|---|
+| **Bilder statt Textwand** | Bild-Hero (Marmorkopf), vier Kapitel-Banner mit Bild (Identität · Traumleben · Anti-Vision · Regeln & Lehren), Porträt neben dem Visionstext. Sechs Bilder aus der Vorlage extrahiert — genau die Statuen-Motive, die im Board noch als offene Plätze standen |
+| **Visionstext** | steht wie gewünscht zwischen Check-in und Board, mit Porträt. Erste zwei Absätze offen, die restlichen sieben hinter „Den ganzen Visionstext lesen" |
+| **Neue Inhalte** | Traumleben-Stufen als Kacheln, Menschen & Erleben, Business & Wirkung, die neun Regeln durchnummeriert (Vertriebsregel im Akzent), acht Schritte als Pillen, Hero Story, Theater of the Mind, fünf Lehren-Blöcke |
+| **Board** | Yachten und Orte zu einer Reihe zusammengefasst, Uhren vollständig statt beschnitten (quadratisch, `contain`), zweiter Urus raus — die Vorlage zeigt vier Autos |
+| **Struktur** | `IdentitaetAnsicht` in Bausteine zerlegt (`Bausteine.tsx`: Hero, Banner, Spalte, Liste); acht Aufklapper tragen das Nachschlagewerk |
+
+**Übernommen sind Aufbau und Bildsprache, nicht die Palette.** Gold auf
+Schwarz und Monospace-Versalien gehören der Vorlage; im Cockpit tragen
+`--ck-accent` und die Serifen-Display-Schrift dieselbe Rolle. Die
+eingefrorenen Tokens bleiben unangetastet. **Eine bewusste Abweichung:** die
+„Nie mehr"-Spalte trägt Warn-Gold statt Rot — Rot ist laut DESIGN-TOKENS
+echten Fehlern vorbehalten, und eine Anti-Liste ist eine Abgrenzung, kein
+Systemfehler. Eine Zeile in `cockpit.css`, wenn du Rot willst.
+
+### Zwei echte Fehler, die die Abnahme gefunden hat
+
+1. **Negative z-index machten Hero- und Bannerbild unsichtbar.** Die Bilder
+   waren geladen (1400×791, `complete: true`) und trotzdem schwarz: `z-index:
+   -2` rutscht hinter den Hintergrund des nächsten Stacking-Contexts, und
+   `.ck-root` bildet als `position: fixed` genau so einen. Jetzt 0/1/2 statt
+   −2/−1/auto — als Testfall festgehalten, damit es nicht zurückkommt.
+2. **Der Visionstext war am Handy drei Bildschirme Textwand.** Genau Kevins
+   Befund, an der längsten Stelle. Aufgelöst über den Aufklapper.
+
+**Verifikation:** `tsc -b` + `build` grün · **39 verify-Skripte grün**,
+`verify-identitaet` von 78 auf **91 Fälle** gewachsen (neu: Kapitelbilder in
+beiden Richtungen, Scrim- und Textschatten-Pflicht, Verbot negativer z-index,
+Vollständigkeit von Visionstext und Regeln) · bei **390×664** abgenommen: kein
+Querscrollen (390 == 390), **19 Bilder** geladen und keins kaputt, alle 15
+Touch-Ziele ≥ 44 px, Konsole in einem frischen Tab ohne einen einzigen Fehler
+· Desktop 1280 mit dreispaltigem Board geprüft.
+
+**Kleiner Feinschliff, bewusst offen:** Die Yacht-Master bringt einen hellen
+Bildgrund mit und steht deshalb als heller Kasten neben den dunklen
+Uhrenbildern. Das ist Bildmaterial, kein Layout — Kevins Vorlage hat dieselbe
+Stelle. Freistellen wäre eine eigene kleine Runde.
+
 ## Runde vom 16.08., abends — **Das Identity-OS steht** (gebaut, nicht live · Migration 0072 offen)
 
 Der Punkt aus §4 ist gebaut: `/identitaet` trägt die ☀️ Morgenlese aus
