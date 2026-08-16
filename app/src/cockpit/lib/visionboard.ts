@@ -26,12 +26,6 @@ export interface BoardBild {
   titel: string
   /** Kevins Notiz aus dem Board — Preis, Anlass oder Grund. */
   notiz?: string
-  /**
-   * Freigestelltes Produktfoto statt Szenerie. Solche Bilder bekommen eine
-   * eigene Fläche, weil ihr transparenter bzw. weißer Grund sonst als harter
-   * Block in der dunklen Seite steht.
-   */
-  freigestellt?: boolean
 }
 
 export interface BoardGruppe {
@@ -39,6 +33,12 @@ export interface BoardGruppe {
   titel: string
   /** Die Zeile unter der Überschrift — sagt, wonach sortiert ist. */
   hinweis?: string
+  /**
+   * Vollständig zeigen statt beschneiden: quadratische Kachel,
+   * `object-fit: contain` auf dunkler Fläche. So hält es die Vorlage für die
+   * Uhren — und nur so bleibt eine Uhr eine Uhr statt ein Ausschnitt.
+   */
+  vollstaendig?: boolean
   bilder: BoardBild[]
 }
 
@@ -47,60 +47,39 @@ export const VISIONBOARD: BoardGruppe[] = [
     id: 'uhren',
     titel: 'Uhren',
     hinweis: 'aufsteigend nach Preis',
+    vollstaendig: true,
     bilder: [
-      {
-        datei: 'uhr-yachtmaster-126622.png',
-        titel: 'Rolex Yacht-Master 40, Rhodium',
-        notiz: 'der Daily — 12.700 €',
-        freigestellt: true,
-      },
-      {
-        datei: 'uhr-rolex-daydate-228239.jpg',
-        titel: 'Rolex Day-Date 40, Weissgold, Meteorit',
-        notiz: 'Herzens-Uhr — 61.550 €',
-      },
+      { datei: 'uhr-yachtmaster-126622.png', titel: 'Yacht-Master 40', notiz: 'der Daily · 12.700 €' },
+      { datei: 'uhr-rolex-daydate-228239.jpg', titel: 'Day-Date 40 Meteorit', notiz: 'Herzens-Uhr · 61.550 €' },
       {
         datei: 'uhr-ap-royaloak-26735SG.jpg',
-        titel: 'AP Royal Oak Flying Tourbillon Openworked, Sandgold',
-        notiz: 'Herzens-Uhr — ca. 250 T€',
+        titel: 'Royal Oak Openworked Sandgold',
+        notiz: 'Herzens-Uhr · ca. 250 T€',
       },
-      {
-        datei: 'uhr-adg-honey-pearl.jpg',
-        titel: 'Artisans de Genève Honey Pearl — Skeleton 5711, Roségold',
-        notiz: 'ca. 250–300 T€',
-      },
-      {
-        datei: 'uhr-rm88-smiley.jpg',
-        titel: 'Richard Mille RM 88 Smiley, Roségold',
-        notiz: 'ca. 1,2 Mio €',
-      },
+      { datei: 'uhr-adg-honey-pearl.jpg', titel: 'AdG Honey Pearl', notiz: 'Skeleton 5711 · ca. 250–300 T€' },
+      { datei: 'uhr-rm88-smiley.jpg', titel: 'RM 88 Smiley', notiz: 'ca. 1,2 Mio €' },
     ],
   },
   {
     id: 'autos',
     titel: 'Autos',
     bilder: [
-      { datei: 'auto-gle-coupe-matt.jpg', titel: 'AMG GLE Coupé, matt-dunkel', notiz: 'das Auto aus dem Visionstext' },
-      { datei: 'auto-porsche-911.jpg', titel: 'Porsche 911, schwarz', notiz: 'Küstenstraße' },
-      { datei: 'auto-urus.jpg', titel: 'Lamborghini Urus, matt-grau/Gold', notiz: 'Altstadt bei Nacht' },
-      { datei: 'auto-urus-sand.jpg', titel: 'Lamborghini Urus, sandgold', notiz: 'Wüstendüne' },
+      { datei: 'auto-porsche-911.jpg', titel: 'Porsche 911', notiz: 'schwarz, Küstenstraße' },
+      { datei: 'auto-gle-coupe-matt.jpg', titel: 'AMG GLE Coupé', notiz: 'matt-dunkel foliert' },
+      { datei: 'auto-urus.jpg', titel: 'Urus', notiz: 'Altstadt bei Nacht' },
       { datei: 'auto-smart-brabus.jpg', titel: 'Smart Brabus', notiz: 'der Stadt-Praktische' },
     ],
   },
   {
-    id: 'yachten',
-    titel: 'Yachten',
+    // Die Vorlage fasst Yachten und Orte zu einer Reihe zusammen — vier
+    // Kacheln nebeneinander statt zweimal zwei.
+    id: 'yachten-orte',
+    titel: 'Yachten & Orte',
     bilder: [
-      { datei: 'yacht-klassisch.jpg', titel: 'Klassiker im Riva-Stil', notiz: 'hat Vibe' },
-      { datei: 'yacht-gross.jpg', titel: 'Superyacht ~80 m', notiz: 'die richtige Yacht' },
-    ],
-  },
-  {
-    id: 'orte',
-    titel: 'Orte',
-    bilder: [
-      { datei: 'finca-mallorca.jpg', titel: 'Steinfinca auf Mallorca', notiz: 'Sportbecken, Oliven, Wein' },
-      { datei: 'insel-luftbild.jpg', titel: 'Private Mittelmeer-Insel', notiz: 'Endgame' },
+      { datei: 'yacht-klassisch.jpg', titel: 'Klassiker', notiz: 'Riva-Stil' },
+      { datei: 'yacht-gross.jpg', titel: 'Superyacht ~80 m' },
+      { datei: 'insel-luftbild.jpg', titel: 'Private Insel', notiz: 'Mittelmeer' },
+      { datei: 'finca-mallorca.jpg', titel: 'Finca Mallorca', notiz: 'Sportbecken, Oliven, Wein' },
     ],
   },
 ]
