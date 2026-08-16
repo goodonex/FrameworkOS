@@ -1,6 +1,36 @@
 # Uriel — Backlog (die eine Quelle der Wahrheit)
 
-**Stand:** 2026-08-16 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
+**Stand:** 2026-08-17 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
+
+## **LIVE seit 17.08.2026, ~00:50 — Identity-OS**
+
+`main` = `7eebb8f` (Kevins Push, sein Wort: „bitte live bringen"), Migration
+**0072 in der Prod-DB** (Historie lückenlos 0001–0072, Trockenlauf wollte
+genau diese eine — sonst war nichts offen). Mit live gingen nur die elf
+Identity-Commits plus zwei Doku-Commits; `origin/main` war vorher schon auf
+dem Stand vom 16.08.
+
+**Der Deploy-Weg war diesmal nicht der normale.** Netlify wies den Build ab:
+*„Skipped due to account credit usage exceeded"* — auch der manuelle Upload
+kam zunächst mit „Forbidden" zurück. Nachdem Kevin das Konto freigeschaltet
+hatte („geht wieder"), stieß der fehlgeschlagene Deploy sich **nicht von
+selbst** neu an; ausgeliefert wurde per `netlify deploy --prod --dir app/dist`
+(lokal gebautes Bundle, Env gegen die Prod-Supabase geprüft). Der nächste
+normale Git-Push baut wieder über Netlify und überholt diesen Stand einfach.
+
+**Beleg am ausgelieferten Bundle** (`index-BS_SetWn.js`, CSS
+`index-rjB1H1h6.css` — das CSS ist **hash-identisch mit dem lokal
+abgenommenen Build**): im JS nachweisbar „Morgenlese", `identity_checkins`,
+`vertriebsblock`, `dankbar_1`, „Yacht-Master", „Clean geblieben", „dann der
+Block"; im CSS `ck-ident-hero`, `ck-morgenlese-zeile`, `ck-ident-streak`,
+`ck-ident-banner`, `ck-ident-regeln`. Assets antworten 200 als `image/jpeg`
+(`/identity/hero-marmor.jpg`, `uhr-rm88-smiley.jpg`, `kapitel-regeln.jpg`),
+Routen `/identitaet`, `/cockpit`, `/morgen` antworten 200.
+
+**Noch nicht am Gerät gesehen:** Die erste eingeloggte Session am iPhone —
+morgens Homescreen → „Morgenlese"-Zeile → lesen, Haken setzen — ist die
+eigentliche Abnahme. Ab jetzt speichert der Check-in echt (0072 ist drin);
+die Clean-Serie startet bei 0 und zählt ab dem ersten Haken.
 
 ## Runde vom 16.08., nachts — **Identity-OS nach Kevins Design-Vorlage umgebaut**
 
