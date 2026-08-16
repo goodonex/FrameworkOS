@@ -45,10 +45,25 @@ Querscrollen (390 == 390), **19 Bilder** geladen und keins kaputt, alle 15
 Touch-Ziele ≥ 44 px, Konsole in einem frischen Tab ohne einen einzigen Fehler
 · Desktop 1280 mit dreispaltigem Board geprüft.
 
-**Kleiner Feinschliff, bewusst offen:** Die Yacht-Master bringt einen hellen
-Bildgrund mit und steht deshalb als heller Kasten neben den dunklen
-Uhrenbildern. Das ist Bildmaterial, kein Layout — Kevins Vorlage hat dieselbe
-Stelle. Freistellen wäre eine eigene kleine Runde.
+### Nachtrag aus Kevins Review
+
+Vier Punkte, alle erledigt: **Preise** korrigiert (Yacht-Master 10.500 €,
+Day-Date 55.000 €) · **die zwei Statuen** standen unmittelbar hintereinander
+(Kapitel-Banner, dann Porträt) — jetzt liegen die beiden Spalten dazwischen,
+dieselbe Folge wie in der Vorlage, und der Visionstext bleibt zwischen
+Check-in und Board · **die weißen Kästen** bei Yacht-Master und RM 88 sind weg
+· und ja, die Seite ist von Anfang an mobil gebaut (jede Messung lief bei
+390×664, Desktop kam als Aufsatz dazu).
+
+**Zum Freistellen der zwei Uhren**, weil der Weg ungewöhnlich ist: Beide kamen
+als Pressefotos auf weißem Studio-Grund. Auf diesem Mac gibt es weder
+ImageMagick noch PIL — der einzige Bild-Decoder im Haus ist der Browser.
+Gerechnet wurde deshalb im Canvas: Flood-Fill **nur von den Bildrändern**, damit
+das weiße RM-Keramikgehäuse verschont bleibt. Beim ersten Versuch (Schwelle
+232) fraß der Fill Löcher ins Gehäuse; mit 252 und einer Lochprüfung als
+Abbruchbedingung sitzt es. Bei der Yacht-Master ist zusätzlich der
+Bodenschatten abgeschnitten. Sie ist damit JPEG statt PNG — freigestellt
+braucht sie kein Alpha mehr.
 
 ## Runde vom 16.08., abends — **Das Identity-OS steht** (gebaut, nicht live · Migration 0072 offen)
 
