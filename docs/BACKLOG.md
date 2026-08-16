@@ -1,6 +1,22 @@
 # Uriel — Backlog (die eine Quelle der Wahrheit)
 
-**Stand:** 2026-08-14 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
+**Stand:** 2026-08-16 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
+
+## Runde vom 16.08. — **Marken-Kompass geplant** (Planung, kein App-Code)
+
+Kevins Auftrag: Der Discovery-/Klarheitsprozess (KLAR-Kennenlernen) soll ein
+Selbsttest im Kundenportal werden — Myers-Briggs-artig, Bildpaare klicken,
+damit der erste Website-Entwurf mit hoher Trefferquote sitzt. **Blaupause für
+die Umsetzung:** `docs/wargames/marken-kompass.md` (Züge K0–K8, D1–D12, blind
+ausführbar für Opus auf `xhigh`). Kern: Stil-Duelle als selbst gerenderte
+Kacheln (fünf Achsen, je ein Parameter kippt), sechs Selbstbild-Regler,
+Anti-Auswahl, die sechs KLAR-Kernfragen; Auswertung deterministisch
+(`verify-kompass`), genau EINE Claude-Synthese am Abschluss (Edge Function
+`kompass-synthese`, Ergebnis in `kunde`/`intern` getrennt — Spannungen und
+Call-Fragen sieht nur Kevin). Neue Tabelle `kompass_laeufe` (Migration
+**0072**; Achtung: 0071 liegt weiter ungepusht mit Wächter — R1/K3 der
+Blaupause regelt Reihenfolge und STOPP). Offen im LEDGER: Anzeigename
+(Kevins Geschmack), 0071-Weg, Test-Kunden-Login.
 
 ## Runde vom 14.08. — **Die Erstnachrichten standen doppelt in der Liste** (Migration 0071 offen)
 
