@@ -14,11 +14,11 @@ Anti-Auswahl, die sechs KLAR-Kernfragen; Auswertung deterministisch
 (`verify-kompass`), genau EINE Claude-Synthese am Abschluss (Edge Function
 `kompass-synthese`, Ergebnis in `kunde`/`intern` getrennt — Spannungen und
 Call-Fragen sieht nur Kevin). Neue Tabelle `kompass_laeufe` (Migration
-**0072**; Achtung: 0071 liegt weiter ungepusht mit Wächter — R1/K3 der
-Blaupause regelt Reihenfolge und STOPP). Offen im LEDGER: Anzeigename
-(Kevins Geschmack), 0071-Weg, Test-Kunden-Login.
+**0072**; 0071 ist angewandt — am 16.08. gegen die Prod-DB verifiziert, die
+STOPP-Regel R1/K3 der Blaupause ist damit erledigt). Offen im LEDGER: Anzeigename
+(Kevins Geschmack), Test-Kunden-Login.
 
-## Runde vom 14.08. — **Die Erstnachrichten standen doppelt in der Liste** (Migration 0071 offen)
+## Runde vom 14.08. — **Die Erstnachrichten standen doppelt in der Liste** (Migration 0071 gepusht)
 
 Kevins Befund: Die Kachel meldete „144 offen", und im Fenster stand fast jeder
 Lead zweimal untereinander.
@@ -36,7 +36,7 @@ Leads, 118 eindeutige Namen, 0 Doppel).
 
 | Zug | Ergebnis | Datei |
 |---|---|---|
-| Schlüssel ohne Gruppe | Unique-Index auf `(brand_id, name)`, alter gruppen-abhängiger Constraint fliegt, Fortschritts-Rettung vorab; Wächter bricht ab, solange Doppel im Bestand liegen | `supabase/migrations/0071_erstnachrichten_schluessel_ohne_gruppe.sql` (neu, **noch nicht gepusht**) |
+| Schlüssel ohne Gruppe | Unique-Index auf `(brand_id, name)`, alter gruppen-abhängiger Constraint fliegt, Fortschritts-Rettung vorab; Wächter bricht ab, solange Doppel im Bestand liegen | `supabase/migrations/0071_erstnachrichten_schluessel_ohne_gruppe.sql` (**angewandt**) |
 | Spiegel | `on_conflict=brand_id,name`; fehlt 0071 noch, weicht der Lauf auf das alte Ziel aus statt still auszufallen | `runner/index.mjs` |
 | Entdopplung in der Oberfläche | Eine Person, eine Zeile — frischester Spiegel-Stand gewinnt den Inhalt, der weiteste Status wird darauf übertragen | `app/src/cockpit/lib/erstnachrichtenDedup.ts` (neu), `app/src/hooks/useErstnachrichten.ts` |
 | Drift-Wache | 12 Fälle, u. a. „abgehakt darf nicht zurückfallen" und „ähnliche Namen bleiben getrennt" | `scripts/verify-erstnachrichten-dedup.ts` (neu) |
@@ -50,11 +50,13 @@ gerechnet: **145 → 118 Zeilen, 144 → 117 offen**, 0 doppelte Namen, Roland
 Wettstein bleibt `gesendet` · Cockpit lokal: Kachel „ERSTNACHRICHTEN 117 offen",
 Fenster ohne einen einzigen doppelten Namen.
 
-**Offen — Bestandsdaten.** In der DB liegen weiterhin **27 überzählige Zeilen**
-(je Person die ältere). Sie sind nicht gelöscht worden; das Statement liegt in
-der Übergabe der Runde. Reihenfolge: erst Schritt 1 aus 0071 (Fortschritt
-retten), dann die Bereinigung, dann 0071 erneut `db push` — der Wächter in der
-Migration lässt den Schlüssel sonst nicht zu.
+**Erledigt — Bestandsdaten (Stand 16.08.).** Die 27 überzähligen Zeilen sind
+weg und 0071 ist durchgelaufen. Gegen die Prod-DB nachgemessen: **118 Zeilen,
+118 eindeutige Namen, 117 offen**, Roland Wettstein steht auf `gesendet`. Der
+Unique-Index `(brand_id, name)` greift (Upsert mit diesem Konflikt-Ziel
+antwortet 200), der alte Schlüssel `(brand_id, gruppe, name)` ist weg (400).
+Der 42P10-Rückfallpfad in `runner/index.mjs` (Zeile ~1368) ist damit toter
+Code — schadet nicht, kann bei der nächsten Runner-Runde raus.
 
 ## Runde vom 13.08., abends — **Der Morgenbrief sieht jetzt auch nachts** (nur Runner, kein Livegang nötig)
 
