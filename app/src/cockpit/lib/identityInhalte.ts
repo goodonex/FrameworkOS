@@ -100,7 +100,7 @@ export const NICHT_MEHR: string[] = [
 
 export const JEDEN_TAG: string[] = [
   'Der 60–90-Minuten-Block, vor allem anderen.',
-  'Morgenlese + Tagesplan.',
+  'Sunrise Success Formel + Tagesplan.',
   'Abends: verdiente Belohnung, Reflexion, rechtzeitig ins Bett.',
 ]
 
@@ -196,11 +196,11 @@ export interface Regel {
 }
 
 export const REGELN: Regel[] = [
-  { titel: 'Vision', text: 'Jeden Morgen die Morgenlese. Der werden, der ich sein will, durch das, was ich heute tue.' },
+  { titel: 'Vision', text: 'Jeden Morgen die Sunrise Success Formel. Der werden, der ich sein will, durch das, was ich heute tue.' },
   { titel: 'Schlaf', text: '8 Stunden Regeneration. Aufstehen fängt beim Schlafengehen an. Ich snooze nicht.' },
   {
     titel: 'Routinen',
-    text: 'erfüllen, auch unmotiviert. Morgens: Zähne, Wasser, Bewegung, Duschen, Morgenlese, Dankbarkeit · Abends: Tag geplant, Kleidung rausgelegt, Handy weg, Meditieren, Lesen.',
+    text: 'erfüllen, auch unmotiviert. Morgens: Zähne, Wasser, Bewegung, Duschen, Sunrise Success Formel, Dankbarkeit · Abends: Tag geplant, Kleidung rausgelegt, Handy weg, Meditieren, Lesen.',
   },
   {
     titel: 'Gesundheit',
@@ -274,7 +274,7 @@ export const LEHREN: LehrBlock[] = [
   {
     titel: 'Sein → Tun → Haben',
     absaetze: [
-      'Erst sein, dann tun, dann haben. Veränderung fließt spirituell → mental → körperlich. Morgenlese = sein · Block = tun · Traumleben = haben.',
+      'Erst sein, dann tun, dann haben. Veränderung fließt spirituell → mental → körperlich. Sunrise Success Formel = sein · Block = tun · Traumleben = haben.',
       'Selbstbild schlägt Weltbild. Nicht die richtige Strategie suchen, die richtige Person werden. Das Außen spiegelt das Innen, mit Verzögerung.',
       'Highest Self oder Lowest Self: jeden Tag meine Wahl. „Würde mein Highest Self jetzt so denken, sprechen, handeln?"',
       'Wichtigkeit niedrig halten. Wollen ohne festhalten. Was auf dem Podest steht, läuft weg. Der Block ist so unromantisch wie Zähneputzen; bewertet wird am Tagesende.',

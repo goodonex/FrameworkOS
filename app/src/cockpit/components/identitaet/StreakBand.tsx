@@ -101,7 +101,7 @@ export function StreakBand({ zeilen, heute, laedt = false }: Props) {
           die Basis-Zeile unter den zwei harten Serien. */}
       <SerienKachel
         feld="morgenlese"
-        titel="Morgenlese"
+        titel="Sunrise Success Formel"
         einheit="Tage am Stück"
         zeilen={zeilen}
         heute={heute}

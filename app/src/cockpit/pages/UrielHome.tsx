@@ -223,7 +223,7 @@ export function UrielHome() {
             <BereichIcon name="horizont" size={18} />
           </span>
           <span className="ck-morgenlese-text">
-            <span className="ck-morgenlese-titel">Morgenlese</span>
+            <span className="ck-morgenlese-titel">Sunrise Success Formel</span>
             <span className="ck-morgenlese-unter">2 Minuten — dann der Block</span>
           </span>
         </button>

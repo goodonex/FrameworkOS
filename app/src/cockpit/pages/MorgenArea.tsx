@@ -151,7 +151,7 @@ export function MorgenArea() {
 
       {/* Die Morgenlese steht VOR dem Loslegen — dieselbe Reihenfolge wie in
           der Visionmap (Regel 1: erst lesen, dann der Block). Damit führt der
-          Push-Tipp in zwei Tipps zur Morgenlese, ohne den Arbeitsweg darunter
+          Push-Tipp in zwei Tipps zur Sunrise Success Formel, ohne den Arbeitsweg darunter
           zu verstellen. */}
       <button
         type="button"
@@ -159,7 +159,7 @@ export function MorgenArea() {
         onClick={() => navigate('/identitaet')}
         style={{ minHeight: 48, fontSize: 13, justifyContent: 'center' }}
       >
-        Morgenlese · 2 Minuten
+        Sunrise Success Formel · 2 Minuten
       </button>
 
       {/* Ein Knopf, ein Ziel: ≤ 2 Interaktionen bis zur ersten erledigten

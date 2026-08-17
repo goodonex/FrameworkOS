@@ -80,13 +80,13 @@ export function IdentitaetAnsicht({
     <div className="ck-ident">
       <IdentHero
         bild={HERO_BILD}
-        label={`Morgenlese · 2 Minuten · ${datumLang(new Date(`${heuteIso}T12:00:00`))}`}
+        label={`Sunrise Success Formel · 2 Minuten · ${datumLang(new Date(`${heuteIso}T12:00:00`))}`}
         titel={MORGENLESE.leitsatz}
         unterzeile={MORGENLESE.leitsatzFolge}
       />
 
       {/* --- Die Morgenlese ------------------------------------------------ */}
-      <section className="ck-ident-abschnitt ck-ident-schmal" aria-label="Morgenlese">
+      <section className="ck-ident-abschnitt ck-ident-schmal" aria-label="Sunrise Success Formel">
         <div className="ck-ident-saetze">
           {MORGENLESE.saetze.map((s) => (
             <p key={s} className="ck-ident-gross">
@@ -117,7 +117,7 @@ export function IdentitaetAnsicht({
 
         {/* Der Gelesen-Haken sitzt GENAU hier — am Ende dessen, was er
             bestätigt. Er schreibt in dieselbe Tageszeile wie die drei
-            Einheiten (0073) und füttert die Morgenlese-Serie im Band darunter.
+            Einheiten (0073) und füttert die Sunrise-Serie im Band darunter.
             Selbstauskunft wie jeder andere Haken auch. */}
         <button
           type="button"
@@ -137,7 +137,7 @@ export function IdentitaetAnsicht({
             <span className="ck-ident-zeile-titel">
               {heute.morgenlese ? 'Gelesen — der Tag gehört dir.' : 'Komplett gelesen'}
             </span>
-            <span className="ck-ident-zeile-mass">zählt die Morgenlese-Serie</span>
+            <span className="ck-ident-zeile-mass">zählt die Sunrise-Serie</span>
           </span>
         </button>
       </section>
