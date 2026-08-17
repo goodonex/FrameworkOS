@@ -2,6 +2,31 @@
 
 **Stand:** 2026-08-17 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
 
+## **LIVE seit 17.08.2026, ~01:25 — Morgenlese-Serie + Vorlesen** (Nachschlag)
+
+Kevins drei Wünsche direkt nach dem Livegang, gebaut und im selben Zug
+ausgeliefert (wieder `netlify deploy --prod`, CSS hash-identisch mit dem
+lokal abgenommenen Build; Migration **0073 in der Prod-DB**):
+
+- **Serie „Morgenlese komplett gelesen":** Der Haken sitzt am Ende der
+  Lese-Sektion — dort, wo das Lesen endet — und schreibt in dieselbe
+  Tageszeile (`identity_checkins.morgenlese`, 0073). Die dritte
+  Serien-Kachel zählt **jeden Kalendertag** (Regel 1: „Jeden Morgen", nicht
+  „jeden Werktag"); mobil liegt sie über beide Spalten.
+- **Visionstext vorlesen:** Knopf am Visionstext, Web Speech API mit
+  deutscher Systemstimme, je Absatz eine Utterance (lange Einzel-Utterances
+  brechen in manchen Browsern still ab). Die Sprach-AUSGABE funktioniert
+  auch auf iOS — anders als die Eingabe (O12).
+- **Eigene Aufnahme (Kevins Endzustand):** hat automatisch Vorrang. Aufnahme
+  in Sprachmemos, Datei nach `app/public/identity/visionstext.m4a` (oder
+  `.mp3`), deployen — der Knopf wechselt ohne Code-Änderung. SPA-Falle
+  bedacht: Netlify beantwortet unbekannte URLs mit `200 text/html`, als
+  Fund zählt deshalb nur `content-type: audio/*`.
+
+Funktional abgenommen: Gelesen-Toggle zieht die Serie live mit (5 → 4
+„Heute noch offen" → 5), Sprachausgabe startet echt und stoppt sauber.
+`verify-identitaet` 99 → **111 Fälle**, 39/39 Skripte grün.
+
 ## **LIVE seit 17.08.2026, ~00:50 — Identity-OS**
 
 `main` = `7eebb8f` (Kevins Push, sein Wort: „bitte live bringen"), Migration
