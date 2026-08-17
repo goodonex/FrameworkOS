@@ -29,9 +29,11 @@ export interface StreakTag {
   vertriebsblock: boolean
   clean: boolean
   sport: boolean
+  /** Morgenlese komplett gelesen (0073) — zählt jeden Kalendertag, Regel 1. */
+  morgenlese: boolean
 }
 
-export type StreakFeld = 'vertriebsblock' | 'clean' | 'sport'
+export type StreakFeld = 'vertriebsblock' | 'clean' | 'sport' | 'morgenlese'
 
 export interface Streak {
   /** Länge der laufenden Serie in gezählten Tagen. */

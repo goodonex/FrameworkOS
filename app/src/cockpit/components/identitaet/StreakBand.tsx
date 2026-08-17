@@ -25,15 +25,17 @@ interface KachelProps {
   zeilen: StreakTag[]
   heute: string
   laedt: boolean
+  /** Mobil über beide Spalten (die dritte Kachel im Zweier-Grid). */
+  breit?: boolean
 }
 
-function SerienKachel({ feld, titel, einheit, zeilen, heute, laedt }: KachelProps) {
+function SerienKachel({ feld, titel, einheit, zeilen, heute, laedt, breit }: KachelProps) {
   const serie = laufendeSerie(zeilen, feld, heute)
   const rekord = laengsteSerie(zeilen, feld)
   const tage = letzteTage(zeilen, feld, heute, 7)
 
   return (
-    <div className="ck-ident-streak">
+    <div className={`ck-ident-streak${breit ? ' ck-ident-streak--breit' : ''}`}>
       <span className="ck-label">{titel}</span>
 
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 6 }}>
@@ -93,6 +95,18 @@ export function StreakBand({ zeilen, heute, laedt = false }: Props) {
         zeilen={zeilen}
         heute={heute}
         laedt={laedt}
+      />
+      {/* Die Morgenlese-Serie (0073) — Regel 1 gilt jeden Tag, also zählt
+          sie wie Clean den lückenlosen Kalender. Mobil über beide Spalten:
+          die Basis-Zeile unter den zwei harten Serien. */}
+      <SerienKachel
+        feld="morgenlese"
+        titel="Morgenlese"
+        einheit="Tage am Stück"
+        zeilen={zeilen}
+        heute={heute}
+        laedt={laedt}
+        breit
       />
     </div>
   )

@@ -25,6 +25,7 @@ import { CheckinKarte } from './CheckinKarte'
 import { Aufklapper, RegelnUndLehren } from './Sektionen'
 import { StreakBand } from './StreakBand'
 import { Visionboard } from './Visionboard'
+import { VisionstextVorlesen } from './VisionstextVorlesen'
 
 /**
  * Die Darstellung des Identity-OS — **ohne einen einzigen Datenpfad**.
@@ -57,7 +58,7 @@ export interface IdentitaetAnsichtProps {
   laedt: boolean
   tabelleFehlt: boolean
   fehler: string | null
-  umschalten: (feld: 'vertriebsblock' | 'clean' | 'sport') => void
+  umschalten: (feld: 'vertriebsblock' | 'clean' | 'sport' | 'morgenlese') => void
   setzen: (patch: Partial<Omit<CheckinRow, 'datum'>>) => void
 }
 
@@ -113,6 +114,32 @@ export function IdentitaetAnsicht({
         </p>
 
         <p className="ck-ident-afform">{MORGENLESE.afformationen.join(' · ')}</p>
+
+        {/* Der Gelesen-Haken sitzt GENAU hier — am Ende dessen, was er
+            bestätigt. Er schreibt in dieselbe Tageszeile wie die drei
+            Einheiten (0073) und füttert die Morgenlese-Serie im Band darunter.
+            Selbstauskunft wie jeder andere Haken auch. */}
+        <button
+          type="button"
+          className={`ck-ident-zeile ck-ident-gelesen${heute.morgenlese ? ' ck-ident-zeile--an' : ''}`}
+          onClick={() => umschalten('morgenlese')}
+          disabled={laedt}
+          aria-pressed={heute.morgenlese}
+        >
+          <span className={`ck-ident-box${heute.morgenlese ? ' ck-ident-box--an' : ''}`} aria-hidden>
+            {heute.morgenlese ? (
+              <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+                <path d="m5 12.5 4.5 4.5L19 7" />
+              </svg>
+            ) : null}
+          </span>
+          <span className="ck-ident-zeile-text">
+            <span className="ck-ident-zeile-titel">
+              {heute.morgenlese ? 'Gelesen — der Tag gehört dir.' : 'Komplett gelesen'}
+            </span>
+            <span className="ck-ident-zeile-mass">zählt die Morgenlese-Serie</span>
+          </span>
+        </button>
       </section>
 
       {/* --- Serien + Check-in --------------------------------------------- */}
@@ -160,7 +187,10 @@ export function IdentitaetAnsicht({
         <div className="ck-ident-bildtext">
           <img src={boardPfad(PORTRAET_BILD)} alt="" loading="lazy" decoding="async" />
           <div>
-            <span className="ck-label">Visionstext</span>
+            <div className="ck-ident-visionstext-kopf">
+              <span className="ck-label">Visionstext</span>
+              <VisionstextVorlesen />
+            </div>
             {/* Die ersten beiden Absätze stehen offen — sie tragen den Kern.
                 Die übrigen sieben würden am Handy drei Bildschirme Textwand
                 ergeben und liegen deshalb einen Tipp entfernt. Der Wortlaut

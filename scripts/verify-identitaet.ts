@@ -94,6 +94,7 @@ const zeile = (datum: string, felder: Partial<Omit<StreakTag, 'datum'>>): Streak
   vertriebsblock: false,
   clean: false,
   sport: false,
+  morgenlese: false,
   ...felder,
 })
 
@@ -377,6 +378,39 @@ wahr('der Banner-Titel trägt einen Textschatten', /\.ck-ident-banner-titel\s*\{
 // Gestapelt wird mit positiven z-index — negative rutschen hinter den
 // Hintergrund von .ck-root (position: fixed) und das Bild verschwindet.
 wahr('kein negativer z-index in der Identity-Sektion', !/\.ck-ident-[a-z-]*\s*\{[^}]*z-index:\s*-/.test(css))
+
+// ---------------------------------------------------------------------------
+// Morgenlese-Serie + Vorlesen (0073, 17.08.)
+// ---------------------------------------------------------------------------
+const migration73 = lies('supabase/migrations/0073_identity_morgenlese.sql')
+wahr('0073 ergaenzt die Spalte morgenlese', /add column if not exists morgenlese boolean not null default false/.test(migration73))
+wahr('der Hook laedt morgenlese mit', /select\('datum, vertriebsblock, clean, sport, morgenlese,/.test(hook))
+// Die Morgenlese zaehlt JEDEN Kalendertag (Regel 1) — wie Clean, anders als
+// der Vertriebsblock.
+wahr('Morgenlese zaehlt samstags', tagZaehlt('morgenlese', SA))
+check(
+  'Morgenlese-Serie reisst am Wochenende',
+  laufendeSerie([zeile(FR, { morgenlese: true })], 'morgenlese', SO).laenge,
+  0,
+)
+check(
+  'lueckenlose Morgenlese-Kette zaehlt jeden Tag',
+  laufendeSerie(
+    [zeile(FR, { morgenlese: true }), zeile(SA, { morgenlese: true }), zeile(SO, { morgenlese: true })],
+    'morgenlese',
+    SO,
+  ).laenge,
+  3,
+)
+const ansicht = lies('app/src/cockpit/components/identitaet/IdentitaetAnsicht.tsx')
+wahr('der Gelesen-Haken sitzt in der Ansicht', /umschalten\('morgenlese'\)/.test(ansicht))
+wahr('das Streak-Band traegt die Morgenlese-Kachel', /feld="morgenlese"/.test(lies('app/src/cockpit/components/identitaet/StreakBand.tsx')))
+const vorlesen = lies('app/src/cockpit/components/identitaet/VisionstextVorlesen.tsx')
+wahr('Vorlesen: eigene Aufnahme hat Vorrang', /visionstext\.m4a/.test(vorlesen) && /visionstext\.mp3/.test(vorlesen))
+wahr('Vorlesen: SPA-Falle wird ueber content-type abgefangen', /startsWith\('audio'\)/.test(vorlesen))
+wahr('Vorlesen: Systemstimme als Rueckfall', /speechSynthesis/.test(vorlesen))
+wahr('Vorlesen: Aufraeumen beim Verlassen', /useEffect\(\(\) => stopp, \[stopp\]\)/.test(vorlesen))
+wahr('Vorlesen haengt am Visionstext', /VisionstextVorlesen/.test(ansicht))
 
 console.log(`${pass} bestanden, ${fail} fehlgeschlagen`)
 process.exit(fail === 0 ? 0 : 1)

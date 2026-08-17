@@ -18,7 +18,7 @@ import type { CheckinRow } from '../../lib/useIdentityCheckin'
 interface Props {
   heute: CheckinRow
   laedt: boolean
-  umschalten: (feld: 'vertriebsblock' | 'clean' | 'sport') => void
+  umschalten: (feld: 'vertriebsblock' | 'clean' | 'sport' | 'morgenlese') => void
   setzen: (patch: Partial<Omit<CheckinRow, 'datum'>>) => void
 }
 

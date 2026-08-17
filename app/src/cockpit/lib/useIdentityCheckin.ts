@@ -25,6 +25,8 @@ export interface CheckinRow {
   vertriebsblock: boolean
   clean: boolean
   sport: boolean
+  /** Morgenlese komplett gelesen (Migration 0073). */
+  morgenlese: boolean
   energie: number | null
   dankbar_1: string | null
   dankbar_2: string | null
@@ -45,6 +47,7 @@ export function leererCheckin(datum: string): CheckinRow {
     vertriebsblock: false,
     clean: false,
     sport: false,
+    morgenlese: false,
     energie: null,
     dankbar_1: null,
     dankbar_2: null,
@@ -68,7 +71,7 @@ export interface UseIdentityCheckinResult {
   /** Ein oder mehrere Felder des HEUTIGEN Tages setzen. */
   setzen: (patch: Partial<Omit<CheckinRow, 'datum'>>) => void
   /** Einen Haken umlegen. */
-  umschalten: (feld: 'vertriebsblock' | 'clean' | 'sport') => void
+  umschalten: (feld: 'vertriebsblock' | 'clean' | 'sport' | 'morgenlese') => void
   neuLaden: () => Promise<void>
 }
 
@@ -117,7 +120,7 @@ export function useIdentityCheckin(): UseIdentityCheckinResult {
     setLaedt(true)
     const { data, error } = await supabase
       .from('identity_checkins')
-      .select('datum, vertriebsblock, clean, sport, energie, dankbar_1, dankbar_2, dankbar_3')
+      .select('datum, vertriebsblock, clean, sport, morgenlese, energie, dankbar_1, dankbar_2, dankbar_3')
       .eq('user_id', u.id)
       .eq('brand_id', b.id)
       .gte('datum', fensterStart)
@@ -238,7 +241,7 @@ export function useIdentityCheckin(): UseIdentityCheckinResult {
   )
 
   const umschalten = useCallback(
-    (feld: 'vertriebsblock' | 'clean' | 'sport') => {
+    (feld: 'vertriebsblock' | 'clean' | 'sport' | 'morgenlese') => {
       const jetzt = zeilenRef.current.find((z) => z.datum === heuteIso) ?? leererCheckin(heuteIso)
       setzen({ [feld]: !jetzt[feld] } as Partial<CheckinRow>)
     },
@@ -268,6 +271,7 @@ export function useIdentityCheckin(): UseIdentityCheckinResult {
         vertriebsblock: z.vertriebsblock,
         clean: z.clean,
         sport: z.sport,
+        morgenlese: z.morgenlese,
       })),
     [zeilen],
   )

@@ -36,6 +36,7 @@ const FIXTURES: StreakTag[] = (() => {
       clean: i < 3,
       vertriebsblock: !istWochenende(tag) && i < 6,
       sport: i === 1 || i === 4,
+      morgenlese: i < 5,
     })
     tag = tagDavor(tag)
   }
@@ -48,6 +49,7 @@ export function IdentitaetVorschau() {
     vertriebsblock: true,
     clean: true,
     sport: false,
+    morgenlese: true,
     energie: 7,
     dankbar_1: 'Der Block lief, bevor ich das System aufgemacht habe.',
     dankbar_2: 'Lisa hat gekocht.',
@@ -57,7 +59,7 @@ export function IdentitaetVorschau() {
   // Die Fixture-Serien ziehen mit, wenn man in der Vorschau einen Haken umlegt.
   const streakZeilen: StreakTag[] = [
     ...FIXTURES.filter((z) => z.datum !== HEUTE),
-    { datum: HEUTE, clean: heute.clean, vertriebsblock: heute.vertriebsblock, sport: heute.sport },
+    { datum: HEUTE, clean: heute.clean, vertriebsblock: heute.vertriebsblock, sport: heute.sport, morgenlese: heute.morgenlese },
   ]
 
   return (

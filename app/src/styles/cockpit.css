@@ -2048,3 +2048,26 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
   .ck-ident-summary-zeichen::after,
   .ck-ident-zeile { transition: none; }
 }
+
+/* --- Morgenlese-Serie + Gelesen-Haken + Vorlesen (0073, 17.08.) ---------- */
+
+/* Die dritte Serien-Kachel liegt mobil über beide Spalten — die Basis-Zeile
+   unter den zwei harten Serien. Am Desktop stehen alle drei nebeneinander. */
+.ck-ident-streak--breit { grid-column: 1 / -1; }
+@media (min-width: 901px) {
+  .ck-ident-streak-band { max-width: 760px; grid-template-columns: repeat(3, 1fr); }
+  .ck-ident-streak--breit { grid-column: auto; }
+}
+
+/* Der Gelesen-Haken am Ende der Morgenlese — etwas Luft zum Text darüber. */
+.ck-ident-gelesen { margin-top: 4px; }
+
+/* Kopfzeile des Visionstexts: Label links, Vorlese-Knopf rechts. */
+.ck-ident-visionstext-kopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.ck-ident-vorlesen { min-height: 44px; }
