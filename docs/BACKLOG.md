@@ -4,6 +4,14 @@
 
 ## **LIVE seit 17.08.2026, ~01:25 — Morgenlese-Serie + Vorlesen** (Nachschlag)
 
+**Nachtrag ~01:45 — Umbenennung, live:** „Morgenlese" heißt überall sichtbar
+jetzt **„Sunrise Success Formel"** (Kevins Wort) — Hero, Homescreen-Zeile,
+`/morgen`-Knopf, Serien-Kachel, Regeln-Texte, und die Visionmap im Vault ist
+nachgezogen (6 Vorkommen), damit Quelle und App nicht auseinanderlaufen.
+Interne Bezeichner (DB-Spalte `morgenlese`, CSS-Klassen) bleiben — eine
+Migration nur fürs Umbenennen wäre Risiko ohne Nutzen. Die Palette findet
+beide Begriffe. Beleg: 7 Vorkommen im ausgelieferten Bundle.
+
 Kevins drei Wünsche direkt nach dem Livegang, gebaut und im selben Zug
 ausgeliefert (wieder `netlify deploy --prod`, CSS hash-identisch mit dem
 lokal abgenommenen Build; Migration **0073 in der Prod-DB**):
