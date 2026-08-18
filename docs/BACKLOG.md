@@ -2,10 +2,32 @@
 
 **Stand:** 2026-08-18 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
 
-## **GEBAUT 18.08.2026, ~14:00 — /sales wird der Tages-Flow** (Kevin: „von oben nach unten abarbeitbar")
+## **LIVE seit 18.08.2026, ~14:40 — /sales wird der Tages-Flow** (Kevin: „von oben nach unten abarbeitbar")
 
-**Nicht live** — der Fast-Forward bleibt Kevins Wort. Migration **0074 ist
-eingespielt** (`db push`, Historie war davor lückenlos bis 0073).
+**LIVE auf Kevins Wort** („bitte alles zusammen live bringen“):
+Fast-Forward `81a6b0f → e2fb366` auf `main`, Netlify hat deployt. Migration
+**0074 ist eingespielt** (`db push`); `migration list` meldet 74 von 74, keine
+offen.
+
+**Beleg am ausgelieferten Bundle** (`index-BAEGf90O.js` — der Hash weicht vom
+lokalen ab, weil Netlify mit eigenen Env-Variablen baut): neun Marken dieser
+Runde nachweisbar — „Neben dem Ritual“, „Portion für heute“, „Reaktionszeit
+zählt“, „Liegt still“, „seither gebucht“, „Postfach-Stand“, „Wer angenommen
+hat“, „Zugesagte Analysen“, „Nie angenommene Anfragen“. **Gegenprobe
+bestanden:** „Kundenarbeit“ und „Werkzeuge bereit“ sind aus dem Prod-Bundle
+verschwunden. („Jetzt dran“ steht weiter drin — das ist das Home-Widget
+`JetztDran.tsx`, nicht die gefallene Sales-Kachel.) `/`, `/cockpit`, `/sales`
+und `/portal` antworten 200.
+
+Im selben Fast-Forward ging die parallele Runde des Tages mit live (Commit
+`e2fb366`): Agenten-Schleuse, die echte Erstnachrichten-Zahl und die
+Widerspruchs-Meldung. Die Schleuse ist Runner-Code und steht deshalb nicht im
+Browser-Bundle; `widersprueche` ist dort nachweisbar.
+
+**Nicht im Repo** (18.08., `.gitignore`): `identity-os-bilder/` (127 MB) und
+die großen HTML-Arbeitsstände `visionmap-2.0.html` / `lebensstil.html`. Sie
+gehen ohnehin nicht live — Netlify baut nur `app/` — und hätten die History
+dauerhaft aufgebläht.
 
 Kevins Befund am Kachel-Raster: elf gleich aussehende Karten, „219 offen" als
 Angst-Zahl obenauf („die erschlagen mich, und die hat auch einfach keine
