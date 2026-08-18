@@ -2,6 +2,63 @@
 
 **Stand:** 2026-08-18 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
 
+## **LIVE seit 18.08.2026, ~16:15 — Warum Leads faelschlich als „offen" galten**
+
+Kevins Befund an der frisch gebauten Erstnachrichten-Zeile: „Bernd Herfurth und
+Célie-Helén Helinurm haben doch schon eine Nachricht gehabt? Jonas Jacobi
+auch... woran haben wir die letzten Wochen gearbeitet?" — und die Nachfrage,
+die den Unterschied machte: **„ich will nicht, dass du das nur bei denen
+fixt."** Zu Recht: an den Prod-Daten nachgemessen waren es **zwei unabhängige
+Ursachen**, und die größere hatte mit den drei Namen nichts zu tun.
+
+### 1. Die Postfach-Abdeckung — die eigentliche Ursache
+
+Der Alltags-Sync blättert 30 Tage zurück. Die Begründung stand als Tatsache im
+Code: *„der einmalige Tiefenscan ist gelaufen, ältere Threads liegen bereits in
+der DB."* Sie war falsch. **39 Threads aus Kevins Postfach standen nie in der
+Tabelle**, teils aus 2025 — der Scan vom 28.07. hatte sie übersehen, und ein
+Fenster, das nur vorwärts schaut, holt sie nie ein. Bernds Chat ist vom 12.01.:
+für das System existierte er nicht.
+
+Ein Zeitfresser kam dazu: `node runner/linkedin/sync.mjs` **schreibt nie in die
+Datenbank**, auch ohne `--dry-run`. Ein Tiefenscan von Hand sah aus, als hätte
+er nachgetragen — er tat es nicht. Steht jetzt am Code.
+
+| Zug | Ergebnis | Datei |
+|---|---|---|
+| Fenster je Aufruf | `syncThreads({ scanTage })` statt einer Modul-Konstante; unbrauchbare Werte fallen auf den Standard zurück | `runner/linkedin/sync.mjs` |
+| Wöchentlicher Tiefenscan | Der Runner fährt `TIEFENSCAN_TAGE = 400` beim ersten Sync nach dem Start und danach wöchentlich (~12 s, 10 Seitenaufrufe) | `runner/index.mjs` (`maybePostfachSync`) |
+| Sichtbar im Log | `postfach-sync (Tiefenscan): … · N neu` statt eines stillen Laufs | `runner/index.mjs` |
+| Lücke geschlossen | 38 fehlende Threads nachgetragen: **DB 160 → 198** (= alles im Postfach) | einmaliger Lauf |
+
+### 2. Der Namensabgleich — der sichtbare Teil
+
+Der exakte Vergleich verlor zwei echte Treffer, deren Threads längst in der DB
+lagen: `Célie-Hélène` vs. `Célie-Helén` (LinkedIn schreibt denselben Menschen
+je nach Quelle anders) und `Jonas Jacobi & Moritz Wagner` vs. `Jonas Jacobi`
+(die Lead-Liste führt Bürogemeinschaften als Doppelnamen).
+
+`personenSchluessel` vergleicht jetzt **Nachname + die ersten vier Zeichen des
+Vornamens**, akzentfrei und ohne Zweitnamen. An Kevins Daten gemessen (198
+Threads, 118 Leads): **null Kollisionen, zwei zusätzliche Treffer.** Die
+Gegenrichtung ist als Test festgehalten — Michael und Martina Schmidt bleiben
+getrennt, denn ein verlorener offener Lead ist teurer als einer, der einmal zu
+viel dasteht.
+
+### Wirkung
+
+Von **113** als „offen" verbuchten Erstnachrichten sind **33 wirklich offen**.
+80 haben längst einen Chat, **16 davon haben geantwortet** — die gehören in die
+Antworten-Zeile, nicht in die Erstnachrichten.
+
+**Neu:** `verify-postfach-tiefenscan` (13 Fälle) hält die widerlegte Annahme
+draußen; `verify-erstnachrichten-offen` von 8 auf 14 Fälle, **Kevins drei Namen
+stehen namentlich drin** — eine Zahl mit Datum überlebt den nächsten Umbau, eine
+allgemeine Warnung nicht. 47 verify-Skripte grün, Build grün. Der Runner wurde
+neu gestartet (launchd, `KeepAlive`), damit der Tiefenscan greift.
+
+---
+
 ## **LIVE seit 18.08.2026, ~15:15 — Der Name ist jetzt ein Kopier-Griff**
 
 Kevins Nachtrag: „Ich muss den Namen anklicken können, um diesen zu kopieren.
