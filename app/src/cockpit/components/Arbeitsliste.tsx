@@ -88,6 +88,7 @@ export function Arbeitsliste({ posten, onErledigt, onZaehler, morgen, loom, proj
   const [offenSeit, setOffenSeit] = useState(0)
   const [erledigt, setErledigt] = useState<Set<string>>(new Set())
   const [kopiertId, setKopiertId] = useState<string | null>(null)
+  const [nameKopiertId, setNameKopiertId] = useState<string | null>(null)
   const [kopierGesperrt, setKopierGesperrt] = useState(false)
 
   const toggle = useCallback((id: string) => {
@@ -95,6 +96,73 @@ export function Arbeitsliste({ posten, onErledigt, onZaehler, morgen, loom, proj
     setOffenSeit(Date.now())
     setKopierGesperrt(false)
   }, [])
+
+  /**
+   * Kopieren mit Rückfallebene (18.08.2026).
+   *
+   * `navigator.clipboard` ist der richtige Weg, scheitert aber je nach
+   * Browser-Zustand mit `NotAllowedError` — messbar im Vorschau-Browser, und
+   * Safari ist hier historisch eigen. Dann greift die alte Technik: ein
+   * unsichtbares Textfeld, markieren, `execCommand('copy')`. Sie ist
+   * veraltet, aber sie funktioniert genau dort, wo die moderne API aussteigt,
+   * und ein „Zwischenablage gesperrt" bei jedem zweiten Namen wäre für Kevins
+   * LinkedIn-Runde teurer als eine veraltete Zeile Code.
+   *
+   * Gibt zurück, ob es geklappt hat — die Rückmeldung am Namen hängt daran.
+   */
+  const inZwischenablage = useCallback(async (text: string): Promise<boolean> => {
+    try {
+      await navigator.clipboard.writeText(text)
+      return true
+    } catch {
+      try {
+        const feld = document.createElement('textarea')
+        feld.value = text
+        // Aus dem Blick, aber im Layout — `display: none` liesse sich nicht markieren.
+        feld.setAttribute('aria-hidden', 'true')
+        feld.style.position = 'fixed'
+        feld.style.top = '-1000px'
+        feld.style.opacity = '0'
+        document.body.appendChild(feld)
+        feld.select()
+        const ok = document.execCommand('copy')
+        document.body.removeChild(feld)
+        return ok
+      } catch {
+        return false
+      }
+    }
+  }, [])
+
+  /**
+   * Der Griff auf den Namen kopiert ihn UND klappt auf (18.08.2026).
+   *
+   * Kevins Arbeitsweise: „Ich muss auf LinkedIn erst nach dem Namen suchen und
+   * dann die Nachricht kopieren und einfügen." Der Name war bisher nur der
+   * Aufklapp-Schalter — er musste ihn von Hand markieren, was auf dem Handy
+   * am zuverlässigsten scheitert. Jetzt liegt er nach demselben Tipp in der
+   * Zwischenablage, mit dem sich die Nachricht darunter öffnet: erst in die
+   * LinkedIn-Suche einfügen, dann unten „Kopieren" für den Text.
+   *
+   * Die Reihenfolge trägt das: Name (suchen) kommt vor Text (einfügen), und
+   * „Kopieren" überschreibt danach bewusst — nie andersherum.
+   */
+  const nameGriff = useCallback(
+    (p: Posten) => {
+      toggle(p.id)
+      void inZwischenablage(p.name).then((ok) => {
+        // Gescheitertes Kopieren darf das Aufklappen nicht mitreissen — der
+        // Hinweis dazu steht unten im aufgeklappten Bereich.
+        if (!ok) {
+          setKopierGesperrt(true)
+          return
+        }
+        setNameKopiertId(p.id)
+        window.setTimeout(() => setNameKopiertId((prev) => (prev === p.id ? null : prev)), 2000)
+      })
+    },
+    [toggle, inZwischenablage],
+  )
 
   const hake = useCallback(
     (p: Posten) => {
@@ -110,15 +178,17 @@ export function Arbeitsliste({ posten, onErledigt, onZaehler, morgen, loom, proj
 
   // Kopiert IMMER den versandfertigen Text: liegt ein Entwurf an, ist das der
   // Entwurf — `p.text` ist bei Antworten die Nachricht des Leads.
-  const kopiere = useCallback(async (p: Posten) => {
-    try {
-      await navigator.clipboard.writeText(p.entwurf?.text ?? p.text)
+  const kopiere = useCallback(
+    async (p: Posten) => {
+      if (!(await inZwischenablage(p.entwurf?.text ?? p.text))) {
+        setKopierGesperrt(true)
+        return
+      }
       setKopiertId(p.id)
       window.setTimeout(() => setKopiertId((prev) => (prev === p.id ? null : prev)), 2000)
-    } catch {
-      setKopierGesperrt(true)
-    }
-  }, [])
+    },
+    [inZwischenablage],
+  )
 
   if (posten.length === 0) {
     return <span style={{ fontSize: 13, color: 'var(--ck-text-3)' }}>Nichts offen.</span>
@@ -156,10 +226,13 @@ export function Arbeitsliste({ posten, onErledigt, onZaehler, morgen, loom, proj
                 onHaken={p.nurZaehler ? undefined : () => hake(p)}
                 onMorgen={morgen && !p.nurZaehler && morgen.moeglich(p) ? () => morgen.verschiebe(p) : undefined}
                 hakenLabel={`${p.name} als erledigt abhaken`}
-                onTitel={() => toggle(p.id)}
+                onTitel={() => nameGriff(p)}
                 ausgeklappt={istOffen}
                 meta={
                   [
+                    // Die Rückmeldung steht vorn, damit sie den Blick trifft —
+                    // am Handy gibt es neben dem Titel keinen Platz dafür.
+                    nameKopiertId === p.id ? '✓ Name kopiert' : null,
                     p.firma && p.firma !== p.name ? p.firma : null,
                     p.spur === 'loom' && skriptUrl ? 'Skript da' : null,
                     p.entwurf ? (p.entwurf.veraltet ? 'Entwurf veraltet' : 'Entwurf da') : null,
@@ -203,8 +276,9 @@ export function Arbeitsliste({ posten, onErledigt, onZaehler, morgen, loom, proj
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <button
                 type="button"
-                onClick={() => toggle(p.id)}
+                onClick={() => nameGriff(p)}
                 aria-expanded={istOffen}
+                title={`${p.name} kopieren und öffnen`}
                 style={{
                   flex: 1,
                   minWidth: 0,
@@ -244,6 +318,11 @@ export function Arbeitsliste({ posten, onErledigt, onZaehler, morgen, loom, proj
                 >
                   {p.name}
                 </span>
+                {/* Die Rückmeldung sitzt am Namen, nicht in einer Ecke: dort
+                    schaut Kevin beim Tippen ohnehin hin. */}
+                {nameKopiertId === p.id ? (
+                  <span style={{ fontSize: 11, color: 'var(--ck-accent)', flexShrink: 0 }}>✓ Name kopiert</span>
+                ) : null}
                 {p.firma && p.firma !== p.name ? (
                   <span
                     style={{
