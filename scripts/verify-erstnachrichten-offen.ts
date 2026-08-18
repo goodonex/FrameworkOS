@@ -15,7 +15,7 @@
  * Start: npx tsx scripts/verify-erstnachrichten-offen.ts
  */
 import { erstnachrichtPosten } from '../app/src/cockpit/lib/arbeitsmodusQuellen'
-import { teileErstnachrichten, type AbgleichThread } from '../app/src/cockpit/lib/erstnachrichtenOffen'
+import { teileErstnachrichten, type AbgleichThread, personenSchluessel } from '../app/src/cockpit/lib/erstnachrichtenOffen'
 import type { Erstnachricht } from '../app/src/hooks/useErstnachrichten'
 import type { LinkedinThread } from '../app/src/types/db'
 
@@ -71,6 +71,62 @@ check('ohne Threads (Sync-Ausfall) bleibt alles offen — niemand geht verloren'
 const posten = erstnachrichtPosten(leads, threads as LinkedinThread[])
 check('erstnachrichtPosten benutzt dieselbe Regel', posten.length === 1 && posten[0].name === 'Sandro Hagen')
 check('erstnachrichtPosten ohne Threads verhält sich wie vorher', erstnachrichtPosten(leads).length === 3)
+
+// ---------------------------------------------------------------------------
+// Kevins echte Fälle vom 18.08.2026 — an den Prod-Daten gefunden.
+//
+// Alle drei kamen aus einer Beschwerde („die haben doch schon eine Nachricht
+// gehabt"), und jeder steht für eine eigene Ursache. Sie stehen hier
+// namentlich, weil eine allgemeine Regel („Akzente egal") beim nächsten
+// Umbau leise verloren geht — ein Name mit Datum nicht.
+// ---------------------------------------------------------------------------
+const echteFaelle = [
+  { name: 'Célie-Hélène Helinurm', status: 'offen' as const },
+  { name: 'Jonas Jacobi & Moritz Wagner', status: 'offen' as const },
+  { name: 'Sandro Hagen', status: 'offen' as const },
+]
+const echteThreads = [
+  // Schreibweise wie im Postfach — NICHT wie in der Lead-Liste.
+  { name: 'Célie-Helén Helinurm', last_from: 'me' as const },
+  { name: 'Jonas Jacobi', last_from: 'me' as const },
+]
+const echt = teileErstnachrichten(echteFaelle, echteThreads)
+check(
+  'Akzent-Abweichung Hélène/Helén gilt als dieselbe Person (Kevin 18.08.)',
+  echt.schonRaus.some((l) => l.name === 'Célie-Hélène Helinurm'),
+  `schonRaus: ${echt.schonRaus.map((l) => l.name).join(', ')}`,
+)
+check(
+  'Doppelname „X & Y" trifft den Thread der ersten Person (Kevin 18.08.)',
+  echt.schonRaus.some((l) => l.name === 'Jonas Jacobi & Moritz Wagner'),
+  `schonRaus: ${echt.schonRaus.map((l) => l.name).join(', ')}`,
+)
+check('wer wirklich keinen Thread hat, bleibt offen', echt.offen.map((l) => l.name).join() === 'Sandro Hagen')
+
+// Die Gegenrichtung: der Schlüssel darf nicht so grob werden, dass zwei
+// verschiedene Menschen zusammenfallen. Ein verlorener offener Lead ist
+// teurer als einer, der einmal zu viel dasteht.
+const namensvettern = teileErstnachrichten(
+  [
+    { name: 'Michael Schmidt', status: 'offen' as const },
+    { name: 'Martina Schmidt', status: 'offen' as const },
+  ],
+  [{ name: 'Michael Schmidt', last_from: 'me' as const }],
+)
+check(
+  'gleicher Nachname, anderer Vorname bleibt getrennt',
+  namensvettern.offen.map((l) => l.name).join() === 'Martina Schmidt' &&
+    namensvettern.schonRaus.map((l) => l.name).join() === 'Michael Schmidt',
+  `offen: ${namensvettern.offen.map((l) => l.name).join(', ')}`,
+)
+check(
+  'Zweitname stört nicht (Bernd Benno Herrfurth = Bernd Herrfurth)',
+  teileErstnachrichten(
+    [{ name: 'Bernd Benno Herrfurth', status: 'offen' as const }],
+    [{ name: 'Bernd Herrfurth', last_from: 'me' as const }],
+  ).schonRaus.length === 1,
+)
+check('personenSchluessel verträgt Leeres', personenSchluessel(null) === '' && personenSchluessel('  ') === '')
 
 console.log(`\n${pass} ok, ${fail} fehlen`)
 process.exit(fail === 0 ? 0 : 1)

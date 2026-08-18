@@ -13,7 +13,7 @@ import { mkdir, readdir, readFile, realpath, rename, stat, unlink, writeFile } f
 import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
-import { syncThreads } from './linkedin/sync.mjs'
+import { syncThreads, TIEFENSCAN_TAGE } from './linkedin/sync.mjs'
 import { upsertThreads } from './linkedin/upsert.mjs'
 import { ladeErstnachrichten } from './linkedin/erstnachrichten.mjs'
 import { baueAntwortInput, holeAntwortThreads } from './linkedin/antwortThreads.mjs'
@@ -2544,6 +2544,14 @@ const POSTFACH_AB_STUNDE = Number(process.env.POSTFACH_STUNDE ?? 6)
 const POSTFACH_BIS_STUNDE = Number(process.env.POSTFACH_BIS_STUNDE ?? 20)
 const POSTFACH_ABSTAND_MS = Number(process.env.POSTFACH_ABSTAND_MS ?? 2 * 60 * 60 * 1000)
 let letzterPostfachSync = 0
+/**
+ * Der Tiefenscan läuft beim ERSTEN Postfach-Sync nach dem Start und danach
+ * wöchentlich. Bewusst kein persistenter Zustand: ein Neustart darf ihn ruhig
+ * auslösen — er kostet ~12 Sekunden, und die Lücke, die er schließt, hat Kevin
+ * drei Wochen lang falsche Zahlen gezeigt.
+ */
+const TIEFENSCAN_ABSTAND_MS = Number(process.env.TIEFENSCAN_ABSTAND_MS ?? 7 * 24 * 60 * 60 * 1000)
+let letzterTiefenscan = 0
 
 async function maybePostfachSync() {
   try {
@@ -2556,10 +2564,17 @@ async function maybePostfachSync() {
     linkedinSyncRunning = true
     letzterPostfachSync = Date.now()
     try {
-      const synced = await syncThreads({})
+      // Einmal pro Woche weit zurückblättern statt nur 30 Tage. Grund steht in
+      // sync.mjs: ein reines Vorwärtsfenster holt Threads, die es einmal
+      // verpasst hat, NIE mehr ein — am 18.08. fehlten so 39 Stück, und Leads
+      // galten als unbeschrieben, obwohl der Chat seit Monaten lief.
+      const tief = Date.now() - letzterTiefenscan > TIEFENSCAN_ABSTAND_MS
+      const synced = await syncThreads(tief ? { scanTage: TIEFENSCAN_TAGE } : {})
       const result = await upsertThreads(synced.threads, {})
+      if (tief) letzterTiefenscan = Date.now()
       console.log(
-        `[runner] postfach-sync: ${result.geschrieben ?? synced.threads.length} Threads` +
+        `[runner] postfach-sync${tief ? ' (Tiefenscan)' : ''}: ${result.geschrieben ?? synced.threads.length} Threads` +
+          (result.inserted ? ` · ${result.inserted} neu` : '') +
           (synced.partial ? ' · TEILWEISE (Lauf brach ab)' : ''),
       )
     } finally {

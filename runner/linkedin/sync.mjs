@@ -25,13 +25,26 @@ const CDP = 'http://127.0.0.1:9222'
 const MESSAGING = 'https://www.linkedin.com/messaging/'
 const HARD_TIMEOUT_MS = 90_000
 
-// Wie weit zurück geblättert wird. 30 Tage im Alltag: der einmalige Tiefenscan
-// ist gelaufen, ältere Threads liegen bereits in der DB und werden nie gelöscht.
-// Weil LinkedIn absteigend nach letzter Aktivität sortiert, rutscht ein alter
-// Thread, in dem wieder etwas passiert, automatisch auf Seite 1 — ein kurzes
-// Fenster übersieht also keine neue Aktivität, es spart nur Seitenaufrufe.
-// Für einen erneuten Tiefenscan: LINKEDIN_SCAN_TAGE=365 node runner/linkedin/sync.mjs --dry-run
+// Wie weit zurück geblättert wird. 30 Tage im Alltag: Weil LinkedIn absteigend
+// nach letzter Aktivität sortiert, rutscht ein alter Thread, in dem wieder etwas
+// passiert, automatisch auf Seite 1 — ein kurzes Fenster übersieht keine neue
+// Aktivität, es spart nur Seitenaufrufe.
+//
+// **Was daran am 18.08.2026 nicht stimmte.** Hier stand die Begründung „der
+// einmalige Tiefenscan ist gelaufen, ältere Threads liegen bereits in der DB".
+// Sie war falsch: 39 Threads aus Kevins Postfach standen NIE in der Tabelle,
+// teils aus 2025 — der Scan vom 28.07. hatte sie übersehen, und ein 30-Tage-
+// Fenster kann sie nie mehr einholen. Folge: Leads galten als „Erstnachricht
+// offen", obwohl der Chat seit Monaten lief (Kevin: „woran haben wir die
+// letzten Wochen gearbeitet?").
+//
+// Ein Fenster, das nur vorwärts schaut, braucht deshalb eine Gegenprobe. Der
+// Runner fährt einmal pro Woche mit TIEFENSCAN_TAGE (siehe `maybePostfachSync`);
+// ein einzelner Tieflauf kostet ~12 Sekunden und 10 Seitenaufrufe.
 const SCAN_TAGE = Number(process.env.LINKEDIN_SCAN_TAGE ?? 30)
+
+/** Fenster des wöchentlichen Tiefenscans — deckt auch lange ruhende Chats ab. */
+export const TIEFENSCAN_TAGE = 400
 
 async function findOrOpenMessaging() {
   const get = async () => (await fetch(`${CDP}/json`)).json()
@@ -434,12 +447,17 @@ async function sichtbarMachen(wsUrl) {
   await befehl('Page.setWebLifecycleState', { state: 'active' })
 }
 
-export async function syncThreads({ dryRun = false } = {}) {
+/**
+ * @param {{dryRun?: boolean, scanTage?: number}} opts — `scanTage` überschreibt
+ *   das Standardfenster (Alltag 30, Tiefenscan {@link TIEFENSCAN_TAGE}).
+ */
+export async function syncThreads({ dryRun = false, scanTage } = {}) {
   const startedAt = Date.now()
   const page = await findOrOpenMessaging()
   await sichtbarMachen(page.webSocketDebuggerUrl)
   const cachedQid = leseQidCache()
-  const result = await evaluate(page.webSocketDebuggerUrl, buildSyncExpr(cachedQid, SCAN_TAGE))
+  const fenster = Number.isFinite(scanTage) && scanTage > 0 ? Number(scanTage) : SCAN_TAGE
+  const result = await evaluate(page.webSocketDebuggerUrl, buildSyncExpr(cachedQid, fenster))
 
   if (result.queryId && result.queryId !== cachedQid) schreibeQidCache(result.queryId)
 
@@ -482,12 +500,17 @@ export async function syncThreads({ dryRun = false } = {}) {
     verlaufNachrichten: result.verlaufNachrichten,
     threadsMitMehrAlsEiner: result.threadsMitMehrAlsEiner,
     mailboxUrn: result.mailboxUrn,
+    scanTage: fenster,
     dryRun,
     elapsedMs: Date.now() - startedAt,
   }
 }
 
-// CLI: `node runner/linkedin/sync.mjs --dry-run` — gibt JSON auf stdout aus, schreibt nichts.
+// CLI: gibt JSON auf stdout aus und schreibt NIE in die Datenbank — auch ohne
+// `--dry-run`. Das hat am 18.08. Zeit gekostet: ein Tiefenscan von Hand sah aus,
+// als hätte er die fehlenden Threads nachgetragen, tat es aber nicht. Wer
+// nachtragen will, ruft `upsertThreads` selbst (der Runner tut genau das).
+// Aufruf mit weiterem Fenster: LINKEDIN_SCAN_TAGE=400 node runner/linkedin/sync.mjs
 if (process.argv[1] && import.meta.url === pathToFileURL(resolvePath(process.argv[1])).href) {
   const dryRun = process.argv.includes('--dry-run')
   syncThreads({ dryRun })
