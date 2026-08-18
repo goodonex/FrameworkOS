@@ -10,6 +10,7 @@ import { ordnePosten, type Posten, type PostenQuellen } from '../cockpit/lib/pri
 import { useContacts, type UseContactsResult } from './useContacts'
 import { useDeliverProjects } from './useDeliverProjects'
 import { useErstnachrichten } from './useErstnachrichten'
+import { useLinkedinNetzwerk } from './useLinkedinNetzwerk'
 import { useLinkedinThreads } from './useLinkedinThreads'
 import { useTasks } from './useTasks'
 
@@ -43,6 +44,9 @@ export function usePosten(slug: string | undefined): UsePostenResult {
   const tasks = useTasks(slug)
   const linkedinThreads = useLinkedinThreads(slug)
   const erstnachrichten = useErstnachrichten(slug)
+  // Nur für den Profil-Link an den Erstnachrichten (18.08.2026) — die Liste
+  // selbst kommt weiter aus `linkedin_erstnachrichten`.
+  const netzwerk = useLinkedinNetzwerk(slug)
 
   // Minutentakt statt Date.now() bei jedem Render — sonst rechnen die useMemos
   // unten bei jedem Tastendruck neu.
@@ -68,14 +72,20 @@ export function usePosten(slug: string | undefined): UsePostenResult {
     () => kundeLiegtPosten(projekte.items, tasks.items, contacts.items, jetzt),
     [projekte.items, tasks.items, contacts.items, jetzt],
   )
-  const antwortListe = useMemo(() => antwortPosten(linkedinThreads.items, jetzt), [linkedinThreads.items, jetzt])
+  const antwortListe = useMemo(
+    () => antwortPosten(linkedinThreads.items, jetzt, contacts.items),
+    [linkedinThreads.items, jetzt, contacts.items],
+  )
   const loomListe = useMemo(() => loomPosten(linkedinThreads.items), [linkedinThreads.items])
-  const followupListe = useMemo(() => followupPosten(linkedinThreads.items, jetzt), [linkedinThreads.items, jetzt])
+  const followupListe = useMemo(
+    () => followupPosten(linkedinThreads.items, jetzt, contacts.items),
+    [linkedinThreads.items, jetzt, contacts.items],
+  )
   // Threads gegenrechnen: eine verschickte Nachricht bleibt sonst ewig „offen",
   // wenn Kevin sie vom Handy geschickt und den Haken nicht gesetzt hat (17.08.).
   const erstnachrichtListe = useMemo(
-    () => erstnachrichtPosten(erstnachrichten.items, linkedinThreads.items),
-    [erstnachrichten.items, linkedinThreads.items],
+    () => erstnachrichtPosten(erstnachrichten.items, linkedinThreads.items, netzwerk.items),
+    [erstnachrichten.items, linkedinThreads.items, netzwerk.items],
   )
 
   const quellen: PostenQuellen = useMemo(

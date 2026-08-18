@@ -2,6 +2,67 @@
 
 **Stand:** 2026-08-18 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
 
+## **FERTIG 18.08.2026, ~18:30 — Die Antworten-Spur zeigte 29, gearbeitet wird an 11**
+
+Kevins Befund am Fenster „Antworten · 29 warten · älteste 492 Tage": *„Erst mal
+dieses älteste 492 Tage — ich hab erst seit Januar diese Zielgruppe. Dann:
+erster, zweiter, dritter, vierter sind schon mal alles keine ICPs. Zusätzlich
+ist da die Nachricht drin, die die mir geschickt haben und nicht ich an die.
+Und die Leute, die gesagt haben, jawoll, schick mir 'n Loom rüber — den muss
+ich ja nicht antworten, also müssen die auch da raus."*
+
+Alle vier Punkte trafen zu. An den Prod-Daten nachgemessen waren es **drei
+unabhängige Ursachen** in einer Liste:
+
+| Ursache | Menge | Regel jetzt |
+|---|---|---|
+| Loom zugesagt → stand in **beiden** Spuren | 13 | Stern + `loom_status: 'offen'` gehört in die Loom-Spur, nicht in Antworten |
+| Post von vor der Makler-Akquise (April/Mai 2025) | 4 | `AKQUISE_START = 2026-01-01` — davor ist Kaltakquise **an** Kevin |
+| Kunde als Lead behandelt (Norbert, Oliver) | 2 | Namensabgleich gegen `contacts` (`won_at` oder `pipeline_stage: 'deal'`) |
+
+**29 → 11.** Die älteste Zeile ist statt 492 nun 218 Tage alt und gehört Kevin
+wirklich. Nichts verschwindet still: Off-ICP und Vor-Akquise stehen aufklappbar
+unter der Liste, zugesagte Looms eine Zeile tiefer im Tages-Flow.
+
+Die Loom-Doppelung hing an einer Lücke zwischen zwei Filtern: `loomPosten`
+prüfte `starred && loom_status === 'offen'`, `antwortPosten` prüfte den Stern
+gar nicht. Bewusst an `loom_status` geknüpft und nicht am Stern allein —
+schreibt jemand **nach** dem verschickten Loom erneut, wartet er wieder auf
+eine Antwort und gehört zurück in die Spur.
+
+### Zerschossene Umlaute brachen den Namensabgleich
+
+Kevin: *„Jetzt finde ich Maurice Jüngling nicht, weil er Maurice Jnglin heißt…
+und außerdem hat er schon eine Nachricht."* LinkedIn liefert ihn in Postfach
+**und** Netzwerk ohne das ü — der Schlüssel wirft Akzente ab (ü → u), gegen ein
+**fehlendes** Zeichen hilft das nicht: `junglin` ≠ `jnglin`.
+
+Der Abgleich hat jetzt einen zweiten, engen Versuch: gleicher Vornamen-Anfang,
+Nachname ≥ 5 Zeichen, genau ein abweichendes Zeichen, und **mehrdeutige Fälle
+zählen nicht**. An Kevins Bestand gemessen (118 Leads, 198 Threads): **ein**
+zusätzlicher Treffer, **null** Kollisionen. Wer die Schwellen ändert, misst neu.
+
+Dazu die eigentliche Abhilfe gegen „ich finde ihn nicht": Erstnachrichten
+tragen jetzt einen **LinkedIn-Profil-Link** (aus `linkedin_netzwerk`, das eine
+`profile_url` führt — `linkedin_erstnachrichten` hat keine). Kein Suchen nach
+einem Namen mehr, der anders geschrieben ist, als LinkedIn ihn kennt.
+
+### ICP-Regeln: englische Makler-Formulierungen ergänzt
+
+`broker`, `realty`, `property`, `sotheby`, `estate agent`, `selling houses` —
+sieben Threads waren als `unklar` einsortiert, obwohl es Makler sind (Sandra
+Furrer/Sotheby's, Diego Büchel, Claudia Scheer, Fabian Wohlleben …). Kern
+108 → 113, unklar 50 → 45.
+
+### Offen
+
+- **13 Alt-Entwürfe auf Off-ICP-Threads** (vor dem Gate vom 18.08. erzeugt) —
+  die Threads sind ausgeblendet, die Entwürfe stehen noch in der Spalte.
+  Einmalig leeren, wenn Kevin es sagt.
+- **Die 45 „unklar"** trennt kein Wortfilter mehr sauber: dort stehen Makler
+  mit kreativen Headlines neben Coaches ohne Off-Wort. Nächster Schritt wäre
+  ein einmaliger Klassifizierungs-Lauf, der das Urteil an die Zeile schreibt.
+
 ## **LIVE seit 18.08.2026, ~16:15 — Warum Leads faelschlich als „offen" galten**
 
 Kevins Befund an der frisch gebauten Erstnachrichten-Zeile: „Bernd Herfurth und

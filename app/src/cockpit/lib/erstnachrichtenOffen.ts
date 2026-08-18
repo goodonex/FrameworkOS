@@ -62,6 +62,58 @@ export function personenSchluessel(name: string | null | undefined): string {
   return `${worte[worte.length - 1]}/${worte[0].slice(0, 4)}`
 }
 
+/**
+ * Editierabstand mit Abbruch bei > 1 (18.08.2026).
+ *
+ * Braucht es, weil LinkedIn denselben Menschen mit zerschossenen Umlauten
+ * ausliefern kann: Kevins Lead „Maurice Jünglin" heißt im Postfach UND in der
+ * Netzwerk-Liste „Maurice Jnglin" — das ü fehlt ersatzlos. Der Schlüssel wirft
+ * Akzente ab (ü → u), aber gegen ein fehlendes Zeichen hilft das nicht:
+ * „junglin" ≠ „jnglin". Kevins Satz dazu: „Jetzt finde ich Maurice Jüngling
+ * nicht, weil er Maurice Jnglin heißt … und außerdem hat er schon eine
+ * Nachricht."
+ */
+function editAbstand(a: string, b: string): number {
+  if (Math.abs(a.length - b.length) > 1) return 2
+  const zeile = Array.from({ length: b.length + 1 }, (_, j) => j)
+  for (let i = 1; i <= a.length; i++) {
+    let davor = zeile[0]
+    zeile[0] = i
+    for (let j = 1; j <= b.length; j++) {
+      const merk = zeile[j]
+      zeile[j] = Math.min(zeile[j] + 1, zeile[j - 1] + 1, davor + (a[i - 1] === b[j - 1] ? 0 : 1))
+      davor = merk
+    }
+  }
+  return zeile[b.length]
+}
+
+/**
+ * Findet den Thread-Schlüssel zu einem Lead, wenn er nicht exakt gleich heißt.
+ *
+ * Bedingungen bewusst eng: **derselbe Vornamen-Anfang**, ein Nachname von
+ * mindestens fünf Zeichen und genau ein abweichendes Zeichen. Mehrdeutige
+ * Fälle (zwei passende Threads) gelten als kein Treffer — lieber einmal zu
+ * viel anzeigen als den falschen Lead abhaken.
+ *
+ * An Kevins Bestand gemessen (118 Leads, 198 Threads): **ein** zusätzlicher
+ * Treffer (Maurice), **null** Mehrdeutigkeiten. Wer die Schwellen ändert,
+ * misst das neu.
+ */
+function fastGleich(schluessel: string, kandidaten: Iterable<string>): string | null {
+  const [nach, vor] = schluessel.split('/')
+  if (!nach || !vor || nach.length < 5) return null
+  let treffer: string | null = null
+  for (const k of kandidaten) {
+    const [kn, kv] = k.split('/')
+    if (kv !== vor || !kn || kn.length < 5) continue
+    if (editAbstand(nach, kn) > 1) continue
+    if (treffer) return null // mehrdeutig → lieber offen lassen
+    treffer = k
+  }
+  return treffer
+}
+
 /** Das Minimum, das ein Thread zum Abgleich beitragen muss. */
 export interface AbgleichThread {
   name: string
@@ -117,7 +169,9 @@ export function teileErstnachrichten<T extends Pick<Erstnachricht, 'name' | 'sta
 
   for (const l of leads) {
     if (l.status !== 'offen') continue
-    const n = personenSchluessel(l.name)
+    const roh = personenSchluessel(l.name)
+    // Exakt zuerst; nur wenn nichts passt, der tolerante Zweitversuch.
+    const n = threadNamen.has(roh) ? roh : (fastGleich(roh, threadNamen) ?? roh)
     if (antwortNamen.has(n)) hatGeantwortet.push(l)
     else if (threadNamen.has(n)) schonRaus.push(l)
     else offen.push(l)
@@ -132,4 +186,39 @@ export function echtOffeneErstnachrichten<T extends Pick<Erstnachricht, 'name' |
   threads: AbgleichThread[],
 ): T[] {
   return teileErstnachrichten(leads, threads).offen
+}
+
+/**
+ * Baut eine Nachschlagefunktion Name → LinkedIn-Profil aus der Netzwerk-Liste
+ * (18.08.2026).
+ *
+ * Der Grund steht in Kevins Satz „Jetzt finde ich Maurice Jüngling nicht, weil
+ * er Maurice Jnglin heißt": Er kopiert den Namen aus der Arbeitsliste in die
+ * LinkedIn-Suche — und findet niemanden, sobald die beiden Schreibweisen
+ * auseinandergehen. Ein Profil-Link umgeht die Suche ganz.
+ *
+ * `linkedin_erstnachrichten` führt kein Profil-Feld (Migration 0060), aber
+ * `linkedin_netzwerk` (0070) tut es. Verglichen wird über denselben
+ * {@link personenSchluessel} inklusive des toleranten Zweitversuchs, damit
+ * genau der Fall trägt, der den Anlass gab.
+ */
+export function profilNachName(
+  netzwerk: { name: string; profile_url: string }[],
+): (name: string | null | undefined) => string | undefined {
+  const nachSchluessel = new Map<string, string>()
+  for (const n of netzwerk) {
+    const k = personenSchluessel(n.name)
+    if (!k || !n.profile_url) continue
+    // Erster Treffer gewinnt: Ein zweiter Eintrag mit demselben Schlüssel ist
+    // fast immer dieselbe Person aus einem älteren Lauf.
+    if (!nachSchluessel.has(k)) nachSchluessel.set(k, n.profile_url)
+  }
+  return (name) => {
+    const roh = personenSchluessel(name)
+    if (!roh) return undefined
+    const direkt = nachSchluessel.get(roh)
+    if (direkt) return direkt
+    const fast = fastGleich(roh, nachSchluessel.keys())
+    return fast ? nachSchluessel.get(fast) : undefined
+  }
 }

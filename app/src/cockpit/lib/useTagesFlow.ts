@@ -1,5 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { useErstnachrichten } from '../../hooks/useErstnachrichten'
+import { useContacts } from '../../hooks/useContacts'
+import { useLinkedinNetzwerk } from '../../hooks/useLinkedinNetzwerk'
 import { useLinkedinThreads } from '../../hooks/useLinkedinThreads'
 import { useActiveBrand } from './activeBrand'
 import { antwortPosten, erstnachrichtPosten, followupPosten, loomPosten } from './arbeitsmodusQuellen'
@@ -64,6 +66,10 @@ export function useFlowLiveQuellen(): { quellen: FlowLiveQuellen; laedt: boolean
   const { activeBrand } = useActiveBrand()
   const threads = useLinkedinThreads(activeBrand?.slug)
   const erstnachrichten = useErstnachrichten(activeBrand?.slug)
+  // Nur für den Profil-Link an den Erstnachrichten (18.08.2026).
+  const netzwerk = useLinkedinNetzwerk(activeBrand?.slug)
+  // Kunden gehören in keine Akquise-Spur (18.08.2026, Fall Reichentrog).
+  const contacts = useContacts(activeBrand?.slug)
   // Der Mount-Zeitpunkt genügt: die Follow-up-Schwellen sind Tage (3/7/14),
   // eine Zähl-Sitzung dauert Minuten. Ein Minutentakt wie in `usePosten` würde
   // hier nur Neuberechnungen erzeugen, die nichts ändern.
@@ -72,14 +78,14 @@ export function useFlowLiveQuellen(): { quellen: FlowLiveQuellen; laedt: boolean
     () =>
       flowQuellen(
         {
-          followup: followupPosten(threads.items, jetzt),
-          erstnachricht: erstnachrichtPosten(erstnachrichten.items, threads.items),
+          followup: followupPosten(threads.items, jetzt, contacts.items),
+          erstnachricht: erstnachrichtPosten(erstnachrichten.items, threads.items, netzwerk.items),
           loom: loomPosten(threads.items),
-          antwort: antwortPosten(threads.items, jetzt),
+          antwort: antwortPosten(threads.items, jetzt, contacts.items),
         },
         jetzt,
       ),
-    [threads.items, erstnachrichten.items, jetzt],
+    [threads.items, erstnachrichten.items, netzwerk.items, contacts.items, jetzt],
   )
   return { quellen, laedt: threads.loading || erstnachrichten.loading }
 }

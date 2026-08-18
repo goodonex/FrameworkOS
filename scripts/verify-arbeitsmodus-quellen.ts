@@ -4,6 +4,7 @@
  */
 import {
   antwortPosten,
+  antwortPostenAusgeblendet,
   erstnachrichtPosten,
   followupPosten,
   loomPosten,
@@ -77,6 +78,48 @@ function check(label: string, actual: unknown, expected: unknown) {
   check('1a genau ein antwort-posten', posten.length, 1)
   check('1b id mit thread-praefix', posten[0]?.id, 'thread:t1')
   check('1c spur antwort', posten[0]?.spur, 'antwort')
+}
+
+// 1b. Wer ein Loom zugesagt hat, steht in der Loom-Spur — nicht in Antworten
+// (18.08.2026: 13 von 29 standen in beiden Listen).
+{
+  const threads = [
+    makeThread({ id: 't1', last_from: 'them', starred: true, loom_status: 'offen' }),
+    // Loom ist raus, der Lead schreibt erneut → wartet wieder auf eine Antwort.
+    makeThread({ id: 't2', last_from: 'them', starred: true, loom_status: 'verschickt' }),
+  ]
+  const posten = antwortPosten(threads, NOW)
+  check('1b1 offene Loom-Zusage nicht in Antworten', posten.length, 1)
+  check('1b2 nach verschicktem Loom wieder drin', posten[0]?.id, 'thread:t2')
+  check('1b3 zugesagtes Loom gilt nicht als ausgeblendet', antwortPostenAusgeblendet(threads, NOW).length, 0)
+}
+
+// 1c. Post von vor der Makler-Akquise (AKQUISE_START) ist kein Lead.
+{
+  const threads = [
+    makeThread({ id: 'alt', last_from: 'them', last_message_at: '2025-05-06T09:00:00Z' }),
+    makeThread({ id: 'neu', last_from: 'them', last_message_at: dayAgo(2) }),
+  ]
+  const posten = antwortPosten(threads, NOW)
+  check('1c1 nur der Thread seit der Akquise', posten.map((p) => p.id), ['thread:neu'])
+  check('1c2 der alte bleibt abrufbar', antwortPostenAusgeblendet(threads, NOW).map((p) => p.id), ['thread:alt'])
+}
+
+
+// 1d. Kunden gehören in keine Akquise-Spur (Fall Reichentrog, 18.08.2026).
+{
+  const threads = [
+    makeThread({ id: 'kunde', name: 'Norbert Reichentrog', last_from: 'them', last_message_at: dayAgo(2) }),
+    makeThread({ id: 'lead', name: 'Michaela Beer', last_from: 'them', last_message_at: dayAgo(2) }),
+    makeThread({ id: 'kunde-fu', name: 'Norbert Reichentrog', last_from: 'me', last_message_at: dayAgo(9) }),
+  ]
+  const kontakte = [
+    { name: 'Norbert Reichentrog', pipeline_stage: 'deal', won_at: null, contact_type: 'person' },
+    { name: 'Michaela Beer', pipeline_stage: 'first_contact', won_at: null, contact_type: 'person' },
+  ]
+  check('1d1 Kunde nicht in Antworten', antwortPosten(threads, NOW, kontakte).map((p) => p.id), ['thread:lead'])
+  check('1d2 Kunde bekommt kein Follow-up', followupPosten(threads, NOW, kontakte).length, 0)
+  check('1d3 ohne Kontaktliste unveraendert', antwortPosten(threads, NOW).length, 2)
 }
 
 // 2. loomPosten: nur starred + loom_status 'offen'.

@@ -62,6 +62,14 @@ export interface Posten {
   name: string
   firma?: string
   website?: string
+  /**
+   * LinkedIn-Profil des Leads. Bei Threads steckt es in `website` (dort ist es
+   * das einzige Ziel); Erstnachrichten brauchen beides — die Firmenseite zum
+   * Recherchieren und das Profil zum Anschreiben. Kevin sucht sonst von Hand
+   * nach dem Namen, und genau das scheitert, wenn LinkedIn ihn zerschossen
+   * ausliefert („Maurice Jnglin", 18.08.2026).
+   */
+  profil?: string
   /** Nachricht, Loom-Skript oder Aufgabenbeschreibung — white-space: pre-wrap in der UI */
   text: string
   /** ISO-Zeitstempel für die Alterssortierung; null sortiert ans Ende seiner Spur */

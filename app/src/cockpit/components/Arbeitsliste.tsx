@@ -380,15 +380,33 @@ export function Arbeitsliste({ posten, onErledigt, onZaehler, morgen, loom, proj
 
             {istOffen ? (
               <div style={{ padding: '0 2px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {p.website ? (
-                  <a
-                    href={linkHref(p.website)}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{ fontSize: 13, color: 'var(--ck-accent)', textDecoration: 'none' }}
-                  >
-                    {linkLabel(p.website)} ↗
-                  </a>
+                {/* Profil zuerst: dort wird die Nachricht eingefügt, die
+                    Website ist nur Vorbereitung. Der Link ersetzt die Suche
+                    nach dem Namen — die scheitert, sobald LinkedIn ihn anders
+                    schreibt als die Lead-Liste (18.08.2026). */}
+                {p.profil || p.website ? (
+                  <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+                    {p.profil ? (
+                      <a
+                        href={linkHref(p.profil)}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ fontSize: 13, color: 'var(--ck-accent)', textDecoration: 'none' }}
+                      >
+                        LinkedIn-Profil ↗
+                      </a>
+                    ) : null}
+                    {p.website ? (
+                      <a
+                        href={linkHref(p.website)}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ fontSize: 13, color: 'var(--ck-accent)', textDecoration: 'none' }}
+                      >
+                        {linkLabel(p.website)} ↗
+                      </a>
+                    ) : null}
+                  </div>
                 ) : null}
                 <div
                   style={{

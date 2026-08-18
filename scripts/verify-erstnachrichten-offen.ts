@@ -128,5 +128,32 @@ check(
 )
 check('personenSchluessel verträgt Leeres', personenSchluessel(null) === '' && personenSchluessel('  ') === '')
 
+
+// Zerschossene Umlaute: LinkedIn liefert „Maurice Jnglin", der Vault kennt
+// „Maurice Jünglin" — echter Fall aus Kevins Bestand (18.08.2026). Gemessen:
+// ein zusaetzlicher Treffer, null Mehrdeutigkeiten.
+{
+  const a = teileErstnachrichten(
+    [lead('Maurice Jünglin'), lead('Sabine Meierhoff')],
+    [thread('Maurice Jnglin', 'me'), thread('Sabine Maierhoff', 'me')],
+  )
+  check('fehlendes Zeichen im Nachnamen findet den Thread', a.schonRaus.length === 2 && a.offen.length === 0)
+}
+
+// Aber nicht grenzenlos: zwei gleich nahe Threads sind kein Beleg.
+{
+  const b = teileErstnachrichten(
+    [lead('Tim Kramer')],
+    [thread('Tim Krahmer', 'me'), thread('Tim Kromer', 'me')],
+  )
+  check('mehrdeutiger Fastreffer bleibt offen', b.offen.length === 1)
+}
+
+// Kurze Nachnamen bleiben tabu — sonst faellt „Tim Bach" auf „Tim Bald".
+{
+  const c = teileErstnachrichten([lead('Tim Bach')], [thread('Tim Bald', 'me')])
+  check('kurzer Nachname wird nicht geraten', c.offen.length === 1)
+}
+
 console.log(`\n${pass} ok, ${fail} fehlen`)
 process.exit(fail === 0 ? 0 : 1)

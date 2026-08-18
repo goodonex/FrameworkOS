@@ -10,7 +10,7 @@ import { Arbeitsliste, type LoomSkriptAktionen } from '../components/Arbeitslist
 import { Arbeitsmodus, type ArbeitsmodusErgebnis } from '../components/Arbeitsmodus'
 import { InmailPanel } from '../components/InmailPanel'
 import { useActiveBrand } from '../lib/activeBrand'
-import { antwortPostenOffIcp, zeilenId } from '../lib/arbeitsmodusQuellen'
+import { antwortPostenAusgeblendet, zeilenId } from '../lib/arbeitsmodusQuellen'
 import { erledigePosten } from '../lib/arbeitsmodusTracking'
 import { ausAltemWert, poolAbleitung, type InmailStand } from '../lib/inmailStand'
 import { heutigesMetrikDatum } from '../lib/metricsDates'
@@ -723,8 +723,8 @@ export function SalesDashboard() {
    * damit der Filter prüfbar bleibt. Ein Filter, dem man nicht auf die Finger
    * schauen kann, wird zu Recht nicht geglaubt.
    */
-  const offIcpListe = useMemo(
-    () => antwortPostenOffIcp(linkedinThreads.items, jetzt),
+  const ausgeblendetListe = useMemo(
+    () => antwortPostenAusgeblendet(linkedinThreads.items, jetzt),
     [linkedinThreads.items, jetzt],
   )
 
@@ -784,20 +784,20 @@ export function SalesDashboard() {
               ),
           kennzahlFarbe: !flow.laedt && antwortenAbgestanden ? 'var(--ck-warn)' : undefined,
           unterzeile:
-            offIcpListe.length > 0
-              ? `${zuerst(antwortListe) ?? 'Reaktionszeit zählt'} · ${offIcpListe.length} Off-ICP ausgeblendet`
+            ausgeblendetListe.length > 0
+              ? `${zuerst(antwortListe) ?? 'Reaktionszeit zählt'} · ${ausgeblendetListe.length} ausgeblendet`
               : (zuerst(antwortListe) ?? 'Reaktionszeit zählt — nicht die Menge.'),
           inhalt: () => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {liste(antwortListe)()}
-              {offIcpListe.length > 0 ? (
+              {ausgeblendetListe.length > 0 ? (
                 <details>
                   <summary
                     style={{ fontSize: 12, color: 'var(--ck-text-3)', cursor: 'pointer', minHeight: 32, display: 'flex', alignItems: 'center' }}
                   >
-                    {offIcpListe.length} weitere haben geantwortet, sind aber nicht deine Zielgruppe
+                    {ausgeblendetListe.length} weitere haben geantwortet — nicht deine Zielgruppe oder von vor der Makler-Akquise
                   </summary>
-                  <div style={{ marginTop: 8 }}>{liste(offIcpListe)()}</div>
+                  <div style={{ marginTop: 8 }}>{liste(ausgeblendetListe)()}</div>
                 </details>
               ) : null}
             </div>
