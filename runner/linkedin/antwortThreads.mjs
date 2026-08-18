@@ -1,3 +1,5 @@
+import { icpUrteil, istArbeitsVorrat } from './icp.mjs'
+
 /**
  * runner/linkedin/antwortThreads.mjs — Eingabe für den Antwort-Entwürfe-Agenten.
  *
@@ -38,6 +40,24 @@ export function hatFrischenEntwurf(thread) {
   if (!text) return false
   if (!thread.entwurf_at || !thread.last_message_at) return true
   return new Date(thread.entwurf_at).getTime() >= new Date(thread.last_message_at).getTime()
+}
+
+/**
+ * Ist die Person überhaupt Kevins Zielgruppe? (18.08.2026)
+ *
+ * Der Agent schrieb bis heute für JEDEN, der zurückgeschrieben hat — auch für
+ * Coaches, Recruiter und KI-Verkäufer, die Kevin akquirieren wollten. Von 30
+ * erzeugten Entwürfen gingen 9 an solche Profile, darunter „Hi Angelique,
+ * wonach bist du auf der Suche in der Gründerkommune?". Kevins Urteil:
+ * „absolute Token-Verschwendung".
+ *
+ * `unklar` zählt bewusst als Zielgruppe: Die Headline ist Freitext, und ein
+ * fälschlich übergangener Makler ist teurer als ein Entwurf zu viel. Der
+ * Thread selbst bleibt in jedem Fall sichtbar — gefiltert wird nur, wofür der
+ * Agent Zeit und Token ausgibt.
+ */
+function istZielgruppe(thread) {
+  return istArbeitsVorrat(icpUrteil(thread.company, thread.name).urteil)
 }
 
 /** Endzustände: hier ist nichts mehr zu tun (Spiegel von `isTerminal`). */
@@ -128,5 +148,10 @@ export async function holeAntwortThreads({ supabaseUrl, headers, brandSlug = 'he
   if (!res.ok) throw new Error(`linkedin_threads HTTP ${res.status}`)
   const rows = await res.json()
 
-  return { brandId: brand.id, threads: rows.filter((t) => istDuBistDran(t, now)) }
+  const wartend = rows.filter((t) => istDuBistDran(t, now))
+  const threads = wartend.filter(istZielgruppe)
+  // Die Zahl gehört ins Lauf-Ergebnis, nicht ins Nichts: Wenn der Filter eines
+  // Tages zu scharf greift, sieht man es an dieser Zeile und nicht daran, dass
+  // ein Kunde nie eine Antwort bekam.
+  return { brandId: brand.id, threads, uebersprungenOffIcp: wartend.length - threads.length }
 }

@@ -10,6 +10,7 @@
 import type { Erstnachricht } from '../../hooks/useErstnachrichten'
 import type { LinkedinThread } from '../../types/db'
 import { echtOffeneErstnachrichten } from './erstnachrichtenOffen'
+import { icpUrteil, istArbeitsVorrat } from './icp'
 import { bucketOf } from './linkedinFollowups'
 import type { Posten, PostenEntwurf } from './prioritaet'
 
@@ -50,10 +51,38 @@ function threadZuPosten(t: LinkedinThread, spur: Posten['spur'], praefix: string
 /**
  * Rang 3 — Lead hat geantwortet, wartet auf Kevin (bucketOf === 'du_bist_dran').
  * `text` bleibt die Nachricht des Leads (der Kontext), der Entwurf hängt daneben.
+ *
+ * **Ohne Off-ICP** (18.08.2026). Kevin fand in dieser Liste 52 Namen, von denen
+ * über die Hälfte ihn akquirieren wollte — Coaches, Recruiter, KI-Verkäufer.
+ * Seine Frage: „Wir haben doch extra einen ICP-Filter, den können wir doch auch
+ * über die offenen Nachrichten laufen lassen." Konnten wir nicht: Der Filter
+ * stand nur im Skill-Text, nicht im Code. Jetzt schon (`icp.ts`), und zwar
+ * für die Anzeige und den Entwurfs-Agenten aus derselben Regel-Datei.
+ *
+ * `unklar` bleibt drin — die Headline ist Freitext, und ein übersehener Makler
+ * ist teurer als ein Name zu viel in der Liste.
  */
 export function antwortPosten(threads: LinkedinThread[], heute: Date): Posten[] {
   return threads
     .filter((t) => bucketOf(t, heute) === 'du_bist_dran')
+    .filter((t) => istArbeitsVorrat(icpUrteil(t.company, t.name).urteil))
+    .map((t) => ({
+      ...threadZuPosten(t, 'antwort', 'thread', t.preview || `Antwort an ${t.name || 'den Lead'} vorbereiten.`),
+      entwurf: entwurfVon(t),
+    }))
+}
+
+/**
+ * Die Gegenmenge: wer geantwortet hat, aber nicht Kevins Zielgruppe ist.
+ *
+ * Bewusst abrufbar statt weggeworfen — die Zeile im Sales-Flow nennt die Zahl
+ * („27 Off-ICP ausgeblendet") und macht sie auf Klick sichtbar. Ein Filter, den
+ * man nicht prüfen kann, ist ein Filter, dem man nicht traut.
+ */
+export function antwortPostenOffIcp(threads: LinkedinThread[], heute: Date): Posten[] {
+  return threads
+    .filter((t) => bucketOf(t, heute) === 'du_bist_dran')
+    .filter((t) => !istArbeitsVorrat(icpUrteil(t.company, t.name).urteil))
     .map((t) => ({
       ...threadZuPosten(t, 'antwort', 'thread', t.preview || `Antwort an ${t.name || 'den Lead'} vorbereiten.`),
       entwurf: entwurfVon(t),

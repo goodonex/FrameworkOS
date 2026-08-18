@@ -10,7 +10,7 @@ import { Arbeitsliste, type LoomSkriptAktionen } from '../components/Arbeitslist
 import { Arbeitsmodus, type ArbeitsmodusErgebnis } from '../components/Arbeitsmodus'
 import { InmailPanel } from '../components/InmailPanel'
 import { useActiveBrand } from '../lib/activeBrand'
-import { zeilenId } from '../lib/arbeitsmodusQuellen'
+import { antwortPostenOffIcp, zeilenId } from '../lib/arbeitsmodusQuellen'
 import { erledigePosten } from '../lib/arbeitsmodusTracking'
 import { ausAltemWert, poolAbleitung, type InmailStand } from '../lib/inmailStand'
 import { heutigesMetrikDatum } from '../lib/metricsDates'
@@ -717,6 +717,17 @@ export function SalesDashboard() {
   const antwortenStand = standJeStufe.get('antworten')
   const loomsStand = standJeStufe.get('looms')
 
+  /**
+   * Wer geantwortet hat, aber nicht Kevins Zielgruppe ist (18.08.2026).
+   * Nicht weggeworfen, sondern eine Klappe tiefer — die Zeile nennt die Zahl,
+   * damit der Filter prüfbar bleibt. Ein Filter, dem man nicht auf die Finger
+   * schauen kann, wird zu Recht nicht geglaubt.
+   */
+  const offIcpListe = useMemo(
+    () => antwortPostenOffIcp(linkedinThreads.items, jetzt),
+    [linkedinThreads.items, jetzt],
+  )
+
   const antwortenAelteste = flowLive.antworten?.aeltesteStunden ?? null
   const antwortenAbgestanden = antwortenAelteste !== null && antwortenAelteste >= 24
 
@@ -772,8 +783,25 @@ export function SalesDashboard() {
                     }`,
               ),
           kennzahlFarbe: !flow.laedt && antwortenAbgestanden ? 'var(--ck-warn)' : undefined,
-          unterzeile: zuerst(antwortListe) ?? 'Reaktionszeit zählt — nicht die Menge.',
-          inhalt: liste(antwortListe),
+          unterzeile:
+            offIcpListe.length > 0
+              ? `${zuerst(antwortListe) ?? 'Reaktionszeit zählt'} · ${offIcpListe.length} Off-ICP ausgeblendet`
+              : (zuerst(antwortListe) ?? 'Reaktionszeit zählt — nicht die Menge.'),
+          inhalt: () => (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {liste(antwortListe)()}
+              {offIcpListe.length > 0 ? (
+                <details>
+                  <summary
+                    style={{ fontSize: 12, color: 'var(--ck-text-3)', cursor: 'pointer', minHeight: 32, display: 'flex', alignItems: 'center' }}
+                  >
+                    {offIcpListe.length} weitere haben geantwortet, sind aber nicht deine Zielgruppe
+                  </summary>
+                  <div style={{ marginTop: 8 }}>{liste(offIcpListe)()}</div>
+                </details>
+              ) : null}
+            </div>
+          ),
           fensterAktion: mobilArbeitsmodus('antwort', antwortListe),
         }
       case 'followups':

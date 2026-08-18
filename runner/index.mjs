@@ -544,12 +544,17 @@ async function runsListe(limit, mitInhalt = false) {
  */
 async function antwortEntwuerfeInput(now = new Date()) {
   if (!SNAPSHOT_ENABLED) return null
-  const { threads } = await holeAntwortThreads({
+  const { threads, uebersprungenOffIcp } = await holeAntwortThreads({
     supabaseUrl: SUPABASE_URL,
     headers: supabaseHeaders(),
     brandSlug: process.env.LINKEDIN_BRAND_SLUG ?? 'herrmann',
     now,
   })
+  // Sichtbar machen, was der ICP-Filter (18.08.) zurückhält. Schweigt er, sieht
+  // niemand, ob er sinnvoll arbeitet oder gerade Kunden aussortiert.
+  if (uebersprungenOffIcp > 0) {
+    console.log(`[runner] antwort-entwuerfe: ${uebersprungenOffIcp} Off-ICP übersprungen (kein Entwurf)`)
+  }
   if (!threads.length) return null
   const gebaut = baueAntwortInput(threads, now)
   // Alle wartenden Threads haben bereits einen frischen Entwurf → nichts zu tun.
