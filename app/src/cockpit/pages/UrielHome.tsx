@@ -9,6 +9,7 @@ import { BereichIcon } from '../components/BereichIcon'
 import { AgentenKacheln } from '../components/home/AgentenKacheln'
 import { AppGrid } from '../components/home/AppGrid'
 import { BefundZeile } from '../components/home/BefundZeile'
+import { WiderspruchZeile } from '../components/home/WiderspruchZeile'
 import { HeroHorizont } from '../components/home/HeroHorizont'
 import { JetztDran } from '../components/home/JetztDran'
 import { TermineWidget } from '../components/home/TermineWidget'
@@ -25,6 +26,7 @@ import {
   verschiebeVor,
 } from '../lib/kachelReihenfolge'
 import { useUiSetting } from '../lib/uiSettings'
+import { flowQuellen } from '../lib/tagesFlow'
 import { tagesansage } from '../lib/tagesansage'
 import { eventsByDate, termineAmTag, ymd, type CalEvent } from '../lib/termineEvents'
 import { CALENDAR_ICAL_KEY, useCalendarFeed } from '../lib/useCalendarFeed'
@@ -125,14 +127,18 @@ export function UrielHome() {
   }, [bookings.items, contacts.items, content.items, cal.events, jetzt])
 
   /**
-   * Die fünf Stufen des Tages für die Hero-Kette (D6: der Hero rechnet nichts).
+   * Die Stufen des Tages für die Hero-Kette (D6: der Hero rechnet nichts).
    *
-   * Das Soll der Follow-up-Stufe kommt aus `quellen.followup` — derselben
-   * Liste, die auch „Jetzt dran" und die Sales-Kachel füttern. Die Seite lädt
-   * dafür nichts nach: `usePosten` hat die Threads schon in der Hand.
+   * Alle Live-Zahlen kommen aus `posten.quellen` — denselben Listen, die auch
+   * „Heute" und die Sales-Zeilen füttern. Die Seite lädt dafür nichts nach:
+   * `usePosten` hat Threads und Erstnachrichten schon in der Hand.
    */
-  const faelligeFollowups = posten.quellen.followup?.length ?? 0
-  const flow = useTagesFlow(metrics.today, faelligeFollowups, metrics.loading || posten.linkedinThreads.loading)
+  const flowLive = useMemo(() => flowQuellen(posten.quellen, jetzt), [posten.quellen, jetzt])
+  const flow = useTagesFlow(
+    metrics.today,
+    flowLive,
+    metrics.loading || posten.linkedinThreads.loading || posten.erstnachrichten.loading,
+  )
 
   const ansage = useMemo(() => tagesansage(geordnet, dauern, jetzt), [geordnet, dauern, jetzt])
   const entwuerfe = useMemo(() => entwuerfeOffen(geordnet), [geordnet])
@@ -209,7 +215,9 @@ export function UrielHome() {
         stufen={flow.staende}
         stufenLaden={flow.laedt}
         onAsk={() => urielOeffnen(true)}
-        onStufe={(feld) => navigate(`/tracking/zaehlen/${feld}`)}
+        onStufe={(stufe) =>
+          navigate(stufe.feld ? `/tracking/zaehlen/${stufe.feld}` : '/sales?kachel=antworten')
+        }
       />
 
       {/* Der Ein-Klick-Weg in die Morgenlese (Visionmap-Regel 1: erst lesen,
@@ -229,7 +237,11 @@ export function UrielHome() {
         </button>
       ) : null}
 
-      <BefundZeile meldung={befund.meldung} onOeffnen={() => navigate('/agenten')} />
+      <BefundZeile befund={befund} onOeffnen={() => navigate("/agenten")} />
+
+      {/* Der Wächter-Befund (17.08.): Zahlen, die zwischen zwei Quellen nicht
+          zusammenpassen. Zeigt sich nur, wenn es etwas zu zeigen gibt. */}
+      <WiderspruchZeile />
 
       {/* HEUTE — was feststeht. Derselbe Baustein wie vorher im Wisch-Stapel,
           jetzt als eigene Sektion (D4: keine versteckten Seiten mehr). */}

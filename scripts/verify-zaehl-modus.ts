@@ -69,23 +69,31 @@ check('keine abgetippte Zielzahl in zaehlFelder.ts', !/tagesziel:\s*\d+/.test(za
 
 // --- 2b. Die Liste trägt den Tages-Flow (D7) ----------------------------
 const reihenfolge = ZAEHL_FELDER.map((z) => z.field)
+// Seit dem 18.08. hat der Flow eine Stufe OHNE Zähl-Feld (Antworten, Frische-
+// Stufe) — zählbar sind nur die übrigen. Genau die müssen die Liste anführen.
+const zaehlbareStufen = TAGES_FLOW.filter((s) => s.feld !== null)
 check(
-  'jede Stufe des Flows hat einen Eintrag — sonst führt der Flow ins Leere',
-  TAGES_FLOW.every((s) => reihenfolge.includes(s.feld)),
-  `Fehlt: ${TAGES_FLOW.filter((s) => !reihenfolge.includes(s.feld)).map((s) => s.feld).join(', ')}`,
+  'jede Zähl-Stufe des Flows hat einen Eintrag — sonst führt der Flow ins Leere',
+  zaehlbareStufen.every((s) => reihenfolge.includes(s.feld as (typeof reihenfolge)[number])),
+  `Fehlt: ${zaehlbareStufen.filter((s) => !reihenfolge.includes(s.feld as (typeof reihenfolge)[number])).map((s) => s.feld).join(', ')}`,
 )
 check(
-  'die Liste beginnt mit dem Flow, in seiner Reihenfolge',
-  JSON.stringify(reihenfolge.slice(0, TAGES_FLOW.length)) === JSON.stringify(TAGES_FLOW.map((s) => s.feld)),
+  'die Antworten-Stufe hat bewusst KEINE Zähl-Kachel',
+  !ZAEHL_FELDER.some((z) => z.langLabel === 'Antworten · LinkedIn'),
+  'Antworten werden abgearbeitet, nicht gezählt — ihr Werkzeug ist die Sales-Zeile.',
+)
+check(
+  'die Liste beginnt mit den Zähl-Stufen des Flows, in seiner Reihenfolge',
+  JSON.stringify(reihenfolge.slice(0, zaehlbareStufen.length)) === JSON.stringify(zaehlbareStufen.map((s) => s.feld)),
   `Ist: ${reihenfolge.join(', ')}`,
 )
 check(
   'die Kanäle ausserhalb des Rituals stehen dahinter, nicht dazwischen',
-  reihenfolge.slice(TAGES_FLOW.length).every((f) => !flowFelder.has(f)),
+  reihenfolge.slice(zaehlbareStufen.length).every((f) => !flowFelder.has(f)),
 )
 check(
-  'die Reaktivierung (InMails) ist als fünfte Stufe wirklich zählbar',
-  reihenfolge[4] === 'inmails',
+  'die Reaktivierung (InMails) ist als Zähl-Kachel wirklich erreichbar',
+  reihenfolge[3] === 'inmails',
 )
 
 // --- 3. Nachschlag ------------------------------------------------------
@@ -115,9 +123,9 @@ check(
 
 // --- 4b. Der Auto-Advance (D5) ------------------------------------------
 check(
-  'der Zähl-Modus fragt den Flow, wohin es weitergeht',
-  /naechsteStufe\(/.test(ui),
-  'Eine eigene „nächste Stufe"-Rechnung hier wäre eine zweite Reihenfolge.',
+  'der Zähl-Modus fragt den Flow, wohin es weitergeht — und nur über Zähl-Stufen',
+  /naechsteZaehlbareStufe\(/.test(ui),
+  'Eine eigene „nächste Stufe"-Rechnung hier wäre eine zweite Reihenfolge — und die zähllose Antworten-Stufe als Ziel wäre /tracking/zaehlen/null.',
 )
 check(
   'der Sprung wartet, bis die Daten da sind',
@@ -139,7 +147,7 @@ check(
 )
 check(
   'der Sprung ersetzt den Verlaufseintrag, statt ihn zu stapeln',
-  /naechsteStufe[\s\S]*?replace: true/.test(ui),
+  /naechsteZaehlbareStufe[\s\S]*?replace: true/.test(ui),
   'Sonst führte „Zurück" durch jede abgeschlossene Stufe des Tages.',
 )
 
@@ -166,8 +174,13 @@ check(
   'Zwei Bedienbilder für dieselbe Zahl — und nur eines kennt den Tages-Flow.',
 )
 check(
-  'der Hero öffnet den Zähl-Modus für die angetippte Stufe',
-  /\/tracking\/zaehlen\/\$\{feld\}/.test(home),
+  'der Hero öffnet den Zähl-Modus für die angetippte Zähl-Stufe',
+  /\/tracking\/zaehlen\/\$\{stufe\.feld\}/.test(home),
+)
+check(
+  'die zähllose Antworten-Stufe führt vom Hero in den Sales-Flow',
+  /stufe\.feld \? [\s\S]{0,80}? : '\/sales\?kachel=antworten'/.test(home),
+  'Ein Ring ohne Ziel wäre ein toter Knopf — und /tracking/zaehlen/null die Sackgasse.',
 )
 
 console.log(`\nverify-zaehl-modus: ${pass} ok, ${fail} fehlgeschlagen`)

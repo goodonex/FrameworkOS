@@ -48,3 +48,10 @@ runner/linkedin/.paging-queryid.json
 
 # Claude-Code-Arbeitsordner (Worktrees, lokale Konfiguration)
 .claude/
+
+# Arbeitsmaterial, kein App-Code (18.08.2026): Identity-OS-Bildrecherche
+# (127 MB) und die großen HTML-Arbeitsstände. Netlify baut nur app/ —
+# im Repo würden sie nur die History aufblähen.
+identity-os-bilder/
+visionmap-2.0.html
+lebensstil.html

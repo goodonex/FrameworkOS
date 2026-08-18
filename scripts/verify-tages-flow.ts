@@ -1,12 +1,13 @@
 /**
- * Drift-Wache für den Tages-Flow (11.08.2026).
+ * Drift-Wache für den Tages-Flow (11.08.2026, neu diktiert 18.08.2026).
  *
  * Der Flow bestimmt, was Kevin morgens zuerst in die Hand nimmt — und wohin
  * ihn der Zähler weiterschiebt, wenn eine Stufe steht. Geprüft wird deshalb
  * genau das, was ihn still falsch machen könnte: eine verrutschte Reihenfolge,
  * ein erfundenes oder abgetipptes Tagesziel, ein Feld, das `daily_metrics`
- * gar nicht hat, und ein Auto-Advance, der im Kreis läuft oder eine offene
- * Stufe überspringt.
+ * gar nicht hat, ein Soll, das beim Abhaken unter Kevin wegschrumpft, eine
+ * Frische-Stufe, die wie ein Zähler behandelt wird, und ein Auto-Advance, der
+ * im Kreis läuft oder auf der zähllosen Antworten-Stufe landet.
  *
  * Start: npx tsx scripts/verify-tages-flow.ts
  */
@@ -17,13 +18,17 @@ import { WEEK_TARGETS } from '../app/src/cockpit/lib/goals'
 import { METRIC_FIELDS } from '../app/src/cockpit/lib/metrikFelder'
 import { ANFRAGEN_LIMIT_TAG } from '../app/src/cockpit/lib/prioritaet'
 import {
+  ANTWORT_FRISCHE_STUNDEN,
   ARBEITSTAGE_WOCHE,
+  FOLLOWUP_PORTION_TAG,
   REAKTIVIERUNG_ZIEL_TAG,
   TAGES_FLOW,
   TAGES_FLOW_ZIELE,
   ersteOffeneStufe,
   flowFortschritt,
+  flowQuellen,
   naechsteStufe,
+  naechsteZaehlbareStufe,
   sollFuer,
   stufeFuerFeld,
   stufenStaende,
@@ -49,47 +54,70 @@ function eingabe(teil: Partial<FlowEingabe> = {}): FlowEingabe {
   return { today: {}, faelligHeute: 0, ...teil }
 }
 
-// --- 1. Die Reihenfolge ist Kevins Diktat (D1) ---------------------------
-const erwartet: StufenId[] = ['anfragen', 'nachrichten', 'looms', 'followups', 'reaktivierung']
+// Indizes der Stufen — einmal benannt, damit die Fälle lesbar bleiben.
+const ANFRAGEN = 0
+const ERSTNACHRICHTEN = 1
+const ANTWORTEN = 2
+const FOLLOWUPS = 3
+const REAKTIVIERUNG = 4
+const LOOMS = 5
+
+// --- 1. Die Reihenfolge ist Kevins Diktat (D1, 18.08.2026) ---------------
+const erwartet: StufenId[] = ['anfragen', 'erstnachrichten', 'antworten', 'followups', 'reaktivierung', 'looms']
 check(
-  'die fünf Stufen stehen in Kevins Reihenfolge',
+  'die sechs Stufen stehen in Kevins Reihenfolge',
   JSON.stringify(TAGES_FLOW.map((s) => s.id)) === JSON.stringify(erwartet),
   `Ist: ${TAGES_FLOW.map((s) => s.id).join(' → ')}`,
 )
 check('keine Dublette unter den Stufen', new Set(TAGES_FLOW.map((s) => s.id)).size === TAGES_FLOW.length)
-check('kein Feld zählt zweimal', new Set(TAGES_FLOW.map((s) => s.feld)).size === TAGES_FLOW.length)
+const zaehlFelder = TAGES_FLOW.filter((s) => s.feld !== null).map((s) => s.feld)
+check('kein Feld zählt zweimal', new Set(zaehlFelder).size === zaehlFelder.length)
 
 // --- 2. Die Felder sind echt --------------------------------------------
 for (const s of TAGES_FLOW) {
+  if (s.art === 'frische') continue
   check(
     `${s.id} zählt ein echtes Metrikfeld (${s.feld})`,
-    (METRIC_FIELDS as readonly string[]).includes(s.feld),
+    s.feld !== null && (METRIC_FIELDS as readonly string[]).includes(s.feld),
     'Ein Tipp auf ein Feld, das daily_metrics nicht hat, verschwindet spurlos.',
   )
+}
+for (const s of TAGES_FLOW) {
   check(`${s.id} hat Label, Lang-Label und Hinweis`, !!s.label && !!s.langLabel && !!s.hinweis)
 }
+check(
+  'die Antworten-Stufe ist die Frische-Stufe und zählt kein Feld',
+  TAGES_FLOW[ANTWORTEN].art === 'frische' && TAGES_FLOW[ANTWORTEN].feld === null,
+  'Das Mapping antwort → null in arbeitsmodusTracking ist Kevins Tabelle wörtlich — hier darf kein Feld erfunden werden.',
+)
+check(
+  'alle übrigen Stufen sind Zähl-Stufen',
+  TAGES_FLOW.every((s) => s.id === 'antworten' || s.art === 'zaehler'),
+)
 
 // --- 3. Ziele werden abgeleitet, nicht abgetippt -------------------------
 const quelle = lies('app/src/cockpit/lib/tagesFlow.ts')
 check(
   'das Anfragen-Ziel kommt aus ANFRAGEN_LIMIT_TAG',
-  TAGES_FLOW[0].standardZiel === ANFRAGEN_LIMIT_TAG,
+  TAGES_FLOW[ANFRAGEN].standardZiel === ANFRAGEN_LIMIT_TAG,
 )
 check(
-  'das Nachrichten-Ziel kommt aus dem Wochenziel geteilt durch die Arbeitswoche',
-  TAGES_FLOW[1].standardZiel === Math.round(WEEK_TARGETS.nachrichten / ARBEITSTAGE_WOCHE),
+  'Erstnachrichten haben kein festes Ziel — es gehen alle raus, die da sind',
+  TAGES_FLOW[ERSTNACHRICHTEN].standardZiel === null,
 )
-check('das Nachrichten-Ziel ist damit 8', TAGES_FLOW[1].standardZiel === 8)
+check(
+  'Follow-ups haben kein festes Ziel — ihr Soll ist die Portion aus dem Fälligen',
+  TAGES_FLOW[FOLLOWUPS].standardZiel === null,
+)
+check(
+  'das Reaktivierungs-Ziel steht als benannte Konstante',
+  TAGES_FLOW[REAKTIVIERUNG].standardZiel === REAKTIVIERUNG_ZIEL_TAG,
+)
 check(
   'das Loom-Ziel kommt aus dem Wochenziel geteilt durch die Arbeitswoche',
-  TAGES_FLOW[2].standardZiel === Math.round(WEEK_TARGETS.looms / ARBEITSTAGE_WOCHE),
+  TAGES_FLOW[LOOMS].standardZiel === Math.round(WEEK_TARGETS.looms / ARBEITSTAGE_WOCHE),
 )
-check('das Loom-Ziel ist damit 2', TAGES_FLOW[2].standardZiel === 2)
-check(
-  'Follow-ups haben kein festes Ziel — ihr Soll kommt aus den Daten des Tages',
-  TAGES_FLOW[3].standardZiel === null,
-)
-check('das Reaktivierungs-Ziel steht als benannte Konstante', TAGES_FLOW[4].standardZiel === REAKTIVIERUNG_ZIEL_TAG)
+check('das Loom-Ziel ist damit 2', TAGES_FLOW[LOOMS].standardZiel === 2)
 check(
   'tagesFlow.ts importiert die Wochenziele, statt sie zu wiederholen',
   /import\s*\{\s*WEEK_TARGETS\s*\}/.test(quelle),
@@ -105,24 +133,80 @@ check(
 )
 check('der Flow ist frei von React (rein prüfbar)', !/from 'react'/.test(quelle))
 
-// --- 4. Das dynamische Soll der vierten Stufe ---------------------------
-check('Stufe 4 nimmt das Soll aus der Fälligkeit', sollFuer(TAGES_FLOW[3], eingabe({ faelligHeute: 7 })) === 7)
-check('ohne fällige Threads ist das Soll 0', sollFuer(TAGES_FLOW[3], eingabe({ faelligHeute: 0 })) === 0)
+// --- 4. Das Soll aus den Daten: stabil unterm Abhaken --------------------
+check(
+  'Erstnachrichten: das Soll sind die Offenen',
+  sollFuer(TAGES_FLOW[ERSTNACHRICHTEN], eingabe({ erstnachrichtenOffen: 7 })) === 7,
+)
+check(
+  'Erstnachrichten: das Soll bleibt beim Abhaken stehen (offen 4 + erledigt 3 = 7)',
+  sollFuer(TAGES_FLOW[ERSTNACHRICHTEN], eingabe({ erstnachrichtenOffen: 4, today: { li_nachrichten: 3 } })) === 7,
+  'Sonst schrumpfte das Ziel mit jedem Haken und „7/7" wäre nie erreichbar.',
+)
+check(
+  'Follow-ups: die Portion drosselt den Berg',
+  sollFuer(TAGES_FLOW[FOLLOWUPS], eingabe({ faelligHeute: 200 })) === FOLLOWUP_PORTION_TAG,
+  'Ein Soll von 200 wäre nie grün — eine Zeile, die nie grün wird, ist ein Vorwurf, keine Routine.',
+)
+check(
+  'Follow-ups: ein kleiner Berg bleibt das Soll (3 fällig → 3)',
+  sollFuer(TAGES_FLOW[FOLLOWUPS], eingabe({ faelligHeute: 3 })) === 3,
+)
+check(
+  'Follow-ups: das Soll bleibt beim Abhaken stehen (fällig 15 + erledigt 5, Drossel 20 → 20)',
+  sollFuer(TAGES_FLOW[FOLLOWUPS], eingabe({ faelligHeute: 15, today: { li_followups: 5 } })) === 20,
+)
+check('ohne fällige Threads ist das Soll 0', sollFuer(TAGES_FLOW[FOLLOWUPS], eingabe({ faelligHeute: 0 })) === 0)
 check(
   'eine negative Fälligkeit kann nicht auftreten und wird auf 0 geklemmt',
-  sollFuer(TAGES_FLOW[3], eingabe({ faelligHeute: -3 })) === 0,
+  sollFuer(TAGES_FLOW[FOLLOWUPS], eingabe({ faelligHeute: -3 })) === 0,
 )
 check(
-  'eine Zielüberschreibung kippt das dynamische Soll NICHT',
-  sollFuer(TAGES_FLOW[3], eingabe({ faelligHeute: 4, ziele: { followups: 99 } })) === 4,
-  'Sonst rechnete sich die Warteschlange schön.',
+  'die Zielüberschreibung setzt die Drossel, nicht das Fällige (Drossel 5, fällig 200 → 5)',
+  sollFuer(TAGES_FLOW[FOLLOWUPS], eingabe({ faelligHeute: 200, ziele: { followups: 5 } })) === 5,
+)
+check(
+  'die Drossel erfindet keine Arbeit (Drossel 99, fällig 4 → 4)',
+  sollFuer(TAGES_FLOW[FOLLOWUPS], eingabe({ faelligHeute: 4, ziele: { followups: 99 } })) === 4,
+  'Sonst rechnete sich die Warteschlange schön — in die andere Richtung.',
+)
+check(
+  'Looms: das Ziel wird auf die offenen Zusagen gedeckelt (Ziel 2, 1 offen → 1)',
+  sollFuer(TAGES_FLOW[LOOMS], eingabe({ loomsOffen: 1 })) === 1,
+)
+check(
+  'Looms: ohne Kenntnis der Offenen bleibt das feste Ziel',
+  sollFuer(TAGES_FLOW[LOOMS], eingabe({})) === 2,
+  'Lieber ein zu hohes Soll als ein erfundenes „nichts fällig".',
+)
+check(
+  'Looms: das Soll bleibt beim Abhaken stehen (1 offen + 1 erledigt, Ziel 2 → 2)',
+  sollFuer(TAGES_FLOW[LOOMS], eingabe({ loomsOffen: 1, today: { looms: 1 } })) === 2,
 )
 
-// --- 5. Zielüberschreibung aus ui_settings ------------------------------
-check('eine gültige Überschreibung gilt', sollFuer(TAGES_FLOW[1], eingabe({ ziele: { nachrichten: 20 } })) === 20)
-check('0 ist eine gültige Überschreibung (Stufe heute aus)', sollFuer(TAGES_FLOW[1], eingabe({ ziele: { nachrichten: 0 } })) === 0)
+// --- 5. Eingefrorene Portionen schlagen die Live-Rechnung ----------------
+check(
+  'eine Portion friert das Soll ein (nachgerückte Fälle zählen nicht mehr)',
+  sollFuer(TAGES_FLOW[FOLLOWUPS], eingabe({ faelligHeute: 200, portionen: { followups: 20 } })) === 20 &&
+    sollFuer(TAGES_FLOW[ERSTNACHRICHTEN], eingabe({ erstnachrichtenOffen: 12, portionen: { erstnachrichten: 7 } })) === 7,
+  'Ohne Einfrieren ist „20/20" ein bewegliches Ziel — um 14 Uhr sind es 23, und die Stufe wird nie grün.',
+)
+check(
+  'eine kaputte Portion fällt auf die Live-Rechnung zurück',
+  sollFuer(TAGES_FLOW[FOLLOWUPS], eingabe({ faelligHeute: 3, portionen: { followups: Number.NaN } })) === 3,
+)
+
+// --- 6. Zielüberschreibung aus ui_settings ------------------------------
+check(
+  'eine gültige Überschreibung gilt (Reaktivierung 10 statt 5)',
+  sollFuer(TAGES_FLOW[REAKTIVIERUNG], eingabe({ ziele: { reaktivierung: 10 } })) === 10,
+)
+check(
+  '0 ist eine gültige Überschreibung (Stufe heute aus)',
+  sollFuer(TAGES_FLOW[REAKTIVIERUNG], eingabe({ ziele: { reaktivierung: 0 } })) === 0,
+)
 for (const [was, wert] of [
-  ['Text', '20'],
+  ['Text', '5'],
   ['Komma-Zahl', 2.5],
   ['negativ', -1],
   ['NaN', Number.NaN],
@@ -132,50 +216,83 @@ for (const [was, wert] of [
 ] as const) {
   check(
     `eine kaputte Überschreibung (${was}) fällt auf den Standard zurück`,
-    sollFuer(TAGES_FLOW[1], eingabe({ ziele: { nachrichten: wert as unknown as number } })) === 8,
+    sollFuer(TAGES_FLOW[REAKTIVIERUNG], eingabe({ ziele: { reaktivierung: wert as unknown as number } })) ===
+      REAKTIVIERUNG_ZIEL_TAG,
     'Ein kaputter ui_settings-Wert darf keine Stufe für immer offen halten.',
   )
 }
 check('der ui_settings-Schlüssel ist benannt', TAGES_FLOW_ZIELE.length > 0)
 
-// --- 6. Stände ----------------------------------------------------------
+// --- 7. Die Frische-Stufe (Antworten) -----------------------------------
+check('die Frische-Schwelle ist ein Tag', ANTWORT_FRISCHE_STUNDEN === 24)
+const frisch = stufenStaende(eingabe({ antworten: { warten: 43, aeltesteStunden: 3 } }))[ANTWORTEN]
+check(
+  '43 dürfen warten, solange keiner über der Schwelle ist',
+  frisch.erledigt && frisch.wert === 43,
+  'Bei Antworten zählt Reaktionszeit, nicht Vollständigkeit.',
+)
+const abgestanden = stufenStaende(eingabe({ antworten: { warten: 2, aeltesteStunden: 26 } }))[ANTWORTEN]
+check('ein Wartender von vorgestern macht die Stufe rot', !abgestanden.erledigt)
+const niemand = stufenStaende(eingabe({ antworten: { warten: 0, aeltesteStunden: null } }))[ANTWORTEN]
+check('niemand wartet → die Stufe steht', niemand.erledigt && niemand.wert === 0)
+check('die Frische-Stufe hat nie ein Soll', frisch.soll === 0 && abgestanden.soll === 0)
+
+// --- 8. Stände ----------------------------------------------------------
 const standardTag = eingabe({
-  today: { li_anfragen: 30, li_nachrichten: 8, looms: 2, li_followups: 0, inmails: 0 },
+  today: { li_anfragen: 30, li_nachrichten: 3, looms: 2, li_followups: 0, inmails: 0 },
   faelligHeute: 3,
+  erstnachrichtenOffen: 0,
+  loomsOffen: 0,
+  antworten: { warten: 5, aeltesteStunden: 2 },
 })
 const s1 = stufenStaende(standardTag)
-check('fünf Stände für fünf Stufen', s1.length === 5)
-check('Anfragen stehen bei 30/30', s1[0].erledigt && s1[0].wert === 30 && s1[0].soll === 30)
-check('Nachrichten stehen bei 8/8', s1[1].erledigt)
-check('Looms stehen bei 2/2', s1[2].erledigt)
-check('Follow-ups sind offen (0 von 3)', !s1[3].erledigt && s1[3].soll === 3)
-check('Reaktivierung ist offen (0 von 5)', !s1[4].erledigt && s1[4].soll === 5)
-check('die erste offene Stufe ist Nummer 4', ersteOffeneStufe(s1) === 3)
-check('Fortschritt: 3 von 5', JSON.stringify(flowFortschritt(s1)) === JSON.stringify({ erledigt: 3, gesamt: 5 }))
+check('sechs Stände für sechs Stufen', s1.length === 6)
+check('Anfragen stehen bei 30/30', s1[ANFRAGEN].erledigt && s1[ANFRAGEN].wert === 30 && s1[ANFRAGEN].soll === 30)
+check('Erstnachrichten stehen (alle raus: offen 0)', s1[ERSTNACHRICHTEN].erledigt)
+check('Antworten sind frisch', s1[ANTWORTEN].erledigt)
+check('Follow-ups sind offen (0 von 3)', !s1[FOLLOWUPS].erledigt && s1[FOLLOWUPS].soll === 3)
+check('Reaktivierung ist offen (0 von 5)', !s1[REAKTIVIERUNG].erledigt && s1[REAKTIVIERUNG].soll === 5)
+check('Looms stehen bei 2/2', s1[LOOMS].erledigt)
+check('die erste offene Stufe sind die Follow-ups', ersteOffeneStufe(s1) === FOLLOWUPS)
+check('Fortschritt: 4 von 6', JSON.stringify(flowFortschritt(s1)) === JSON.stringify({ erledigt: 4, gesamt: 6 }))
 
 const uebererfuellt = stufenStaende(eingabe({ today: { li_anfragen: 44 } }))
-check('mehr als das Ziel gilt als erledigt', uebererfuellt[0].erledigt)
+check('mehr als das Ziel gilt als erledigt', uebererfuellt[ANFRAGEN].erledigt)
+
+// Leere Pflicht: die Quelle ist leer, obwohl das eingefrorene Soll höher lag —
+// zwei Erstnachrichten verworfen statt gesendet. Die Stufe darf nicht für
+// immer rot bleiben.
+const verworfen = stufenStaende(
+  eingabe({ erstnachrichtenOffen: 0, today: { li_nachrichten: 5 }, portionen: { erstnachrichten: 7 } }),
+)[ERSTNACHRICHTEN]
+check('leere Quelle heisst erledigt, auch unterm eingefrorenen Soll', verworfen.erledigt && verworfen.soll === 7)
 
 const leererTag = stufenStaende(eingabe())
-check('ein leerer Tag hat nichts erledigt ausser der Stufe ohne Soll', ersteOffeneStufe(leererTag) === 0)
+check('ein leerer Tag beginnt bei den Anfragen', ersteOffeneStufe(leererTag) === ANFRAGEN)
 check(
-  'Stufe 4 gilt bei Soll 0 als erledigt und wird übersprungen (D5)',
-  leererTag[3].erledigt && leererTag[3].soll === 0,
+  'Follow-ups gelten bei Soll 0 als erledigt und werden übersprungen (D5)',
+  leererTag[FOLLOWUPS].erledigt && leererTag[FOLLOWUPS].soll === 0,
 )
-check('ein fehlendes Feld in der Tageszeile zählt als 0, nicht als NaN', leererTag[0].wert === 0)
+check('ein fehlendes Feld in der Tageszeile zählt als 0, nicht als NaN', leererTag[ANFRAGEN].wert === 0)
 
 const allesFertig = stufenStaende(
-  eingabe({ today: { li_anfragen: 30, li_nachrichten: 8, looms: 2, inmails: 5 }, faelligHeute: 0 }),
+  eingabe({
+    today: { li_anfragen: 30, li_nachrichten: 2, looms: 2, inmails: 5 },
+    faelligHeute: 0,
+    erstnachrichtenOffen: 0,
+    loomsOffen: 0,
+    antworten: { warten: 0, aeltesteStunden: null },
+  }),
 )
 check('ein vollendeter Tag hat keine offene Stufe', ersteOffeneStufe(allesFertig) === -1)
-check('Fortschritt am vollendeten Tag: 5 von 5', flowFortschritt(allesFertig).erledigt === 5)
+check('Fortschritt am vollendeten Tag: 6 von 6', flowFortschritt(allesFertig).erledigt === 6)
 
-// --- 7. Auto-Advance ----------------------------------------------------
-check('von Stufe 1 aus geht es auf die nächste offene (4)', naechsteStufe(s1, 0) === 3)
-check('von Stufe 4 aus geht es weiter auf 5', naechsteStufe(s1, 3) === 4)
+// --- 9. Auto-Advance ----------------------------------------------------
+check('von Stufe 1 aus geht es auf die nächste offene (Follow-ups)', naechsteStufe(s1, ANFRAGEN) === FOLLOWUPS)
+check('von den Follow-ups aus geht es weiter zur Reaktivierung', naechsteStufe(s1, FOLLOWUPS) === REAKTIVIERUNG)
 check(
   'nach der letzten offenen Stufe wird von vorne gesucht',
-  naechsteStufe(s1, 4) === 3,
+  naechsteStufe(s1, LOOMS) === FOLLOWUPS,
   'Wer mittendrin einsteigt, darf vorne Offenes nicht verlieren.',
 )
 check('ist alles erledigt, gibt es kein Weiter (-1)', naechsteStufe(allesFertig, 0) === -1)
@@ -183,17 +300,65 @@ check(
   'die eigene Stufe kommt nie als Antwort zurück',
   (() => {
     const nurEineOffen = stufenStaende(
-      eingabe({ today: { li_anfragen: 30, li_nachrichten: 8, looms: 2, inmails: 0 }, faelligHeute: 0 }),
+      eingabe({
+        today: { li_anfragen: 30, li_nachrichten: 2, looms: 2, inmails: 0 },
+        faelligHeute: 0,
+        erstnachrichtenOffen: 0,
+        loomsOffen: 0,
+        antworten: { warten: 0, aeltesteStunden: null },
+      }),
     )
-    // Offen ist nur Stufe 5 (Index 4) — von dort aus gibt es kein Weiter.
-    return naechsteStufe(nurEineOffen, 4) === -1
+    return naechsteStufe(nurEineOffen, REAKTIVIERUNG) === -1
   })(),
   'Sonst schöbe der Auto-Advance den Zähler auf sich selbst und liefe im Kreis.',
 )
 check('ein leerer Flow bricht den Auto-Advance nicht', naechsteStufe([], 0) === -1)
 
-// --- 8. Nachschlag und Anschluss an die Zähl-Liste ----------------------
+// Der Zähl-Advance überspringt die zähllose Antworten-Stufe.
+const antwortenOffen = stufenStaende(
+  eingabe({
+    today: { li_anfragen: 30, li_nachrichten: 2 },
+    faelligHeute: 3,
+    erstnachrichtenOffen: 0,
+    antworten: { warten: 2, aeltesteStunden: 30 },
+  }),
+)
+check(
+  'der Zähl-Advance landet nie auf der Antworten-Stufe',
+  naechsteZaehlbareStufe(antwortenOffen, ANFRAGEN) === FOLLOWUPS,
+  'Die Antworten-Stufe hat im Zähl-Modus keine Seite — /tracking/zaehlen/null wäre die Sackgasse.',
+)
+check(
+  'der normale Advance darf dagegen auf ihr landen (fürs Sales-Board)',
+  naechsteStufe(antwortenOffen, ANFRAGEN) === ANTWORTEN,
+)
+
+// --- 10. flowQuellen: eine Abfrage, eine Zahl ---------------------------
+const jetzt = new Date('2026-08-18T12:00:00Z')
+const q = flowQuellen(
+  {
+    followup: [{}, {}, {}],
+    erstnachricht: [{}],
+    loom: [{}, {}],
+    antwort: [
+      { timestamp: '2026-08-18T09:00:00Z' },
+      { timestamp: '2026-08-16T12:00:00Z' },
+      { timestamp: null },
+    ],
+  },
+  jetzt,
+)
+check('flowQuellen zählt die Listen selbst', q.faelligHeute === 3 && q.erstnachrichtenOffen === 1 && q.loomsOffen === 2)
+check(
+  'die älteste Antwort bestimmt die Frische (48 h)',
+  q.antworten?.warten === 3 && Math.round(q.antworten?.aeltesteStunden ?? 0) === 48,
+)
+const leer = flowQuellen({}, jetzt)
+check('leere Quellen sind leer, nicht kaputt', leer.faelligHeute === 0 && leer.antworten?.aeltesteStunden === null)
+
+// --- 11. Nachschlag und Anschluss an die Zähl-Liste ----------------------
 check('stufeFuerFeld findet die Anfragen-Stufe', stufeFuerFeld('li_anfragen')?.id === 'anfragen')
+check('stufeFuerFeld findet die Erstnachrichten', stufeFuerFeld('li_nachrichten')?.id === 'erstnachrichten')
 check('stufeFuerFeld gibt bei Unsinn null', stufeFuerFeld('gibtsnicht') === null)
 check('stufeFuerFeld verträgt undefined', stufeFuerFeld(undefined) === null)
 check(
@@ -205,7 +370,7 @@ check(
 // Ob die Zähl-Liste den Flow trägt (Reihenfolge, kein fehlendes Feld), prüft
 // `verify-zaehl-modus.ts` — dort ist diese Liste zu Hause.
 
-// --- 9. Die Kette im Hero (D6: der Hero rechnet nichts) -----------------
+// --- 12. Die Kette im Hero (D6: der Hero rechnet nichts) -----------------
 const kette = lies('app/src/cockpit/components/home/TagesFlowStack.tsx')
 const hero = lies('app/src/cockpit/components/home/HeroHorizont.tsx')
 const home = lies('app/src/cockpit/pages/UrielHome.tsx')
@@ -219,18 +384,13 @@ check(
   !/bucketOf|linkedinFollowups|ANFRAGEN_LIMIT_TAG|WEEK_TARGETS/.test(kette),
   'Der Hero, der selbst rechnet, läuft der Zahl im Tracking davon.',
 )
-check(
-  'die Kette schreibt nichts',
-  !/bump\(|supabase|upsert/.test(kette),
-)
+check('die Kette schreibt nichts', !/bump\(|supabase|upsert/.test(kette))
 check(
   'die Kette nutzt den bestehenden Widget-Stack, statt eigene Gesten zu bauen',
   /ck-widget-stack/.test(kette) && !/onTouchMove|onPointerMove/.test(kette),
 )
 check(
   'der Einstiegs-Sprung läuft synchron nach dem Layout, nicht in einem Frame',
-  // Auf den Aufruf gemünzt, nicht auf das Wort — der Kommentar daneben darf
-  // erklären, warum der Frame-Weg gescheitert ist.
   /useLayoutEffect\(/.test(kette) && !/requestAnimationFrame\(/.test(kette),
   'Am 11.08. gemessen: der Frame wurde bei jedem Render weggeräumt, der Sprung kam nie zustande.',
 )
@@ -244,18 +404,16 @@ check(
   /angefasst\.current = true/.test(kette) && /angefasst\.current\) return/.test(kette),
   'Eine Bahn, die sich unter dem eigenen Wisch weiterbewegt, ist ein Ärgernis.',
 )
+check('die Instrumentierung der Fehlersuche ist wieder draussen', !/console\.log|__flow/.test(kette))
+check('auch der Hero selbst rechnet keine Stände', !/stufenStaende\(|useTagesFlow\(/.test(hero))
 check(
-  'die Instrumentierung der Fehlersuche ist wieder draussen',
-  !/console\.log|__flow/.test(kette),
-)
-check(
-  'auch der Hero selbst rechnet keine Stände',
-  !/stufenStaende\(|useTagesFlow\(/.test(hero),
-)
-check(
-  'der Homescreen holt das Follow-up-Soll aus der bestehenden Postenquelle',
-  /quellen\.followup/.test(home),
+  'der Homescreen leitet die Live-Zahlen aus der bestehenden Postenquelle ab',
+  /flowQuellen\(posten\.quellen/.test(home),
   'Ein zweiter Ladelauf für dieselben Threads wäre der teuerste Weg zu derselben Zahl.',
+)
+check(
+  'die Antworten-Stufe führt vom Hero in den Sales-Flow, nicht in den Zähler',
+  /kachel=antworten/.test(home),
 )
 
 // Token-Disziplin: keine Farbe im Komponenten-Code (Gesetz 6).

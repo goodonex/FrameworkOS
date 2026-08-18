@@ -12,11 +12,11 @@ import { TAGES_FLOW, type Stufe, type StufenId } from './tagesFlow'
  * Bewusst NICHT alle 19 Metrikfelder: der Zähl-Modus ist zum Abarbeiten da,
  * nicht zum Nachtragen. Alles Übrige bleibt in `/tracking` erreichbar.
  *
- * **Die Reihenfolge ist der Tages-Flow** (D7, 11.08.): vorne die fünf Stufen
- * aus `tagesFlow.ts` in Kevins Reihenfolge, dahinter die Kanäle, die nicht Teil
- * des Rituals sind. Damit wischt der Zähl-Modus den Tag entlang statt quer
- * durch die Kanäle. QuickTrack liest dieselbe Liste und ordnet sich mit um —
- * gewollt, es ist dieselbe Arbeit in einer anderen Hülle.
+ * **Die Reihenfolge ist der Tages-Flow** (D7, 11.08.): vorne die Stufen aus
+ * `tagesFlow.ts` in Kevins Reihenfolge, dahinter die Kanäle, die nicht Teil
+ * des Rituals sind. Die Antworten-Stufe fehlt hier mit Absicht: sie hat kein
+ * Zähl-Feld (Antworten werden abgearbeitet, nicht gezählt) — ihre Arbeit
+ * passiert im Sales-Flow, nicht unterm Daumen.
  */
 export interface ZaehlFeld {
   field: MetricField
@@ -30,9 +30,10 @@ export interface ZaehlFeld {
    * und den Wochenzielen in `goals.ts` ableitet. Felder ohne Ziel zeigen ihren
    * Stand, statt eine Wunschzahl zu behaupten.
    *
-   * Die Follow-up-Stufe steht bewusst OHNE Ziel in dieser Liste: ihr Soll
-   * hängt an den heute fälligen Threads und ist einer statischen Liste nicht
-   * bekannt. Wer es braucht, fragt den Flow (`useTagesFlow`).
+   * Erstnachrichten und Follow-ups stehen bewusst OHNE Ziel in dieser Liste:
+   * ihr Soll hängt an den offenen bzw. fälligen Zeilen und ist einer
+   * statischen Liste nicht bekannt. Wer es braucht, fragt den Flow
+   * (`useTagesFlow`).
    */
   tagesziel?: number
 }
@@ -44,13 +45,17 @@ export interface ZaehlFeld {
  */
 const KURZ_LABEL: Record<StufenId, string> = {
   anfragen: 'LI Vernetzung',
-  nachrichten: 'LI Nachricht',
-  looms: 'Loom',
+  erstnachrichten: 'LI Nachricht',
+  antworten: 'LI Antwort',
   followups: 'LI Follow-up',
   reaktivierung: 'Reaktivierung',
+  looms: 'Loom',
 }
 
-function ausStufe(stufe: Stufe): ZaehlFeld {
+/** Nur Stufen mit Zähl-Feld werden zu Zähl-Kacheln. */
+type ZaehlbareStufe = Stufe & { feld: MetricField }
+
+function ausStufe(stufe: ZaehlbareStufe): ZaehlFeld {
   const feld: ZaehlFeld = {
     field: stufe.feld,
     label: KURZ_LABEL[stufe.id],
@@ -61,7 +66,7 @@ function ausStufe(stufe: Stufe): ZaehlFeld {
 }
 
 export const ZAEHL_FELDER: ZaehlFeld[] = [
-  ...TAGES_FLOW.map(ausStufe),
+  ...TAGES_FLOW.filter((s): s is ZaehlbareStufe => s.feld !== null).map(ausStufe),
   { field: 'ig_anfragen', label: 'IG Follow', langLabel: 'Follows · Instagram' },
   { field: 'ig_nachrichten', label: 'IG Nachricht', langLabel: 'Erstnachrichten · Instagram' },
   { field: 'call_followups', label: 'FU Call', langLabel: 'Follow-up-Calls' },

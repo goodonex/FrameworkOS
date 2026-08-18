@@ -105,26 +105,44 @@ check(
 // ---------------------------------------------------------------------------
 const dash = ohneKommentare('app/src/cockpit/pages/SalesDashboard.tsx')
 check('Sales-Kacheln haben einen Platzhalter für den Ladezustand', /const zahl = \(text: string\)/.test(dash), true)
-check('„Alles abgearbeitet" läuft durch den Platzhalter', /zahl\(geordnetMitAnfrage\.length \?/.test(dash), true)
-// Die Kacheln, die eine gezählte Menge zeigen. „Vernetzungsanfragen", „Quoten",
-// „InMails" und „Werkzeuge" hängen NICHT an usePosten und bleiben außen vor.
-for (const kachel of [
-  'kundenaufgabePosten.length',
-  'antwortListe.length',
-  'erstnachrichtListe.length',
-  'followupListe.length',
-  'loomVerschicktGesamt',
-]) {
-  check(`Kachel-Zahl ${kachel} ist gegen den Ladezustand gesichert`, dash.includes(`zahl(\``), true)
-}
+// Seit dem Flow-Umbau (18.08.) hängt der Platzhalter am Flow-Ladezustand:
+// solange Metriken ODER Posten laden, ist jede Aussage über „erledigt"
+// vorläufig — und „steht" ist die teuerste falsche Zahl auf diesem Board.
+check('der Platzhalter hängt am Flow-Ladezustand', /const zahl = \(text: string\) => \(flow\.laedt \?/.test(dash), true)
 check(
-  'Die Unterzeile von „Jetzt dran" wiederholt die Kennzahl nicht',
-  /ansage !== `\$\{geordnetMitAnfrage\.length\} offen`/.test(dash),
+  'der Flow bekommt den Posten-Ladezustand mitgeteilt',
+  /useTagesFlow\(metrics\.today, flowLive, postenLaedt \|\| metrics\.loading\)/.test(dash),
   true,
 )
 check(
-  'Kennzahl und Unterzeile rechnen auf derselben Liste',
-  /tagesansage\(geordnetMitAnfrage, dauern, jetzt\)/.test(dash),
+  'auch der Zeilen-Zustand (grün/dran) wartet auf den Flow',
+  /if \(!eintrag \|\| flow\.laedt\) return 'offen'/.test(dash),
+  true,
+)
+// Die Zeilen, die eine gezählte Menge zeigen. „Vernetzungsanfragen" hängt am
+// Zähler, nicht an usePosten, und bleibt außen vor.
+for (const zeile of [
+  'erstnachrichtStand',
+  'antwortenStand',
+  'followupStand',
+  'loomsStand',
+  'kundenarbeitPosten.length',
+]) {
+  check(`Zeilen-Zahl ${zeile} ist gegen den Ladezustand gesichert`, dash.includes(`zahl(\``), true)
+}
+check(
+  'die Kopfzeile wiederholt die Kennzahl nicht',
+  /ansage !== `\$\{geordnet\.length\} offen`/.test(dash),
+  true,
+)
+check(
+  'Ansage und Liste rechnen auf derselben Quelle',
+  /tagesansage\(geordnet, dauern, jetzt\)/.test(dash),
+  true,
+)
+check(
+  'die Zeilen-Zahlen kommen aus denselben Listen wie die Fenster dahinter',
+  /flowQuellen\(quellen, jetzt\)/.test(dash),
   true,
 )
 

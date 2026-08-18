@@ -11,7 +11,7 @@ import { bucketOf, type FollowupBucket } from '../lib/linkedinFollowups'
 import { useActiveBrand } from '../lib/activeBrand'
 import { useDailyMetrics } from '../lib/useDailyMetrics'
 import { METRIC_FIELDS, METRIK_LABEL, berechneStand, pruefeBuchung } from '../lib/metrikFelder'
-import { mondayOf, toIsoDate } from '../lib/metricsDates'
+import { heutigesMetrikDatum, mondayOf, toIsoDate } from '../lib/metricsDates'
 import {
   anfragenSum,
   nachrichtenSum,
@@ -216,7 +216,7 @@ export function UrielDock() {
           if (metrics.tableMissing) {
             return { ok: false, summary: 'Tracking-Tabelle fehlt', data: { error: 'table_missing' } }
           }
-          const heute = toIsoDate(new Date())
+          const heute = heutigesMetrikDatum()
           const geprueft = pruefeBuchung({
             feld: input.feld,
             wert: input.wert,

@@ -7,6 +7,23 @@
  * gültig.
  */
 
+/**
+ * Der Metrik-Tag wechselt um 4 Uhr morgens, nicht um Mitternacht.
+ *
+ * Kevin arbeitet nachweislich nach Mitternacht (Commits um 01:25 sind im Log).
+ * Ein Loom um 0:30 gehört zu seinem „gestern" — zählte er auf den Kalendertag,
+ * stünde die Hälfte des Abends morgens als „heute schon erledigt" im Flow, und
+ * die Tageszeile von gestern bliebe unvollständig. Die Grenze gilt überall,
+ * wo `daily_metrics` gelesen oder geschrieben wird — EINE Tageswahrheit, kein
+ * zweiter Kalender daneben.
+ */
+export const METRIK_TAG_WECHSEL_STUNDE = 4
+
+/** Das Datum, auf das JETZT gebucht und gelesen wird — mit 4-Uhr-Grenze. */
+export function heutigesMetrikDatum(jetzt: Date = new Date()): string {
+  return toIsoDate(new Date(jetzt.getTime() - METRIK_TAG_WECHSEL_STUNDE * 60 * 60 * 1000))
+}
+
 export function toIsoDate(d: Date): string {
   const y = d.getFullYear()
   const m = String(d.getMonth() + 1).padStart(2, '0')

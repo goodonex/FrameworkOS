@@ -1,34 +1,50 @@
 import { useEffect, useState } from 'react'
+import type { InmailStand, PoolAbleitung } from '../lib/inmailStand'
 
 /**
- * InMail-Kachel-Fenster (O13 / D8): der Credits-Stand ist editierbar.
+ * InMail-Fenster (18.08.2026) — aus der Bestands-Kachel wurde die
+ * Reaktivierungs-Zeile: vorne die Tagesration (heute X von Y, direkt
+ * buchbar), dahinter der ABGELEITETE Pool.
  *
- * Vorher stand die 150 als Konstante im Code (`prioritaet.ts`) — die Kachel
- * behauptete also einen Stand, den nur ein Deploy ändern konnte. Der Wert lebt
- * jetzt in `ui_settings` (Migration 0068, Schlüssel `sales.inmailCredits`):
- * kein neues Feld, keine neue Tabelle, geräteübergreifend.
- *
- * Was 150 genau ist (Gesamtbestand oder Monatskontingent), ist weiterhin offen
- * — deshalb steht hier „Bestand" und keine erfundene Tagesration.
+ * Kevins Frage vom 18.08. („ist das getrackt oder einfach eine Zahl?") hat
+ * eine ehrliche Antwort bekommen: der Stand wird beim Speichern mit dem
+ * Metrik-Datum gestempelt, und die Anzeige zieht die seither über den Flow
+ * gebuchten InMails ab (`inmailStand.poolAbleitung`). Der Pool sinkt also von
+ * selbst mit jedem Haken — nachjustiert wird nur noch, wenn LinkedIn anders
+ * zählt (Antworten geben Credits zurück).
  */
 export function InmailPanel({
-  wert,
+  stand,
+  abgeleitet,
+  tagesration,
+  heuteGebucht,
+  onBuchen,
   onSpeichern,
 }: {
-  wert: number
+  /** Der gespeicherte Stand mitsamt Stempel. */
+  stand: InmailStand
+  /** Pool nach Abzug der seither gebuchten InMails. */
+  abgeleitet: PoolAbleitung
+  /** Das Tagesziel der Reaktivierungs-Stufe. */
+  tagesration: number
+  /** Heute gebuchte InMails (daily_metrics). */
+  heuteGebucht: number
+  /** +1/−1 auf `daily_metrics.inmails` — derselbe Weg wie der Zähl-Modus. */
+  onBuchen: (delta: 1 | -1) => void
+  /** Speichert einen nachjustierten Stand; das Datum stempelt der Aufrufer. */
   onSpeichern: (neu: number) => void
 }) {
-  const [entwurf, setEntwurf] = useState(String(wert))
+  const [entwurf, setEntwurf] = useState(String(abgeleitet.pool))
   const [gespeichert, setGespeichert] = useState(false)
 
   // Kommt der Wert aus Supabase nach, darf das Feld nicht auf dem alten stehen bleiben.
   useEffect(() => {
-    setEntwurf(String(wert))
-  }, [wert])
+    setEntwurf(String(abgeleitet.pool))
+  }, [abgeleitet.pool])
 
   const zahl = Number(entwurf)
   const gueltig = entwurf.trim() !== '' && Number.isFinite(zahl) && zahl >= 0
-  const geaendert = gueltig && zahl !== wert
+  const geaendert = gueltig && Math.floor(zahl) !== abgeleitet.pool
 
   const speichern = () => {
     if (!geaendert) return
@@ -38,13 +54,57 @@ export function InmailPanel({
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <span style={{ fontSize: 13, color: 'var(--ck-text-3)' }}>
-        Bestand, kein Tagesrhythmus. Reaktivierung offener Anfragen läuft über den Skill{' '}
-        <code>linkedin-inmail</code>.
-      </span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* Die Tagesration — der eigentliche Handgriff dieser Zeile. */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+        <div>
+          <div style={{ fontSize: 20, fontWeight: 600 }}>
+            {heuteGebucht} von {tagesration} heute
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--ck-text-3)', marginTop: 2 }}>
+            Verfasst der Skill <code>linkedin-inmail</code> — hier wird gebucht, was raus ist.
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            type="button"
+            className="ck-btn"
+            style={{ minHeight: 44, minWidth: 44 }}
+            disabled={heuteGebucht <= 0}
+            onClick={() => onBuchen(-1)}
+            aria-label="Eine InMail zurücknehmen"
+          >
+            −
+          </button>
+          <button
+            type="button"
+            className="ck-btn ck-btn--primary"
+            style={{ minHeight: 44, minWidth: 44 }}
+            onClick={() => onBuchen(1)}
+            aria-label="Eine InMail buchen"
+          >
+            +1
+          </button>
+        </div>
+      </div>
+
+      {/* Der abgeleitete Pool — Herkunft offen ausgewiesen. */}
+      <div style={{ fontSize: 13, color: 'var(--ck-text-2)', lineHeight: 1.6 }}>
+        Pool ≈ <strong>{abgeleitet.pool} Credits</strong>
+        {abgeleitet.reichtTage !== null ? <> · reicht ~{abgeleitet.reichtTage} Arbeitstage</> : null}
+        <br />
+        {stand.standVom ? (
+          <>
+            Stand vom {stand.standVom.slice(8, 10)}.{stand.standVom.slice(5, 7)}. − {abgeleitet.seitherGebucht}{' '}
+            seither gebucht. Antworten geben Credits zurück — gelegentlich mit dem Sales Navigator abgleichen.
+          </>
+        ) : (
+          <>Alt-Bestand ohne Datum — einmal speichern, dann rechnet der Pool ab hier mit.</>
+        )}
+      </div>
+
       <label className="ck-label" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        Credits-Stand
+        Stand nachjustieren
         <input
           className="ck-input"
           type="number"
@@ -68,9 +128,6 @@ export function InmailPanel({
           {gespeichert ? '✓ gespeichert' : 'Speichern'}
         </button>
       </label>
-      <span style={{ fontSize: 11, color: 'var(--ck-text-3)' }}>
-        Den echten Stand zeigt LinkedIn im Sales Navigator — hier wird er nur festgehalten.
-      </span>
     </div>
   )
 }

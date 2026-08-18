@@ -1,5 +1,4 @@
-import type { MetricField } from '../../lib/metrikFelder'
-import type { StufenStand } from '../../lib/tagesFlow'
+import type { Stufe, StufenStand } from '../../lib/tagesFlow'
 import { TagesFlowStack } from './TagesFlowStack'
 
 /**
@@ -36,8 +35,8 @@ export function HeroHorizont({
   stufenLaden: boolean
   /** Öffnet das bestehende Uriel-Dock. Der Hero kennt Uriel nicht selbst. */
   onAsk: () => void
-  /** Der Ring ist der kürzeste Weg in den Zähl-Modus (11.08.). */
-  onStufe: (feld: MetricField) => void
+  /** Der Ring ist der kürzeste Weg ins Werkzeug der Stufe (11.08.). */
+  onStufe: (stufe: Stufe) => void
 }) {
   return (
     <header className="ck-hero">

@@ -8,15 +8,23 @@ import { supabase } from '../../lib/supabase'
 import { AnfragenZaehler } from '../components/AnfragenZaehler'
 import { Arbeitsliste, type LoomSkriptAktionen } from '../components/Arbeitsliste'
 import { Arbeitsmodus, type ArbeitsmodusErgebnis } from '../components/Arbeitsmodus'
-import { ConversionPanel } from '../components/ConversionPanel'
 import { InmailPanel } from '../components/InmailPanel'
-import { WerkzeugePanel } from '../components/WerkzeugePanel'
 import { useActiveBrand } from '../lib/activeBrand'
 import { zeilenId } from '../lib/arbeitsmodusQuellen'
 import { erledigePosten } from '../lib/arbeitsmodusTracking'
-import { istAltlast } from '../lib/linkedinFollowups'
-import { funnelKpis, sumField } from '../lib/metricsAggregate'
-import { INMAIL_CREDITS_STAND, RANGFOLGE, tagesstand, type Posten, type Spur } from '../lib/prioritaet'
+import { ausAltemWert, poolAbleitung, type InmailStand } from '../lib/inmailStand'
+import { heutigesMetrikDatum } from '../lib/metricsDates'
+import { INMAIL_CREDITS_STAND, type Posten, type Spur } from '../lib/prioritaet'
+import { bereiteDatenVor, salesSerie, type SalesStreak } from '../lib/salesStreak'
+import {
+  TAGES_FLOW,
+  ersteOffeneStufe,
+  flowQuellen,
+  type Stufe,
+  type StufenId,
+  type StufenStand,
+} from '../lib/tagesFlow'
+import { useTagesFlow } from '../lib/useTagesFlow'
 import { useUiSetting } from '../lib/uiSettings'
 import { tagesansage } from '../lib/tagesansage'
 import { postRun } from '../lib/runnerApi'
@@ -25,38 +33,27 @@ import { useDailyMetrics } from '../lib/useDailyMetrics'
 import { useRunnerData } from '../lib/useRunnerData'
 
 /**
- * Sales-Dashboard als Kacheln. Jede Kachel ist komplett klickbar und
- * vergrößert sich per Layout-Morph zum Arbeitsfenster (framer-motion
- * layoutId). Im Fenster steht die eigentliche Arbeit: die Namensliste der
- * Spur (Arbeitsliste) — Name aufklappen → Text/Skript darunter, daneben
- * Haken, Kopieren (nur bei versandfertigem Text) bzw. Skript
- * öffnen/generieren bei Looms.
+ * Das Sales-Board als Tages-Flow (18.08.2026) — Kevins Diktat: „Ich will es
+ * von oben nach unten abarbeitbar haben."
+ *
+ * Aus dem Kachel-Raster (elf gleich aussehende Karten, „219 offen" als
+ * Angst-Zahl obendrauf) wurden die Stufen des Tages als Zeilen in fester
+ * Reihenfolge: Anfragen → Erstnachrichten → Antworten → Follow-ups →
+ * InMails → Looms. Die erste offene Zeile ist betont, erledigte werden grün
+ * und tragen einen Haken, jede Zähl-Zeile zeigt ihre Serie („n Werktage in
+ * Folge"). Darunter, bewusst ruhig und ohne Alarm-Optik: die Projekte.
+ *
+ * Was BLIEB: Zeile → Fenster → Namensliste → Haken, Kopieren nur bei
+ * versandfertigem Text (Kevins UI-Gesetze). Das Fenster ist dasselbe
+ * (`KachelFenster`, layout-Morph), die Arbeit darin auch. Gefallen sind die
+ * Kacheln „Jetzt dran" (die 219 hatte keine Funktion — der Flow ersetzt sie),
+ * „Quoten" (Wochen-Thema, wohnt in /tracking) und „Werkzeuge" (wohnt in
+ * /agenten).
  *
  * Vollbild gibt es NUR am Handy: den Ein-Posten-Arbeitsmodus (aus dem
  * Fenster heraus) und den Ein-Knopf-Anfragen-Zähler. Am Desktop bleibt
  * alles im Fenster — Vollbild wäre dort verschenkter Platz.
  */
-
-function pct(v: number | null): string {
-  return v == null ? '—' : `${Math.round(v * 100)}%`
-}
-
-/** Schwächste Stufe zuerst — genau die, an der es gerade hakt. */
-function quotenFarbeUndText(conv: ReturnType<typeof funnelKpis>['conv']): { farbe: string; text: string } {
-  const schlechteste = [...conv].sort((a, b) => {
-    const ra = a.state === 'low' ? 0 : a.state === 'ok' ? 1 : a.state === 'great' ? 2 : 3
-    const rb = b.state === 'low' ? 0 : b.state === 'ok' ? 1 : b.state === 'great' ? 2 : 3
-    return ra - rb
-  })[0]
-  const farbe =
-    schlechteste?.state === 'low'
-      ? 'var(--ck-warn)'
-      : schlechteste?.state === 'great'
-        ? 'var(--ck-accent)'
-        : 'var(--ck-text-1)'
-  const text = conv.map((k) => `${pct(k.rate)}`).join(' · ')
-  return { farbe, text }
-}
 
 export interface KachelDef {
   id: string
@@ -71,6 +68,19 @@ export interface KachelDef {
   fensterAktion?: { label: string; onClick: () => void }
 }
 
+/** Eine Zeile des Tages-Flows — die Kachel-Definition plus Zeilen-Zustand. */
+export interface FlowZeileDef extends KachelDef {
+  /** Position im Ritual (1-basiert) — der Projekte-Block hat keine. */
+  nummer?: number
+  zustand: 'aktiv' | 'erledigt' | 'offen' | 'ruhig'
+  streak?: SalesStreak
+}
+
+/**
+ * Das Grid-Kärtchen der alten Ansicht. Das Board rendert es nicht mehr —
+ * es bleibt exportiert, weil die Dev-Vorschau (`src/dev/SalesVorschau.tsx`)
+ * damit Layout-Varianten durchspielt.
+ */
 export function KachelCard({ kachel, onOeffnen }: { kachel: KachelDef; onOeffnen: () => void }) {
   return (
     <motion.button
@@ -108,6 +118,126 @@ export function KachelCard({ kachel, onOeffnen }: { kachel: KachelDef; onOeffnen
         >
           {kachel.unterzeile}
         </div>
+      ) : null}
+    </motion.button>
+  )
+}
+
+/** Der grüne Haken einer stehenden Zeile. */
+function HakenZeichen() {
+  return (
+    <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M4.5 12.5l5 5 10-11" />
+    </svg>
+  )
+}
+
+/** Das Serien-Flämmchen — currentColor, damit die Token-Disziplin hält. */
+function SerienZeichen() {
+  return (
+    <svg viewBox="0 0 24 24" width={13} height={13} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M12 3c1 3-4 5-4 9a4 4 0 0 0 8 0c0-2-1-3.5-2-4.5 0 1.5-.7 2.3-1.5 2.8C12.8 8.6 13.5 5.5 12 3Z" />
+    </svg>
+  )
+}
+
+/** Eine Zeile des Boards — komplett klickbar, morpht ins Fenster. */
+export function FlowZeile({ zeile, onOeffnen }: { zeile: FlowZeileDef; onOeffnen: () => void }) {
+  const aktiv = zeile.zustand === 'aktiv'
+  const erledigt = zeile.zustand === 'erledigt'
+  const ruhig = zeile.zustand === 'ruhig'
+  return (
+    <motion.button
+      type="button"
+      layoutId={`kachel-${zeile.id}`}
+      transition={{ duration: 0.22, ease: 'easeOut' }}
+      onClick={onOeffnen}
+      className="ck-panel"
+      style={{
+        padding: aktiv ? '16px 16px' : '12px 16px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        textAlign: 'left',
+        cursor: 'pointer',
+        font: 'inherit',
+        color: 'inherit',
+        width: '100%',
+        borderColor: aktiv ? 'var(--ck-accent)' : undefined,
+        opacity: ruhig ? 0.85 : 1,
+      }}
+    >
+      {/* Position im Ritual — Haken, sobald die Stufe steht. */}
+      {zeile.nummer !== undefined ? (
+        <span
+          aria-hidden
+          style={{
+            width: 26,
+            height: 26,
+            borderRadius: '50%',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            fontSize: 12,
+            fontWeight: 600,
+            color: erledigt ? 'var(--ck-accent)' : aktiv ? 'var(--ck-accent)' : 'var(--ck-text-3)',
+            border: `1.5px solid ${erledigt || aktiv ? 'var(--ck-accent)' : 'var(--ck-border-strong)'}`,
+          }}
+        >
+          {erledigt ? <HakenZeichen /> : zeile.nummer}
+        </span>
+      ) : null}
+
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span className="ck-label" style={{ display: 'block' }}>
+          {zeile.titel}
+        </span>
+        <span
+          style={{
+            display: 'block',
+            fontSize: aktiv ? 17 : 15,
+            fontWeight: 600,
+            marginTop: 2,
+            color: zeile.kennzahlFarbe ?? (erledigt ? 'var(--ck-accent)' : 'var(--ck-text-1)'),
+          }}
+        >
+          {zeile.kennzahl}
+        </span>
+        {zeile.unterzeile ? (
+          <span
+            style={{
+              display: 'block',
+              fontSize: 12,
+              color: 'var(--ck-text-2)',
+              marginTop: 2,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {zeile.unterzeile}
+          </span>
+        ) : null}
+      </span>
+
+      {/* Die Serie: n Werktage in Folge, ein Frei-Tag je Woche eingerechnet. */}
+      {zeile.streak && zeile.streak.laenge > 0 ? (
+        <span
+          className="ck-zahl"
+          title={`${zeile.streak.laenge} Werktage in Folge${zeile.streak.heuteOffen ? ' — heute noch offen' : ''} · ein Frei-Tag je Woche eingerechnet`}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+            fontSize: 12,
+            flexShrink: 0,
+            color: zeile.streak.heuteOffen ? 'var(--ck-text-3)' : 'var(--ck-accent)',
+          }}
+        >
+          <SerienZeichen />
+          {zeile.streak.laenge}
+        </span>
       ) : null}
     </motion.button>
   )
@@ -157,13 +287,11 @@ export function KachelFenster({ kachel, onClose }: { kachel: KachelDef; onClose:
            * DECKEND, nicht die Klassenfarbe. `.ck-panel` traegt `--ck-card`
            * (0.55) — bewusst durchscheinend fuer Flaechen AUF der Seite. Ueber
            * einem Backdrop bleibt davon Geistertext: 0.86 Backdrop mal 0.55
-           * Panel laesst noch ~6 % der Kacheln dahinter durch, und das
-           * Dashboard stand quer durch die Namensliste ("KUNDENARBEIT 0 offen"
-           * mitten zwischen den Leads, der Kopf ueber der Unter-Navigation).
-           * `--ck-panel` ist die deckende Entsprechung derselben Farbe und
-           * laut tokens.css genau fuer "alles, was ueber Canvas, Foto oder
-           * Backdrop liegt" da — jedes andere Overlay im Cockpit macht es so
-           * (RunDrawer, OsDetailPanel, FunnelStufen, Arbeitsmodus).
+           * Panel laesst noch ~6 % der Zeilen dahinter durch. `--ck-panel` ist
+           * die deckende Entsprechung derselben Farbe und laut tokens.css
+           * genau fuer "alles, was ueber Canvas, Foto oder Backdrop liegt" da —
+           * jedes andere Overlay im Cockpit macht es so (RunDrawer,
+           * OsDetailPanel, FunnelStufen, Arbeitsmodus).
            */
           background: 'var(--ck-panel)',
           borderColor: 'var(--ck-border-strong)',
@@ -172,10 +300,10 @@ export function KachelFenster({ kachel, onClose }: { kachel: KachelDef; onClose:
       >
         {/**
          * Kopf und Fussaktion kleben, statt mitzuscrollen. Vorher lagen beide im
-         * Scrollfluss: bei „Jetzt dran" mit ~200 Posten stand „Arbeitsmodus
-         * starten" unter zweihundert Zeilen, und „Schliessen" war nach dem
-         * ersten Wisch weg. Das negative `top`/`bottom` frisst das Panel-Padding
-         * (20), sonst bliebe ein Spalt, durch den die Liste durchscheint.
+         * Scrollfluss: bei langen Listen stand „Arbeitsmodus starten" unter
+         * zweihundert Zeilen, und „Schliessen" war nach dem ersten Wisch weg.
+         * Das negative `top`/`bottom` frisst das Panel-Padding (20), sonst
+         * bliebe ein Spalt, durch den die Liste durchscheint.
          */}
         <div
           style={{
@@ -225,6 +353,18 @@ export function KachelFenster({ kachel, onClose }: { kachel: KachelDef; onClose:
   )
 }
 
+/** „vor 2 h", „vor 35 min", „vor 3 Tagen" — für die Daten-Frische. */
+function vorZeit(iso: string | null): string | null {
+  if (!iso) return null
+  const ms = Date.now() - new Date(iso).getTime()
+  if (!Number.isFinite(ms) || ms < 0) return null
+  const min = Math.floor(ms / 60_000)
+  if (min < 60) return `vor ${Math.max(1, min)} min`
+  const std = Math.floor(min / 60)
+  if (std < 48) return `vor ${std} h`
+  return `vor ${Math.floor(std / 24)} Tagen`
+}
+
 export function SalesDashboard() {
   const navigate = useNavigate()
   const isMobile = useIsMobile()
@@ -258,7 +398,7 @@ export function SalesDashboard() {
 
   const kundenaufgabePosten = quellen.kundenaufgabe ?? []
   // Kundenaufgaben (mit Projekt) und eigene Aufgaben (ohne) landen in derselben
-  // Kachel — für Kevin ist beides „was ich noch schulde". Die Rangfolge trennt
+  // Zeile — für Kevin ist beides „was ich noch schulde". Die Rangfolge trennt
   // sie trotzdem: `aufgabe` steht hinter LinkedIn.
   const kundenarbeitPosten = useMemo(
     () => [...kundenaufgabePosten, ...(quellen.aufgabe ?? [])],
@@ -270,77 +410,80 @@ export function SalesDashboard() {
   const followupListe = quellen.followup ?? []
   const erstnachrichtListe = quellen.erstnachricht ?? []
 
-  // Altlasten sind kein eigener Eimer mehr, sondern die ältesten unter den
-  // fälligen (14.08.2026). Die Zahl bleibt als Hinweis stehen — sie sagt jetzt
-  // „so viel davon liegt schon über 30 Tage", nicht mehr „so viel ist aussortiert".
-  const altlastAnzahl = useMemo(
-    () => linkedinThreads.items.filter((t) => istAltlast(t, jetzt)).length,
-    [linkedinThreads.items, jetzt],
-  )
-  const loomStarredGesamt = useMemo(() => linkedinThreads.items.filter((t) => t.starred).length, [linkedinThreads.items])
-  const loomVerschicktGesamt = useMemo(
-    () => linkedinThreads.items.filter((t) => t.starred && t.loom_status === 'verschickt').length,
-    [linkedinThreads.items],
-  )
-
-  const monthRevenue = useMemo(() => sumField(metrics.monthRows, 'umsatz'), [metrics.monthRows])
-  const funnel = useMemo(() => funnelKpis(metrics.monthRows, monthRevenue), [metrics.monthRows, monthRevenue])
-  // D8: der Credits-Stand lebt in ui_settings (0068), nicht mehr hart im Code.
-  // Die Konstante in prioritaet.ts bleibt der Standard, solange nichts gesetzt ist.
-  const { wert: inmailCredits, setzen: setzeInmailCredits } = useUiSetting<number>(
-    'sales.inmailCredits',
-    INMAIL_CREDITS_STAND,
-  )
-  const tag = useMemo(
-    () => tagesstand(metrics.today, inmailCredits),
-    [metrics.today, inmailCredits],
-  )
-
   /**
-   * O7 / Wargame Zug 8 — der Anfragen-Posten. Er hat keine Zeile in einer
-   * Tabelle: die Quelle ist `daily_metrics.li_anfragen`, deshalb entsteht er
-   * hier synthetisch statt in `arbeitsmodusQuellen`.
-   *
-   * Nur am Desktop (D6: „Vernetzungsanfragen machen nur am Laptop Sinn") und
-   * nur, solange das Tagesziel offen ist — er verschwindet von selbst, wenn der
-   * Zaehler es sagt. `nurZaehler` sperrt ihn gegen `erledigePosten`.
+   * Der Tages-Flow — dieselbe Rechnung wie im Hero und im Zähl-Modus, gefüttert
+   * aus DENSELBEN Listen, die sich hinter den Zeilen öffnen („eine Abfrage,
+   * eine Zahl"). `useTagesFlow` friert dabei die Tagesportionen ein (0074).
    */
-  const anfragenPosten = useMemo<Posten | null>(() => {
-    if (isMobile) return null
-    if (tag.anfragenHeute >= tag.anfragenLimit) return null
-    const offen = tag.anfragenLimit - tag.anfragenHeute
-    return {
-      id: 'anfrage:tagesziel',
-      spur: 'anfrage',
-      name: `Vernetzungsanfragen: noch ${offen} von ${tag.anfragenLimit}`,
-      text: 'Auf LinkedIn senden, hier mitzaehlen. Der Zaehler ist die Wahrheit — dieser Posten verschwindet von selbst.',
-      timestamp: null,
-      nurZaehler: true,
+  const flowLive = useMemo(() => flowQuellen(quellen, jetzt), [quellen, jetzt])
+  const flow = useTagesFlow(metrics.today, flowLive, postenLaedt || metrics.loading)
+  const staende = flow.staende
+  const standJeStufe = useMemo(() => {
+    const map = new Map<StufenId, StufenStand>()
+    for (const s of staende) map.set(s.stufe.id, s)
+    return map
+  }, [staende])
+  const aktivIndex = flow.laedt ? -2 : ersteOffeneStufe(staende)
+
+  /** Serien je Zähl-Stufe — aus Metrik-Historie und eingefrorenen Portionen. */
+  const heuteIso = heutigesMetrikDatum()
+  const streakDaten = useMemo(
+    () => bereiteDatenVor(metrics.windowRows, flow.portionen.historie),
+    [metrics.windowRows, flow.portionen.historie],
+  )
+  const serieFuer = useCallback(
+    (stufe: Stufe): SalesStreak | undefined =>
+      stufe.feld === null || flow.portionen.tableMissing && stufe.standardZiel === null
+        ? undefined
+        : salesSerie(stufe, heuteIso, streakDaten),
+    [heuteIso, streakDaten, flow.portionen.tableMissing],
+  )
+
+  // Daten-Frische: die Zahlen sind nur so jung wie der letzte Sync. Ohne den
+  // Hinweis liest sich eine alte 18 wie eine falsche 18.
+  const postfachStand = useMemo(() => {
+    let max: string | null = null
+    for (const t of linkedinThreads.items) {
+      // `last_synced_at` setzt der Chrome-Sync (runner/linkedin/sync.mjs) —
+      // der ehrlichste Stempel dafür, wie alt diese Zahlen wirklich sind.
+      if (t.last_synced_at && (!max || t.last_synced_at > max)) max = t.last_synced_at
     }
-  }, [isMobile, tag.anfragenHeute, tag.anfragenLimit])
+    return max
+  }, [linkedinThreads.items])
 
   /**
-   * „Jetzt dran" mit dem Erinnerungs-Posten an seinem Rang. Der Arbeitsmodus
-   * bekommt bewusst `geordnet` OHNE ihn (siehe oeffneArbeitsmodus).
+   * InMail-Pool (18.08.): der Stand trägt jetzt ein Datum, die Anzeige zieht
+   * seither gebuchte InMails ab. Der alte, datumslose Schlüssel bleibt als
+   * Startwert lesbar — beim ersten Speichern wandert alles auf den neuen.
    */
-  const geordnetMitAnfrage = useMemo(() => {
-    if (!anfragenPosten) return geordnet
-    // `geordnet` ist bereits nach RANGFOLGE sortiert — der Posten wird an
-    // seinem Rang eingeschoben, statt die Liste neu zu sortieren. `ordnePosten`
-    // erwartet Quellen je Spur, keine flache Liste.
-    const rang = (spur: Spur) => RANGFOLGE.indexOf(spur)
-    const i = geordnet.findIndex((p) => rang(p.spur) > rang('anfrage'))
-    return i === -1
-      ? [...geordnet, anfragenPosten]
-      : [...geordnet.slice(0, i), anfragenPosten, ...geordnet.slice(i)]
-  }, [geordnet, anfragenPosten])
+  const { wert: altCredits } = useUiSetting<number>('sales.inmailCredits', INMAIL_CREDITS_STAND)
+  const { wert: inmailStandRoh, setzen: setzeInmailStand } = useUiSetting<InmailStand | null>(
+    'sales.inmailStand',
+    null,
+  )
+  const inmailStand = inmailStandRoh ?? ausAltemWert(altCredits)
+  const reaktivierungsStand = standJeStufe.get('reaktivierung')
+  const inmailPool = useMemo(
+    () => poolAbleitung(inmailStand, metrics.windowRows, reaktivierungsStand?.soll ?? 0),
+    [inmailStand, metrics.windowRows, reaktivierungsStand?.soll],
+  )
+
+  /**
+   * Die Follow-up-Portion als Liste: nur so viele Namen, wie heute noch dran
+   * sind. Der Berg dahinter bleibt bewusst unsichtbar — er steht als eine
+   * ruhige Zahl in der Unterzeile, nicht als 200 Zeilen im Fenster.
+   */
+  const followupStand = standJeStufe.get('followups')
+  const followupPortionsListe = useMemo(() => {
+    if (!followupStand) return followupListe
+    const rest = Math.max(0, followupStand.soll - followupStand.wert)
+    return followupListe.slice(0, rest)
+  }, [followupListe, followupStand])
+  const followupRueckstand = Math.max(0, followupListe.length - followupPortionsListe.length)
 
   // Vollbild-Arbeitsmodus ist ein Handy-Werkzeug — am Desktop passiert die
-  // Arbeit in der Liste im Kachel-Fenster.
+  // Arbeit in der Liste im Zeilen-Fenster.
   const oeffneArbeitsmodus = useCallback((spur: Spur | 'alle', liste: Posten[]) => {
-    // O7/D6: Erinnerungs-Posten gehoeren nie in den Vollbild-Arbeitsmodus —
-    // dort gibt es nur „Erledigt", und genau das darf dieser Posten nicht.
-    // Gefiltert wird hier, damit KEIN Aufrufer es vergessen kann.
     const echte = liste.filter((p) => !p.nurZaehler)
     if (echte.length === 0) return
     setOffenKachelId(null)
@@ -402,11 +545,7 @@ export function SalesDashboard() {
     }
   }, [])
 
-  const loomsSichtbar =
-    offenKachelId === 'looms' ||
-    offenKachelId === 'jetzt-dran' ||
-    arbeitsmodus?.spur === 'loom' ||
-    arbeitsmodus?.spur === 'alle'
+  const loomsSichtbar = offenKachelId === 'looms' || arbeitsmodus?.spur === 'loom' || arbeitsmodus?.spur === 'alle'
   useEffect(() => {
     if (loomsSichtbar) void ladeLibrary()
   }, [loomsSichtbar, ladeLibrary])
@@ -510,22 +649,6 @@ export function SalesDashboard() {
     [navigate],
   )
 
-  const liste = useCallback(
-    (posten: Posten[]) => () => (
-      <Arbeitsliste
-        posten={posten}
-        onErledigt={onArbeitsmodusErledigt}
-        // O7: die einzige Aktion des Anfragen-Postens — kein Haken, kein Kopieren.
-        onZaehler={() => setOffenKachelId('vernetzungsanfragen')}
-        morgen={morgenAktion}
-        loom={loomAktionen}
-        projektLink={projektLink}
-        onNavigiere={navigiere}
-      />
-    ),
-    [onArbeitsmodusErledigt, loomAktionen, projektLink, navigiere],
-  )
-
   /**
    * v2 (f): „→ morgen" hinter dem Wischen. Es gibt genau einen bestehenden
    * Verschiebe-Pfad, und der gilt für LinkedIn-Threads: `snooze` setzt
@@ -546,6 +669,21 @@ export function SalesDashboard() {
     [linkedinThreads],
   )
 
+  const liste = useCallback(
+    (posten: Posten[]) => () => (
+      <Arbeitsliste
+        posten={posten}
+        onErledigt={onArbeitsmodusErledigt}
+        onZaehler={() => setOffenKachelId('vernetzungsanfragen')}
+        morgen={morgenAktion}
+        loom={loomAktionen}
+        projektLink={projektLink}
+        onNavigiere={navigiere}
+      />
+    ),
+    [onArbeitsmodusErledigt, morgenAktion, loomAktionen, projektLink, navigiere],
+  )
+
   /** Am Handy: „Arbeitsmodus starten" im Fenster-Fuß — am Desktop bewusst nicht. */
   const mobilArbeitsmodus = useCallback(
     (spur: Spur | 'alle', posten: Posten[]) =>
@@ -556,140 +694,202 @@ export function SalesDashboard() {
   )
 
   /**
-   * Solange die Quellen laden, steht auf jeder Kachel ein Platzhalter statt
-   * einer Zahl. „0 offen" und „Alles abgearbeitet" sind sonst schlicht falsch —
-   * und „alles erledigt" ist die teuerste falsche Zahl, die hier stehen kann.
+   * Solange die Quellen laden, steht auf jeder Zeile ein Platzhalter statt
+   * einer Zahl. „0 offen" und „steht" sind sonst schlicht falsch — und
+   * „alles erledigt" ist die teuerste falsche Zahl, die hier stehen kann.
    */
-  const zahl = (text: string) => (postenLaedt ? '…' : text)
+  const zahl = (text: string) => (flow.laedt ? '…' : text)
+
+  /** Der Zeilen-Zustand aus dem Stufen-Stand — die erste offene ist „dran". */
+  const zustandVon = (stufeId: StufenId): FlowZeileDef['zustand'] => {
+    const index = staende.findIndex((s) => s.stufe.id === stufeId)
+    const eintrag = staende[index]
+    if (!eintrag || flow.laedt) return 'offen'
+    if (eintrag.erledigt) return 'erledigt'
+    return index === aktivIndex ? 'aktiv' : 'offen'
+  }
+
+  const zuerst = (liste: Posten[]): string | undefined =>
+    liste[0] ? `zuerst: ${liste[0].firma ? `${liste[0].firma} — ` : ''}${liste[0].name}` : undefined
+
+  const anfragenStand = standJeStufe.get('anfragen')
+  const erstnachrichtStand = standJeStufe.get('erstnachrichten')
+  const antwortenStand = standJeStufe.get('antworten')
+  const loomsStand = standJeStufe.get('looms')
+
+  const antwortenAelteste = flowLive.antworten?.aeltesteStunden ?? null
+  const antwortenAbgestanden = antwortenAelteste !== null && antwortenAelteste >= 24
+
+  /** Die sechs Zeilen des Rituals — Reihenfolge ist `TAGES_FLOW`, nicht Meinung. */
+  const flowZeilen: FlowZeileDef[] = TAGES_FLOW.map((stufe, index): FlowZeileDef => {
+    const nummer = index + 1
+    const basis = { nummer, zustand: zustandVon(stufe.id), streak: serieFuer(stufe), titel: stufe.langLabel }
+
+    switch (stufe.id) {
+      case 'anfragen':
+        return {
+          ...basis,
+          id: 'vernetzungsanfragen',
+          kennzahl: `${anfragenStand?.wert ?? 0} von ${anfragenStand?.soll ?? 0}`,
+          unterzeile: 'Zähler — das Ritual läuft direkt auf LinkedIn.',
+          inhalt: () => (
+            <AnfragenZaehler
+              heute={anfragenStand?.wert ?? 0}
+              limit={anfragenStand?.soll ?? 0}
+              onPlus={() => metrics.bump('li_anfragen', 1)}
+              onMinus={() => {
+                if ((anfragenStand?.wert ?? 0) > 0) metrics.bump('li_anfragen', -1)
+              }}
+            />
+          ),
+        }
+      case 'erstnachrichten':
+        return {
+          ...basis,
+          id: 'erstnachrichten',
+          kennzahl: erstnachrichten.tableMissing
+            ? 'Migration 0060 ausstehend'
+            : zahl(`${erstnachrichtStand?.wert ?? 0} von ${erstnachrichtStand?.soll ?? 0}`),
+          unterzeile: zuerst(erstnachrichtListe) ?? 'Wer angenommen hat, bekommt seine Nachricht.',
+          inhalt: liste(erstnachrichtListe),
+          fensterAktion: mobilArbeitsmodus('erstnachricht', erstnachrichtListe),
+        }
+      case 'antworten':
+        return {
+          ...basis,
+          id: 'antworten',
+          kennzahl: linkedinThreads.tableMissing
+            ? 'Migration 0058 ausstehend'
+            : zahl(
+                (antwortenStand?.wert ?? 0) === 0
+                  ? 'Niemand wartet'
+                  : `${antwortenStand?.wert} warten · älteste ${
+                      antwortenAelteste === null
+                        ? '—'
+                        : antwortenAelteste < 48
+                          ? `${Math.max(1, Math.round(antwortenAelteste))} h`
+                          : `${Math.round(antwortenAelteste / 24)} Tage`
+                    }`,
+              ),
+          kennzahlFarbe: !flow.laedt && antwortenAbgestanden ? 'var(--ck-warn)' : undefined,
+          unterzeile: zuerst(antwortListe) ?? 'Reaktionszeit zählt — nicht die Menge.',
+          inhalt: liste(antwortListe),
+          fensterAktion: mobilArbeitsmodus('antwort', antwortListe),
+        }
+      case 'followups':
+        return {
+          ...basis,
+          id: 'followups',
+          kennzahl: linkedinThreads.tableMissing
+            ? 'Migration 0058 ausstehend'
+            : zahl(`${followupStand?.wert ?? 0} von ${followupStand?.soll ?? 0}`),
+          unterzeile:
+            followupRueckstand > 0
+              ? `Portion für heute — ${followupRueckstand} weitere warten im Rückstand.`
+              : (zuerst(followupPortionsListe) ?? 'Chats ohne Antwort — die heutige Portion.'),
+          inhalt: () => (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {liste(followupPortionsListe)()}
+              {followupRueckstand > 0 ? (
+                <p style={{ fontSize: 12, color: 'var(--ck-text-3)', margin: 0 }}>
+                  {followupRueckstand} weitere sind fällig, aber nicht Teil der heutigen Portion — sie
+                  kommen morgen in 20er-Schritten dran. Der Berg schrumpft, ohne dich zu erschlagen.
+                </p>
+              ) : null}
+            </div>
+          ),
+          fensterAktion: mobilArbeitsmodus('followup', followupPortionsListe),
+        }
+      case 'reaktivierung':
+        return {
+          ...basis,
+          id: 'inmails',
+          kennzahl: zahl(
+            `${reaktivierungsStand?.wert ?? 0} von ${reaktivierungsStand?.soll ?? 0} · Pool ≈ ${inmailPool.pool}`,
+          ),
+          unterzeile: 'Nie angenommene Anfragen — die InMail-Welle.',
+          inhalt: () => (
+            <InmailPanel
+              stand={inmailStand}
+              abgeleitet={inmailPool}
+              tagesration={reaktivierungsStand?.soll ?? 0}
+              heuteGebucht={reaktivierungsStand?.wert ?? 0}
+              onBuchen={(delta) => {
+                if (delta === -1 && (reaktivierungsStand?.wert ?? 0) <= 0) return
+                metrics.bump('inmails', delta)
+              }}
+              onSpeichern={(neu) => setzeInmailStand({ wert: neu, standVom: heuteIso })}
+            />
+          ),
+        }
+      case 'looms':
+        return {
+          ...basis,
+          id: 'looms',
+          kennzahl: linkedinThreads.tableMissing
+            ? 'Migration 0061 ausstehend'
+            : zahl(`${loomsStand?.wert ?? 0} von ${loomsStand?.soll ?? 0}`),
+          unterzeile:
+            loomListe.length > 0
+              ? `${loomListe.length} zugesagt und offen — Stern = Ja zur Analyse.`
+              : 'Zugesagte Analysen aufnehmen und rausschicken.',
+          inhalt: liste(loomListe),
+          fensterAktion: mobilArbeitsmodus('loom', loomListe),
+        }
+    }
+  })
+
+  /**
+   * Der Projekte-Block — bewusst UNTER dem Ritual und bewusst leise: bei
+   * Reichentrog wartet Kevin auf den Kollegen, da ist kein Handgriff. Eine
+   * Alarm-Optik hier wäre Druck ohne Funktion (Kevins Wort vom 18.08.:
+   * „zu präsent"). Die Kachel-IDs bleiben, damit /sales?kachel=… und das
+   * Heute-Deck weiter treffen.
+   */
+  const projektZeilen: FlowZeileDef[] = [
+    {
+      id: 'kundenarbeit',
+      titel: 'Projekte',
+      zustand: 'ruhig',
+      kennzahl: zahl(
+        kundenarbeitPosten.length === 0
+          ? 'Nichts offen'
+          : `${kundenarbeitPosten.length} Aufgabe${kundenarbeitPosten.length === 1 ? '' : 'n'} offen`,
+      ),
+      unterzeile: zuerst(kundenarbeitPosten),
+      inhalt: liste(kundenarbeitPosten),
+      fensterAktion: mobilArbeitsmodus('kundenaufgabe', kundenarbeitPosten),
+    },
+    {
+      id: 'liegt-zu-lange',
+      titel: 'Liegt still',
+      zustand: 'ruhig',
+      kennzahl: zahl(
+        liegend.length === 0
+          ? 'Nichts liegt'
+          : `${liegend.length} Projekt${liegend.length === 1 ? '' : 'e'} ohne Bewegung`,
+      ),
+      unterzeile: liegend.length > 0 ? 'Ansehen — nachfassen oder bewusst warten.' : undefined,
+      inhalt: liste(kundeLiegtListe),
+      fensterAktion: mobilArbeitsmodus('kunde_liegt', kundeLiegtListe),
+    },
+  ]
+
+  const alleZeilen = [...flowZeilen, ...projektZeilen]
+  const offenKachel = alleZeilen.find((k) => k.id === offenKachelId) ?? null
 
   /**
    * Die Ansage trägt nur, wenn sie mehr sagt als die Kennzahl. Ohne genug
    * Messwerte in `arbeits_dauern` liefert `tagesansage` genau „185 offen" —
    * dieselbe Zeichenkette, die schon groß darüber steht.
    */
-  const ansage = geordnetMitAnfrage.length ? tagesansage(geordnetMitAnfrage, dauern, jetzt) : undefined
-
-  const kacheln: KachelDef[] = [
-    {
-      id: 'jetzt-dran',
-      titel: 'Jetzt dran',
-      kennzahl: zahl(geordnetMitAnfrage.length ? `${geordnetMitAnfrage.length} offen` : 'Alles abgearbeitet'),
-      // Kevins Morgen-Frage, aus seinen eigenen Messdaten (arbeits_dauern):
-      // „12 offen · ≈ 1 h 40 · um 13:25 durch".
-      unterzeile: !postenLaedt && ansage && ansage !== `${geordnetMitAnfrage.length} offen` ? ansage : undefined,
-      inhalt: liste(geordnetMitAnfrage),
-      fensterAktion: mobilArbeitsmodus('alle', geordnet),
-    },
-    {
-      id: 'kundenarbeit',
-      titel: 'Kundenarbeit',
-      // Seit 14.08.2026 stehen hier auch Aufgaben OHNE Projekt (Spur `aufgabe`).
-      // Vorher meldete die Kachel 0 offen, während unter /aufgaben eine seit
-      // 73 Tagen überfällige lag — unsichtbar, weil ihr ein Projekt fehlte.
-      kennzahl: zahl(`${kundenarbeitPosten.length} offen`),
-      unterzeile: kundenarbeitPosten[0]
-        ? `zuerst: ${kundenarbeitPosten[0].firma ? `${kundenarbeitPosten[0].firma} — ` : ''}${kundenarbeitPosten[0].name}`
-        : undefined,
-      inhalt: liste(kundenarbeitPosten),
-      fensterAktion: mobilArbeitsmodus('kundenaufgabe', kundenarbeitPosten),
-    },
-    {
-      id: 'liegt-zu-lange',
-      titel: 'Liegt zu lange',
-      kennzahl: zahl(
-        liegend.length ? `${liegend.length} Projekt${liegend.length === 1 ? '' : 'e'} > 14 Tage` : 'Keins liegt',
-      ),
-      kennzahlFarbe: !postenLaedt && liegend.length ? 'var(--ck-warn)' : undefined,
-      inhalt: liste(kundeLiegtListe),
-      fensterAktion: mobilArbeitsmodus('kunde_liegt', kundeLiegtListe),
-    },
-    {
-      id: 'antworten',
-      titel: 'Antworten',
-      kennzahl: linkedinThreads.tableMissing
-        ? 'Migration 0058 ausstehend'
-        : zahl(`${antwortListe.length} warten · ${antwortListe.filter((p) => p.starred).length} mit Stern`),
-      inhalt: liste(antwortListe),
-      fensterAktion: mobilArbeitsmodus('antwort', antwortListe),
-    },
-    {
-      id: 'looms',
-      titel: 'Looms',
-      kennzahl: linkedinThreads.tableMissing
-        ? 'Migration 0061 ausstehend'
-        : zahl(`${loomVerschicktGesamt} von ${loomStarredGesamt} verschickt`),
-      unterzeile:
-        !postenLaedt && loomListe.length ? `${loomListe.length} offen — Skript generieren & aufnehmen` : undefined,
-      inhalt: liste(loomListe),
-      fensterAktion: mobilArbeitsmodus('loom', loomListe),
-    },
-    {
-      id: 'erstnachrichten',
-      titel: 'Erstnachrichten',
-      kennzahl: erstnachrichten.tableMissing
-        ? 'Migration 0060 ausstehend'
-        : zahl(`${erstnachrichtListe.length} offen`),
-      inhalt: liste(erstnachrichtListe),
-      fensterAktion: mobilArbeitsmodus('erstnachricht', erstnachrichtListe),
-    },
-    {
-      id: 'followups',
-      titel: 'Follow-ups',
-      kennzahl: linkedinThreads.tableMissing
-        ? 'Migration 0058 ausstehend'
-        : zahl(`${followupListe.length} fällig · davon ${altlastAnzahl} Altlasten`),
-      inhalt: liste(followupListe),
-      fensterAktion: mobilArbeitsmodus('followup', followupListe),
-    },
-    {
-      id: 'vernetzungsanfragen',
-      titel: 'Vernetzungsanfragen',
-      kennzahl: `${tag.anfragenHeute} von ${tag.anfragenLimit}`,
-      unterzeile: 'Zähler — das Ritual läuft direkt auf LinkedIn',
-      inhalt: () => (
-        <AnfragenZaehler
-          heute={tag.anfragenHeute}
-          limit={tag.anfragenLimit}
-          onPlus={() => metrics.bump('li_anfragen', 1)}
-          onMinus={() => {
-            if (tag.anfragenHeute > 0) metrics.bump('li_anfragen', -1)
-          }}
-        />
-      ),
-    },
-    {
-      id: 'quoten',
-      titel: 'Quoten',
-      kennzahl: quotenFarbeUndText(funnel.conv).text,
-      kennzahlFarbe: quotenFarbeUndText(funnel.conv).farbe,
-      inhalt: () => <ConversionPanel kpis={funnel} />,
-      fensterAktion: { label: 'Zu /tracking', onClick: () => navigiere('/tracking') },
-    },
-    {
-      id: 'inmails',
-      titel: 'InMails',
-      kennzahl: `${tag.inmailCredits} Credits übrig`,
-      inhalt: () => (
-        <InmailPanel wert={inmailCredits} onSpeichern={setzeInmailCredits} />
-      ),
-    },
-    {
-      id: 'werkzeuge',
-      titel: 'Werkzeuge',
-      kennzahl:
-        runner.state !== 'online' ? 'Runner offline' : aktiveAgenten.length ? `${aktiveAgenten.length} aktiv` : 'Bereit',
-      kennzahlFarbe: runner.state !== 'online' ? 'var(--ck-warn)' : undefined,
-      inhalt: () => (
-        <WerkzeugePanel runnerState={runner.state} activeAgents={aktiveAgenten} onRan={() => void refreshRuns()} />
-      ),
-    },
-  ]
-
-  const offenKachel = kacheln.find((k) => k.id === offenKachelId) ?? null
+  const ansage = geordnet.length ? tagesansage(geordnet, dauern, jetzt) : undefined
+  const frische = vorZeit(postfachStand)
 
   // Sprung aus dem Heute-Deck: `/sales?kachel=antworten` öffnet direkt das
   // zuständige Fenster. Der Parameter wird danach entfernt, sonst öffnete sich
-  // die Kachel nach jedem Schließen wieder.
+  // die Zeile nach jedem Schließen wieder. `kachel=jetzt-dran` (alte Links aus
+  // Heute-Deck und /morgen) heisst seit dem Umbau: die erste offene Zeile.
   const [suchParams, setSuchParams] = useSearchParams()
   const kachelParam = suchParams.get('kachel')
   const modusParam = suchParams.get('modus')
@@ -697,7 +897,7 @@ export function SalesDashboard() {
     if (!kachelParam && !modusParam) return
 
     // O3 Zug 7: `?modus=arbeit` kommt vom „Loslegen" auf /morgen. Am Handy
-    // öffnet es direkt den Arbeitsmodus statt des Kachel-Fensters — der Weg vom
+    // öffnet es direkt den Arbeitsmodus statt des Zeilen-Fensters — der Weg vom
     // Push zum ersten Posten soll zwei Tipps lang sein, nicht drei.
     //
     // Der Effekt darf NICHT feuern, solange die Posten noch laden: sonst stünde
@@ -705,11 +905,17 @@ export function SalesDashboard() {
     // Parameter stehen lassen und beim nächsten Durchlauf erneut prüfen.
     if (modusParam === 'arbeit' && isMobile) {
       // O18: nicht nur "nicht leer", sondern "fertig geladen". Die Quellen
-      // kommen nacheinander an; bei 209 Postens stand sonst "1 / 2" im
+      // kommen nacheinander an; bei 209 Posten stand sonst "1 / 2" im
       // Arbeitsmodus, weil der Effekt nach der ersten Antwort feuerte.
       if (postenLaedt || geordnet.length === 0) return
       oeffneArbeitsmodus('alle', geordnet)
-    } else if (kachelParam && kacheln.some((k) => k.id === kachelParam)) {
+    } else if (kachelParam === 'jetzt-dran') {
+      // Alte Links: „Jetzt dran" gibt es nicht mehr als Kachel — dran ist die
+      // erste offene Zeile des Rituals. Solange der Flow lädt: warten.
+      if (flow.laedt) return
+      const ziel = aktivIndex >= 0 ? flowZeilen[aktivIndex] : null
+      if (ziel) setOffenKachelId(ziel.id)
+    } else if (kachelParam && alleZeilen.some((k) => k.id === kachelParam)) {
       setOffenKachelId(kachelParam)
     }
 
@@ -717,11 +923,11 @@ export function SalesDashboard() {
     next.delete('kachel')
     next.delete('modus')
     setSuchParams(next, { replace: true })
-    // kacheln wird bei jedem Render neu gebaut — die Abhängigkeit ist bewusst
-    // nur der Parameter (plus das, was über „noch nicht geladen" entscheidet),
-    // sonst liefe der Effekt endlos.
+    // Die Zeilen werden bei jedem Render neu gebaut — die Abhängigkeit ist
+    // bewusst nur der Parameter (plus das, was über „noch nicht geladen"
+    // entscheidet), sonst liefe der Effekt endlos.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kachelParam, modusParam, isMobile, geordnet.length, postenLaedt])
+  }, [kachelParam, modusParam, isMobile, geordnet.length, postenLaedt, flow.laedt, aktivIndex])
 
   const oeffneKachel = useCallback(
     (id: string) => {
@@ -738,15 +944,27 @@ export function SalesDashboard() {
 
   return (
     <MotionConfig reducedMotion="user">
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-          gap: 14,
-        }}
-      >
-        {kacheln.map((k) => (
-          <KachelCard key={k.id} kachel={k} onOeffnen={() => oeffneKachel(k.id)} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 760 }}>
+        {/* Kopf: Tagesansage + Daten-Frische — eine Zeile, keine Kachel. */}
+        {(ansage && ansage !== `${geordnet.length} offen`) || frische ? (
+          <div
+            className="ck-label"
+            style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}
+          >
+            <span>{!postenLaedt && ansage && ansage !== `${geordnet.length} offen` ? ansage : ''}</span>
+            {frische ? <span title="Letzter Postfach-Sync">Postfach-Stand: {frische}</span> : null}
+          </div>
+        ) : null}
+
+        {flowZeilen.map((z) => (
+          <FlowZeile key={z.id} zeile={z} onOeffnen={() => oeffneKachel(z.id)} />
+        ))}
+
+        <div className="ck-label" style={{ marginTop: 10 }}>
+          Neben dem Ritual
+        </div>
+        {projektZeilen.map((z) => (
+          <FlowZeile key={z.id} zeile={z} onOeffnen={() => oeffneKachel(z.id)} />
         ))}
       </div>
 
@@ -757,11 +975,11 @@ export function SalesDashboard() {
       {anfragenVollbild ? (
         <AnfragenZaehler
           vollbild
-          heute={tag.anfragenHeute}
-          limit={tag.anfragenLimit}
+          heute={anfragenStand?.wert ?? 0}
+          limit={anfragenStand?.soll ?? 0}
           onPlus={() => metrics.bump('li_anfragen', 1)}
           onMinus={() => {
-            if (tag.anfragenHeute > 0) metrics.bump('li_anfragen', -1)
+            if ((anfragenStand?.wert ?? 0) > 0) metrics.bump('li_anfragen', -1)
           }}
           onClose={() => setAnfragenVollbild(false)}
         />

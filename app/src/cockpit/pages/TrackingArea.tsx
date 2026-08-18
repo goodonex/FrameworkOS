@@ -6,6 +6,7 @@ import { VitalsPanel } from '../components/VitalsPanel'
 import { channelRates, funnelKpis, sumField, termineAttribution, weekVitals } from '../lib/metricsAggregate'
 import type { MetricField } from '../lib/useDailyMetrics'
 import { toIsoDate, useDailyMetrics } from '../lib/useDailyMetrics'
+import { heutigesMetrikDatum } from '../lib/metricsDates'
 import { formatEuro, monthKeyOf } from '../lib/goals'
 import { useActiveBrand } from '../lib/activeBrand'
 import { useMonthGoal } from '../lib/useMonthGoal'
@@ -239,7 +240,7 @@ export function TrackingArea() {
     [metrics.monthRows, monthRevenue],
   )
   // Ausgewählter Tag fürs (rückwirkende) Eintragen — Default heute.
-  const [selectedDate, setSelectedDate] = useState(toIsoDate(new Date()))
+  const [selectedDate, setSelectedDate] = useState(heutigesMetrikDatum())
 
   if (metrics.tableMissing) {
     return (
@@ -259,7 +260,7 @@ export function TrackingArea() {
   const weekUmsatz = metrics.weekRows.reduce((a, r) => a + (Number(r.umsatz) || 0), 0)
 
   // Datums-Navigation fürs rückwirkende Eintragen.
-  const todayIso = toIsoDate(new Date())
+  const todayIso = heutigesMetrikDatum()
   const shiftDate = (iso: string, delta: number) => {
     const d = new Date(`${iso}T12:00:00`) // Mittag → kein DST/TZ-Tagessprung
     d.setDate(d.getDate() + delta)

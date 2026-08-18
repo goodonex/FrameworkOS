@@ -3,7 +3,8 @@ import { AnimatePresence, MotionConfig } from 'framer-motion'
 import { AnfragenZaehler } from '../cockpit/components/AnfragenZaehler'
 import { Arbeitsliste, type LoomSkriptAktionen } from '../cockpit/components/Arbeitsliste'
 import { HeuteDeck } from '../cockpit/components/HeuteDeck'
-import { KachelCard, KachelFenster, type KachelDef } from '../cockpit/pages/SalesDashboard'
+import { InmailPanel } from '../cockpit/components/InmailPanel'
+import { FlowZeile, KachelFenster, type FlowZeileDef } from '../cockpit/pages/SalesDashboard'
 import type { Posten } from '../cockpit/lib/prioritaet'
 import { medianeJeSpur, tagesansage } from '../cockpit/lib/tagesansage'
 
@@ -91,39 +92,23 @@ export function SalesVorschau() {
     fehler: null,
   }
 
-  const kacheln: KachelDef[] = [
-    {
-      id: 'looms',
-      titel: 'Looms',
-      kennzahl: '0 von 15 verschickt',
-      unterzeile: '3 offen — Skript generieren & aufnehmen',
-      inhalt: () => <Arbeitsliste posten={LOOM_POSTEN} onErledigt={() => {}} loom={loomAktionen} />,
-    },
-    {
-      id: 'erstnachrichten',
-      titel: 'Erstnachrichten',
-      kennzahl: '90 offen',
-      inhalt: () => <Arbeitsliste posten={ERSTNACHRICHT_POSTEN} onErledigt={() => {}} />,
-    },
-    {
-      id: 'kundenarbeit',
-      titel: 'Kundenarbeit',
-      kennzahl: '2 offen',
-      unterzeile: 'zuerst: Reichentrog & Kollegen — Hero-Video Safari-Fix',
-      inhalt: () => (
-        <Arbeitsliste
-          posten={KUNDEN_POSTEN}
-          onErledigt={() => {}}
-          projektLink={() => '/projekte'}
-          onNavigiere={() => {}}
-        />
-      ),
-    },
+  /**
+   * Die Zeilen des Boards in Kevins Reihenfolge (18.08.2026) — mit
+   * Fixture-Zuständen, die genau die Fälle zeigen, um die es ihm ging:
+   * Stufe 1 steht (grün, Haken, Serie), Stufe 2 ist dran (betont), die
+   * Antworten sind frisch trotz vieler Wartender, die Follow-ups laufen als
+   * gedrosselte Portion mit sichtbarem Rückstand, und die Projekte stehen
+   * leise unten.
+   */
+  const zeilen: FlowZeileDef[] = [
     {
       id: 'vernetzungsanfragen',
+      nummer: 1,
       titel: 'Vernetzungsanfragen',
+      zustand: anfragen >= 30 ? 'erledigt' : 'aktiv',
       kennzahl: `${anfragen} von 30`,
-      unterzeile: 'Zähler — das Ritual läuft direkt auf LinkedIn',
+      unterzeile: 'Zähler — das Ritual läuft direkt auf LinkedIn.',
+      streak: { laenge: 6, heuteOffen: anfragen < 30 },
       inhalt: () => (
         <AnfragenZaehler
           heute={anfragen}
@@ -134,27 +119,92 @@ export function SalesVorschau() {
       ),
     },
     {
+      id: 'erstnachrichten',
+      nummer: 2,
+      titel: 'Erstnachrichten · LinkedIn',
+      zustand: anfragen >= 30 ? 'aktiv' : 'offen',
+      kennzahl: `0 von ${ERSTNACHRICHT_POSTEN.length}`,
+      unterzeile: `zuerst: ${ERSTNACHRICHT_POSTEN[0].firma} — ${ERSTNACHRICHT_POSTEN[0].name}`,
+      streak: { laenge: 4, heuteOffen: true },
+      inhalt: () => <Arbeitsliste posten={ERSTNACHRICHT_POSTEN} onErledigt={() => {}} />,
+    },
+    {
       id: 'antworten',
-      titel: 'Antworten',
-      kennzahl: `${ANTWORT_POSTEN.length} warten · 1 mit Stern`,
-      unterzeile: '2 Entwürfe liegen bereit',
+      nummer: 3,
+      titel: 'Antworten · LinkedIn',
+      // Frisch trotz Menge: 43 dürfen warten, solange keiner von vorgestern ist.
+      zustand: 'erledigt',
+      kennzahl: `${ANTWORT_POSTEN.length} warten · älteste 3 h`,
+      unterzeile: 'Reaktionszeit zählt — nicht die Menge.',
       inhalt: () => <Arbeitsliste posten={ANTWORT_POSTEN} onErledigt={() => {}} />,
     },
     {
-      id: 'jetzt-dran',
-      titel: 'Jetzt dran',
-      kennzahl: `${ALLE_POSTEN.length} offen`,
-      // Echte Tagesansage-Logik auf Fixture-Messwerten — dieselbe Funktion, die
-      // im Cockpit aus `arbeits_dauern` rechnet.
-      unterzeile: tagesansage(ALLE_POSTEN, DAUERN),
+      id: 'followups',
+      nummer: 4,
+      titel: 'Follow-ups · LinkedIn',
+      zustand: 'offen',
+      kennzahl: '0 von 20',
+      unterzeile: 'Portion für heute — 199 weitere warten im Rückstand.',
+      streak: { laenge: 2, heuteOffen: true },
+      inhalt: () => <Arbeitsliste posten={ANTWORT_POSTEN} onErledigt={() => {}} />,
+    },
+    {
+      id: 'inmails',
+      nummer: 5,
+      titel: 'Reaktivierung · InMails',
+      zustand: 'offen',
+      kennzahl: '0 von 5 · Pool ≈ 143',
+      unterzeile: 'Nie angenommene Anfragen — die InMail-Welle.',
       inhalt: () => (
-        <Arbeitsliste posten={ALLE_POSTEN} onErledigt={() => {}} loom={loomAktionen} projektLink={() => null} />
+        <InmailPanel
+          stand={{ wert: 150, standVom: '2026-08-12' }}
+          abgeleitet={{ pool: 143, seitherGebucht: 7, reichtTage: 28 }}
+          tagesration={5}
+          heuteGebucht={0}
+          onBuchen={() => {}}
+          onSpeichern={() => {}}
+        />
       ),
     },
-    { id: 'quoten', titel: 'Quoten', kennzahl: '0% · — · —', kennzahlFarbe: 'var(--ck-warn)' },
+    {
+      id: 'looms',
+      nummer: 6,
+      titel: 'Looms',
+      zustand: 'offen',
+      kennzahl: '0 von 2',
+      unterzeile: `${LOOM_POSTEN.length} zugesagt und offen — Stern = Ja zur Analyse.`,
+      inhalt: () => <Arbeitsliste posten={LOOM_POSTEN} onErledigt={() => {}} loom={loomAktionen} />,
+    },
   ]
 
-  const offenKachel = kacheln.find((k) => k.id === offen) ?? null
+  const projekte: FlowZeileDef[] = [
+    {
+      id: 'kundenarbeit',
+      titel: 'Projekte',
+      zustand: 'ruhig',
+      kennzahl: `${KUNDEN_POSTEN.length} Aufgaben offen`,
+      unterzeile: `zuerst: ${KUNDEN_POSTEN[0].firma} — ${KUNDEN_POSTEN[0].name}`,
+      inhalt: () => (
+        <Arbeitsliste
+          posten={KUNDEN_POSTEN}
+          onErledigt={() => {}}
+          projektLink={() => '/projekte'}
+          onNavigiere={() => {}}
+        />
+      ),
+    },
+    {
+      id: 'liegt-zu-lange',
+      titel: 'Liegt still',
+      zustand: 'ruhig',
+      kennzahl: '2 Projekte ohne Bewegung',
+      unterzeile: 'Ansehen — nachfassen oder bewusst warten.',
+      inhalt: () => <Arbeitsliste posten={KUNDEN_POSTEN} onErledigt={() => {}} />,
+    },
+  ]
+
+  const alleZeilen = [...zeilen, ...projekte]
+  const offenKachel = alleZeilen.find((k) => k.id === offen) ?? null
 
   return (
     <MotionConfig reducedMotion="user">
@@ -170,9 +220,19 @@ export function SalesVorschau() {
         <div style={{ marginBottom: 14 }}>
           <HeuteDeck slug={undefined} />
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
-          {kacheln.map((k) => (
-            <KachelCard key={k.id} kachel={k} onOeffnen={() => setOffen(k.id)} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 760 }}>
+          <div className="ck-label" style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+            <span>{tagesansage(ALLE_POSTEN, DAUERN)}</span>
+            <span>Postfach-Stand: vor 2 h</span>
+          </div>
+          {zeilen.map((z) => (
+            <FlowZeile key={z.id} zeile={z} onOeffnen={() => setOffen(z.id)} />
+          ))}
+          <div className="ck-label" style={{ marginTop: 10 }}>
+            Neben dem Ritual
+          </div>
+          {projekte.map((z) => (
+            <FlowZeile key={z.id} zeile={z} onOeffnen={() => setOffen(z.id)} />
           ))}
         </div>
         <AnimatePresence>

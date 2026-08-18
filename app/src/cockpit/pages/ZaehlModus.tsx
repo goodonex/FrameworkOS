@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { TAGES_FLOW, naechsteStufe } from '../lib/tagesFlow'
-import { useFaelligeFollowups, useTagesFlow, type TagesFlowStand } from '../lib/useTagesFlow'
+import { TAGES_FLOW, naechsteZaehlbareStufe } from '../lib/tagesFlow'
+import { useFlowLiveQuellen, useTagesFlow, type TagesFlowStand } from '../lib/useTagesFlow'
 import { ZAEHL_FELDER, zaehlFeldFuer, type ZaehlFeld } from '../lib/zaehlFelder'
 import { useDailyMetrics } from '../lib/useDailyMetrics'
 
@@ -30,8 +30,8 @@ export function ZaehlModus() {
   const { feld } = useParams<{ feld: string }>()
   const gewaehlt = zaehlFeldFuer(feld)
   const metrics = useDailyMetrics()
-  const faellig = useFaelligeFollowups()
-  const flow = useTagesFlow(metrics.today, faellig.anzahl, metrics.loading || faellig.laedt)
+  const live = useFlowLiveQuellen()
+  const flow = useTagesFlow(metrics.today, live.quellen, metrics.loading || live.laedt)
 
   return gewaehlt ? (
     <Vollbild zaehlFeld={gewaehlt} metrics={metrics} flow={flow} />
@@ -189,7 +189,9 @@ function Vollbild({
    */
   const { index: stufenIndex, stand, soll } = sollUndStand(zaehlFeld, flow)
   const stufeErledigt = stand?.erledigt ?? false
-  const zielStufe = stufeErledigt ? naechsteStufe(flow.staende, stufenIndex) : -2
+  // Nur zählbare Stufen sind Sprungziele — die Antworten-Stufe hat im
+  // Zähl-Modus keine Seite (sie wird abgearbeitet, nicht gezählt).
+  const zielStufe = stufeErledigt ? naechsteZaehlbareStufe(flow.staende, stufenIndex) : -2
   const stufeWarOffen = useRef(false)
   const [uebergang, setUebergang] = useState<{ ziel: number } | null>(null)
 
@@ -220,7 +222,7 @@ function Vollbild({
     // Meldung bleibt einfach stehen.
     if (!uebergang || uebergang.ziel < 0) return
     const ziel = TAGES_FLOW[uebergang.ziel]
-    if (!ziel) return
+    if (!ziel?.feld) return
     const id = window.setTimeout(() => {
       navigate(`/tracking/zaehlen/${ziel.feld}`, { replace: true })
     }, STUFE_STEHT_MS)
@@ -318,7 +320,7 @@ function Vollbild({
           // Fehler, auch wenn er richtig ist.
           <span className="ck-zaehl-uebergang" role="status">
             <strong>{naechste ? 'Stufe steht.' : 'Der Tag steht.'}</strong>
-            <span>{naechste ? `Weiter zu ${naechste.label}` : 'Alle fünf Stufen sind durch.'}</span>
+            <span>{naechste ? `Weiter zu ${naechste.label}` : 'Alle Stufen sind durch.'}</span>
           </span>
         ) : rest !== null ? (
           <span className="ck-zaehl-ziel ck-zahl">

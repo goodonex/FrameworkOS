@@ -1,6 +1,5 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
-import type { MetricField } from '../../lib/metrikFelder'
-import { ersteOffeneStufe, type StufenStand } from '../../lib/tagesFlow'
+import { ersteOffeneStufe, type Stufe, type StufenStand } from '../../lib/tagesFlow'
 
 /**
  * Die Stufen-Kette im Hero (11.08.2026) — aus einer Kennzahl werden fünf.
@@ -26,6 +25,12 @@ const RADIUS = 52
 const UMFANG = 2 * Math.PI * RADIUS
 
 function unterzeile(s: StufenStand): string {
+  // Die Frische-Stufe (Antworten) hat kein Soll — dort zählt, ob jemand über
+  // der Schwelle wartet, nicht wie viele heute erledigt wurden.
+  if (s.stufe.art === 'frische') {
+    if (s.wert <= 0) return 'Niemand wartet.'
+    return s.erledigt ? `${s.wert} warten — alle frisch.` : `${s.wert} warten · ${s.stufe.hinweis}`
+  }
   if (s.soll <= 0) return 'Heute ist nichts fällig.'
   if (s.erledigt) return 'Steht.'
   return `Noch ${s.soll - s.wert} · ${s.stufe.hinweis}`
@@ -39,8 +44,12 @@ export function TagesFlowStack({
   staende: StufenStand[]
   /** Solange true, ist „offen" noch nicht entschieden — dann wird nicht gescrollt. */
   laedt: boolean
-  /** Öffnet den Zähl-Modus für diese Stufe. Die Kette kennt die Route nicht selbst. */
-  onStufe: (feld: MetricField) => void
+  /**
+   * Öffnet das Werkzeug dieser Stufe — den Zähl-Modus bei Zähl-Stufen, die
+   * Sales-Zeile bei der Antworten-Stufe. Die Kette kennt die Routen nicht
+   * selbst; wohin es geht, entscheidet der Aufrufer an `stufe.feld`.
+   */
+  onStufe: (stufe: Stufe) => void
 }) {
   const bahn = useRef<HTMLDivElement>(null)
   const [sichtbar, setSichtbar] = useState(0)
@@ -128,15 +137,28 @@ export function TagesFlowStack({
         }}
       >
         {staende.map((s) => {
-          const anteil = s.soll > 0 ? Math.min(1, Math.max(0, s.wert / s.soll)) : 0
+          // Frische-Stufe: der Ring kennt keinen Fortschritt, nur frisch oder
+          // nicht — voll, wenn niemand über der Schwelle wartet.
+          const anteil =
+            s.stufe.art === 'frische'
+              ? s.erledigt
+                ? 1
+                : 0
+              : s.soll > 0
+                ? Math.min(1, Math.max(0, s.wert / s.soll))
+                : 0
           return (
             <div key={s.stufe.id} className="ck-flow-seite">
               <div className="ck-ring">
                 <button
                   type="button"
                   className="ck-ring-feld"
-                  onClick={() => onStufe(s.stufe.feld)}
-                  aria-label={`${s.stufe.langLabel} zählen — ${s.wert}${s.soll > 0 ? ` von ${s.soll}` : ''}`}
+                  onClick={() => onStufe(s.stufe)}
+                  aria-label={
+                    s.stufe.art === 'frische'
+                      ? `${s.stufe.langLabel} öffnen — ${s.wert} warten`
+                      : `${s.stufe.langLabel} zählen — ${s.wert}${s.soll > 0 ? ` von ${s.soll}` : ''}`
+                  }
                 >
                   <svg viewBox="0 0 120 120" aria-hidden>
                     {/* Glas-Mitte + Bahn */}
