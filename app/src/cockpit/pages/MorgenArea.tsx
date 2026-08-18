@@ -132,7 +132,7 @@ export function MorgenArea() {
           des Morgens — nicht in ein Protokoll, das niemand aufmacht.
           O18, Zug 2: dieselbe Zeile steht jetzt auch auf dem Homescreen —
           eine Komponente, damit sie nicht auseinanderläuft. */}
-      <BefundZeile meldung={befund.meldung} onOeffnen={() => navigate('/agenten')} />
+      <BefundZeile befund={befund} onOeffnen={() => navigate("/agenten")} />
 
       <section>
         {zeile('Posten offen', String(geordnet.length), true)}

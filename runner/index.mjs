@@ -25,6 +25,8 @@ import { leseListe, mitNetzwerkLock } from './linkedin/netzwerk.mjs'
 import { baueMorgenbriefInput } from './morgenbriefInput.mjs'
 import { upsertNetzwerk } from './linkedin/netzwerkUpsert.mjs'
 import { installiereLogHygiene, kuerzeLogDatei } from './logHygiene.mjs'
+import { WACH_KARENZ_MS, bewerteWachheit, chromeErreichbar, netzErreichbar, startBereitAus } from './startBereit.mjs'
+import { bewerteSchleuse, pruefeAnmeldung, pruefeDurchgang, pruefeSupabase, pruefeVault } from './schleuse.mjs'
 
 // ---------- Lokale .env (nur für Secrets wie den Supabase-Key; gitignored) ----------
 // Minimaler Parser (zero-dependency). Prozess-Env hat Vorrang vor der Datei.
@@ -447,6 +449,15 @@ const MAX_VERSUCHE_PRO_TAG = Number(process.env.MAX_VERSUCHE_PRO_TAG ?? 2)
 const MAX_ANMELDUNG_PRO_TAG = Number(process.env.MAX_ANMELDUNG_PRO_TAG ?? 4)
 
 /**
+ * Eigener Deckel für Fehlstarts (18.08.): Läufe, die der schlafende Mac
+ * verschluckt hat, bevor die CLI einen einzigen Zug tun konnte. Sechs statt
+ * zwei — so ein Lauf kostet keinen Token und sagt nichts über den Agenten.
+ * Seit `warteAufRechner` sollten sie gar nicht mehr entstehen; der Deckel ist
+ * der Gurt für den Fall, dass der Mac MITTEN im Lauf einschläft.
+ */
+const MAX_FEHLSTART_PRO_TAG = Number(process.env.MAX_FEHLSTART_PRO_TAG ?? 6)
+
+/**
  * Was ein Agent heute schon getan hat — nach **Status**, nicht nach Dateiname.
  *
  * O17 Schritt 4: Der alte Guard prüfte nur, ob eine Datei mit heutigem Datum und
@@ -471,14 +482,16 @@ async function tagesLaufStand(agent, heute) {
  * vorher in jeder `maybe*`-Funktion einzeln (und ungleich) standen.
  */
 async function routineFaellig(agent, heute) {
-  const { erfolg, fehlschlaege, anmeldungFehler } = await tagesLaufStand(agent, heute)
+  const { erfolg, fehlschlaege, anmeldungFehler, fehlstarts } = await tagesLaufStand(agent, heute)
   return darfRoutineStarten({
     erfolg,
     fehlschlaege,
     anmeldungFehler,
+    fehlstarts,
     laeuft: [...running.values()].some((r) => r.agent === agent),
     maxVersuche: MAX_VERSUCHE_PRO_TAG,
     maxAnmeldung: MAX_ANMELDUNG_PRO_TAG,
+    maxFehlstart: MAX_FEHLSTART_PRO_TAG,
   })
 }
 
@@ -586,6 +599,22 @@ async function entwuerfeAnThreads(runId, markdown) {
   }
 }
 
+/**
+ * Wo `claude` liegt — einmal berechnet, von Agentenstart UND Schleuse benutzt
+ * (18.08.). Unter launchd fehlt die CLI oft im PATH; prüfte die Schleuse mit
+ * einem anderen PATH als der Lauf, bestätigte sie eine Anmeldung, an die der
+ * Agent nie herankommt.
+ */
+const CLI_PATH = [
+  process.env.PATH ?? '',
+  join(homedir(), '.nvm', 'versions', 'node', `v${process.versions.node}`, 'bin'),
+  join(homedir(), '.local', 'bin'),
+  '/opt/homebrew/bin',
+  '/usr/local/bin',
+]
+  .filter(Boolean)
+  .join(':')
+
 // ---------- Agent starten ----------
 async function startRun(agent, input) {
   const id = `${nowStamp()}-${agent}`
@@ -616,14 +645,7 @@ async function startRun(agent, input) {
     : ''
   const prompt = cfg.buildPrompt(inputBlock)
 
-  // Unter launchd fehlt claude oft im PATH → gängige Bin-Verzeichnisse anhängen.
-  const extraBins = [
-    join(homedir(), '.nvm', 'versions', 'node', `v${process.versions.node}`, 'bin'),
-    join(homedir(), '.local', 'bin'),
-    '/opt/homebrew/bin',
-    '/usr/local/bin',
-  ]
-  const PATH = [process.env.PATH ?? '', ...extraBins].filter(Boolean).join(':')
+  const PATH = CLI_PATH
 
   // O17 (07.08.2026): `--output-format text` schweigt bis zum Schluss und gibt
   // dann alles auf einmal aus. Ein abgebrochener Lauf hinterlässt damit exakt
@@ -722,6 +744,9 @@ async function startRun(agent, input) {
     const ergebnis = (lauf.ergebnis ?? '').trim()
     try {
       if (code === 0 && ergebnis) {
+        // 18.08.: Ein gelungener Lauf ist der beste Beweis, dass die CLI
+        // durchkommt — die Schleuse spart sich daraufhin ihren eigenen Ping.
+        letzterErfolgAt = Date.now()
         // Unverändertes Format: der Endtext, sonst nichts. Die Mitschrift ist
         // Diagnose für den Fehlerfall und hat im gelungenen Lauf nichts verloren.
         await writeRunFile(id, agent, 'done', startedAt, ergebnis + '\n')
@@ -1430,6 +1455,10 @@ async function fuehreJobAus(job) {
   throw new Error(`Unbekannte Auftragsart: ${job.kind}`)
 }
 
+/** Wie viele Fehlschläge in Folge, bevor der Runner Alarm gibt (18.08.). */
+const POLL_FEHLER_SCHWELLE = 3
+let pollFehlerSerie = 0
+
 async function pollJobs() {
   if (!SNAPSHOT_ENABLED || jobLaeuft) return
   jobLaeuft = true
@@ -1439,6 +1468,8 @@ async function pollJobs() {
       { headers: supabaseHeaders() },
     )
     if (!res.ok) return
+    // Die Leitung steht wieder — die Serie beginnt von vorn.
+    pollFehlerSerie = 0
     const [job] = await res.json()
     if (!job) return
 
@@ -1470,7 +1501,23 @@ async function pollJobs() {
       body: JSON.stringify({ ...patch, finished_at: new Date().toISOString() }),
     })
   } catch (e) {
-    console.error('[runner] Auftrags-Abfrage fehlgeschlagen:', e?.message ?? e)
+    /**
+     * Erst bei einer Serie melden (18.08.).
+     *
+     * Die Abfrage läuft alle vier Sekunden. Ein einzelner Aussetzer — WLAN
+     * wechselt, Supabase hustet — heilt sich mit dem nächsten Durchlauf von
+     * selbst und sagt niemandem etwas. Im Log standen dadurch tagelang
+     * „Auftrags-Abfrage fehlgeschlagen"-Zeilen, an die man sich gewöhnt; genau
+     * dann übersieht man die Serie, die wirklich bedeutet, dass Kevins Knöpfe
+     * vom Handy ins Leere gehen. Drei hintereinander sind rund zwölf Sekunden
+     * ohne Draht — das ist eine Meldung wert, ein einzelner nicht.
+     */
+    pollFehlerSerie += 1
+    if (pollFehlerSerie === POLL_FEHLER_SCHWELLE) {
+      console.error(
+        `[runner] Auftrags-Abfrage fehlgeschlagen (${pollFehlerSerie}× in Folge — Cockpit-Knöpfe vom Handy kommen gerade nicht an): ${e?.message ?? e}`,
+      )
+    }
   } finally {
     jobLaeuft = false
   }
@@ -1766,6 +1813,10 @@ const server = createServer(async (req, res) => {
         running: [...running.values()].map(({ id, agent, startedAt }) => ({ id, agent, startedAt })),
         // Siehe Heartbeat: keine echte Warteschlange, `System/Queue` ist Protokoll.
         queued: [],
+        // 18.08.: Warum gerade nichts läuft, muss man abfragen können, ohne im
+        // Log zu suchen — `null` heißt: seit dem Start war keine Routine fällig.
+        schleuse: schleuseLetztes(),
+        wach: wachStand().wach,
       })
     }
 
@@ -2181,6 +2232,209 @@ async function raeumeQueue() {
 void raeumeQueue()
 
 /**
+ * Der Wach-Wächter (18.08.2026) — „erst wach, dann losrennen".
+ *
+ * **Der Fehler, den das behebt.** Siehe Kopf von `startBereit.mjs`: Vier rote
+ * Morgen-Läufe mit je null Ereignissen, weil der Mac im DarkWake kurz die Timer
+ * feuern ließ und sofort weiterschlief. Der Runner startete Agenten in einen
+ * Rechner hinein, der gar nicht arbeiten konnte, und verbrauchte damit den
+ * Tagesdeckel, bevor Kevin überhaupt am Schreibtisch saß.
+ *
+ * Der Tick hier ist die Uhr, an der sich das messen lässt: `setInterval` steht
+ * im Schlaf still. Kommt der Tick pünktlich, war der Mac wach; klafft eine
+ * Lücke, lag er dazwischen — und die Karenz beginnt von vorn.
+ */
+const WACH_TICK_MS = 60 * 1000
+let letzterWachTick = null
+let wachSeit = Date.now()
+let wachTimer = null
+
+/**
+ * Nach einem erkannten Aufwacher genau einmal nachfassen, sobald die Karenz
+ * abgelaufen ist. Ohne das läge zwischen „Kevin klappt den Laptop auf" und dem
+ * ersten Morgenbrief-Versuch der Zufall des 5-Minuten-Ticks; so ist es die
+ * Karenz plus ein paar Sekunden.
+ */
+function planeNachDemAufwachen() {
+  if (wachTimer) return
+  wachTimer = setTimeout(() => {
+    wachTimer = null
+    // Das Postfach zuerst — es ist die Quelle, aus der die Entwürfe entstehen.
+    // Ohne diese Zeile wartete es beim Aufwachen auf den nächsten
+    // Fünf-Minuten-Tick, während die Entwürfe schon liefen (18.08. gemessen).
+    void maybePostfachSync()
+    void maybeMorgenbrief()
+    void maybeAntwortEntwuerfe()
+  }, WACH_KARENZ_MS + 10_000)
+  wachTimer.unref?.()
+}
+
+function wachTick() {
+  const jetzt = Date.now()
+  const erstTick = letzterWachTick === null
+  const b = bewerteWachheit({ jetzt, letzterTick: letzterWachTick, wachSeit, tickAbstandMs: WACH_TICK_MS })
+  letzterWachTick = jetzt
+  wachSeit = b.wachSeit
+  if (b.schlafErkannt) {
+    console.log(`[runner] Mac war ${Math.round(b.luecke / 60000)} Min. weg — Routinen warten auf stabile Wachheit`)
+  }
+  // Auch der allererste Tick fasst nach: Ein Runner-Neustart ist häufig selbst
+  // die Folge eines Aufwachers, und ohne Nachfassen hinge der Morgenbrief bis
+  // zum regulären Fünf-Minuten-Tick fest.
+  if (b.schlafErkannt || erstTick) planeNachDemAufwachen()
+}
+
+/** Wie lange der Mac jetzt am Stück wach ist — Grundlage jeder Startfreigabe. */
+function wachStand() {
+  return bewerteWachheit({
+    jetzt: Date.now(),
+    letzterTick: letzterWachTick,
+    wachSeit,
+    tickAbstandMs: WACH_TICK_MS,
+  })
+}
+
+/** Warte-Meldungen höchstens alle 30 Minuten je Agent — sonst 200 Zeilen pro Nacht. */
+const WARTE_LOG_MS = 30 * 60 * 1000
+const warteLog = new Map()
+
+/**
+ * Den Sync-Chrome selbst hochfahren, wenn ein Agent ihn braucht (18.08.).
+ *
+ * Kevins Bild vom Ablauf: „wartet, bis Laptop und Chrome offen sind, und geht
+ * dann selbstständig rein." Der Laptop ist seine Sache — Chrome nicht: Das
+ * Sync-Profil `~/.uriel-chrome` ist reine Maschinerie, kein Fenster, in dem er
+ * arbeitet. Genau derselbe Befehl wie sein Alias `chrome-sync` in `~/.zshrc`.
+ *
+ * Eng eingezäunt, weil ein Fenster aufpoppt: höchstens einmal pro Stunde, nur
+ * tagsüber, abschaltbar über `CHROME_AUTOSTART=0`. Ein LinkedIn, das in diesem
+ * Profil ausgeloggt ist, kann das hier NICHT heilen — dann bleibt es bei der
+ * Meldung aus `sync.mjs`, und Kevin muss sich einmal von Hand anmelden.
+ */
+const CHROME_AUTOSTART = process.env.CHROME_AUTOSTART !== '0'
+const CHROME_START_ABSTAND_MS = 60 * 60 * 1000
+let letzterChromeStart = 0
+
+function starteSyncChrome() {
+  const stunde = new Date().getHours()
+  if (!CHROME_AUTOSTART || stunde < 6 || stunde >= 20) return
+  if (Date.now() - letzterChromeStart < CHROME_START_ABSTAND_MS) return
+  letzterChromeStart = Date.now()
+  try {
+    const p = spawn(
+      '/usr/bin/open',
+      [
+        '-na',
+        'Google Chrome',
+        '--args',
+        `--user-data-dir=${join(homedir(), '.uriel-chrome')}`,
+        '--remote-debugging-port=9222',
+        '--remote-debugging-address=127.0.0.1',
+        '--no-first-run',
+        '--no-default-browser-check',
+      ],
+      { detached: true, stdio: 'ignore' },
+    )
+    p.on('error', (e) => console.error('[runner] Sync-Chrome konnte nicht starten:', e?.message ?? e))
+    p.unref()
+    console.log('[runner] Sync-Chrome war zu — selbst gestartet, der nächste Tick prüft nach')
+  } catch (e) {
+    console.error('[runner] Sync-Chrome konnte nicht starten:', e?.message ?? e)
+  }
+}
+
+/**
+ * Die Schleuse (18.08.) — Kevins Wunsch: „einen vorab checken lassen, ob wir
+ * angemeldet sind und überall reinkommen, und erst dann die anderen loslegen."
+ *
+ * Der Zustand wird gecacht, weil ihn alle Agenten teilen: Grün hält eine halbe
+ * Stunde, Rot nur eine Minute — ein repariertes Login soll sofort greifen, kein
+ * Agent soll auf die nächste halbe Stunde warten.
+ */
+const SCHLEUSE_GRUEN_MS = 30 * 60 * 1000
+const SCHLEUSE_ROT_MS = 60 * 1000
+/** Der echte CLI-Probelauf: frühestens alle zehn Minuten wieder. */
+const DURCHGANG_ABSTAND_MS = 10 * 60 * 1000
+/** Ein gelungener Agentenlauf ist der bessere Beweis — und hält sechs Stunden. */
+const DURCHGANG_GILT_MS = 6 * 60 * 60 * 1000
+let schleuseStand = null
+let letzterDurchgang = 0
+let letzterErfolgAt = 0
+
+/** Der Befund für Log, Cockpit und Wächter — auch für `/status` lesbar. */
+function schleuseLetztes() {
+  return schleuseStand ? { ...schleuseStand.urteil, geprueft: new Date(schleuseStand.zeit).toISOString() } : null
+}
+
+async function schleuseOffen() {
+  const jetzt = Date.now()
+  const haltbar = schleuseStand?.urteil.offen ? SCHLEUSE_GRUEN_MS : SCHLEUSE_ROT_MS
+  if (schleuseStand && jetzt - schleuseStand.zeit < haltbar) return schleuseStand.urteil
+
+  // Reihenfolge: erst das Billige und Lokale (Millisekunden), dann das Netz.
+  const befunde = [
+    await pruefeVault(RUNS_DIR),
+    await pruefeAnmeldung({ claudeBin: process.env.CLAUDE_BIN ?? 'claude', pfad: CLI_PATH }),
+    await pruefeSupabase({ url: SUPABASE_URL, key: SUPABASE_SERVICE_ROLE_KEY }),
+  ]
+
+  // Der echte Zug durch die CLI nur, wenn er etwas beweisen kann: Solange heute
+  // schon ein Agent durchgelaufen ist, ist der Durchgang belegt — dann wäre der
+  // Ping reine Zeremonie.
+  const bisGrün = bewerteSchleuse(befunde).offen
+  if (bisGrün && jetzt - letzterErfolgAt > DURCHGANG_GILT_MS && jetzt - letzterDurchgang > DURCHGANG_ABSTAND_MS) {
+    letzterDurchgang = jetzt
+    befunde.push(await pruefeDurchgang({ claudeBin: process.env.CLAUDE_BIN ?? 'claude', pfad: CLI_PATH }))
+  }
+
+  const urteil = bewerteSchleuse(befunde)
+  // Nur bei Zustandswechsel reden — sonst steht dieselbe Zeile alle fünf
+  // Minuten im Log und niemand liest sie mehr.
+  const vorher = schleuseStand?.urteil
+  if (!vorher || vorher.offen !== urteil.offen || vorher.grund !== urteil.grund) {
+    if (urteil.offen) console.log('[runner] Schleuse offen — Agenten dürfen laufen')
+    else console.error(`[runner] Schleuse ZU — ${urteil.grund}${urteil.hinweis ? ` · ${urteil.hinweis}` : ''}`)
+  }
+  schleuseStand = { zeit: jetzt, urteil }
+  return urteil
+}
+
+/**
+ * Darf dieser Agent JETZT starten — oder wartet er auf den Rechner?
+ *
+ * Ein „nein" ist hier ausdrücklich **kein Fehlversuch**: Es entsteht keine
+ * Run-Datei, es zählt nichts auf den Tagesdeckel, und der nächste Tick fragt
+ * erneut. Genau das ist der Unterschied zum Zustand vor dem 18.08.
+ */
+async function warteAufRechner(agent, { brauchtChrome = false } = {}) {
+  const { wach } = wachStand()
+  // Reihenfolge spart Arbeit: Ist der Mac ohnehin frisch aufgewacht, braucht es
+  // weder Netz- noch Chrome-Anfrage.
+  const netz = wach ? await netzErreichbar() : false
+  const chrome = wach && brauchtChrome ? await chromeErreichbar() : true
+  // Fehlt nur noch Chrome, ist das der eine Punkt, den der Runner selbst
+  // erledigen kann — starten und beim nächsten Tick nachsehen.
+  if (wach && netz && brauchtChrome && !chrome) starteSyncChrome()
+  let stand = startBereitAus({ wach, netz, chrome, brauchtChrome })
+  // Steht der Rechner, entscheidet die Schleuse — das, was alle Agenten
+  // gemeinsam brauchen, wird einmal geprüft und nicht von jedem einzeln.
+  if (stand.bereit) {
+    const tor = await schleuseOffen()
+    if (!tor.offen) stand = { bereit: false, fehlt: [tor.grund], grund: tor.grund }
+  }
+  if (!stand.bereit) {
+    const zuletzt = warteLog.get(agent)
+    if (!zuletzt || zuletzt.grund !== stand.grund || Date.now() - zuletzt.zeit > WARTE_LOG_MS) {
+      warteLog.set(agent, { grund: stand.grund, zeit: Date.now() })
+      console.log(`[runner] ${agent} wartet — ${stand.grund}`)
+    }
+  } else {
+    warteLog.delete(agent)
+  }
+  return stand.bereit
+}
+
+/**
  * Morgenbrief als Routine statt Knopf (Ideen-Sammlung, Etappe 2): werktags ab
  * ~7:00 einmal pro Kalendertag von selbst. Muster von maybeDream — die Runs
  * im Vault sind das Gedächtnis, es braucht keinen eigenen Zustand. Läuft der
@@ -2199,6 +2453,9 @@ async function maybeMorgenbrief() {
     // als „heute schon gelaufen" zählen. Der laufende Agent ist mitgeprüft.
     const heute = nowStamp().slice(0, 10)
     if (!(await routineFaellig('morgenbrief', heute))) return
+    // 18.08.: Erst der Rechner, dann der Agent. Ein „nein" kostet nichts und
+    // wiederholt sich beim nächsten Tick — der Brief kommt dann eben um 9.
+    if (!(await warteAufRechner('morgenbrief'))) return
     console.log('[runner] morgenbrief startet (kein erfolgreicher Lauf heute)…')
     // Denselben Input mitgeben, den der Cockpit-Knopf liefert — sonst sagt der
     // Brief von 7:00 jeden Morgen „Blindflug, keine Vitals durchgereicht".
@@ -2242,6 +2499,14 @@ async function maybeAntwortEntwuerfe() {
     if (jetzt.getHours() < ENTWUERFE_AB_STUNDE) return
     const heute = nowStamp().slice(0, 10)
     if (!(await routineFaellig('linkedin-antwort-entwuerfe', heute))) return
+    if (!(await warteAufRechner('linkedin-antwort-entwuerfe'))) return
+    // 18.08.: Erst das Postfach, dann die Entwürfe. Ohne diese Reihenfolge
+    // schreibt der Agent morgens auf dem Stand von gestern Mittag.
+    if (!(await postfachFrisch())) {
+      console.log('[runner] antwort-entwuerfe wartet — Postfach ist noch nicht frisch gesynct')
+      void maybePostfachSync()
+      return
+    }
 
     // Keine wartenden Leads → kein Lauf. Ein leerer Entwurfs-Run wäre nur eine
     // Zeile Rauschen in der Freigaben-Queue.
@@ -2255,6 +2520,81 @@ async function maybeAntwortEntwuerfe() {
     await startRun('linkedin-antwort-entwuerfe', gebaut.input)
   } catch (e) {
     console.error('[runner] antwort-entwuerfe übersprungen:', e?.message ?? e)
+  }
+}
+
+/**
+ * Das Postfach als Routine (18.08.2026) — die Lücke, die alles davor entwertet.
+ *
+ * **Der Fehler, den das behebt.** Am 18.08. um 12:20 stand in der Datenbank als
+ * jüngster Postfach-Stempel der **17.08., 13:52** — zweiundzwanzig Stunden alt.
+ * Grund: `syncThreads` wurde an genau zwei Stellen gerufen, und beide sind
+ * HTTP-Endpunkte. Es gab **keine Routine**. Morgenbrief, Antwort-Entwürfe,
+ * Netzwerk und Wächter liefen von selbst — ausgerechnet die Quelle, aus der
+ * Antworten, Entwürfe und Follow-up-Stufen stammen, lief nur auf Knopfdruck.
+ *
+ * Der Wächter schwieg dazu, weil sein Schwellwert bei 48 Stunden liegt: Ein
+ * Postfach von gestern Mittag ist ihm noch frisch genug. Für den Agenten, der
+ * um 6:00 Antwort-Entwürfe schreibt, ist es das nicht.
+ *
+ * Zwei Stunden Takt, 6 bis 20 Uhr, auch am Wochenende: Antworten kommen nicht
+ * nur werktags, und ein Lauf kostet rund 45 Sekunden.
+ */
+const POSTFACH_AB_STUNDE = Number(process.env.POSTFACH_STUNDE ?? 6)
+const POSTFACH_BIS_STUNDE = Number(process.env.POSTFACH_BIS_STUNDE ?? 20)
+const POSTFACH_ABSTAND_MS = Number(process.env.POSTFACH_ABSTAND_MS ?? 2 * 60 * 60 * 1000)
+let letzterPostfachSync = 0
+
+async function maybePostfachSync() {
+  try {
+    const stunde = new Date().getHours()
+    if (stunde < POSTFACH_AB_STUNDE || stunde >= POSTFACH_BIS_STUNDE) return
+    if (Date.now() - letzterPostfachSync < POSTFACH_ABSTAND_MS) return
+    if (linkedinSyncRunning) return
+    // Braucht den Sync-Chrome — dieselbe Vorprüfung wie jede andere Routine.
+    if (!(await warteAufRechner('postfach-sync', { brauchtChrome: true }))) return
+    linkedinSyncRunning = true
+    letzterPostfachSync = Date.now()
+    try {
+      const synced = await syncThreads({})
+      const result = await upsertThreads(synced.threads, {})
+      console.log(
+        `[runner] postfach-sync: ${result.geschrieben ?? synced.threads.length} Threads` +
+          (synced.partial ? ' · TEILWEISE (Lauf brach ab)' : ''),
+      )
+    } finally {
+      linkedinSyncRunning = false
+    }
+  } catch (e) {
+    console.error('[runner] postfach-sync übersprungen:', e?.message ?? e)
+  }
+}
+
+/**
+ * Wie frisch ist das Postfach? (18.08.2026)
+ *
+ * Der Antwort-Entwürfe-Agent liest `linkedin_threads`. Läuft er auf einem
+ * Postfach von gestern, schreibt er Entwürfe für Leads, die vielleicht längst
+ * geantwortet haben — und übersieht die, die es heute Nacht taten. Deshalb
+ * wartet er, bis der Postfach-Sync heute einmal durch war, statt blind zu
+ * starten.
+ */
+async function postfachFrisch() {
+  if (!SNAPSHOT_ENABLED) return true // ohne DB keine Aussage — dann nicht blockieren
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/linkedin_threads?select=last_synced_at&order=last_synced_at.desc&limit=1`,
+      { headers: { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` } },
+    )
+    if (!res.ok) return true
+    const rows = await res.json()
+    const stempel = Date.parse(rows[0]?.last_synced_at ?? '')
+    if (!Number.isFinite(stempel)) return true
+    // Sechs Stunden: großzügig genug, dass ein Sync um 6:00 den Lauf um 6:05
+    // trägt, streng genug, dass „gestern Mittag" nicht durchgeht.
+    return Date.now() - stempel < 6 * 60 * 60 * 1000
+  } catch {
+    return true
   }
 }
 
@@ -2275,7 +2615,24 @@ function netzwerkStand() {
  * Liste ab, ist die erste trotzdem aktuell — und `vollstaendig` sagt ohnehin,
  * worauf man sich verlassen darf.
  */
-async function starteNetzwerkSync() {
+/**
+ * Wie weit wird geblättert? (17.08.2026)
+ *
+ * Im Alltag kurz: Beide Listen sind nach Datum sortiert, das Neue steht oben —
+ * zehn Runden reichen für rund hundert Einträge und damit für ein Vielfaches
+ * dessen, was an einem Tag dazukommt (17.08.: sieben neue Kontakte). Der volle
+ * Durchlauf über 1.600 Einträge dauert sieben Minuten und bewegt sich durch
+ * Kevins Konto — das ist nichts, was mehrmals täglich laufen sollte.
+ *
+ * Einmal in der Woche trotzdem ganz durch: Nur ein vollständiger Lauf darf
+ * schließen, dass jemand aus einer Liste VERSCHWUNDEN ist (`upsertNetzwerk`
+ * hängt genau daran), und nur er schreibt die Gesamtzahl fort, an der der
+ * Widerspruchs-Wächter die Erntelücke misst. Bei einem kurzen Lauf bleibt beides
+ * unangetastet — er kann also nichts kaputt machen, nur ergänzen.
+ */
+const NETZWERK_RUNDEN_KURZ = 10
+
+async function starteNetzwerkSync({ kurz = false } = {}) {
   if (netzwerkSync.laeuft) return netzwerkStand()
   netzwerkSync = { laeuft: true, seit: new Date().toISOString(), letztes: netzwerkSync.letztes }
   const teile = []
@@ -2285,7 +2642,10 @@ async function starteNetzwerkSync() {
     // machen (am 12.08. gemessen: beide Läufe endeten unvollständig).
     const ergebnis = await mitNetzwerkLock(async () => {
       for (const welche of ['einladungen', 'kontakte']) {
-        const gelesen = await leseListe(welche, { log: (...a) => console.log(...a) })
+        const gelesen = await leseListe(welche, {
+          log: (...a) => console.log(...a),
+          ...(kurz ? { maxRunden: NETZWERK_RUNDEN_KURZ } : {}),
+        })
         if (gelesen.loginWall) {
           teile.push({ seite: welche, fehler: 'Login-Wall — im Sync-Chrome bei LinkedIn anmelden' })
           break
@@ -2330,19 +2690,140 @@ async function starteNetzwerkSync() {
 const NETZWERK_AB_STUNDE = Number(process.env.NETZWERK_SYNC_STUNDE ?? 7)
 let netzwerkTagesStempel = null
 
+/**
+ * Lief heute schon ein vollständiger Netzwerk-Lauf? (17.08.2026)
+ *
+ * Die Antwort steht in `linkedin_netzwerk_meta` und überlebt damit einen
+ * Runner-Neustart — die Prozessvariable tut das nicht. Genau daran hing ein
+ * teurer Fehler: Am Morgen des 17.08. startete der Runner wegen abgelaufener
+ * Anmeldung immer wieder neu, und JEDER Start schickte einen siebenminütigen
+ * Durchlauf durch Kevins LinkedIn — um 07:02, 07:04, 07:05 und 07:07. Das ist
+ * nicht nur Zeit, das ist ein Muster, für das LinkedIn Konten sperrt.
+ */
+async function netzwerkHeuteSchonDurch(heute) {
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/runner_snapshots?key=eq.linkedin_netzwerk_meta&select=data&limit=1`,
+      { headers: { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` } },
+    )
+    if (!res.ok) return false
+    const rows = await res.json()
+    const data = rows[0]?.data ?? {}
+    // Zwei Wege zählen: ein vollständiger Lauf (schreibt `vollAt` je Liste)
+    // oder ein kurzer (schreibt `letzterLaufAt`). Sonst liefe nach jedem
+    // Neustart wenigstens der kurze Lauf erneut durch Kevins Konto.
+    if (String(data.letzterLaufAt ?? '').slice(0, 10) === heute) return true
+    return ['kontakte', 'einladungen'].every((s) => String(data[s]?.vollAt ?? '').slice(0, 10) === heute)
+  } catch {
+    // Im Zweifel NICHT überspringen: ein ausgelassener Lauf ist harmloser als
+    // veraltete Zahlen — aber ein Lauf zu viel wäre hier der teurere Fehler,
+    // deshalb entscheidet unten zusätzlich der gesetzte Tagesstempel.
+    return false
+  }
+}
+
+/**
+ * Den Zeitpunkt des letzten Laufs festhalten — auch für kurze Läufe.
+ *
+ * Landet neben den Vollständigkeits-Stempeln in `linkedin_netzwerk_meta`, damit
+ * es eine einzige Stelle bleibt, an der steht, wann dieser Sync zuletzt an
+ * Kevins Konto war.
+ */
+async function merkeNetzwerkLauf(stempel) {
+  try {
+    const kopf = {
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      'Content-Type': 'application/json',
+    }
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/runner_snapshots?key=eq.linkedin_netzwerk_meta&select=data&limit=1`,
+      { headers: kopf },
+    )
+    const rows = res.ok ? await res.json() : []
+    const data = { ...(rows[0]?.data ?? {}), letzterLaufAt: stempel }
+    await fetch(`${SUPABASE_URL}/rest/v1/runner_snapshots`, {
+      method: 'POST',
+      headers: { ...kopf, Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({ key: 'linkedin_netzwerk_meta', data, updated_at: stempel }),
+    })
+  } catch (e) {
+    console.error('[runner] netzwerk-Lauf nicht vermerkt:', e?.message ?? e)
+  }
+}
+
 async function maybeNetzwerkSync() {
   try {
     const jetzt = new Date()
     if (jetzt.getHours() < NETZWERK_AB_STUNDE) return
     const heute = nowStamp().slice(0, 10)
     if (netzwerkTagesStempel === heute) return
+    // Frisch gestartet: erst in der Datenbank nachsehen, statt blind loszulaufen.
+    if (netzwerkTagesStempel === null && (await netzwerkHeuteSchonDurch(heute))) {
+      netzwerkTagesStempel = heute
+      console.log('[runner] netzwerk-sync übersprungen — heute bereits vollständig gelaufen')
+      return
+    }
     if (netzwerkSync.laeuft) return
     if (!SNAPSHOT_ENABLED) return // ohne service_role kein Schreibweg
+    // Dieser Lauf geht durch den Sync-Chrome — ohne ihn nicht anfangen (18.08.).
+    // Der Tagesstempel darf erst danach fallen, sonst gilt ein Lauf als erledigt,
+    // den es nie gab.
+    if (!(await warteAufRechner('netzwerk-sync', { brauchtChrome: true }))) return
     netzwerkTagesStempel = heute
-    console.log('[runner] netzwerk-sync startet (Tages-Routine)…')
-    await starteNetzwerkSync()
+    // Sonntag ist der volle Durchlauf, an allen anderen Tagen nur die Spitze
+    // der Listen — das Neue steht dort ohnehin oben.
+    const kurz = jetzt.getDay() !== 0
+    console.log(`[runner] netzwerk-sync startet (${kurz ? 'kurz, nur die neuesten' : 'voller Durchlauf'})…`)
+    await starteNetzwerkSync({ kurz })
+    await merkeNetzwerkLauf(new Date().toISOString())
   } catch (e) {
     console.error('[runner] netzwerk-sync übersprungen:', e?.message ?? e)
+  }
+}
+
+/**
+ * Der Widerspruchs-Wächter als laufende Routine (17.08.2026).
+ *
+ * Er braucht kein Chrome und keine Uhrzeit-Schwelle: Er liest nur, was in der
+ * Datenbank steht, und ist in Sekunden durch. Genau deshalb darf er oft laufen
+ * — der Fehler, für den es ihn gibt, entsteht nicht nachts um drei, sondern
+ * immer dann, wenn eine Nachricht vom Handy rausgeht und der Haken im Cockpit
+ * ausbleibt.
+ */
+let letzterWaechterLauf = 0
+const WAECHTER_ABSTAND_MS = 15 * 60 * 1000
+
+async function maybeWaechter() {
+  try {
+    if (!SNAPSHOT_ENABLED) return // ohne service_role kein Schreibweg
+    if (Date.now() - letzterWaechterLauf < WAECHTER_ABSTAND_MS) return
+    letzterWaechterLauf = Date.now()
+    const { ladeUndPruefe, schreibeBefund } = await import('./widersprueche.mjs')
+    const ergebnis = await ladeUndPruefe()
+    // 18.08.: Eine geschlossene Schleuse gehört ganz nach vorn. Sie ist der
+    // Grund, warum in der Agenten-Liste NICHTS steht — und „nichts" ist der
+    // Zustand, den man am leichtesten übersieht. Der Weg über den Wächter
+    // spart eine eigene Cockpit-Anzeige: Das Band auf dem Homescreen zeigt
+    // Befunde schon an.
+    const tor = schleuseLetztes()
+    if (tor && !tor.offen) {
+      ergebnis.befunde.unshift({
+        schluessel: 'schleuse_zu',
+        schwere: 'hoch',
+        text: `Agenten angehalten — ${tor.grund}`,
+        zahl: -1,
+        tun: tor.hinweis || 'Runner-Log ansehen',
+      })
+      ergebnis.anzahl = ergebnis.befunde.length
+      ergebnis.hoch = ergebnis.befunde.filter((b) => b.schwere === 'hoch').length
+    }
+    await schreibeBefund(ergebnis)
+    if (ergebnis.anzahl > 0) {
+      console.log(`[runner] wächter: ${ergebnis.anzahl} Widersprüche (${ergebnis.hoch} dringend)`)
+    }
+  } catch (e) {
+    console.error('[runner] wächter übersprungen:', e?.message ?? e)
   }
 }
 
@@ -2350,6 +2831,10 @@ async function maybeDream() {
   try {
     const today = nowStamp().slice(0, 10)
     if (!(await routineFaellig('dream-check', today))) return
+    // Auch dieser Lauf geht durch die CLI und hat am 18.08. dieselbe Falle
+    // vor sich: Er startet fünf Sekunden nach dem Runner, und der startet oft
+    // genau dann, wenn der Mac gerade eben erst aufgewacht ist.
+    if (!(await warteAufRechner('dream-check'))) return
 
     const names = await readdir(RUNS_DIR)
     const recentRuns = names
@@ -2370,11 +2855,23 @@ server.listen(PORT, '127.0.0.1', () => {
   // leicht verzögert, damit der Start nicht blockiert
   setTimeout(() => void maybeDream(), 5000)
 
+  // Die Uhr, an der die Routinen ablesen, ob der Mac wach ist (18.08.). Muss
+  // vor ihnen laufen und feiner ticken als sie: Ein DarkWake von einer Minute
+  // darf nicht zwischen zwei Fünf-Minuten-Ticks unsichtbar bleiben.
+  wachTick()
+  const wt = setInterval(wachTick, WACH_TICK_MS)
+  wt.unref?.()
+
   // Morgenbrief: kurz nach dem Start prüfen (Mac gerade aufgeklappt) und dann
   // alle 5 Minuten — so kommt er auch, wenn der Rechner erst um 9 angeht.
   setTimeout(() => void maybeMorgenbrief(), 10_000)
   const mb = setInterval(() => void maybeMorgenbrief(), MORGENBRIEF_CHECK_MS)
   mb.unref?.()
+
+  // Das Postfach zuerst: Es ist die Quelle, aus der die Entwürfe gebaut werden.
+  setTimeout(() => void maybePostfachSync(), 15_000)
+  const pf = setInterval(() => void maybePostfachSync(), MORGENBRIEF_CHECK_MS)
+  pf.unref?.()
 
   // Antwort-Entwürfe im selben Takt, aber eine Stunde früher als der Morgenbrief:
   // beim Aufklappen des Macs prüfen und dann alle 5 Minuten.
@@ -2387,6 +2884,13 @@ server.listen(PORT, '127.0.0.1', () => {
   // über Kevins LinkedIn; der erste Tick in fünf Minuten reicht vollkommen.
   const nw = setInterval(() => void maybeNetzwerkSync(), MORGENBRIEF_CHECK_MS)
   nw.unref?.()
+
+  // Der Widerspruchs-Wächter: kurz nach dem Start einmal, danach im 15-Minuten-
+  // Takt (er selbst bremst über `WAECHTER_ABSTAND_MS`). Reines Lesen der
+  // Datenbank — kein Chrome, kein Vault, kein Modell.
+  setTimeout(() => void maybeWaechter(), 30_000)
+  const wa = setInterval(() => void maybeWaechter(), MORGENBRIEF_CHECK_MS)
+  wa.unref?.()
 
   // OS-Map-Snapshot für die Live-Domain: einmal beim Start + periodisch spiegeln.
   if (SNAPSHOT_ENABLED) {

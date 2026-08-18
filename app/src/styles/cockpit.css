@@ -2071,3 +2071,52 @@ button.ck-nav-item { background: none; font-family: inherit; cursor: pointer; te
   margin-bottom: 8px;
 }
 .ck-ident-vorlesen { min-height: 44px; }
+
+/* --- Sperrbalken: Uriel steht still und Kevin muss ran (17.08.2026) ---
+   Ausnahme von „Ruhe schlägt Effekt": Solange die Anmeldung abgelaufen ist,
+   läuft KEIN Agent — kein Morgenbrief, keine Entwürfe, kein Postfach-Sync.
+   Vom 14. bis 17.08. blieb das unbemerkt, weil die Warnung aussah wie jede
+   andere rote Zeile am Handy: wegwischbar. Dieser Balken liegt über allem,
+   pulsiert und lässt sich nicht schließen — er verschwindet erst, wenn der
+   Zustand behoben ist. */
+.ck-sperrbalken {
+  /* Flex-Kind der Shell zwischen Statusleiste und Inhalt: kein Scrollen kann
+     ihn wegschieben, weil er ausserhalb des scrollenden Bereichs liegt. */
+  position: relative;
+  z-index: 90;
+  flex-shrink: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border: none;
+  border-bottom: 1px solid #ff6b6b;
+  background: var(--ck-danger);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  animation: ck-sperr-puls 1.8s ease-in-out infinite;
+}
+.ck-sperrbalken:hover { filter: brightness(1.08); }
+.ck-sperrbalken-text { min-width: 0; flex: 1; }
+.ck-sperrbalken-tun {
+  display: block;
+  font-weight: 400;
+  font-size: 12px;
+  opacity: 0.92;
+}
+.ck-sperrbalken-pfeil { flex-shrink: 0; opacity: 0.9; }
+
+@keyframes ck-sperr-puls {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(229, 72, 77, 0.55); }
+  50% { box-shadow: 0 0 22px 6px rgba(229, 72, 77, 0.55); }
+}
+
+/* Wer Bewegung abbestellt hat, bekommt den Balken ohne Puls — die Dringlichkeit
+   trägt dann die Fläche, nicht die Animation. */
+@media (prefers-reduced-motion: reduce) {
+  .ck-sperrbalken { animation: none; box-shadow: 0 0 18px 4px rgba(229, 72, 77, 0.45); }
+}

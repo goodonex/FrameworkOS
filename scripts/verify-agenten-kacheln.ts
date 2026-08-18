@@ -144,5 +144,33 @@ check(
 )
 check('ohne Fehlschlag keine Meldung', agentenBefund([run('morgenbrief', 'done', MI)], MI).meldung, null)
 
+// --- Die Aufheb-Regel (17.08.2026) -----------------------------------------
+// „Anmeldung abgelaufen" gilt kontoweit: läuft danach IRGENDEIN Agent durch,
+// ist die Ursache behoben und der Sperrbalken muss fallen. Ohne diese Regel
+// stand er nach der Reparatur bis Mitternacht — eine Warnung, die nicht
+// verschwindet, wenn man sie befolgt, ist wertlos.
+function umUhr(r: RunSummary, stunde: number): RunSummary {
+  const t = new Date(MI)
+  t.setHours(stunde, 0, 0, 0)
+  return { ...r, started: t.toISOString(), finished: t.toISOString() }
+}
+const fehler7 = umUhr(mitGrund(run('morgenbrief', 'error', MI), ANMELDUNG), 7)
+const erfolg9 = umUhr(run('dream-check', 'done', MI), 9)
+check(
+  'ein Erfolg NACH dem Fehlschlag hebt den Handlungsbedarf auf',
+  agentenBefund([fehler7, erfolg9], MI).handlungsbedarf,
+  null,
+)
+check(
+  'ein Erfolg VOR dem Fehlschlag hebt nichts auf',
+  agentenBefund([umUhr(run('dream-check', 'done', MI), 6), fehler7], MI).handlungsbedarf?.agent,
+  'morgenbrief',
+)
+check(
+  'nach der Aufhebung bleibt der Fehlschlag als Namensmeldung sichtbar',
+  agentenBefund([fehler7, erfolg9], MI).meldung,
+  'morgenbrief ist heute gescheitert — Anmeldung abgelaufen',
+)
+
 console.log(`${pass} bestanden, ${fail} fehlgeschlagen`)
 process.exit(fail === 0 ? 0 : 1)

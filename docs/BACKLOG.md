@@ -1,6 +1,327 @@
 # Uriel — Backlog (die eine Quelle der Wahrheit)
 
-**Stand:** 2026-08-17 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
+**Stand:** 2026-08-18 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
+
+## **GEBAUT 18.08.2026, ~14:00 — /sales wird der Tages-Flow** (Kevin: „von oben nach unten abarbeitbar")
+
+**Nicht live** — der Fast-Forward bleibt Kevins Wort. Migration **0074 ist
+eingespielt** (`db push`, Historie war davor lückenlos bis 0073).
+
+Kevins Befund am Kachel-Raster: elf gleich aussehende Karten, „219 offen" als
+Angst-Zahl obenauf („die erschlagen mich, und die hat auch einfach keine
+richtige Funktion"), 30/30 Anfragen sehen aus wie eine offene Aufgabe,
+„Kundenarbeit" heißt komisch und ist zu präsent, obwohl er dort auf den
+Kollegen wartet, und den Zahlen traut er nicht („bei den Looms bin ich mir
+nicht sicher, ob die Zahl korrekt ist", „150 Credits — ist das getrackt oder
+einfach eine Zahl?").
+
+### Der Umbau
+
+| Zug | Ergebnis | Datei |
+|---|---|---|
+| **Reihenfolge neu diktiert** | Sechs Stufen statt fünf: Anfragen → **Erstnachrichten** → **Antworten** → Follow-ups → InMails → Looms. Erstnachrichten und Antworten waren vorher EINE Stufe („nachrichten") — für Kevin sind es zwei Stationen | `lib/tagesFlow.ts` |
+| **Zwei Stufen-Arten** | `zaehler` (Soll erreicht = grün) und **`frische`** (Antworten: grün, solange keiner > 24 h wartet). 43 dürfen warten, solange keiner von vorgestern ist — bei Antworten zählt Reaktionszeit, nicht Vollständigkeit | `lib/tagesFlow.ts` |
+| **Follow-up-Drossel** | Statt 200 fälliger Threads zieht die Stufe eine Tagesportion (20). Eine Zeile, die nie grün wird, ist keine Routine, sondern ein Vorwurf. Der Rückstand steht als eine ruhige Zahl in der Unterzeile | `lib/tagesFlow.ts` (`FOLLOWUP_PORTION_TAG`) |
+| **Portionen einfrieren** | Neue Tabelle `sales_tagesportionen`: beim ersten Öffnen des Tages wird das Soll festgeschrieben. Ohne das ist „20/20" ein bewegliches Ziel — um 14 Uhr sind es 23, weil neue Fälle nachrutschten, und die Stufe wird nie grün. Zugleich das Gedächtnis für die Streak | `0074_sales_tagesportionen.sql`, `lib/useTagesPortionen.ts` |
+| **Soll schrumpft nicht unterm Haken** | Aus-den-Daten-Solls rechnen `offen + heute erledigt` — sonst fiele „7/7" beim Abhaken auf „4/4" zurück | `lib/tagesFlow.ts` (`sollFuer`) |
+| **Leere Pflicht = erfüllt** | Ist die Quelle leer (Erstnachricht verworfen statt gesendet), gilt die Stufe als erledigt statt für immer rot zu bleiben | `lib/tagesFlow.ts` |
+| **Streak je Zeile** | Werktage, ein Freeze pro Woche (auch am Serien-Kopf: Freitag beim Kunden, Montag früh geöffnet → Serie lebt), laufender Tag bricht nichts. Ein Tag ohne eingefrorene Portion ist KEIN Urteil — die Serie beginnt sauber bei der Einführung | `lib/salesStreak.ts` |
+| **4-Uhr-Tagesgrenze** | Der Metrik-Tag wechselt um 4 Uhr, nicht um Mitternacht. Ein Loom um 0:30 gehört zu Kevins „gestern" (Commits um 01:25 sind im Log) | `lib/metricsDates.ts` (`heutigesMetrikDatum`) |
+| **InMail-Stand wird ehrlich** | Kevins Frage „getrackt oder einfach eine Zahl?" hatte die Antwort „Zahl". Jetzt: Stand mit Datums-Stempel, Anzeige zieht seither gebuchte InMails ab, Tagesration (0 von 5) vorne, Pool + Reichweite dahinter | `lib/inmailStand.ts`, `components/InmailPanel.tsx` |
+| **Daten-Frische sichtbar** | „Postfach-Stand: vor 2 h" aus `last_synced_at`. Die 18 Looms sind vielleicht nicht falsch, sondern alt — ohne den Hinweis liest sich eine alte Zahl wie eine falsche | `pages/SalesDashboard.tsx` |
+| **Projekte statt „Kundenarbeit"** | Umbenannt, unter das Ritual verschoben, ohne Alarm-Optik („Liegt still" statt „Liegt zu lange > 14 Tage" in Warnfarbe). Blockiert ≠ überfällig | `pages/SalesDashboard.tsx` |
+| **Gefallen** | „Jetzt dran" (die 219 — der Flow ersetzt sie; alte `?kachel=jetzt-dran`-Links öffnen jetzt die erste offene Zeile), „Quoten" (Wochen-Thema, wohnt in `/tracking`), „Werkzeuge" (wohnt in `/agenten`) | `pages/SalesDashboard.tsx` |
+
+**Eine Abfrage, eine Zahl.** Die Zahl auf einer Zeile ist buchstäblich die
+Länge der Liste, die sich hinter ihr öffnet (`flowQuellen`) — nie ein zweiter
+Rechenweg. Genau das war der 78-Erstnachrichten-Fehler vom 17.08.
+
+**Belegt:** `tsc -b` grün · `npm run build` grün (3,1 s) · **46 verify-Skripte
+grün**, darunter neu `verify-sales-streak` (26 Fälle) und
+`verify-inmail-stand` (7); `verify-tages-flow` von 61 auf **101 Fälle**
+gewachsen, `verify-zaehl-modus` auf 48, `verify-ladezustand` auf 46. Optik in
+`/dev/sales-vorschau` gegengesehen (Screenshot an Kevin), Konsole fehlerfrei.
+
+**Offen für Kevin:** Zahlen-Prüfung an den echten Daten (Looms 18, InMail-Pool)
+— dafür muss er eingeloggt draufschauen; die Dev-Vorschau läuft auf Fixtures.
+
+---
+
+## **LIVE seit 18.08.2026, ~12:30 — Prüfung der ganzen Kette** (Kevin: „prüfe alles")
+
+Anlass war Kevins Satz: „Jedes Mal, wenn ich anfangen möchte, komm ich an
+irgendwas, was wieder nicht funktioniert." Geprüft wurde die Kette in der
+Reihenfolge, in der ein Fehler alles Nachfolgende entwertet: Scraping →
+ICP-Filter → Leads → Entwürfe → Tracking.
+
+### Der Fund: das Postfach hatte gar keine Routine
+
+`syncThreads` wurde an genau zwei Stellen gerufen — **beide sind
+HTTP-Endpunkte.** Morgenbrief, Antwort-Entwürfe, Netzwerk-Sync und Wächter
+liefen von selbst; ausgerechnet die Quelle, aus der Antworten, Entwürfe und
+Follow-up-Stufen stammen, lief nur auf Knopfdruck. Am 18.08. um 12:20 war der
+jüngste Postfach-Stempel der **17.08., 13:52** — 22 Stunden alt. Der Wächter
+schwieg, weil sein Schwellwert bei 48 Stunden liegt.
+
+Damit schrieb der Entwurfs-Agent um 6:00 Antworten auf dem Stand von gestern
+Mittag.
+
+| Zug | Ergebnis | Datei |
+|---|---|---|
+| Postfach als Routine | Zwei Stunden Takt, 6–20 Uhr, auch am Wochenende (Antworten kommen nicht nur werktags). Mit derselben Vorprüfung wie jede andere Routine — Mac wach, Netz, Sync-Chrome | `runner/index.mjs` (`maybePostfachSync`) |
+| Reihenfolge erzwungen | Die Antwort-Entwürfe warten jetzt, bis das Postfach in den letzten sechs Stunden gesynct wurde, und stoßen den Sync selbst an, falls nicht | `runner/index.mjs` (`postfachFrisch`) |
+| Beim Aufwachen zuerst | Der Nachfass-Check nach dem Aufklappen zieht das Postfach mit — vorher wartete es auf den nächsten Fünf-Minuten-Tick, während die Entwürfe schon liefen | `runner/index.mjs` (`planeNachDemAufwachen`) |
+| Live belegt | `[12:23:17] postfach-sync: 38 Threads` · Stempel jetzt von heute statt von gestern | — |
+
+### Was geprüft wurde und in Ordnung ist
+
+- **ICP-Filter:** Kein Code, sondern eine Regel im Skill `linkedin-leads`. Gegen
+  das Ergebnis geprüft: **0 Off-ICP-Treffer** unter allen 118 Erstnachrichten,
+  alle 118 mit zugeordneter Firma, 6 ohne Website (dort ausdrücklich vermerkt).
+- **Antwort-Entwürfe:** 30 Stück, stichprobenhaft zehn gelesen. Kevins Ton,
+  jeder greift die konkrete letzte Nachricht auf, Off-ICP-Kontakte (Recruiter,
+  Personal-Brander, Agenturen) werden höflich abmoderiert statt bearbeitet.
+- **Postfach-Sync selbst:** Dry-Run `partial: false`, sauber bis zur
+  30-Tage-Grenze, zwei Seiten geholt.
+- **Funnel- und Follow-up-Logik:** 38 + 75 + 21 Prüffälle grün.
+
+### Was nicht in Ordnung ist — und was das heißt
+
+**Das KPI-Tracking ist faktisch leer.** Von 21 Feldern in `daily_metrics` werden
+**zwei** benutzt: `li_anfragen` (21 von 23 Tagen) und `li_nachrichten` (5 Tage).
+Antworten, Termine, Looms, InMails, Abschlüsse, Umsatz — durchgehend null.
+
+Das ist kein technischer Defekt: Die Tabelle steht, das Schreiben funktioniert.
+Es füllt nur niemand. Und die Rohdaten liegen im System: 43 Threads mit
+`last_from = 'them'` sind Antworten, `loom_status` trägt die Looms, die
+Erstnachrichten tragen ihren Versandstatus. Solange daraus nichts abgeleitet
+wird, ist keine Funnel-Quote rechenbar — genau die Zahl, um die es beim
+Sales-KPI-System ging. **Eigene Entscheidung, eigene Runde.**
+
+**Migration 0071 fehlt weiterhin in der Prod-Datenbank.** Der Spiegel weicht auf
+das alte Konflikt-Ziel aus und funktioniert (118 Zeilen, 0 Doppel, zuletzt
+gespiegelt 12:22). Aber die Schwäche bleibt: Formuliert Kevin eine
+Gruppen-Überschrift im Vault um, legt der Spiegel die Gruppe ein zweites Mal an
+— am 14.08. waren das 145 Zeilen für 118 Leads. Ohne DB-Passwort ist die
+Migration von hier aus nicht anwendbar.
+
+| Zug | Ergebnis | Datei |
+|---|---|---|
+| Wächter gegen die Doppelung | Solange 0071 fehlt: Stehen mehr Zeilen in der Tabelle als Leads in der Quelldatei, ist das ein dringender Befund mit Handgriff | `runner/widersprueche.mjs` (Satz 3b) |
+| Poll-Rauschen abgestellt | „Auftrags-Abfrage fehlgeschlagen" erst nach **drei** Fehlschlägen in Folge (~12 Sekunden ohne Draht). Ein einzelner Aussetzer bei einem 4-Sekunden-Takt heilt sich selbst; täglich geloggt gewöhnt man sich daran und übersieht die echte Serie | `runner/index.mjs` (`pollJobs`) |
+
+**Verifikation:** 9 Drift-Wachen grün (32 · 31 · 25 · 33 · 38 · 17 · 38 · 21 ·
+75 Fälle). Widerspruchsband live bei **einem** Befund, und der ist Kevins Klick.
+
+## **LIVE seit 18.08.2026, ~12:00 — Der Wächter meldete zwölf und übersah neunhundert**
+
+Kevin: „widersprüche sind noch da". Vier Befunde standen im Band. Am Ende war
+**einer** davon echt — und der größte Ausfall des Tages stand in keinem.
+
+### Der Fund: Chrome fror die Seite ein, der Scraper hielt das für das Listenende
+
+| Zeitpunkt | Geerntet |
+|---|---|
+| 17.08., 17:46 | 953 von 959 Einladungen |
+| 18.08., 07:05 | **10** von 958 |
+| 18.08., 11:38 | **40** von 957 |
+
+Am Tab gemessen: `document.visibilityState` = **hidden**, Seitenhöhe 739 px. Das
+Sync-Chrome-Fenster liegt im Alltag hinter Kevins Arbeit, und Chrome drosselt
+unsichtbare Seiten bis zum Stillstand — LinkedIns Nachladen hängt an
+IntersectionObserver und rAF, also genau daran. Nach fünf Runden ohne Zuwachs
+bricht die Schleife ab; sie hielt die Drosselung für das Ende der Liste.
+
+`Page.bringToFront` (seit dem 12.08. im Code) half nicht: Es holt den Tab
+INNERHALB seines Fensters nach vorn. Liegt das Fenster hinter anderen, bleibt
+die Seite `hidden`.
+
+| Zug | Ergebnis | Datei |
+|---|---|---|
+| Sichtbarkeit vorspielen | `Emulation.setFocusEmulationEnabled` + `Page.setWebLifecycleState('active')` — reine Renderer-Emulation, es springt kein Fenster vor den Bildschirm. An **drei** Stellen verankert: beim Verbinden, nach der Navigation (anderer Renderer) und nach jeder Sitzungs-Erneuerung | `runner/linkedin/netzwerk.mjs` |
+| Gegenprobe | 15 Runden auf der Einladungsliste: **40 → 160**. Danach voller Lauf: **950/957 und 648/660, beide `vollstaendig: true`** | — |
+| Auch im Postfach-Sync | Dort holt `fetch` die Threads, das ist unbetroffen — aber der eine DOM-abhängige Schritt (`listeAnstossen`, der LinkedIn dazu bringt, seine Blätter-Query abzufeuern) klemmt genauso. Klemmt er, syncht der Lauf still nur die erste Seite, und es gibt keine Gesamtzahl, an der das auffiele. **Eingebaut, aber nicht separat verifiziert** — das zeigt der nächste reguläre Lauf | `runner/linkedin/sync.mjs` |
+
+### Der blinde Fleck: ein abgebrochener Lauf hinterließ keine Spur
+
+`schreibeMeta` läuft nur bei vollständigen Läufen (zu Recht — am 12.08. kippten
+50 von 882 Einträgen die InMail-Kachel auf 50). Damit war ein Teil-Lauf in der
+Meta **unsichtbar**: Der Wächter las die Zahlen von gestern und meldete „12
+fehlen", während dreimal hintereinander neunhundert fehlten.
+
+| Zug | Ergebnis | Datei |
+|---|---|---|
+| Abbruch-Vermerk | Eigenes Feld `letzterAbbruch` neben den Vollständigkeits-Zahlen, die es weiterhin nicht anfassen darf. Der nächste vollständige Lauf räumt es ab | `runner/linkedin/netzwerkUpsert.mjs` |
+| Neue Regel | Nicht mehr „geerntet vs. Kopfzahl", sondern „ist der letzte Lauf durchgelaufen oder abgebrochen". Unter einem Viertel der Liste: **hoch** statt mittel | `runner/widersprueche.mjs` (Satz 3) |
+
+### Zwei Fehlalarme, beide mit Beleg abgeräumt
+
+**„12 fehlen" war nie behebbar.** Nach dem vollständigen Lauf standen 648
+Kontakte in der Datenbank — und im DOM der Seite exakt dieselben 648 eindeutigen
+Profile, bei „660 Kontakte" im Kopf. LinkedIn zählt dort mit, was keine
+anklickbare Karte hat (gelöschte und gesperrte Konten, Einladungen an blanke
+E-Mail-Adressen). Der Scraper hatte alles.
+
+**„8 Kontakte gelten als Einladung offen"** ist Kevins InMail-Welle: Alle acht
+standen am 18.08. nachweislich noch auf der Einladungsliste, zwei haben sogar
+geantwortet, ohne anzunehmen. Die Regel „wer schreibt, hat angenommen" stimmt
+nicht mehr, seit gezielt Leute mit OFFENER Anfrage angeschrieben werden. Sie
+greift jetzt nur noch, wenn der Eintrag beim letzten vollständigen Lauf **nicht
+mehr gesehen** wurde — dann ist „offen" ein Datenrest.
+
+**Zwei eigene Fehler auf dem Weg dorthin, beide erst an den Echtdaten
+aufgefallen** — die Attrappen im Verify waren grün:
+
+1. Verglichen wurde gegen die zuletzt gelaufene Liste statt gegen die eigene.
+   Einladungen waren 11:48 fertig, Kontakte 11:51 — schon erklärte das jeden
+   Einladungs-Eintrag für veraltet.
+2. Der Stempel-Vergleich lief über Zeichenketten. Postgres liefert
+   `…281+00:00`, `toISOString()` schreibt `…281Z` — derselbe Moment, aber `+`
+   sortiert vor `Z`. Damit galten alle 950 frisch gesehenen Einladungen als
+   veraltet, und die Regel meldete exakt dieselben acht Fehlalarme wie vorher.
+
+Beide Fallen stehen jetzt als Fälle in der Drift-Wache — der Format-Fall
+wortgleich mit den echten Stempeln.
+
+**Ergebnis:** 4 Befunde → **1**, und der ist echt: die 78 Erstnachrichten, die
+laut Postfach längst raus sind. Ein Klick auf „Als verschickt verbuchen" im
+LinkedIn-Bereich. Live gegengemessen, Runner-Log 11:59: `wächter: 1
+Widersprüche (1 dringend)`. Drift-Wachen grün: `verify-widersprueche` 26/26 ·
+`verify-agenten-gesundheit` 17/17 · `verify-schleuse` 31/31 ·
+`verify-start-bereit` 25/25 · `verify-lauf-grund` 33/33 ·
+`verify-routine-guard` 38/38.
+
+## **LIVE seit 18.08.2026, ~10:50 — „Es wird doch immer noch als fehlerhaft angezeigt"** (Nachschlag, deployt)
+
+Kevins Screenshot um 10:44, Handy, `frameworkos.de`:
+
+    ⚠ 2 Agenten sind heute gescheitert: linkedin-antwort-entwuerfe,
+      morgenbrief — Nicht angelaufen — ansehen
+
+Die neue Einordnung war also schon durchgereicht („Nicht angelaufen" statt
+„Zeitlimit erreicht") — aber die Oberfläche wertete sie weiter als Fehlschlag.
+Und das, obwohl **beide Agenten um 10:07 sauber durchgelaufen waren.**
+
+Zwei Lücken in `agentenBefund`, beide in derselben Funktion:
+
+| Lücke | Was falsch war | Regel jetzt |
+|---|---|---|
+| Erfolg räumt nicht auf | Die Regel „ein Erfolg danach hebt den Befund auf" galt seit dem 17.08. nur für den **Sperrbalken** (`handlungsbedarf`), nicht für die rote Zeile darunter. Die zählte stur alle `error`-Läufe des Tages | Ein Fehlschlag, auf den ein erfolgreicher Lauf **desselben Agenten** folgt, ist erledigt. Der Erfolg eines anderen räumt nichts ab — sonst deckt ein gelungener Dream-Check den fehlenden Morgenbrief zu |
+| Fehlstart galt als Scheitern | Ein Lauf, den der schlafende Mac verschluckt hat, stand rot in der Liste — und ließ den Agenten zugleich als „hat heute stattgefunden" gelten | `fehlstart` ist kein Fehlschlag, sondern ein Nicht-Ereignis: keine rote Meldung, aber der Agent bleibt **ausstehend**. Genau das soll dort stehen, wenn der Mac einen Vormittag durchschläft |
+
+| Zug | Datei |
+|---|---|
+| Beide Regeln, mit Begründung am Code | `app/src/cockpit/lib/agentenGesundheit.ts` |
+| `fehlstart` im Typ ergänzt (der Runner schickt ihn seit heute) | `app/src/cockpit/lib/runnerApi.ts` |
+| Drift-Wache, 17 Fälle — der Kern ist der Screenshot von 10:44 als Testfall | `scripts/verify-agenten-gesundheit.ts` (neu; im Dateikopf seit dem 07.08. erwähnt, aber nie angelegt) |
+
+**Verifikation.** `tsc --noEmit` grün · `verify-agenten-gesundheit` 17/17 · Build
+**CSS hash-identisch** mit dem live stehenden Stand (`index-DCeg9aTh.css`) —
+der Beleg, dass der Deploy keinen fremden Zwischenstand mitschleppt. Vor dem
+Deploy im ausgelieferten Bundle nachgemessen, dass der uncommittete
+App-Arbeitsstand vom 17.08. **bereits live war** (Marker „zwei Quellen nicht
+übereinstimmen" im alten Bundle) — sonst wäre dieser Deploy eine ungeprüfte
+Live-Schaltung gewesen. Nach dem Deploy im Browser gegengemessen:
+`index-YBPJMzgV.js`, Fix drin, Widerspruchsband unverändert drin.
+
+## **LIVE seit 18.08.2026, ~10:25 — Die Schleuse: einmal vorne prüfen statt hinten viermal scheitern** (Nachschlag)
+
+Kevins Einwand direkt nach dem Umbau oben: „Auch dass die Agenten immer einzeln
+scheitern — können wir nicht einen vorab checken lassen, ob wir angemeldet sind
+und überall reinkommen, und erst dann die anderen loslegen?"
+
+Genau das war das Bild vom 12./13. und 17.08.: Die Anmeldung der Claude-CLI
+lief ab, und **jeder Agent stellte das für sich selbst fest** — eigene
+Run-Datei, eigene rote Zeile, eigener Verbrauch am Tagesdeckel. Vier Zeilen für
+einen einzigen Umstand, und die Ursache stand nur in der Mitschrift, nicht in
+der Liste.
+
+| Zug | Ergebnis | Datei |
+|---|---|---|
+| Vier Prüfungen, einmal | Vault beschreibbar (iCloud) · `claude auth status --json` · Supabase antwortet · dazu der echte CLI-Probelauf. Gemessen: 1,5 s für die drei schnellen, 7 s für den Probelauf | `runner/schleuse.mjs` (neu) |
+| Der Probelauf | `auth status` liest nur lokalen Zustand — eine Sitzung, die erst beim Zugriff als abgelaufen auffällt, sieht dort gültig aus (genau die Form vom 12.08.). Ein Ein-Wort-Prompt klärt das. Bewusst **einmal pro Tag**, und gar nicht, solange heute schon ein Agent durchgelaufen ist: Der gelungene Lauf ist der bessere Beweis | `runner/schleuse.mjs` (`pruefeDurchgang`) |
+| Ein Tor für alle | Urteil gecacht: grün eine halbe Stunde, **rot nur eine Minute** — ein repariertes Login soll sofort greifen, kein Agent auf die nächste halbe Stunde warten | `runner/index.mjs` (`schleuseOffen`) |
+| Eine Meldung statt vier | Ist die Schleuse zu, entsteht **keine Run-Datei** — der Tagesdeckel bleibt unangetastet. Was Kevin selbst beheben muss, steht vorn: „Anmeldung" schlägt „Datenbank nicht erreichbar", sonst liest er morgens den Nebenschauplatz | `runner/schleuse.mjs` (`bewerteSchleuse`) |
+| Sichtbar ohne App-Änderung | Eine geschlossene Schleuse wird dem Widerspruchs-Wächter vorangestellt und erscheint damit im Band auf dem Homescreen. „Nichts in der Liste" ist der Zustand, den man am leichtesten übersieht — jetzt steht dort ein Satz mit Handgriff | `runner/index.mjs` (`maybeWaechter`), `/status` |
+| Ein PATH für beide | `CLI_PATH` einmal berechnet, von Agentenstart UND Schleuse benutzt. Prüfte die Schleuse mit einem anderen PATH als der Lauf, bestätigte sie eine Anmeldung, an die der Agent nie herankommt | `runner/index.mjs` |
+| Drift-Wache | 31 Fälle. Die CLI-Prüfungen nehmen ihren Prozessstarter als Parameter — so sind „abgemeldet", „OAuth abgelaufen", „Kontingent erschöpft" und „CLI antwortet nicht" echt geprüft, ohne Kevins Anmeldung anzufassen | `scripts/verify-schleuse.ts` (neu) |
+
+**Was sie bewusst NICHT prüft.** Ob LinkedIn im Sync-Chrome noch angemeldet
+ist, ließe sich nur durch einen echten Seitenaufruf feststellen — ein
+zusätzlicher Zugriff auf Kevins Konto bei **jeder** Prüfung. Am 17.08. gingen
+schon einmal vier Sieben-Minuten-Durchläufe in einer Viertelstunde durch sein
+Postfach; das ist ein Muster, für das LinkedIn Konten sperrt. Die Login-Wall
+meldet weiterhin der Lauf, der sie tatsächlich trifft (`linkedin/sync.mjs`).
+
+**Verifikation, beide Richtungen gefahren.** Integrationstest mit eigenem
+Test-Vault, eigenem Port und einer Attrappen-CLI — echte Runner-Kette, kein
+echter Agent, keine Kosten:
+
+    Schleuse offen:  [10:22:29] morgenbrief wartet — Mac gerade erst aufgewacht
+                     [10:22:50] Schleuse offen — Agenten dürfen laufen
+                     [10:22:50] morgenbrief startet …            → Run-Datei da
+    Schleuse zu:     [10:23:45] Schleuse ZU — Claude-CLI ist abgemeldet
+                                · Im Terminal `claude` neu anmelden
+                     [10:23:45] morgenbrief wartet — Claude-CLI ist abgemeldet
+                                                                 → Runs-Ordner LEER
+
+Das ist der ganze Punkt: **eine** Zeile mit Handgriff statt vier roter, und
+kein einziger verbrauchter Versuch. Drift-Wachen grün: `verify-schleuse` 31/31
+(neu) · `verify-start-bereit` 25/25 · `verify-lauf-grund` 33/33 ·
+`verify-routine-guard` 38/38.
+
+## **LIVE seit 18.08.2026, ~10:05 — Der Runner rennt nicht mehr in einen schlafenden Mac**
+
+**Der Befund.** Vier rote Zeilen am Morgen des 18.08.: Morgenbrief und
+Antwort-Entwürfe, je 06:16 und 06:48, „Zeitlimit erreicht (10 Min.)". In allen
+vier Run-Dateien steht dasselbe: **0 Ereignisse · 0 Werkzeug-Aufrufe.** Kein
+gescheiterter Lauf also, sondern gar keiner. Der Mac lag im DarkWake — wach
+genug, dass die Timer feuerten, ohne Netz (`Auftrags-Abfrage fehlgeschlagen:
+fetch failed`, sekundengleich um 06:16:43), und Sekunden später wieder im
+Schlaf. Der 07.08. hatte dasselbe Muster; `caffeinate` hält den Mac aber nur am
+Netzteil wach, nachts im Clamshell auf Batterie nicht.
+
+Teuer war nicht der Fehlversuch, sondern seine **Buchung**: zwei davon erreichen
+`MAX_VERSUCHE_PRO_TAG`, und beide Agenten waren bis Mitternacht gesperrt —
+obwohl Kevin ab 9:00 mit wachem Rechner davorsaß. Genau deshalb sah er dieselbe
+Liste seit dem 17.08. jeden Morgen rot.
+
+**Die Antwort ist nicht „mehr Versuche", sondern erst prüfen, dann starten.**
+
+| Zug | Ergebnis | Datei |
+|---|---|---|
+| Wach-Uhr | Eigener 60-Sekunden-Tick als Schlaf-Detektor: `setInterval` steht im Schlaf still, eine Lücke über dem 1,6-fachen Abstand kann nur Schlaf sein. Danach **3 Minuten Karenz** — länger als jeder DarkWake, kurz genug, dass Kevin das Aufklappen nicht als Wartezeit erlebt | `runner/startBereit.mjs` (neu), `runner/index.mjs` (`wachTick`) |
+| Startfreigabe | Vor jedem Routine-Start: Mac stabil wach · Netz antwortet (`api.anthropic.com`, 4s Deckel) · für Chrome-Agenten CDP auf 9222. Ein „nein" erzeugt **keine Run-Datei und keinen Fehlversuch** — der nächste Tick fragt erneut, notfalls stundenlang | `runner/index.mjs` (`warteAufRechner`) |
+| Nachfassen | Nach erkanntem Aufwachen ein einmaliger Nachfass-Check, sobald die Karenz durch ist. Ohne ihn entschiede der Zufall des 5-Minuten-Ticks, ob der Brief drei oder acht Minuten nach dem Aufklappen kommt | `runner/index.mjs` (`planeNachDemAufwachen`) |
+| Eigener Abbruchgrund | „Zeitlimit **und 0 Werkzeug-Aufrufe**" heißt jetzt **„Nicht angelaufen"** statt „Zeitlimit erreicht" — rückwirkend auch für die Läufe, die schon im Vault liegen (`laufGrund` liest beim Ausliefern). Der Werkzeug-Zähler ist der Beleg, nicht der Ereignis-Zähler: Der 06:48-Lauf hatte zwei Ereignisse, beide mit Zeitstempel `[+17:13]` — die CLI eröffnete beim nächsten Aufwacher gerade noch ihre Sitzung. Gegenprobe an allen 15 Zeitlimit-Läufen im Vault: **12 ohne einen einzigen Werkzeug-Aufruf, 3 mit** — nur die drei waren je echte Zeitlimits | `runner/laufGrund.mjs` |
+| Chrome selbst starten | Fehlt nur noch der Sync-Chrome, macht der Runner ihn selbst auf — derselbe Befehl wie Kevins Alias `chrome-sync`. Eingezäunt: höchstens einmal pro Stunde, nur 6–20 Uhr, `CHROME_AUTOSTART=0` schaltet es ab. Ein ausgeloggtes LinkedIn heilt das NICHT — dafür bleibt die Meldung aus `sync.mjs` | `runner/index.mjs` (`starteSyncChrome`) |
+| Eigener Deckel | Fehlstarts zählen getrennt vom echten Kontingent, sechs statt zwei — sie kosten keinen Token und sagen nichts über den Agenten. Muster von den Anmelde-Fehlern (13.08.). Der Deckel bleibt als Gurt für den Fall, dass der Mac MITTEN im Lauf einschläft | `runner/routineGuard.mjs` |
+| Drift-Wache | 23 Fälle: die echte Mitschrift vom 18.08., die Abgrenzung zum echten Zeitlimit (Lauf MIT Zügen), beide Deckel, DarkWake gegen trägen Tick, Karenz-Grenze auf die Sekunde | `scripts/verify-start-bereit.ts` (neu) |
+
+**Verifikation, live gemessen.** Runner um 10:04 neu geladen; im Log steht
+exakt der geplante Ablauf:
+
+    [10:04:27] morgenbrief wartet — Mac gerade erst aufgewacht
+    [10:07:28] morgenbrief startet (kein erfolgreicher Lauf heute)…
+    → status: done nach 21 Sekunden
+
+Also: erst die Karenz, dann der Nachfass-Check auf die Sekunde genau, dann ein
+Brief, der wach 21 statt „10 Minuten" braucht — **an einem Tag, an dem beide
+Agenten nach altem Stand bis Mitternacht gesperrt gewesen wären.** Drift-Wachen
+grün: `verify-start-bereit` 25/25 (neu) · `verify-lauf-grund` 33/33 ·
+`verify-routine-guard` 38/38.
+
+Zwei Nachbesserungen aus genau diesem Live-Lauf: Die Warte-Meldung sagte
+zunächst „… · kein Netz", obwohl das WLAN lief — der Netz-Check wird während
+der Karenz gar nicht erst ausgeführt, also darf sein Ergebnis auch nicht
+gemeldet werden (Kaskade statt Sammelliste). Und der Dream-Check bekam
+denselben Vorab-Check: Er startet fünf Sekunden nach dem Runner, und der
+startet oft genau dann, wenn der Mac eben erst aufgewacht ist.
+
+**Was Kevin davon merkt:** Der Laptop kann nachts zu bleiben. Läuft der Morgen
+ins Leere, steht in der Liste nicht mehr „Zeitlimit erreicht", sondern „Nicht
+angelaufen" — und der Agent hat seinen Versuch noch. Wer aufklappt, bekommt
+seinen Brief rund drei Minuten später, ohne einen Knopf zu drücken.
 
 ## **LIVE seit 17.08.2026, ~01:25 — Morgenlese-Serie + Vorlesen** (Nachschlag)
 

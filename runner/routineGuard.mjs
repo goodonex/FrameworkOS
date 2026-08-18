@@ -27,6 +27,7 @@ export function bewerteTagesLaeufe(metas, agent) {
   let erfolg = false
   let fehlschlaege = 0
   let anmeldungFehler = 0
+  let fehlstarts = 0
   for (const m of metas ?? []) {
     if (!m || m.agent !== agent) continue
     if (m.status === 'done') erfolg = true
@@ -37,11 +38,19 @@ export function bewerteTagesLaeufe(metas, agent) {
       // Agent nach Kevins Neu-Anmeldung trotzdem bis Mitternacht gesperrt: genau
       // das ist am 12./13.08. passiert. Eigener Zähler, eigener Deckel.
       if (m.grund?.schluessel === 'anmeldung') anmeldungFehler += 1
+      // 18.08.: Dieselbe Logik für den Fehlstart — Zeitlimit ohne ein einziges
+      // Ereignis, weil der Mac im DarkWake lag. Am 18.08. reichten zwei davon,
+      // um Morgenbrief und Antwort-Entwürfe bis Mitternacht zu sperren, obwohl
+      // kein Versuch stattgefunden hatte und Kevin ab 9:00 mit wachem Rechner
+      // davorsaß. Seit derselben Runde verhindert `startBereit` diese Läufe
+      // vorab — der eigene Zähler ist der Gurt für den Fall, dass der Mac
+      // MITTEN im Lauf einschläft, wo kein Vorab-Check mehr greifen kann.
+      else if (m.grund?.schluessel === 'fehlstart') fehlstarts += 1
       else fehlschlaege += 1
     }
     // 'running' zählt weder als Erfolg noch als Fehlschlag — der Lauf ist offen.
   }
-  return { erfolg, fehlschlaege, anmeldungFehler }
+  return { erfolg, fehlschlaege, anmeldungFehler, fehlstarts }
 }
 
 /**
@@ -55,18 +64,26 @@ export function bewerteTagesLaeufe(metas, agent) {
  *    gelingen lässt — aber es MUSS einer sein: ohne ihn hämmert der Tick bei
  *    dauerhaft abgelaufener Anmeldung alle fünf Minuten los und legt dabei
  *    knapp 300 nutzlose Run-Dateien pro Tag im Vault ab.
+ * 5. Fehlstarts (18.08.) zählen wie Anmelde-Fehler getrennt und großzügiger:
+ *    Ein Lauf, den der schlafende Mac verschluckt hat, kostet keinen Token und
+ *    sagt nichts über den Agenten — er darf das echte Kontingent des Tages
+ *    nicht anfassen. Ein Deckel bleibt trotzdem, aus demselben Grund wie
+ *    unter 4.
  */
 export function darfRoutineStarten({
   erfolg,
   fehlschlaege,
   anmeldungFehler = 0,
+  fehlstarts = 0,
   laeuft,
   maxVersuche = 2,
   maxAnmeldung = 4,
+  maxFehlstart = 6,
 }) {
   if (laeuft) return false
   if (erfolg) return false
   if (fehlschlaege >= maxVersuche) return false
   if (anmeldungFehler >= maxAnmeldung) return false
+  if (fehlstarts >= maxFehlstart) return false
   return true
 }

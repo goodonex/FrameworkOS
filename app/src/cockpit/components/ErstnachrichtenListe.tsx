@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useErstnachrichten, type Erstnachricht } from '../../hooks/useErstnachrichten'
+import { useLinkedinThreads } from '../../hooks/useLinkedinThreads'
+import { teileErstnachrichten } from '../lib/erstnachrichtenOffen'
 
 /**
  * Arbeitsliste für die versandfertigen LinkedIn-Erstnachrichten.
@@ -130,10 +132,17 @@ function LeadKarte({
 
 export function ErstnachrichtenListe({ brandSlug }: { brandSlug: string | undefined }) {
   const q = useErstnachrichten(brandSlug)
+  const threads = useLinkedinThreads(brandSlug)
   const [anzahlSichtbar, setAnzahlSichtbar] = useState(5)
 
-  const offen = useMemo(() => q.items.filter((i) => i.status === 'offen'), [q.items])
-  const erledigt = q.items.length - offen.length
+  // Der Haken im Cockpit ist nur die halbe Wahrheit — das Postfach ist die
+  // andere (17.08.2026). Wer dort einen Thread hat, ist angeschrieben.
+  const { offen, schonRaus, hatGeantwortet } = useMemo(
+    () => teileErstnachrichten(q.items, threads.items),
+    [q.items, threads.items],
+  )
+  const erledigt = q.items.filter((i) => i.status !== 'offen').length
+  const ausPostfach = [...schonRaus, ...hatGeantwortet]
   const sichtbar = offen.slice(0, anzahlSichtbar)
 
   if (q.tableMissing) {
@@ -167,7 +176,40 @@ export function ErstnachrichtenListe({ brandSlug }: { brandSlug: string | undefi
           <div className="ck-label" style={{ fontSize: 9 }}>Erledigt</div>
           <div style={{ fontSize: 20, fontWeight: 600, color: 'var(--ck-text-1)' }}>{erledigt}</div>
         </div>
+        {ausPostfach.length ? (
+          <div className="ck-panel" style={{ padding: '10px 14px', flex: 1, minWidth: 140 }}>
+            <div className="ck-label" style={{ fontSize: 9 }}>Laut Postfach raus</div>
+            <div style={{ fontSize: 20, fontWeight: 600, color: 'var(--ck-text-1)' }}>{ausPostfach.length}</div>
+            {hatGeantwortet.length ? (
+              <div style={{ fontSize: 10, color: 'var(--ck-accent)' }}>
+                {hatGeantwortet.length} davon haben geantwortet
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
+
+      {ausPostfach.length ? (
+        <div
+          className="ck-panel"
+          style={{ padding: '10px 14px', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}
+        >
+          <span style={{ fontSize: 12, color: 'var(--ck-text-2)', flex: 1, minWidth: 200 }}>
+            {ausPostfach.length} dieser Leads haben bereits einen Thread im Postfach — sie stehen hier nicht mehr
+            in der Liste.
+            {hatGeantwortet.length ? ` ${hatGeantwortet.length} haben geantwortet und liegen unter „Antworten".` : ''}
+          </span>
+          <button
+            type="button"
+            className="ck-btn"
+            style={{ fontSize: 10 }}
+            title="Setzt den Status dieser Zeilen dauerhaft auf „gesendet“"
+            onClick={() => void q.erledigeViele(ausPostfach.map((l) => l.id))}
+          >
+            Als verschickt verbuchen
+          </button>
+        </div>
+      ) : null}
 
       {q.error ? <div style={{ fontSize: 11, color: 'var(--ck-warn)' }}>{q.error}</div> : null}
 

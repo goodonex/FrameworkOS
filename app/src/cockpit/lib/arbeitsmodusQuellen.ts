@@ -9,6 +9,7 @@
  */
 import type { Erstnachricht } from '../../hooks/useErstnachrichten'
 import type { LinkedinThread } from '../../types/db'
+import { echtOffeneErstnachrichten } from './erstnachrichtenOffen'
 import { bucketOf } from './linkedinFollowups'
 import type { Posten, PostenEntwurf } from './prioritaet'
 
@@ -78,10 +79,16 @@ export function followupPosten(threads: LinkedinThread[], heute: Date): Posten[]
     }))
 }
 
-/** Rang 5 — versandfertige Erstnachrichten (Migration 0060). */
-export function erstnachrichtPosten(leads: Erstnachricht[]): Posten[] {
-  return leads
-    .filter((l) => l.status === 'offen')
+/**
+ * Rang 5 — versandfertige Erstnachrichten (Migration 0060).
+ *
+ * Der Haken im Cockpit ist NICHT die einzige Wahrheit: Wer die Nachricht vom
+ * Handy verschickt hat, hat einen Thread im Postfach — der zählt genauso
+ * (17.08.2026, siehe `erstnachrichtenOffen`). Ohne `threads` verhält sich die
+ * Funktion wie vorher.
+ */
+export function erstnachrichtPosten(leads: Erstnachricht[], threads: LinkedinThread[] = []): Posten[] {
+  return echtOffeneErstnachrichten(leads, threads)
     // Reihenfolge aus der Quelldatei = Kevins Abarbeitungsreihenfolge (sort_index).
     .sort((a, b) => a.sort_index - b.sort_index)
     .map((l): Posten => ({

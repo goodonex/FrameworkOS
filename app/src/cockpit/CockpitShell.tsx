@@ -46,6 +46,10 @@ export function CockpitShell() {
       >
         <UrielAura />
         <StatusBar />
+        {/* Der Wächter rendert den Sperrbalken („Anmeldung abgelaufen — Uriel
+            läuft nicht") und steht deshalb hier oben statt am Ende: zwischen
+            Statusleiste und Inhalt, ausserhalb des scrollenden Bereichs. */}
+        <RunWatcher />
         <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
           <NavRail />
           <main className="ck-main" style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
@@ -54,7 +58,6 @@ export function CockpitShell() {
         </div>
         <ChatBubble />
         <UrielDock />
-        <RunWatcher />
       </div>
     </ActiveBrandProvider>
   )

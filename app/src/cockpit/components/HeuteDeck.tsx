@@ -11,7 +11,7 @@ import { tagesansage } from '../lib/tagesansage'
 import { CALENDAR_ICAL_KEY, useCalendarFeed } from '../lib/useCalendarFeed'
 import { useKundenPosteingang } from '../lib/useKundenPosteingang'
 import { useRunnerData } from '../lib/useRunnerData'
-import { agentenBefund } from '../lib/agentenGesundheit'
+import { agentenBefund, istGesperrt } from '../lib/agentenGesundheit'
 
 const COLLAPSE_KEY = 'ck.heute.collapsed'
 const TOP = 5
@@ -145,8 +145,9 @@ export function HeuteDeck({ slug }: { slug: string | undefined }) {
       {/* O17 Schritt 4: Ein nachts gescheiterter Agent wurde bisher nirgends
           gemeldet — der RunWatcher toastet nur, was er live umkippen sieht.
           Diese Zeile steht auch dann, wenn Kevin erst mittags aufmacht, und
-          bleibt bewusst AUSSERHALB des Zuklapp-Bereichs. */}
-      {befund.meldung ? (
+          bleibt bewusst AUSSERHALB des Zuklapp-Bereichs. Bei gesperrtem Uriel
+          schweigt sie: dann steht der Sperrbalken der Shell über allem (17.08.). */}
+      {befund.meldung && !istGesperrt(befund) ? (
         <button
           type="button"
           onClick={() => navigate('/agenten')}

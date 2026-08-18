@@ -36,38 +36,43 @@ function check(label: string, actual: unknown, expected: unknown) {
     erfolg: true,
     fehlschlaege: 1,
     anmeldungFehler: 0,
+    fehlstarts: 0,
   })
   check('1b fremder Agent zählt nicht mit', bewerteTagesLaeufe(metas, 'dream-check'), {
     erfolg: false,
     fehlschlaege: 1,
     anmeldungFehler: 0,
+    fehlstarts: 0,
   })
   check('1c unbekannter Agent', bewerteTagesLaeufe(metas, 'gibtsnicht'), {
     erfolg: false,
     fehlschlaege: 0,
     anmeldungFehler: 0,
+    fehlstarts: 0,
   })
   check('1d leere Liste', bewerteTagesLaeufe([], 'morgenbrief'), {
     erfolg: false,
     fehlschlaege: 0,
     anmeldungFehler: 0,
+    fehlstarts: 0,
   })
   check('1e undefined überlebt', bewerteTagesLaeufe(undefined, 'morgenbrief'), {
     erfolg: false,
     fehlschlaege: 0,
     anmeldungFehler: 0,
+    fehlstarts: 0,
   })
   check(
     '1f laufender Lauf ist weder Erfolg noch Fehlschlag',
     bewerteTagesLaeufe([{ agent: 'x', status: 'running' }], 'x'),
-    { erfolg: false, fehlschlaege: 0, anmeldungFehler: 0 },
+    { erfolg: false, fehlschlaege: 0, anmeldungFehler: 0, fehlstarts: 0 },
   )
   // Die Falle des alten Guards: Namens-Teilstring. `includes('antwort-entwuerfe')`
   // hätte `linkedin-antwort-entwuerfe` mitgezählt.
   check(
     '1g exakter Name, kein Teilstring',
     bewerteTagesLaeufe([{ agent: 'linkedin-antwort-entwuerfe', status: 'done' }], 'antwort-entwuerfe'),
-    { erfolg: false, fehlschlaege: 0, anmeldungFehler: 0 },
+    { erfolg: false, fehlschlaege: 0, anmeldungFehler: 0, fehlstarts: 0 },
   )
 
   // 13.08.: Die Lage vom 12./13.08. — zwei Läufe, beide nur an der abgelaufenen
@@ -82,7 +87,7 @@ function check(label: string, actual: unknown, expected: unknown) {
       ],
       'morgenbrief',
     ),
-    { erfolg: false, fehlschlaege: 0, anmeldungFehler: 2 },
+    { erfolg: false, fehlschlaege: 0, anmeldungFehler: 2, fehlstarts: 0 },
   )
   check(
     '1i echter Fehlschlag und Anmeldung nebeneinander',
@@ -94,7 +99,7 @@ function check(label: string, actual: unknown, expected: unknown) {
       ],
       'morgenbrief',
     ),
-    { erfolg: false, fehlschlaege: 2, anmeldungFehler: 1 },
+    { erfolg: false, fehlschlaege: 2, anmeldungFehler: 1, fehlstarts: 0 },
   )
 }
 

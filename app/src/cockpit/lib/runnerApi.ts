@@ -11,7 +11,12 @@ import { beauftrageRunner, leseSpiegel, runnerDirekt } from './runnerBridge'
  * allgemeinen „Fehler", statt einen zu erfinden.
  */
 export interface LaufGrund {
-  schluessel: 'anmeldung' | 'kontingent' | 'netz' | 'zeitlimit' | 'unbekannt'
+  /**
+   * `fehlstart` seit dem 18.08.: Zeitlimit ohne einen einzigen Werkzeug-Aufruf
+   * — der Lauf hat nie stattgefunden, weil der Mac schlief. Kein Scheitern,
+   * sondern ein Nicht-Ereignis (siehe `runner/laufGrund.mjs`).
+   */
+  schluessel: 'anmeldung' | 'kontingent' | 'netz' | 'fehlstart' | 'zeitlimit' | 'unbekannt'
   /** Kurz, für die Zeile in der Liste: „Anmeldung abgelaufen". */
   kurz: string
   /** Was zu tun ist — ein Satz. */

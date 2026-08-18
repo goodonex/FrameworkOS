@@ -147,6 +147,13 @@ export async function upsertNetzwerk(liste, { jetzt = new Date() } = {}) {
 
   // Der Merker für die Oberfläche — siehe `schreibeMeta`.
   if (liste.vollstaendig) await schreibeMeta(liste.seite, stempel, liste.gesamt, zeilen.length)
+  // 18.08.: Auch ein ABGEBROCHENER Lauf hinterlässt eine Spur — getrennt von den
+  // Vollständigkeits-Zahlen, damit er sie nicht kippt (siehe den Vorfall vom
+  // 12.08. weiter unten). Vorher war ein Teil-Lauf in der Meta unsichtbar: Am
+  // Morgen des 18.08. brachen drei Läufe bei 10, 40 und 50 von 957 ab, und der
+  // Widerspruchs-Wächter meldete unbeirrt „12 fehlen" — die Zahl von gestern.
+  // Neunhundert fehlten, und niemand konnte es sehen.
+  else await merkeAbbruch(liste.seite, stempel, liste.gesamt, zeilen.length)
 
   return {
     seite: liste.seite,
@@ -181,6 +188,9 @@ async function schreibeMeta(seite, stempel, gesamt, geerntet) {
   } catch {
     /* noch keine Zeile — dann eben eine neue */
   }
+  // `letzterAbbruch` fällt hier bewusst weg: Ein vollständiger Lauf hat den
+  // Abbruch nachgeholt, und eine Warnung, die nach der Reparatur stehen bleibt,
+  // bringt man sich bei zu übersehen.
   data[seite] = { vollAt: stempel, gesamt, geerntet }
 
   const res = await fetch(`${SUPABASE_URL}/rest/v1/runner_snapshots`, {
@@ -190,6 +200,35 @@ async function schreibeMeta(seite, stempel, gesamt, geerntet) {
   })
   if (!res.ok) {
     console.error(`[netzwerk] Meta-Zeile HTTP ${res.status}: ${(await res.text().catch(() => '')).slice(0, 160)}`)
+  }
+}
+
+/**
+ * Den letzten abgebrochenen Lauf vermerken (18.08.2026).
+ *
+ * Bewusst ein EIGENES Feld neben `vollAt`/`gesamt`/`geerntet`: Diese drei
+ * dürfen nur ein vollständiger Lauf anfassen — daran hing der Fehler vom
+ * 12.08., als 50 von 882 Einträgen die InMail-Kachel auf 50 kippten. Der
+ * Wächter liest `letzterAbbruch` und kann daraus melden, was wirklich los ist:
+ * nicht „es fehlen zwölf", sondern „der letzte Lauf kam nur bis 40 von 957".
+ */
+async function merkeAbbruch(seite, stempel, gesamt, geerntet) {
+  const key = 'linkedin_netzwerk_meta'
+  let data = {}
+  try {
+    const rows = await hole(`runner_snapshots?key=eq.${key}&select=data&limit=1`)
+    data = rows[0]?.data ?? {}
+  } catch {
+    /* noch keine Zeile — dann eben eine neue */
+  }
+  data[seite] = { ...(data[seite] ?? {}), letzterAbbruch: { at: stempel, gesamt, geerntet } }
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/runner_snapshots`, {
+    method: 'POST',
+    headers: { ...authHeaders(), Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify({ key, data, updated_at: stempel }),
+  })
+  if (!res.ok) {
+    console.error(`[netzwerk] Abbruch-Vermerk HTTP ${res.status}: ${(await res.text().catch(() => '')).slice(0, 160)}`)
   }
 }
 

@@ -27,6 +27,8 @@ interface Result {
   setzeStatus: (id: string, status: Erstnachricht['status']) => Promise<void>
   /** Alles vor dieser Position als erledigt abhaken — für den einmaligen Einstieg. */
   alleDavorErledigen: (sortIndex: number) => Promise<void>
+  /** Mehrere Zeilen auf einmal als verschickt verbuchen (Postfach-Abgleich, 17.08.). */
+  erledigeViele: (ids: string[]) => Promise<void>
 }
 
 /** Versandfertige LinkedIn-Erstnachrichten aus dem Vault (Migration 0060). */
@@ -116,5 +118,27 @@ export function useErstnachrichten(brandSlug: string | undefined): Result {
     [brandId, reload],
   )
 
-  return { items, loading, tableMissing, error, reload, setzeStatus, alleDavorErledigen }
+  /**
+   * Der Postfach-Abgleich schreibt in einem Rutsch zurück: Wer nachweislich
+   * einen Thread hat, ist verschickt. Kevin löst das per Klick aus — automatisch
+   * geschriebene Statuszeilen wären nicht mehr zu unterscheiden von seinen.
+   */
+  const erledigeViele = useCallback(
+    async (ids: string[]) => {
+      if (!supabase || ids.length === 0) return
+      const jetzt = new Date().toISOString()
+      setItems((cur) =>
+        cur.map((i) => (ids.includes(i.id) ? { ...i, status: 'gesendet' as const, sent_at: jetzt } : i)),
+      )
+      const { error: err } = await supabase
+        .from('linkedin_erstnachrichten')
+        .update({ status: 'gesendet', sent_at: jetzt })
+        .in('id', ids)
+      if (err) setError(err.message)
+      await reload()
+    },
+    [reload],
+  )
+
+  return { items, loading, tableMissing, error, reload, setzeStatus, alleDavorErledigen, erledigeViele }
 }

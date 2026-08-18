@@ -45,6 +45,32 @@ const MUSTER = [
     handeln: false,
   },
   {
+    /**
+     * 18.08.: Zeitlimit UND null Ereignisse ist kein zu langsamer Agent,
+     * sondern ein Lauf, der nie angelaufen ist — der Mac lag im DarkWake, die
+     * CLI kam nicht zu einem einzigen Zug. Steht vor 'zeitlimit', sonst
+     * schluckt das allgemeinere Muster den Fall, und trägt einen eigenen
+     * Schlüssel, weil `routineGuard` dafür einen eigenen Deckel führt: Vier
+     * solche Fehlstarts hatten am 18.08. den Morgenbrief für den ganzen Tag
+     * gesperrt, obwohl kein einziger Versuch stattgefunden hatte.
+     */
+    schluessel: 'fehlstart',
+    test: /Zeitlimit\s+\d+\s+Minuten|Exit 143/i,
+    /**
+     * Der Beleg ist der **Werkzeug**-Zähler, nicht der Ereignis-Zähler. Von den
+     * vier Läufen am 18.08. hatten drei null Ereignisse, der vierte zwei — aber
+     * beide mit Zeitstempel `[+17:13]`, also siebzehn Minuten nach dem Start:
+     * Die CLI kam beim nächsten Aufwacher gerade noch dazu, ihre Sitzung zu
+     * eröffnen, bevor der Kill sie traf. Ohne einen einzigen Werkzeug-Aufruf
+     * hat kein Agent gearbeitet — es gibt schlicht nichts, was zehn Minuten
+     * gedauert haben könnte.
+     */
+    und: /·\s*0 Werkzeug-Aufrufe/,
+    kurz: 'Nicht angelaufen',
+    hinweis: 'Der Mac schlief beim Start — läuft, sobald er wach ist',
+    handeln: false,
+  },
+  {
     schluessel: 'zeitlimit',
     // Der Runner schreibt das selbst in die Kopfzeile („Exit 143 — Zeitlimit 10 Minuten").
     test: /Zeitlimit\s+\d+\s+Minuten|Exit 143/i,
@@ -76,6 +102,11 @@ export function laufGrund(text) {
 
   for (const m of MUSTER) {
     if (!m.test.test(text)) continue
+    // `und` schärft ein zu weites Muster (18.08.): Der Fehlstart trägt dieselbe
+    // Kopfzeile wie ein echtes Zeitlimit und unterscheidet sich nur an der
+    // Mitschrift. Fehlt die zweite Bedingung, greift weiter unten das
+    // allgemeinere Muster — deshalb `continue` statt Abbruch.
+    if (m.und && !m.und.test(text)) continue
     // Steht eine Zahl im Text, die die Meldung schärft (etwa die Dauer beim
     // Zeitlimit), gehört sie hinein — sonst rät man, ob zehn Minuten oder zwei
     // gemeint sind.

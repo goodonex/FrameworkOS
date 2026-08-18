@@ -311,6 +311,19 @@ const ERNTE_EXPR = `(() => {
  * steht, hat angenommen oder wurde zurückgezogen). Ein abgebrochener Lauf darf
  * das nie entscheiden.
  */
+async function sichtbarMachen(s, log = () => {}) {
+  try {
+    await s.befehl('Emulation.setFocusEmulationEnabled', { enabled: true })
+  } catch (e) {
+    log(`[netzwerk] Fokus-Emulation nicht aktiv (${e.message}) — bei unsichtbarem Fenster erntet der Lauf zu wenig`)
+  }
+  try {
+    await s.befehl('Page.setWebLifecycleState', { state: 'active' })
+  } catch {
+    /* Ältere Chrome-Fassungen kennen den Befehl nicht — dann trägt die Fokus-Emulation allein. */
+  }
+}
+
 export async function leseListe(seitenName, { maxRunden = MAX_RUNDEN, jetzt = new Date(), log = () => {} } = {}) {
   const seite = SEITEN[seitenName]
   if (!seite) throw new Error(`unbekannte Liste: ${seitenName}`)
@@ -326,6 +339,30 @@ export async function leseListe(seitenName, { maxRunden = MAX_RUNDEN, jetzt = ne
   } catch (e) {
     log(`[netzwerk] Tab nicht nach vorn zu holen (${e.message}) — Nachladen könnte ausbleiben`)
   }
+
+  /**
+   * Der Seite Sichtbarkeit vorspielen (18.08.2026).
+   *
+   * **Der Fehler, den das behebt.** Am 17.08. um 17:46 erntete derselbe Lauf
+   * 953 von 959 Einladungen. Am 18.08. um 07:05 waren es 10, um 11:38 dann 40 —
+   * und der Widerspruchs-Wächter meldete brav „12 fehlen", während in Wahrheit
+   * neunhundert fehlten. Am Tab gemessen: `document.visibilityState` stand auf
+   * **hidden**, die Seitenhöhe bei 739 Pixeln. LinkedIns Nachladen hängt an
+   * IntersectionObserver und rAF; beides drosselt Chrome in unsichtbaren
+   * Fenstern bis zum Stillstand. Nach fünf Runden ohne Zuwachs bricht die
+   * Schleife ab — sie hielt die Drosselung für das Ende der Liste.
+   *
+   * `Page.bringToFront` allein reicht nicht: Es holt den Tab INNERHALB seines
+   * Fensters nach vorn. Liegt das Sync-Chrome-Fenster hinter Kevins Arbeit,
+   * minimiert oder auf einem anderen Space, bleibt die Seite `hidden` — und
+   * genau so läuft dieses Fenster im Alltag, den ganzen Tag.
+   *
+   * `setFocusEmulationEnabled` sagt der Seite, sie sei sichtbar und fokussiert;
+   * `setWebLifecycleState('active')` verhindert zusätzlich das Einfrieren
+   * inaktiver Seiten. Beide sind reine Emulation im Renderer — sie reißen kein
+   * Fenster vor Kevins Bildschirm.
+   */
+  await sichtbarMachen(s, log)
 
   // Frisch laden. Eine Seite, die schon durchgescrollt wurde, legt nichts mehr
   // nach — sie blieb am 12.08. reproduzierbar stehen, egal wie lange man
@@ -350,6 +387,8 @@ export async function leseListe(seitenName, { maxRunden = MAX_RUNDEN, jetzt = ne
   }
   if (!bereit) throw new Error(`Liste ${seitenName} kam nach dem Laden nicht hoch`)
   await s.befehl('Page.bringToFront').catch(() => {})
+  // Nach der Navigation erneut: der Renderer ist ein anderer als vorher.
+  await sichtbarMachen(s, log)
 
   const nachKey = new Map()
   let gesamt = null
@@ -369,6 +408,7 @@ export async function leseListe(seitenName, { maxRunden = MAX_RUNDEN, jetzt = ne
       try { s.schliessen() } catch {}
       s = sitzung(tab.webSocketDebuggerUrl)
       await new Promise((r) => setTimeout(r, 1500))
+      await sichtbarMachen(s, log)
       continue
     }
     if (roh?.loginWall) return { loginWall: true, seite: seitenName }

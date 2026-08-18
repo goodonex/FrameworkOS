@@ -394,9 +394,50 @@ function schreibeQidCache(qid) {
   }
 }
 
+/**
+ * Der Seite Sichtbarkeit vorspielen (18.08.2026).
+ *
+ * Dieselbe Ursache wie in `netzwerk.mjs`, nur schwächer sichtbar: Das
+ * Sync-Chrome-Fenster liegt im Alltag hinter Kevins Arbeit, und Chrome drosselt
+ * unsichtbare Seiten bis zum Stillstand. Die Threads selbst holt dieser Sync
+ * per `fetch` — davon ist nichts betroffen. Aber der eine DOM-abhängige Schritt
+ * ist es: `listeAnstossen` muss die Liste dazu bringen, ihre Blätter-Query
+ * einmal selbst abzufeuern, damit wir sie abgreifen können. Klemmt der, syncht
+ * der Lauf nur die erste Seite — und niemand merkt es, weil es hier keine
+ * Gesamtzahl zum Vergleichen gibt.
+ *
+ * Reine Renderer-Emulation: Sie holt kein Fenster vor Kevins Bildschirm.
+ * Fehlschläge sind nicht schlimm genug für einen Abbruch — der Lauf ist dann
+ * höchstens so gut wie vorher.
+ */
+async function sichtbarMachen(wsUrl) {
+  const befehl = (method, params) =>
+    new Promise((fertig) => {
+      let ws
+      const zu = () => {
+        try { ws?.close() } catch {}
+        fertig()
+      }
+      const t = setTimeout(zu, 5000)
+      try {
+        ws = new WebSocket(wsUrl)
+      } catch {
+        clearTimeout(t)
+        return fertig()
+      }
+      ws.addEventListener('open', () => ws.send(JSON.stringify({ id: 1, method, params })))
+      ws.addEventListener('message', () => { clearTimeout(t); zu() })
+      ws.addEventListener('error', () => { clearTimeout(t); zu() })
+    })
+  await befehl('Page.bringToFront', {})
+  await befehl('Emulation.setFocusEmulationEnabled', { enabled: true })
+  await befehl('Page.setWebLifecycleState', { state: 'active' })
+}
+
 export async function syncThreads({ dryRun = false } = {}) {
   const startedAt = Date.now()
   const page = await findOrOpenMessaging()
+  await sichtbarMachen(page.webSocketDebuggerUrl)
   const cachedQid = leseQidCache()
   const result = await evaluate(page.webSocketDebuggerUrl, buildSyncExpr(cachedQid, SCAN_TAGE))
 

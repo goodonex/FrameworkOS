@@ -46,10 +46,24 @@ check(
 check('sie sagt, was zu tun ist', /claude/.test(anmeldung?.hinweis ?? ''))
 
 // --- 2. Der zweite echte Fall: Zeitlimit -------------------------------
-// Wortgleich aus 2026-08-12-072719-linkedin-antwort-entwuerfe.md.
+// Wortgleich aus 2026-08-14-061530-linkedin-antwort-entwuerfe.md.
+//
+// 18.08.: Hier stand vorher der Lauf vom 12.08. mit **0 Werkzeug-Aufrufen** —
+// der gilt seit dieser Runde als Fehlstart, weil er nie gearbeitet hat (siehe
+// den Kopf von `startBereit.mjs`). Ein echtes Zeitlimit braucht als Beleg einen
+// Lauf, der wirklich unterwegs war: vier gelesene Dateien, dann der Abbruch.
+// Gegenprobe an allen 15 Zeitlimit-Läufen im Vault: 12 ohne einen einzigen
+// Werkzeug-Aufruf (Fehlstarts), 3 mit — und nur die drei sind echte Zeitlimits.
 const ECHT_ZEITLIMIT = `# Run abgebrochen (Exit 143 — Zeitlimit 10 Minuten)
 
-**Mitschrift bis zum Abbruch** — 3 Ereignisse · 0 Werkzeug-Aufrufe`
+**Mitschrift bis zum Abbruch** — 12 Ereignisse · 4 Werkzeug-Aufrufe
+
+Read×4
+
+\`\`\`
+[+04:04] Sitzung gestartet · 29 Werkzeuge · /Users/kevinherrmann/Second Brain
+[+04:09] → Read  /Users/kevinherrmann/.claude/skills/herrmann-outreach/SKILL.md
+\`\`\``
 
 const zeitlimit = laufGrund(ECHT_ZEITLIMIT)
 check('das echte Zeitlimit wird erkannt', zeitlimit?.schluessel === 'zeitlimit')

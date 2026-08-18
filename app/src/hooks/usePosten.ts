@@ -71,7 +71,12 @@ export function usePosten(slug: string | undefined): UsePostenResult {
   const antwortListe = useMemo(() => antwortPosten(linkedinThreads.items, jetzt), [linkedinThreads.items, jetzt])
   const loomListe = useMemo(() => loomPosten(linkedinThreads.items), [linkedinThreads.items])
   const followupListe = useMemo(() => followupPosten(linkedinThreads.items, jetzt), [linkedinThreads.items, jetzt])
-  const erstnachrichtListe = useMemo(() => erstnachrichtPosten(erstnachrichten.items), [erstnachrichten.items])
+  // Threads gegenrechnen: eine verschickte Nachricht bleibt sonst ewig „offen",
+  // wenn Kevin sie vom Handy geschickt und den Haken nicht gesetzt hat (17.08.).
+  const erstnachrichtListe = useMemo(
+    () => erstnachrichtPosten(erstnachrichten.items, linkedinThreads.items),
+    [erstnachrichten.items, linkedinThreads.items],
+  )
 
   const quellen: PostenQuellen = useMemo(
     () => ({
