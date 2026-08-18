@@ -2,6 +2,33 @@
 
 **Stand:** 2026-08-18 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
 
+## **LIVE seit 18.08.2026, ~15:15 — Der Name ist jetzt ein Kopier-Griff**
+
+Kevins Nachtrag: „Ich muss den Namen anklicken können, um diesen zu kopieren.
+Ich muss auf LinkedIn erst nach dem Namen suchen und dann die Nachricht
+kopieren und einfügen."
+
+Der Name war bisher nur der Aufklapp-Schalter — markieren musste er von Hand,
+was am Handy am zuverlässigsten scheitert. Jetzt tut **ein** Tipp beides: Name
+in die Zwischenablage, Nachricht klappt darunter auf. Die Reihenfolge trägt
+das — Name (suchen) kommt vor Text (einfügen), und „Kopieren" überschreibt
+danach bewusst, nie andersherum. Rückmeldung am Desktop neben dem Namen, am
+Handy als erstes Meta-Element (dort ist neben dem Titel kein Platz).
+
+**Dazu eine Rückfallebene für BEIDE Kopier-Wege.** `navigator.clipboard`
+scheiterte im Vorschau-Browser reproduzierbar mit `NotAllowedError` (Safari ist
+hier historisch eigen); dann greift `execCommand` über ein unsichtbares
+Textfeld. Veraltet, aber es funktioniert genau dort, wo die moderne API
+aussteigt — und ein „Zwischenablage gesperrt" bei jedem zweiten Namen wäre in
+Kevins LinkedIn-Runde teurer als eine veraltete Zeile Code.
+
+**Am laufenden Cockpit belegt** (echter Klick, nicht synthetisch): die
+Zwischenablage ändert sich wirklich, „Name kopiert" erscheint (per
+MutationObserver nachgewiesen, die Anzeige steht nur 2 s), der Text klappt auf,
+und der Sperr-Hinweis bleibt weg — vor dem Fallback stand er da.
+
+---
+
 ## **LIVE seit 18.08.2026, ~14:40 — /sales wird der Tages-Flow** (Kevin: „von oben nach unten abarbeitbar")
 
 **LIVE auf Kevins Wort** („bitte alles zusammen live bringen“):
