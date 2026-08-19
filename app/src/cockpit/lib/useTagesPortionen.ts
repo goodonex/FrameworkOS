@@ -24,6 +24,14 @@ export interface PortionsZeile {
   datum: string // YYYY-MM-DD
   stufe: StufenId
   soll: number
+  /**
+   * 0075: Wann die Stufe an diesem Tag STAND — unabhängig davon, ob der Zähler
+   * das Soll erreicht hat. Am 18.08.2026 standen 37 von 39 Erstnachrichten im
+   * Zähler, weil Kevin zwei verworfen hat: Zeile grün, Streak gerissen. „Die
+   * Liste ist leer" lässt sich rückwirkend nicht rekonstruieren, also wird der
+   * Moment festgehalten.
+   */
+  erledigtAt: string | null
 }
 
 const HISTORIE_TAGE = 60
@@ -37,6 +45,13 @@ export interface TagesPortionen {
   tableMissing: boolean
   /** Schreibt fehlende Portionen für heute fest. Bereits vorhandene gewinnen. */
   friereEin: (portionen: Partial<Record<StufenId, number>>) => void
+  /**
+   * Hält fest, dass eine Stufe heute steht — einmal, beim ersten Mal. Ein
+   * späteres Zurückfallen (ein neuer Fall rutscht nach) löscht den Vermerk
+   * nicht: Kevin hat den Tag abgearbeitet, was danach reinkommt, ist Ware für
+   * morgen.
+   */
+  merkeErledigt: (stufen: StufenId[]) => void
 }
 
 function istPortionsStufe(stufe: string): stufe is StufenId {
@@ -66,7 +81,7 @@ export function useTagesPortionen(heute: string): TagesPortionen {
     const vonIso = von.toISOString().slice(0, 10)
     void sb
       .from('sales_tagesportionen')
-      .select('datum, stufe, soll')
+      .select('datum, stufe, soll, erledigt_at')
       .eq('user_id', userId)
       .eq('brand_id', brandId)
       .gte('datum', vonIso)
@@ -81,7 +96,14 @@ export function useTagesPortionen(heute: string): TagesPortionen {
         setHistorie(
           (data ?? [])
             .filter((z) => istPortionsStufe(z.stufe))
-            .map((z) => ({ datum: z.datum, stufe: z.stufe as StufenId, soll: z.soll })),
+            .map((z) => ({
+              datum: z.datum,
+              stufe: z.stufe as StufenId,
+              soll: z.soll,
+              // Die Spalte darf fehlen (Migration 0075 noch nicht eingespielt) —
+              // dann verhält sich alles wie vorher.
+              erledigtAt: (z as { erledigt_at?: string | null }).erledigt_at ?? null,
+            })),
         )
         setGeladen(true)
       })
@@ -115,7 +137,7 @@ export function useTagesPortionen(heute: string): TagesPortionen {
         const vorhanden = new Set(alt.filter((z) => z.datum === heute).map((z) => z.stufe))
         const neu = zeilen
           .filter((z) => !vorhanden.has(z.stufe))
-          .map((z) => ({ datum: z.datum, stufe: z.stufe, soll: z.soll }))
+          .map((z) => ({ datum: z.datum, stufe: z.stufe, soll: z.soll, erledigtAt: null }))
         return neu.length ? [...alt, ...neu] : alt
       })
       void supabase
@@ -130,5 +152,43 @@ export function useTagesPortionen(heute: string): TagesPortionen {
     [userId, brandId, heute, tableMissing],
   )
 
-  return { heutige, historie, geladen, tableMissing, friereEin }
+  /** Je Stufe höchstens ein Schreibversuch pro Mount. */
+  const erledigtGemerkt = useRef<Set<string>>(new Set())
+
+  const merkeErledigt = useCallback(
+    (stufen: StufenId[]) => {
+      if (!supabase || !userId || !brandId || tableMissing) return
+      const offen = stufen.filter((stufe) => !erledigtGemerkt.current.has(`${heute}|${stufe}`))
+      if (offen.length === 0) return
+      for (const stufe of offen) erledigtGemerkt.current.add(`${heute}|${stufe}`)
+      const at = new Date().toISOString()
+      // Optimistisch mergen, damit die Streak nicht auf den Roundtrip wartet.
+      setHistorie((alteZeilen) =>
+        alteZeilen.map((z) =>
+          z.datum === heute && offen.includes(z.stufe) && z.erledigtAt == null
+            ? { ...z, erledigtAt: at }
+            : z,
+        ),
+      )
+      const sb = supabase
+      for (const stufe of offen) {
+        void sb
+          .from('sales_tagesportionen')
+          .update({ erledigt_at: at })
+          .eq('user_id', userId)
+          .eq('brand_id', brandId)
+          .eq('datum', heute)
+          .eq('stufe', stufe)
+          .is('erledigt_at', null)
+          .then(({ error }) => {
+            if (error && !isMissingSupabaseTableError(error.message)) {
+              console.warn('[tagesPortionen] erledigt-Vermerk fehlgeschlagen:', error.message)
+            }
+          })
+      }
+    },
+    [userId, brandId, heute, tableMissing],
+  )
+
+  return { heutige, historie, geladen, tableMissing, friereEin, merkeErledigt }
 }

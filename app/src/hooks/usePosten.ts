@@ -36,6 +36,8 @@ export interface UsePostenResult {
   tasks: ReturnType<typeof useTasks>
   linkedinThreads: ReturnType<typeof useLinkedinThreads>
   erstnachrichten: ReturnType<typeof useErstnachrichten>
+  /** Die Annahmen aus `linkedin_netzwerk` — Grundlage der Wochenkontrolle. */
+  netzwerk: ReturnType<typeof useLinkedinNetzwerk>
 }
 
 export function usePosten(slug: string | undefined): UsePostenResult {
@@ -113,7 +115,21 @@ export function usePosten(slug: string | undefined): UsePostenResult {
 
   const geordnet = useMemo(() => ordnePosten(quellen, jetzt), [quellen, jetzt])
 
-  return { geordnet, quellen, liegend, jetzt, contacts, projekte, tasks, linkedinThreads, erstnachrichten }
+  // `netzwerk` gehört mit hinaus: Die Wochenkontrolle (19.08.2026) braucht die
+  // Annahmen, und ein zweites Abonnement derselben Tabelle auf derselben Seite
+  // wäre ein zweiter Ladelauf für dieselben Daten.
+  return {
+    geordnet,
+    quellen,
+    liegend,
+    jetzt,
+    contacts,
+    projekte,
+    tasks,
+    linkedinThreads,
+    erstnachrichten,
+    netzwerk,
+  }
 }
 
 /** Wartende Entwürfe über alle Spuren — die Zahl fürs Heute-Deck. */

@@ -86,10 +86,26 @@ function vorDerAkquise(t: LinkedinThread): boolean {
  *   eine Antwort und gehört zurück in diese Spur.
  * - **Vor der Akquise** eingegangen → `AKQUISE_START`.
  */
+/**
+ * Ein Akquise-Versuch, vom Entwurfs-Agenten am Nachrichtentext erkannt
+ * (19.08.2026, Migration 0075).
+ *
+ * Der Wortlisten-Filter unten liest nur die LinkedIn-Headline, und die verrät
+ * die Absicht nicht: „Schritt für Schritt ein erfolgreiches Unternehmen
+ * aufbauen" (Verkäufer) und „90 Tage: Leben, Business und Energie im Einklang"
+ * (Coach) standen beide in Kevins Antworten-Spur. Sein Einwand: „Brauche ich
+ * bei den Antworten, die ich schnell rausschicken möchte, Leute, die mich
+ * akquirieren wollen?" Nein — sie stehen ab jetzt in der Klappe darunter.
+ */
+function istAkquiseVersuch(t: LinkedinThread): boolean {
+  return t.agent_urteil === 'akquise'
+}
+
 function wartetAufAntwort(t: LinkedinThread, heute: Date): boolean {
   if (bucketOf(t, heute) !== 'du_bist_dran') return false
   if (t.starred && t.loom_status === 'offen') return false
   if (vorDerAkquise(t)) return false
+  if (istAkquiseVersuch(t)) return false
   return true
 }
 
@@ -139,7 +155,12 @@ export function antwortPostenAusgeblendet(threads: LinkedinThread[], heute: Date
   return threads
     .filter((t) => bucketOf(t, heute) === 'du_bist_dran')
     .filter((t) => !(t.starred && t.loom_status === 'offen'))
-    .filter((t) => vorDerAkquise(t) || !istArbeitsVorrat(icpUrteil(t.company, t.name).urteil))
+    .filter(
+      (t) =>
+        vorDerAkquise(t) ||
+        istAkquiseVersuch(t) ||
+        !istArbeitsVorrat(icpUrteil(t.company, t.name).urteil),
+    )
     .map((t) => ({
       ...threadZuPosten(t, 'antwort', 'thread', t.preview || `Antwort an ${t.name || 'den Lead'} vorbereiten.`),
       entwurf: entwurfVon(t),

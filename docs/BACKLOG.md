@@ -1,6 +1,64 @@
 # Uriel — Backlog (die eine Quelle der Wahrheit)
 
-**Stand:** 2026-08-18 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
+**Stand:** 2026-08-19 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
+
+## **FERTIG 19.08.2026 — Die Antworten-Spur zeigte die falschen Leute UND schrieb den falschen Ton**
+
+Kevin ist die Spur einmal komplett durchgegangen. Fünf Befunde, alle an
+Prod-Daten belegt, alle behoben (Migration **0075**):
+
+**1 · Die Streak riss, obwohl der Tag stand.** Am 18.08. standen 37 von 39
+Erstnachrichten im Zähler, weil Kevin zwei verworfen statt gesendet hat. Die
+Zeile war grün („Liste leer"), die Serie zählte nur „Zähler ≥ Soll" und brach.
+`sales_tagesportionen.erledigt_at` hält jetzt den Moment fest, in dem eine
+Stufe steht; `stufeGruenAnTag` liest ihn und sticht damit den Zähler. Der
+18.08. wurde von Hand nachgetragen. **0 von 0 zählte bereits korrekt** — die
+Portion wird mit `soll: 0` eingefroren, und eine leere Pflicht ist erfüllt.
+
+**2 · Der ICP-Filter liest die Headline, und die lügt.** „90 Tage: Leben,
+Business und Energie im Einklang" (Coach) bekam einen Entwurf, „Lizenzpartner
+Evernest" nicht. Wer da schreibt, steht nur in der **Nachricht** — und die
+liest allein der Agent. Er vergibt jetzt je Thread ein `agent_urteil`
+(`lead` / `kontakt` / `akquise`), das an den Thread geschrieben wird.
+`akquise` fliegt dauerhaft aus der Spur (Anzeige **und** nächster Lauf) und
+steht aufklappbar darunter. Die Wortlisten bleiben als Vorfilter.
+
+**3 · Fünf echte Makler hatten nie einen Entwurf.** Cäcilia Page, Janis
+Stomeo, Natalie Kloppe, Silvio Tantulli (35–22 Tage). `ANTWORT_MAX` von 10 auf
+**18** — der Lauf vom 19.08. brauchte für zehn Entwürfe 2:21 Min, das passt.
+
+**4 · Der Ton war der eines Bittstellers.** 14 von 31 Altentwürfen enthielten
+eine verbotene Floskel. Kevins Urteil zu „dann lass ich dich in Ruhe": *„Das
+zeigt schon, dass ich das Gefühl habe, jemand zu sein, der stört."* Zu „Sie
+wissen, wo Sie mich finden": *„Die wird sich niemals bei mir melden, niemals.
+In der Zeit haben schon fünfzehn Leute zwischenzeitlich bei der angerufen."*
+Der Skill `linkedin-antwort-entwuerfe` hat jetzt eine Verbotstabelle
+(Entschuldigung für Verspätung, Rückzugsfloskel, Empfehlungsbitte,
+konstruierter Lebenslauf-Bezug) und eine Haltung zur Absage: **eine** charmante,
+leicht ungläubige Rückfrage statt Rückzug — *„nur weil jemand einmal sagt, hab
+ich keinen Bock drauf, heißt das noch lange nicht, dass er es nicht braucht."*
+
+**5 · „älteste 219 Tage" nannte keinen Namen.** Kevins Frage: *„Welcher von
+denen ist jetzt 219 Tage alt?"* Die Zeile nennt jetzt die Person.
+
+### Neu: die Wochenkontrolle (`wochenkontrolle.ts`, Zeile „Neben dem Ritual")
+
+Kevins Bauchschmerz: *„Wir entwickeln viele Regeln, die die falschen Leute
+raushalten. Aber ich bin mir nicht sicher, ob die Leute, die rein müssen, auch
+wirklich reingekommen sind."* Jede andere Ansicht zeigt, wer **drin** ist —
+diese zeigt für sieben Tage, wer angenommen hat und **nicht** angeschrieben
+wurde, getrennt nach *aussortiert* (die einzige Liste, in der ein Fehler
+stecken kann — mit Headline und auslösendem Filterwort), *noch offen* und
+*angeschrieben*. Keine zweite Wahrheit: die Zuordnung kommt aus
+`angenommenOhneErstnachricht`, das Urteil aus `icp.ts`.
+
+**Prüfbar:** `verify-wochenkontrolle` (14), `verify-sales-streak` (29, drei
+neue Fälle), dazu unverändert grün: `verify-antwort-entwuerfe`,
+`verify-entwuerfe`, `verify-icp`, `verify-tages-flow`.
+
+**Offen:** Die 31 Altentwürfe im alten Ton hängen noch an den Threads — der
+Agent überspringt sie, weil sie „frisch" sind. Sie müssen einmal geleert
+werden, damit der neue Skill sie ersetzt. Sicherung liegt im Scratchpad.
 
 ## **FERTIG 18.08.2026, ~18:30 — Die Antworten-Spur zeigte 29, gearbeitet wird an 11**
 

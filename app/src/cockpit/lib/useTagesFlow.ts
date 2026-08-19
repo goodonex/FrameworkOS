@@ -123,5 +123,27 @@ export function useTagesFlow(
     () => stufenStaende({ today, ...quellen, portionen: portionen.heutige, ziele }),
     [today, quellen, portionen.heutige, ziele],
   )
-  return { staende, laedt: quelleLaedt || !geladen || !portionen.geladen, portionen }
+
+  const laedt = quelleLaedt || !geladen || !portionen.geladen
+
+  /**
+   * Der Gegen-Vermerk zum Einfrieren (0075, 19.08.2026): Steht eine Stufe,
+   * wird das FESTGEHALTEN — nicht nur angezeigt.
+   *
+   * Grund: Die Zeile wird auch grün, wenn die Liste leerläuft, ohne dass der
+   * Zähler das Soll erreicht (Kevin verwirft eine Erstnachricht, statt sie zu
+   * senden). Die Streak sah davon nichts und riss am 18.08. bei 37 von 39.
+   * Rückwirkend ist „die Liste war leer" nicht rekonstruierbar, also muss der
+   * Moment mitgeschrieben werden, in dem er wahr ist.
+   */
+  useEffect(() => {
+    if (laedt || portionen.tableMissing) return
+    const fertig = staende
+      .filter((s) => s.erledigt && (PORTION_STUFEN as readonly string[]).includes(s.stufe.id))
+      .map((s) => s.stufe.id)
+    if (fertig.length) portionen.merkeErledigt(fertig)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- festgehalten wird der Moment, nicht jede Neuberechnung
+  }, [laedt, portionen.tableMissing, staende])
+
+  return { staende, laedt, portionen }
 }

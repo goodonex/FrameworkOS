@@ -44,6 +44,78 @@ export function parseDraftsRoh(content) {
 }
 
 /**
+ * Zieht die Urteile aus demselben ```json-Block (19.08.2026).
+ *
+ * Warum der Agent das überhaupt entscheidet: Der Wortlisten-Filter
+ * (`icpRegeln.json`) sieht nur die LinkedIn-Headline. „90 Tage: Leben, Business
+ * und Energie im Einklang" ist ein Coach, „Schritt für Schritt ein
+ * erfolgreiches Unternehmen aufbauen" ein Verkäufer — beide standen in Kevins
+ * Antworten-Spur, beide bekamen Entwürfe. Wer da schreibt, steht in der
+ * NACHRICHT, und die liest nur der Agent. Sein Urteil wird an den Thread
+ * geschrieben, damit die Fehleinschätzung nicht jeden Morgen neu entsteht.
+ *
+ * Unbekannte Urteilswerte werden verworfen, nicht gerettet: Ein Tippfehler
+ * würde sonst als Constraint-Fehler den ganzen Lauf killen, dessen Entwürfe
+ * längst brauchbar sind.
+ */
+const URTEILE = new Set(['lead', 'kontakt', 'akquise'])
+
+export function parseUrteileRoh(content) {
+  if (!content) return []
+  const blocks = [...String(content).matchAll(/```json\s*([\s\S]*?)```/g)]
+  if (!blocks.length) return []
+  let parsed
+  try {
+    parsed = JSON.parse(blocks[blocks.length - 1][1])
+  } catch {
+    return []
+  }
+  const arr = Array.isArray(parsed?.urteile) ? parsed.urteile : []
+  const out = []
+  for (const u of arr) {
+    if (!u || typeof u !== 'object') continue
+    const key = typeof u.thread_key === 'string' ? u.thread_key.trim() : ''
+    const urteil = typeof u.urteil === 'string' ? u.urteil.trim().toLowerCase() : ''
+    if (!key || !URTEILE.has(urteil)) continue
+    out.push({ thread_key: key, urteil })
+  }
+  return out
+}
+
+/**
+ * Schreibt die Urteile an die Threads. Eigener Durchgang statt Huckepack auf
+ * den Entwürfen: Ein `akquise`-Thread bekommt gerade KEINEN Entwurf — sein
+ * Urteil ist aber das wertvollste, weil er dadurch morgen nicht mehr vorgelegt
+ * wird.
+ *
+ * Fehler hier beenden den Lauf nicht: die Entwürfe hängen schon, und ein
+ * fehlendes Urteil kostet nur eine Zeile zu viel in der Liste.
+ */
+export async function schreibeUrteile({ supabaseUrl, headers, brandId, urteile }) {
+  const at = new Date().toISOString()
+  let geschrieben = 0
+  for (const u of urteile) {
+    try {
+      const res = await fetch(
+        `${supabaseUrl}/rest/v1/linkedin_threads?brand_id=eq.${brandId}` +
+          `&thread_key=eq.${encodeURIComponent(u.thread_key)}`,
+        {
+          method: 'PATCH',
+          headers: { ...headers, Prefer: 'return=representation' },
+          body: JSON.stringify({ agent_urteil: u.urteil, agent_urteil_at: at }),
+        },
+      )
+      if (!res.ok) continue
+      const zeilen = await res.json()
+      if (zeilen.length) geschrieben++
+    } catch {
+      // Ein Urteil ist Zusatznutzen, kein Liefergegenstand.
+    }
+  }
+  return { geschrieben }
+}
+
+/**
  * Schreibt je Entwurf eine Zeile fort. Bewusst PATCH je thread_key statt eines
  * Sammel-Upserts: die Zeilen existieren bereits, und ein Upsert würde bei einem
  * Tippfehler im thread_key stillschweigend eine halbe Geister-Zeile anlegen.

@@ -438,7 +438,19 @@ export interface LinkedinThread {
   entwurf_at?: string | null
   /** 0065: Run, aus dem der Entwurf stammt (Nachvollziehbarkeit). */
   entwurf_run_id?: string | null
+  /**
+   * 0075: Was der Entwurfs-Agent nach dem Lesen der NACHRICHT über die Person
+   * urteilt — die Headline allein reicht nicht (`icpRegeln.json` hielt Coaches
+   * für Leads und Makler für Fremde). `null` = noch nicht beurteilt und zählt
+   * wie `lead`; `akquise` fliegt aus der Antworten-Spur.
+   */
+  agent_urteil?: AgentUrteil | null
+  /** 0075: wann das Urteil entstand. */
+  agent_urteil_at?: string | null
 }
+
+/** 0075: Urteil des Entwurfs-Agenten über den Absender eines Threads. */
+export type AgentUrteil = 'lead' | 'kontakt' | 'akquise'
 
 export type SalesFieldType = 'textarea' | 'text' | 'number' | 'toggle'
 

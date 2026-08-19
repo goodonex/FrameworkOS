@@ -190,6 +190,53 @@ check(
   `Mo+Di beurteilt grün; Fr ohne Portion kostet das Freeze, Do beendet. Ist: ${JSON.stringify(s7)}`,
 )
 
+// --- 7b. Der erledigt-Vermerk sticht den Zähler (0075) ---------------------
+// Kevins Fall vom 18.08.2026: 37 von 39 Erstnachrichten im Zähler, weil er zwei
+// verworfen statt gesendet hat. Die Zeile war grün („Liste leer"), die Serie
+// riss. Der Vermerk hält genau diesen Moment fest.
+const mitVermerk = bereiteDatenVor(
+  [
+    { datum: DI, li_nachrichten: 37 },
+    { datum: MO, li_nachrichten: 12 },
+  ],
+  [
+    { datum: DI, stufe: 'erstnachrichten', soll: 39, erledigtAt: '2026-08-18T18:41:00Z' },
+    { datum: MO, stufe: 'erstnachrichten', soll: 12 },
+  ],
+)
+const s8 = salesSerie(ERSTNACHRICHTEN, DI, mitVermerk)
+check(
+  'ein erledigt-Vermerk macht den Tag grün, auch wenn der Zähler unter dem Soll blieb',
+  s8.laenge === 2 && !s8.heuteOffen,
+  `37 von 39, aber Liste leer und vermerkt. Ist: ${JSON.stringify(s8)}`,
+)
+
+const ohneVermerk = bereiteDatenVor(
+  [
+    { datum: DI, li_nachrichten: 37 },
+    { datum: MO, li_nachrichten: 12 },
+  ],
+  [
+    { datum: DI, stufe: 'erstnachrichten', soll: 39 },
+    { datum: MO, stufe: 'erstnachrichten', soll: 12 },
+  ],
+)
+check(
+  'ohne Vermerk bleibt es beim alten Urteil — der Vermerk erfindet keine Serie',
+  salesSerie(ERSTNACHRICHTEN, DI, ohneVermerk).laenge === 1,
+  'Nur Montag zählt; Dienstag kostet das Freeze der Woche.',
+)
+
+const leererTag = bereiteDatenVor(
+  [{ datum: DI, li_nachrichten: 0 }],
+  [{ datum: DI, stufe: 'erstnachrichten', soll: 0 }],
+)
+check(
+  'ein Tag ohne offene Erstnachrichten (0 von 0) zählt als geschafft',
+  salesSerie(ERSTNACHRICHTEN, DI, leererTag).laenge === 1,
+  'Eine leere Pflicht ist erfüllt — sonst bestraft die Serie einen ruhigen Tag.',
+)
+
 // --- 8. Blatt-Disziplin ---------------------------------------------------
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'

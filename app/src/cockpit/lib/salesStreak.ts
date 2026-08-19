@@ -44,6 +44,11 @@ export interface PortionsTag {
   datum: string
   stufe: string
   soll: number
+  /**
+   * 0075: Der Tag, an dem die Stufe stand — auch ohne erreichten Zähler.
+   * `null`/fehlend heisst nur „kein Vermerk", nicht „nicht geschafft".
+   */
+  erledigtAt?: string | null
 }
 
 export interface SalesStreak {
@@ -76,14 +81,20 @@ export function isoWoche(iso: string): string {
 export interface StreakDaten {
   metrikJeTag: Map<string, MetrikTag>
   sollJeTagUndStufe: Map<string, number>
+  /** Schlüssel `datum|stufe` aller Tage mit gesetztem `erledigt_at`. */
+  erledigtJeTagUndStufe: Set<string>
 }
 
 export function bereiteDatenVor(metriken: MetrikTag[], portionen: PortionsTag[]): StreakDaten {
   const metrikJeTag = new Map<string, MetrikTag>()
   for (const m of metriken) metrikJeTag.set(m.datum, m)
   const sollJeTagUndStufe = new Map<string, number>()
-  for (const p of portionen) sollJeTagUndStufe.set(`${p.datum}|${p.stufe}`, p.soll)
-  return { metrikJeTag, sollJeTagUndStufe }
+  const erledigtJeTagUndStufe = new Set<string>()
+  for (const p of portionen) {
+    sollJeTagUndStufe.set(`${p.datum}|${p.stufe}`, p.soll)
+    if (p.erledigtAt) erledigtJeTagUndStufe.add(`${p.datum}|${p.stufe}`)
+  }
+  return { metrikJeTag, sollJeTagUndStufe, erledigtJeTagUndStufe }
 }
 
 /**
@@ -93,6 +104,22 @@ export function bereiteDatenVor(metriken: MetrikTag[], portionen: PortionsTag[])
  */
 export function stufeGruenAnTag(stufe: Stufe, datum: string, daten: StreakDaten): boolean | null {
   if (stufe.art === 'frische' || stufe.feld === null) return null
+
+  /**
+   * Der Vermerk sticht jeden Zähler (0075, 19.08.2026).
+   *
+   * Die Oberfläche kennt drei Wege zu grün — Soll erreicht, Soll war 0, oder
+   * die LISTE IST LEER (`offenJetzt === 0`). Die Streak kannte nur die ersten
+   * beiden und riss deshalb genau dort, wo Kevin sauber gearbeitet hatte: am
+   * 18.08. standen 37 von 39 Erstnachrichten im Zähler, weil er zwei verworfen
+   * hat statt sie zu senden. Zeile grün, Serie kaputt — und eine Serie, die
+   * unfair reisst, wird ignoriert statt gejagt.
+   *
+   * Rückwirkend ist „war die Liste leer?" nicht rekonstruierbar. Also hält die
+   * Oberfläche den Moment fest, in dem die Stufe stand, und hier wird er
+   * gelesen.
+   */
+  if (daten.erledigtJeTagUndStufe.has(`${datum}|${stufe.id}`)) return true
 
   const wertRoh = daten.metrikJeTag.get(datum)?.[stufe.feld]
   const wert = typeof wertRoh === 'number' && Number.isFinite(wertRoh) ? wertRoh : 0

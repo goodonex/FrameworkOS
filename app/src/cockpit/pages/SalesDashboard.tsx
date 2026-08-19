@@ -25,6 +25,8 @@ import {
   type StufenStand,
 } from '../lib/tagesFlow'
 import { useTagesFlow } from '../lib/useTagesFlow'
+import { wochenkontrolle } from '../lib/wochenkontrolle'
+import { WochenkontrolleTafel } from '../components/linkedin/WochenkontrolleTafel'
 import { useUiSetting } from '../lib/uiSettings'
 import { tagesansage } from '../lib/tagesansage'
 import { postRun } from '../lib/runnerApi'
@@ -374,7 +376,7 @@ export function SalesDashboard() {
   // Posten-Verdrahtung liegt seit Etappe 3 im gemeinsamen Hook — das Heute-Deck
   // liest exakt dieselbe Rangfolge.
   const posten = usePosten(slug)
-  const { geordnet, quellen, liegend, jetzt, tasks, linkedinThreads, erstnachrichten } = posten
+  const { geordnet, quellen, liegend, jetzt, tasks, linkedinThreads, erstnachrichten, netzwerk } = posten
   /**
    * Laden noch Quellen? Dann ist `geordnet` nur ein Zwischenstand (O18).
    * Wichtig fuer `?modus=arbeit` unten — sonst startet der Arbeitsmodus mit den
@@ -731,6 +733,26 @@ export function SalesDashboard() {
   const antwortenAelteste = flowLive.antworten?.aeltesteStunden ?? null
   const antwortenAbgestanden = antwortenAelteste !== null && antwortenAelteste >= 24
 
+  /**
+   * WER am längsten wartet, nicht nur wie lange (19.08.2026).
+   *
+   * „älteste 219 Tage" war Kevins Frage: „Welcher von denen ist jetzt 219 Tage
+   * alt?" Eine Zahl ohne Namen zwingt zum Aufklappen und Suchen — und wirkt
+   * dabei wie ein Alarm, obwohl dahinter meist ein Altfall steht. Mit dem Namen
+   * ist die Zeile in einem Blick erledigt.
+   */
+  const antwortenAeltester = useMemo(() => {
+    let aeltester: Posten | null = null
+    let aeltesteZeit = Number.POSITIVE_INFINITY
+    for (const p of antwortListe) {
+      const t = p.timestamp ? new Date(p.timestamp).getTime() : Number.NaN
+      if (!Number.isFinite(t) || t >= aeltesteZeit) continue
+      aeltesteZeit = t
+      aeltester = p
+    }
+    return aeltester
+  }, [antwortListe])
+
   /** Die sechs Zeilen des Rituals — Reihenfolge ist `TAGES_FLOW`, nicht Meinung. */
   const flowZeilen: FlowZeileDef[] = TAGES_FLOW.map((stufe, index): FlowZeileDef => {
     const nummer = index + 1
@@ -774,12 +796,14 @@ export function SalesDashboard() {
             : zahl(
                 (antwortenStand?.wert ?? 0) === 0
                   ? 'Niemand wartet'
-                  : `${antwortenStand?.wert} warten · älteste ${
+                  : `${antwortenStand?.wert} warten · am längsten ${
+                      antwortenAeltester ? antwortenAeltester.name : 'unbekannt'
+                    }${
                       antwortenAelteste === null
-                        ? '—'
+                        ? ''
                         : antwortenAelteste < 48
-                          ? `${Math.max(1, Math.round(antwortenAelteste))} h`
-                          : `${Math.round(antwortenAelteste / 24)} Tage`
+                          ? ` (${Math.max(1, Math.round(antwortenAelteste))} h)`
+                          : ` (${Math.round(antwortenAelteste / 24)} Tage)`
                     }`,
               ),
           kennzahlFarbe: !flow.laedt && antwortenAbgestanden ? 'var(--ck-warn)' : undefined,
@@ -868,6 +892,26 @@ export function SalesDashboard() {
   })
 
   /**
+   * Die Wochenkontrolle (19.08.2026) — die Gegenprobe zu allen Filtern.
+   *
+   * Kevins Bauchschmerz: „Ich bin mir nicht sicher, ob die Leute, die in die
+   * Liste rein müssen, auch wirklich reingekommen sind." Jede andere Zeile
+   * zeigt, wer drin ist; diese zeigt, wer NICHT angeschrieben wurde und warum.
+   * Bewusst „neben dem Ritual" und ohne Alarm-Optik: sie ist eine Prüfung für
+   * den Freitag, kein Posten für heute.
+   */
+  const kontrolle = useMemo(
+    () =>
+      wochenkontrolle(
+        netzwerk.items,
+        linkedinThreads.items,
+        erstnachrichten.items,
+        jetzt,
+      ),
+    [netzwerk.items, linkedinThreads.items, erstnachrichten.items, jetzt],
+  )
+
+  /**
    * Der Projekte-Block — bewusst UNTER dem Ritual und bewusst leise: bei
    * Reichentrog wartet Kevin auf den Kollegen, da ist kein Handgriff. Eine
    * Alarm-Optik hier wäre Druck ohne Funktion (Kevins Wort vom 18.08.:
@@ -900,6 +944,22 @@ export function SalesDashboard() {
       unterzeile: liegend.length > 0 ? 'Ansehen — nachfassen oder bewusst warten.' : undefined,
       inhalt: liste(kundeLiegtListe),
       fensterAktion: mobilArbeitsmodus('kunde_liegt', kundeLiegtListe),
+    },
+    {
+      id: 'wochenkontrolle',
+      titel: 'Wochenkontrolle',
+      zustand: 'ruhig',
+      kennzahl: zahl(
+        kontrolle.alle.length === 0
+          ? 'Keine Annahmen'
+          : `${kontrolle.alle.length} angenommen · ${kontrolle.angeschrieben.length} angeschrieben` +
+              (kontrolle.aussortiert.length > 0 ? ` · ${kontrolle.aussortiert.length} aussortiert` : ''),
+      ),
+      unterzeile:
+        kontrolle.aussortiert.length > 0
+          ? 'Prüfen, ob unter den Aussortierten ein Makler steht.'
+          : 'Sieben Tage: wer angenommen hat und wer angeschrieben wurde.',
+      inhalt: () => <WochenkontrolleTafel kontrolle={kontrolle} />,
     },
   ]
 

@@ -17,7 +17,7 @@ import { syncThreads, TIEFENSCAN_TAGE } from './linkedin/sync.mjs'
 import { upsertThreads } from './linkedin/upsert.mjs'
 import { ladeErstnachrichten } from './linkedin/erstnachrichten.mjs'
 import { baueAntwortInput, holeAntwortThreads } from './linkedin/antwortThreads.mjs'
-import { parseDraftsRoh, schreibeEntwuerfe } from './linkedin/entwuerfe.mjs'
+import { parseDraftsRoh, parseUrteileRoh, schreibeEntwuerfe, schreibeUrteile } from './linkedin/entwuerfe.mjs'
 import { neuerLauf, nimmBrocken, protokollText } from './agentStream.mjs'
 import { bewerteTagesLaeufe, darfRoutineStarten } from './routineGuard.mjs'
 import { laufGrund } from './laufGrund.mjs'
@@ -575,7 +575,11 @@ async function entwuerfeAnThreads(runId, markdown) {
   if (!SNAPSHOT_ENABLED) return
   try {
     const drafts = parseDraftsRoh(markdown)
-    if (!drafts.length) {
+    const urteile = parseUrteileRoh(markdown)
+    // Ein Lauf ohne Entwürfe kann trotzdem etwas wert sein: Sind alle
+    // vorgelegten Threads Akquise-Versuche, ist die Urteilsliste das ganze
+    // Ergebnis — und genau die hält sie morgen aus Kevins Spur.
+    if (!drafts.length && !urteile.length) {
       console.warn(`[runner] ${runId}: kein verwertbarer json-Block — keine Entwürfe am Posten`)
       return
     }
@@ -586,6 +590,22 @@ async function entwuerfeAnThreads(runId, markdown) {
     )
     const [brand] = br.ok ? await br.json() : []
     if (!brand?.id) return
+
+    if (urteile.length) {
+      const u = await schreibeUrteile({
+        supabaseUrl: SUPABASE_URL,
+        headers: supabaseHeaders(),
+        brandId: brand.id,
+        urteile,
+      })
+      const akquise = urteile.filter((x) => x.urteil === 'akquise').length
+      console.log(
+        `[runner] Urteile am Thread: ${u.geschrieben} geschrieben` +
+          (akquise ? ` · ${akquise} als Akquise-Versuch aussortiert` : ''),
+      )
+    }
+
+    if (!drafts.length) return
 
     const r = await schreibeEntwuerfe({
       supabaseUrl: SUPABASE_URL,

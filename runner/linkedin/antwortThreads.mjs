@@ -21,8 +21,16 @@ import { icpUrteil, istArbeitsVorrat } from './icp.mjs'
  * **Von 20 auf 10 gesenkt am 14.08.2026.** Der Lauf ist seit dem 04.08. jeden
  * Morgen ins 10-Minuten-Limit gerannt („ZEITLIMIT ERREICHT") und hat damit gar
  * nichts geliefert. Zehn fertige Entwürfe sind mehr als zwanzig abgebrochene.
+ *
+ * **Am 19.08.2026 auf 18 angehoben.** Kevins Befund: In seiner Antworten-Spur
+ * standen echte Makler ohne Entwurf (Evernest-Lizenzpartner, Kloppestates),
+ * weil der Deckel vor ihnen zuging — „ich versteh gar nicht, warum da kein
+ * Entwurf da ist, so bringt mir das Ganze nix." Der Lauf vom 19.08. brauchte
+ * für zehn Entwürfe 2:21 Minuten; 18 passen mit Reserve ins 10-Minuten-Limit.
+ * Zugleich schrumpft der Vorrat dauerhaft, weil `agent_urteil = 'akquise'`
+ * unten dauerhaft aussortiert.
  */
-export const ANTWORT_MAX = 10
+export const ANTWORT_MAX = 18
 
 /**
  * Hat der Thread schon einen brauchbaren Entwurf?
@@ -58,6 +66,23 @@ export function hatFrischenEntwurf(thread) {
  */
 function istZielgruppe(thread) {
   return istArbeitsVorrat(icpUrteil(thread.company, thread.name).urteil)
+}
+
+/**
+ * Hat der Agent den Thread schon als Akquise-Versuch erkannt? (19.08.2026)
+ *
+ * Der Wortlisten-Filter oben sieht nur die Headline, und die verrät die
+ * Absicht oft nicht: „Schritt für Schritt ein erfolgreiches Unternehmen
+ * aufbauen" liest sich harmlos — im Chat steht ein Verkaufsversuch. Wer da
+ * schreibt, weiss nur, wer die NACHRICHT gelesen hat. Genau das tut der Agent,
+ * und sein Urteil (Migration 0075) gilt ab dann dauerhaft: Kevin soll denselben
+ * Verkäufer nicht jeden Morgen erneut vorgelegt bekommen.
+ *
+ * Bewusst ohne Verfallsdatum. Schreibt ein Akquisiteur erneut, ist er immer
+ * noch Akquisiteur — eine zweite Nachricht macht aus ihm keinen Lead.
+ */
+function istAkquiseVersuch(thread) {
+  return thread.agent_urteil === 'akquise'
 }
 
 /** Endzustände: hier ist nichts mehr zu tun (Spiegel von `isTerminal`). */
@@ -149,7 +174,7 @@ export async function holeAntwortThreads({ supabaseUrl, headers, brandSlug = 'he
   const rows = await res.json()
 
   const wartend = rows.filter((t) => istDuBistDran(t, now))
-  const threads = wartend.filter(istZielgruppe)
+  const threads = wartend.filter((t) => istZielgruppe(t) && !istAkquiseVersuch(t))
   // Die Zahl gehört ins Lauf-Ergebnis, nicht ins Nichts: Wenn der Filter eines
   // Tages zu scharf greift, sieht man es an dieser Zeile und nicht daran, dass
   // ein Kunde nie eine Antwort bekam.
