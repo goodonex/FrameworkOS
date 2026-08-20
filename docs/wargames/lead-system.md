@@ -2,7 +2,8 @@
 
 **Erstellt:** 2026-08-20 · **Planer:** Fable 5 · **Überarbeitet nach Kevins Korrekturen:** Opus 5
 **Executor:** Opus 5 auf `xhigh` (blind ausführbar) · **Branch:** `cockpit-rebuild`
-**Repo:** `~/Kevin OS/02 Projekte/uriel` · **Status:** FREIGEGEBEN in der Sache (V1–V3 beantwortet), Umsetzung auf Kevins Startwort.
+**Repo:** `~/Kevin OS/02 Projekte/uriel` · **Status:** ✅ **UMGESETZT am 20.08.2026** (Z0–Z7). Ergebnisse und Abweichungen
+stehen unten unter „Was tatsächlich passiert ist".
 
 ---
 
@@ -291,3 +292,79 @@ die „hier, tausend Leute"-Liste für einen Mitarbeiter.
   Nie-Annehmer werden damit **E-Mail-Kandidaten** (nicht InMail-Kandidaten) —
   genau Kevins Punkt, dass ein voller InMail-Stapel demotiviert, den er nie
   abarbeiten kann. ✅
+
+
+---
+
+## Was tatsächlich passiert ist (20.08.2026)
+
+**Z0 · RECON — die Erwartung war falsch, und das hat den Entwurf gerettet.**
+Die Blaupause rechnete mit einer URL-Match-Quote über 80 %. Gemessen: **0 %**.
+LinkedIn gibt zwei Sorten IDs aus, die sich nicht überschneiden — die
+Einladungsliste lesbare Slugs (`anton-bachhaeubl-45a96920b`), das Postfach
+opake IDs (`ACoAACAUWC4B…`). Ein „erst URL, dann Name"-Verheirater wäre in der
+Praxis immer beim Namen gelandet, nur mit dem falschen Gefühl von Sicherheit.
+Der Name trägt: 230 von 239 Threads eindeutig, 2 mehrdeutig, 7 ohne Treffer.
+Daraus die Konsequenz im Entwurf: **`li_urn` ist kein Suchschlüssel, sondern
+ein Gedächtnis** — einmal zugeordnet, festgeschrieben, danach unabhängig vom
+Namen.
+
+**Z1 · Migration 0076** eingespielt über `db push`, genau eine Migration, wie
+das Gesetz es verlangt. Historie 0001–0076 lückenlos.
+
+**Z2 · Backfill.** 1693 Leads (1686 aus dem Netzwerk, 7 nur aus dem Postfach),
+2036 verheiratete Spiegel-Zeilen, 230 festgeschriebene opake IDs, 1996
+Ereignisse. **4 mehrdeutige Fälle** (0,2 %) bleiben bewusst unverbunden — weit
+unter der Abbruchgrenze von 5 %. Kein einziger Lead hat mehr als einen Thread,
+es wurde also nichts fälschlich verschmolzen.
+
+**Zwei Fehler, die erst der zweite Lauf gezeigt hat** — beide behoben:
+`PGRST102` (PostgREST verlangt bei Sammel-Inserts identische Schlüssel in allen
+Objekten) und `23505` (ohne `on_conflict`-Ziel läuft `ignore-duplicates` ins
+Leere, der zweite Lauf stirbt statt still nichts zu tun). Die Idempotenz ist
+danach belegt: dritter Lauf legt 0 an, verheiratet 0, Ereignisse bleiben gleich.
+
+**Z3 · Abweichung vom Plan, begründet.** Statt Ereignis-Schreiber in
+`netzwerkUpsert.mjs` und `upsert.mjs` einzubauen (zwei Schreibwege, Gefahr von
+Doppel-Ereignissen), läuft `scripts/leads-sync.ts` **alle 30 Minuten im
+Runner**, vor dem Widerspruchs-Wächter. Ein Mechanismus, eine Wahrheit. `tsx`
+ist dafür als devDependency ins Repo gekommen, damit der Kindprozess nicht am
+npx-Cache hängt.
+
+**Z3b · Kevins 78er-Ärgernis, aufgelöst.** Von 80 als „offen" geführten
+Erstnachrichten waren 76 durch einen Thread beweisbar verschickt. Statt einer
+dritten Leseregel wird die **Tabelle selbst wahr**: Runde 5 der Pflegeroutine
+verbucht sie. Der Widerspruchs-Wächter meldet seitdem **2 statt 78**. Die
+Ausnahme für InMail-Fälle (Einladung noch offen → die vorbereitete Nachricht
+ist ungenutzt, nicht verschickt) bleibt bestehen.
+
+**Z4 · Ein Denkfehler, den der Test gefunden hat.** Station und Fälligkeit
+mussten getrennt werden: Ein Lead, dessen E-Mail durch den 7-Tage-
+Mindestabstand verschoben wird, fiel sonst auf „Anfrage läuft" zurück — als
+hoffte er noch auf eine Annahme, obwohl er die 30 Tage längst hinter sich hat.
+28 Prüffälle, alle grün.
+
+**Z5–Z7 · Oberfläche** wie geplant: Lead-Akte als Fenster (Vollbild nur mobil),
+Tagesjournal mit Datums-Blättern, Pipeline mit CSV-Export je Station.
+
+### Offene Punkte, die diese Runde nicht lösen konnte
+
+1. **Die Vergangenheit ist dünn — „wie oft habe ich den geschrieben" beginnt
+   heute.** `sync.mjs` fordert bis zu 10 Nachrichten je Thread an
+   (`VERLAUF_MAX = 10`), aber Voyagers Konversationsliste liefert je Thread nur
+   die **letzte**: an Prod gemessen haben alle 237 Threads mit Verlauf genau
+   einen Eintrag. Historische Follow-ups sind damit nicht rekonstruierbar; ab
+   jetzt wird jedes Ereignis mitgeschrieben. Wer das nachholen will, braucht
+   einen Tiefenscan mit einer eigenen Nachrichten-Query je Thread — eine eigene
+   Runde, ~239 Abfragen.
+2. **Die Kanaldaten fehlen** (E-Mail, Anschrift, Telefon). Felder sind da und
+   bleiben leer; Beschaffung über Apollo o. ä. ist Kevins ausdrücklich spätere
+   Runde. Der stille Zweig sammelt bis dahin Kandidaten, die er nicht bedienen
+   kann — das ist gewollt und sichtbar, nicht kaputt.
+3. **4 mehrdeutige Namen** warten auf Kevins Handverbindung. Die Lead-Akte
+   zeigt sie; die UI zum Verbinden zweier Leads ist noch nicht gebaut.
+4. **`verify-postfach-tiefenscan` ist rot** — nicht durch diese Runde. Parallel
+   hat jemand `runner/index.mjs` umgebaut (Zeitmarken auf Platte gegen
+   Runner-Neustarts, datiert 20.08.); das Prüfskript sucht noch den alten
+   Code-Pfad `if (tief) letzterTiefenscan = Date.now()`. Die Datei wurde
+   deshalb in dieser Runde nicht committet.
