@@ -447,6 +447,8 @@ export interface LinkedinThread {
   agent_urteil?: AgentUrteil | null
   /** 0075: wann das Urteil entstand. */
   agent_urteil_at?: string | null
+  /** 0076: Verweis auf den Lead. Der Sync schickt die Spalte nie mit. */
+  lead_id?: string | null
 }
 
 /** 0075: Urteil des Entwurfs-Agenten über den Absender eines Threads. */
@@ -1150,4 +1152,66 @@ export interface SalesBooking {
   status: SalesBookingStatus
   cancelled_at: string | null
   created_at: string
+}
+
+/* ── 0076: Lead-System ─────────────────────────────────────────────────────
+ * Die Identitäts- und Protokollschicht unter den LinkedIn-Spiegeln.
+ * Blaupause: docs/wargames/lead-system.md
+ */
+
+export type LeadStatus = 'aktiv' | 'wiedervorlage' | 'ruht' | 'disqualifiziert' | 'kunde'
+
+export interface Lead {
+  id: string
+  brand_id: string
+  /** Lesbarer Slug aus `linkedin_netzwerk`; '' bei Leads, die nur im Postfach stehen. */
+  profil_key: string
+  /** Opake LinkedIn-ID aus `linkedin_threads.profile_url`; '' bis ein Thread existiert. */
+  li_urn: string
+  profile_url: string
+  name: string
+  headline: string
+  lead_status: LeadStatus
+  wiedervorlage_am: string | null
+  wiedervorlage_grund: string
+  disqualifiziert_grund: string
+  markiert: boolean
+  notiz: string
+  /** Kanaldaten für den stillen Zweig — bewusst leer, Beschaffung ist eine eigene Runde. */
+  email: string
+  telefon: string
+  anschrift: string
+  first_seen_at: string
+  updated_at: string
+}
+
+export type LeadEreignisTyp =
+  | 'anfrage'
+  | 'angenommen'
+  | 'erstnachricht'
+  | 'followup'
+  | 'antwort_erhalten'
+  | 'loom_zugesagt'
+  | 'loom_gesendet'
+  | 'inmail'
+  | 'email'
+  | 'postkarte'
+  | 'anruf'
+  | 'wiedervorlage_gesetzt'
+  | 'disqualifiziert'
+  | 'reaktiviert'
+  | 'notiz'
+
+export type LeadEreignisQuelle = 'sync' | 'ui' | 'backfill'
+
+/** Append-only: nie ändern, nie löschen — Korrekturen sind neue Ereignisse. */
+export interface LeadEreignis {
+  id: string
+  brand_id: string
+  lead_id: string
+  typ: LeadEreignisTyp
+  at: string
+  quelle: LeadEreignisQuelle
+  details: Record<string, unknown>
+  erstellt_at: string
 }

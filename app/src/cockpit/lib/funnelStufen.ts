@@ -29,6 +29,8 @@ export interface NetzwerkEintrag {
   eingeladen_at: string | null
   angenommen_at: string | null
   zuletzt_gesehen_at: string
+  /** 0076: Verweis auf den Lead. */
+  lead_id?: string | null
 }
 
 /** Eine Person in einer Funnel-Liste — das, was die Oberfläche zeigt. */

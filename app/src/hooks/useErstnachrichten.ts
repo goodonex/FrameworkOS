@@ -16,6 +16,8 @@ export interface Erstnachricht {
   sent_at: string | null
   /** Wann der Runner die Zeile zuletzt aus dem Vault gespiegelt hat (0060). */
   last_synced_at?: string | null
+  /** 0076: Verweis auf den Lead. */
+  lead_id?: string | null
 }
 
 interface Result {
