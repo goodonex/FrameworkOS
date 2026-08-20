@@ -10,7 +10,7 @@
 import { spawn } from 'node:child_process'
 import { createServer } from 'node:http'
 import { mkdir, readdir, readFile, realpath, rename, stat, unlink, writeFile } from 'node:fs/promises'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 import { syncThreads, TIEFENSCAN_TAGE } from './linkedin/sync.mjs'
@@ -284,19 +284,64 @@ const AGENT_CATALOG = [
     description: 'Individualisiertes Loom-Skript für einen Lead (Akt 2 + Spickzettel + Begleit-DM).',
     kind: 'write',
     cwd: SALES_ROOT,
+    // Der Agent läuft sandboxed im Sales-Ordner und kommt NICHT an den Vault
+    // (19.08.2026 am ersten Lauf belegt: Read wird abgelehnt). Statt den Vault
+    // per --add-dir zu öffnen — was dem Agenten dort auch Schreibrechte gäbe —
+    // liest der Runner die Sprechfassung selbst und hängt sie an den Prompt.
+    kontextDatei: join(SALES_VAULT_DIR, 'Loom-Skript (vollständige Sprechfassung).md'),
+    kontextLabel: 'SPRECHFASSUNG',
     prompt:
-      'Baue für den Lead aus den Eingabedaten (name, website) ein individualisiertes Loom-Skript. ' +
-      'Standard-Akte 1/3/4/5 aus der Sprechfassung im Vault ' +
-      '(lies per Read: ' + JSON.stringify(join(SALES_VAULT_DIR, 'Loom-Skript (vollständige Sprechfassung).md')) + ') ' +
-      'übernehmen — NUR Akt 2 (IST-Analyse: erst Positiv, dann 3 Optimierungspunkte), Spickzettel und ' +
-      'Begleit-DM individualisieren. Website per WebFetch analysieren (Eigentümer-Seite? Bewertungstool? ' +
-      'käufer- vs. eigentümerlastig? modern/veraltet?). Ausgabe: EINE selbst-enthaltene HTML-Datei ' +
-      '"Loom-Skript <YYYY-MM-DD> (<Name>).html" im Stil von "Loom-Batch 2026-07-23 (6 Leads).html" ' +
-      '(liegt in DIESEM Ordner, als Vorbild lesen) in DIESEM Ordner. Regeln: Fehler zeigen = Mehrwert, ' +
-      'WAS+WARUM nie WIE, kein Sales-Angebot im CTA, keine Emojis. JS-Strings: deutsche Anführungszeichen ' +
-      'NIE als „…" mit ASCII-Schließquote (bricht den JS-String) — nutze einen Helper wie ' +
-      "const G=s=>'„'+s+'“' oder durchgängig curly-Anführungszeichen. Vor Abschluss den <script>-Teil " +
-      'mit `node --check` validieren.',
+      'Baue für den Lead aus den Eingabedaten (name, firma, website, letzteNachricht, kevinNotizen) ' +
+      'ein individualisiertes Loom-Skript nach der SPRECHFASSUNG 3 (Stand 20.08.2026). Die ' +
+      'vollständige Fassung steht unten im Block SPRECHFASSUNG — sie ist die Wahrheit, nicht dein ' +
+      'Gedächtnis. Sie hat VIER Akte (der frühere Feindbild-Akt ist entfallen) und einen Schritt 0. ' +
+      'HARTE LÄNGENGRENZE: der gesprochene Text aller vier Akte zusammen darf 520 WÖRTER NICHT ' +
+      'überschreiten (Kevin spricht ruhig, das sind rund 4:20 Min). Zähle sie vor dem Abschluss ' +
+      'wirklich nach und nenne die Zahl im Skript-Kopf. Richtwerte: Akt 1 ~200, Akt 2 ~170, ' +
+      'Akt 3 ~120, Akt 4 ~50. Ist es zu lang, kürze in Akt 2. ' +
+      'ABLAUF: ' +
+      '(1) Website per WebFetch analysieren — auch zwei, drei Unterseiten, nicht nur die Startseite: ' +
+      'Was kann ein Eigentümer tun, ohne zu sprechen? Gibt es eine Sofort-Zahl oder nur ein ' +
+      'Formular? Führt die Navigation dahin, wo sie hinführen soll? Trennt die Seite Eigentümer, ' +
+      'Käufer und Kapitalanleger? Wirkt sie eigen oder generisch? Sagen Google-Bewertungen etwas ' +
+      'über ihn, das auf der Seite selbst NICHT vorkommt? ' +
+      '(2) SCHRITT 0 oben ins Skript: Die KERN-IDEE ist bei jedem Lead DIESELBE und wird wörtlich ' +
+      'übernommen — "Auf meiner Website entscheidet sich, ob ein Eigentümer bei mir anfragt, und da ' +
+      'liegt gerade mehr drin, als rausgeholt wird." Individuell sind NUR: das Segment, der ' +
+      'Glaubenssatz und die zwei Stationen, die die Idee belegen. ' +
+      '(3) Akt 2 hat ZWEI Stationen (nicht drei), je als Frage, die er sich selbst beantwortet, ' +
+      'danach [STILL]. Dieselbe Person über beide Stationen (halb elf abends, Sofa, hat es noch ' +
+      'keinem erzählt). Das Positive davor: EIN bis ZWEI Sätze, locker — keine Kennzahlen-Aufzählung ' +
+      'und kein Satz, der das Lob streckt. Danach der Vergleich mit der Demo-Seite: nur das ' +
+      'Ergebnis, nie der Bauplan. ' +
+      '(4) KEVINS NOTIZEN (Feld kevinNotizen) sind seine eigenen Beobachtungen von der Seite, roh ' +
+      'diktiert. Sie sind oft schärfer als deine Analyse und haben VORRANG bei der Auswahl der ' +
+      'Stationen. Aber: NICHT wörtlich übernehmen und NICHT alle. Nimm die zwei bis drei stärksten, ' +
+      'die auf die Kern-Idee einzahlen, übersetze sie in ruhige, verkaufsfähige Sprache (aus "die ' +
+      'Seite ist kalt und seelenlos" wird eine Beobachtung, keine Beschimpfung), und lass den Rest ' +
+      'als Halbsatz mitlaufen oder weg. Was nicht ins Skript passt, listest du am Ende unter ' +
+      '"Nicht verwendet — bewusst" mit einem Satz Begründung. ' +
+      '(5) Akte 1, 3 und 4 aus der Sprechfassung übernehmen, nur Vorname/Firma/Domain einsetzen. ' +
+      'In Akt 3 den Regie-Hinweis mitführen: geblurrtes Slide, Inhalt NICHT erklären. Das Slide ' +
+      'EXISTIERT NICHT — schreibe "Slide existiert noch nicht; bis dahin Akt 3 ohne Einblendung" ' +
+      'und erfinde weder Dateinamen noch Ordner dafür. Nenne NIE einen Pfad, den du nicht per ls ' +
+      'geprüft hast. ' +
+      '(6) Spickzettel und Begleit-DM individualisieren. Nutzt der Lead in letzteNachricht eine ' +
+      'eigene Formulierung, im ersten Satz der DM daran anknüpfen. ' +
+      'TONALITÄT (hart): additiv, nie defizitär — "so gewinnst du NOCH MEHR Mandate", niemals ' +
+      '"endlich" oder "bisher gar nicht". Nie "so würde ich das machen". Kein Kleinmachen ' +
+      '("ganz kurz", Rechtfertigungen). KEIN FÜLLSATZ: jeder Satz braucht Zweck — Vertrauen, Beleg, ' +
+      'Frage oder Übergang; Sätze, die Selbstverständliches behaupten, streichen. Kein Kanal-Rundgang ' +
+      '(Google-Profil, Bewertungen, Instagram, Ads werden nicht einzeln durchgegangen). Keine Emojis. ' +
+      'AUSGABE: EINE selbst-enthaltene HTML-Datei "Loom-Skript <YYYY-MM-DD> (<Name>).html" im ' +
+      'UNTERORDNER "Loom-Skripte/" dieses Ordners (anlegen, falls er fehlt). ' +
+      'HARTE REGEL — KEIN JAVASCRIPT: kein <script>-Tag, keine Tabs, keine Klick-Interaktion. Jeder ' +
+      'Text steht direkt als HTML im Dokument, alle Akte untereinander, von oben nach unten lesbar ' +
+      'und druckbar (Kevin öffnet die Datei in einem Viewer, der Inline-Skripte blockiert). Styling ' +
+      'nur über einen <style>-Block. Deutsche Anführungszeichen direkt als „…“ setzen. ' +
+      'SELBSTPRÜFUNG vor Abschluss (Pflicht): `grep -c "<script" <datei>` muss 0 ergeben; der ' +
+      'sichtbare Text enthält Schritt 0, Akt 1 bis 4, Spickzettel und Begleit-DM; die Wortzahl des ' +
+      'Sprechtexts liegt unter 520 und steht im Kopf.',
   },
   {
     id: 'followup-pdf',
@@ -328,13 +373,36 @@ function agentConfig(agent) {
   const a = AGENT_BY_ID.get(agent)
   if (!a) return null
   if (a.kind === 'write') {
+    // Kontext-Datei (z. B. die Sprechfassung im Vault) direkt in den Prompt
+    // legen. Fehlt sie, läuft der Agent trotzdem — mit ehrlichem Hinweis, statt
+    // sich still etwas auszudenken.
+    const kontext = () => {
+      if (!a.kontextDatei) return ''
+      try {
+        const txt = readFileSync(a.kontextDatei, 'utf8')
+        return `\n\n===== ${a.kontextLabel ?? 'KONTEXT'} (Quelle: ${a.kontextDatei}) =====\n${txt}\n===== ENDE ${a.kontextLabel ?? 'KONTEXT'} =====\n`
+      } catch (e) {
+        console.error('[runner] Kontext-Datei nicht lesbar:', a.kontextDatei, e?.message ?? e)
+        return `\n\n[WARNUNG: ${a.kontextLabel ?? 'KONTEXT'} konnte nicht geladen werden. Brich ab und melde das, statt den Inhalt zu erfinden.]\n`
+      }
+    }
     return {
       cwd: a.cwd,
-      buildPrompt: (inputBlock) => `${a.prompt}${inputBlock}`,
+      buildPrompt: (inputBlock) => `${a.prompt}${inputBlock}${kontext()}`,
       // Scoped, KEIN Blanket-Bypass: acceptEdits erlaubt nur Datei-Writes im
       // cwd; die konkreten Build-Befehle (node/mkdir/…) sind in a.cwd/.claude/
       // settings.json allow-gelistet. Alles andere wird headless verweigert.
-      extraArgs: ['--permission-mode', 'acceptEdits'],
+      //
+      // 19.08.2026: `WebFetch` aus der Projekt-settings.json griff headless
+      // nicht — der erste Loom-Lauf brach ab, weil er die Website des Leads
+      // nicht laden durfte. Die Werkzeugliste steht deshalb explizit am Aufruf.
+      // Bewusst ohne Bash-Wildcard: die Build-Befehle bleiben in settings.json.
+      extraArgs: [
+        '--permission-mode',
+        'acceptEdits',
+        '--allowedTools',
+        'Read,Write,Edit,Glob,Grep,WebFetch,WebSearch,Bash(node:*),Bash(mkdir:*),Bash(ls:*),Bash(cat:*),Bash(date:*)',
+      ],
     }
   }
   return { cwd: VAULT, buildPrompt: (inputBlock) => `/${agent}${inputBlock}`, extraArgs: [] }
@@ -1679,7 +1747,17 @@ async function salesLibrary() {
   }
 
   const vaultFiles = await listDir(SALES_VAULT_DIR, new Set(['.md']))
-  const skripteFiles = await listDir(SALES_ROOT, new Set(['.md', '.html', '.pdf']))
+  // Seit 19.08.2026 liegen die generierten Loom-Skripte im Unterordner
+  // `Loom-Skripte/` (Kevins Wunsch: ein Ordner zum Abarbeiten). Die Bibliothek
+  // liest beide Ebenen, damit „Skript öffnen" im Cockpit weiter funktioniert;
+  // `rel` trägt den Unterordner mit — der Datei-Spiegel joint ihn auf SALES_ROOT.
+  const skripteFiles = [
+    ...(await listDir(SALES_ROOT, new Set(['.md', '.html', '.pdf']))),
+    ...(await listDir(join(SALES_ROOT, 'Loom-Skripte'), new Set(['.md', '.html', '.pdf']))).map((f) => ({
+      ...f,
+      rel: `Loom-Skripte/${f.name}`,
+    })),
+  ].sort((a, b) => (a.mtime < b.mtime ? 1 : -1))
 
   return {
     vault: vaultFiles.map((f) => ({
@@ -1690,7 +1768,7 @@ async function salesLibrary() {
     })),
     skripte: skripteFiles.map((f) => ({
       name: f.name.replace(/\.(html|pdf|md)$/, ''),
-      rel: f.name,
+      rel: f.rel ?? f.name,
       kind: f.ext.slice(1),
       mtime: f.mtime,
     })),
@@ -2338,18 +2416,42 @@ const warteLog = new Map()
  */
 const CHROME_AUTOSTART = process.env.CHROME_AUTOSTART !== '0'
 const CHROME_START_ABSTAND_MS = 60 * 60 * 1000
-let letzterChromeStart = 0
+/**
+ * Die Stunden-Sperre liegt auf Platte, nicht im Prozess (20.08.).
+ *
+ * Als reine Modul-Variable war sie wirkungslos: Der Runner laeuft unter
+ * launchd mit KeepAlive und startet bei jedem Schlaf-/Wach-Zyklus des Macs
+ * neu — im Log stehen 171 Starts. Jeder Neustart setzte den Zaehler auf 0,
+ * der naechste Tick durfte sofort wieder ein Chrome-Fenster aufmachen. Genau
+ * das nervte Kevin am 20.08.: "immer wieder geht Chrome auf".
+ */
+const CHROME_START_MARKE = join(LOG_DIR, '.letzter-chrome-start')
+
+function letzterChromeStartAus() {
+  try {
+    return Number(readFileSync(CHROME_START_MARKE, 'utf8').trim()) || 0
+  } catch {
+    return 0
+  }
+}
 
 function starteSyncChrome() {
   const stunde = new Date().getHours()
   if (!CHROME_AUTOSTART || stunde < 6 || stunde >= 20) return
-  if (Date.now() - letzterChromeStart < CHROME_START_ABSTAND_MS) return
-  letzterChromeStart = Date.now()
+  if (Date.now() - letzterChromeStartAus() < CHROME_START_ABSTAND_MS) return
+  try {
+    writeFileSync(CHROME_START_MARKE, String(Date.now()))
+  } catch {
+    /* Ohne Marke bleibt es beim alten Verhalten — kein Grund, den Start zu verhindern. */
+  }
   try {
     const p = spawn(
       '/usr/bin/open',
       [
-        '-na',
+        // `-g` haelt das Fenster im Hintergrund: Der Sync braucht keinen Fokus
+        // (dafuer gibt es die Fokus-Emulation in netzwerk.mjs), aber ohne `-g`
+        // reisst jeder Start Chrome vor Kevins laufende Arbeit.
+        '-nag',
         'Google Chrome',
         '--args',
         `--user-data-dir=${join(homedir(), '.uriel-chrome')}`,

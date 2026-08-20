@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { useIsMobile } from '../../hooks/useViewport'
-import type { Posten } from '../lib/prioritaet'
+import { nachrichtStand, type Posten } from '../lib/prioritaet'
 import type { ArbeitsmodusErgebnis } from './Arbeitsmodus'
 import { ListenZeile } from './home/ListenZeile'
 
@@ -233,6 +233,9 @@ export function Arbeitsliste({ posten, onErledigt, onZaehler, morgen, loom, proj
                     // Die Rückmeldung steht vorn, damit sie den Blick trifft —
                     // am Handy gibt es neben dem Titel keinen Platz dafür.
                     nameKopiertId === p.id ? '✓ Name kopiert' : null,
+                    // Wann kam die letzte Nachricht — bei Looms die Zusage,
+                    // auf die der Lead gerade wartet (19.08.2026).
+                    nachrichtStand(p.timestamp) || null,
                     p.firma && p.firma !== p.name ? p.firma : null,
                     p.spur === 'loom' && skriptUrl ? 'Skript da' : null,
                     p.entwurf ? (p.entwurf.veraltet ? 'Entwurf veraltet' : 'Entwurf da') : null,
@@ -322,6 +325,14 @@ export function Arbeitsliste({ posten, onErledigt, onZaehler, morgen, loom, proj
                     schaut Kevin beim Tippen ohnehin hin. */}
                 {nameKopiertId === p.id ? (
                   <span style={{ fontSize: 11, color: 'var(--ck-accent)', flexShrink: 0 }}>✓ Name kopiert</span>
+                ) : null}
+                {/* Alter der letzten Nachricht. Steht VOR der Firma und
+                    schrumpft nie: „gestern" ist beim Überfliegen der Liste
+                    wichtiger als die LinkedIn-Headline dahinter. */}
+                {nachrichtStand(p.timestamp) ? (
+                  <span style={{ fontSize: 11, color: 'var(--ck-text-3)', flexShrink: 0 }}>
+                    {nachrichtStand(p.timestamp)}
+                  </span>
                 ) : null}
                 {p.firma && p.firma !== p.name ? (
                   <span
@@ -507,23 +518,10 @@ export function Arbeitsliste({ posten, onErledigt, onZaehler, morgen, loom, proj
                       </button>
                     )
                   ) : null}
-                  {/* O3 Zug 9: Aufnehmen ist der Schritt zwischen „Skript da"
-                      und „Haken" — bisher fehlte er ganz. Bewusst ein echter
-                      Link statt window.open: aus einem async-Kontext heraus
-                      schluckt der Popup-Blocker das Fenster. Kein loom://,
-                      das ist nicht verlaesslich; die Desktop-App faengt die
-                      URL selbst ab, wenn sie installiert ist. */}
-                  {p.spur === 'loom' ? (
-                    <a
-                      className="ck-btn"
-                      style={{ minHeight: 40, display: 'inline-flex', alignItems: 'center' }}
-                      href="https://www.loom.com/record"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Loom aufnehmen ↗
-                    </a>
-                  ) : null}
+                  {/* Der Knopf „Loom aufnehmen ↗" ist am 19.08.2026 entfallen.
+                      Er zeigte auf loom.com/record — bei Kevin eine 404-Seite, und
+                      aufgenommen wird ohnehin in der Loom-Desktop-App. Was an dieser
+                      Stelle zählt, ist das Skript: es steht als erster Knopf. */}
                   {projekt && onNavigiere ? (
                     <button
                       type="button"

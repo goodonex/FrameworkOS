@@ -13,6 +13,7 @@ import { echtOffeneErstnachrichten, profilNachName } from './erstnachrichtenOffe
 import { icpUrteil, istArbeitsVorrat } from './icp'
 import { istKunde, kundenSchluessel, type KundenKontakt } from './kundenAbgleich'
 import { bucketOf } from './linkedinFollowups'
+import { verlaufVon } from './linkedinVerlauf'
 import type { Posten, PostenEntwurf } from './prioritaet'
 
 /**
@@ -167,13 +168,31 @@ export function antwortPostenAusgeblendet(threads: LinkedinThread[], heute: Date
     }))
 }
 
+/**
+ * Die letzte Nachricht des Leads — die Zusage, wegen der er in dieser Spur steht.
+ *
+ * Bis zum 19.08.2026 stand an jedem Loom-Posten derselbe Satz („Loom-Analyse für
+ * X aufnehmen und verschicken."). Das war Anweisung, keine Information: Kevin
+ * weiß, was ein Loom-Posten von ihm will. Was er NICHT weiß, ist, ob der Lead
+ * wirklich zugesagt hat — und genau das steht hier jetzt wörtlich.
+ *
+ * Kam die letzte Nachricht von Kevin selbst, wird das benannt statt kaschiert:
+ * dann ist die Zusage älter als der letzte Schriftwechsel und gehört geprüft.
+ */
+function letzteNachricht(t: LinkedinThread): string {
+  const vom = verlaufVon(t)
+  const letzte = vom.length > 0 ? vom[vom.length - 1] : null
+  const text = (letzte?.text ?? t.preview ?? '').trim()
+  if (!text) return `Kein Nachrichtentext gespiegelt — Zusage im Postfach prüfen.`
+  const vonKevin = letzte ? letzte.sender === 'me' : t.last_from === 'me'
+  return vonKevin ? `Zuletzt hast DU geschrieben: „${text}“` : text
+}
+
 /** Rang 4 — Lead hat Ja zum Loom gesagt, Skript/Aufnahme steht noch aus. */
 export function loomPosten(threads: LinkedinThread[]): Posten[] {
   return threads
     .filter((t) => t.starred && t.loom_status === 'offen')
-    .map((t) =>
-      threadZuPosten(t, 'loom', 'loom', `Loom-Analyse für ${t.name || 'den Lead'} aufnehmen und verschicken.`),
-    )
+    .map((t) => threadZuPosten(t, 'loom', 'loom', letzteNachricht(t)))
 }
 
 /** Rang 6 — fällige Follow-ups (bucketOf === 'faellig'). */

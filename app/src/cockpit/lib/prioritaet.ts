@@ -110,9 +110,38 @@ export function ordnePosten(quellen: PostenQuellen, _heute: Date): Posten[] {
   const out: Posten[] = []
   for (const spur of RANGFOLGE) {
     const bucket = quellen[spur] ?? []
-    out.push(...[...bucket].sort(dringlichkeit))
+    out.push(...[...bucket].sort(spur === 'loom' ? frischeZuerst : dringlichkeit))
   }
   return out
+}
+
+/**
+ * Looms drehen die Alters-Regel um (19.08.2026, Kevins Ansage).
+ *
+ * Überall sonst gilt: was am längsten liegt, ist am dringendsten. Bei einer
+ * zugesagten Analyse ist es andersherum — wer gestern „ja, schick rüber"
+ * geschrieben hat, wartet gerade darauf; wer das vor zwei Monaten schrieb, hat
+ * es vergessen. Die frischeste Zusage konvertiert am besten, die alten stehen
+ * unten und zeigen ehrlich, was liegen geblieben ist.
+ */
+function frischeZuerst(a: Posten, b: Posten): number {
+  const ta = a.timestamp ? new Date(a.timestamp).getTime() : Number.NEGATIVE_INFINITY
+  const tb = b.timestamp ? new Date(b.timestamp).getTime() : Number.NEGATIVE_INFINITY
+  return tb - ta
+}
+
+/**
+ * „vor 5 Tagen · 14.08." — der Stand einer Nachricht am Posten. Ohne
+ * Zeitstempel bleibt die Zeile leer, statt ein Datum zu erfinden.
+ */
+export function nachrichtStand(iso: string | null, jetzt: Date = new Date()): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const tage = Math.floor((jetzt.getTime() - d.getTime()) / 86_400_000)
+  const datum = d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })
+  const wann = tage <= 0 ? 'heute' : tage === 1 ? 'gestern' : `vor ${tage} Tagen`
+  return `${wann} · ${datum}`
 }
 
 /** Kevins einzig echtes Tageslimit — Vernetzungsanfragen. Alles andere ist unbegrenzt. */
