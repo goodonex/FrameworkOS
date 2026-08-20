@@ -7,6 +7,10 @@ import type { LinkedinThread } from '../../types/db'
 import { HeuteTabs } from '../components/HeuteTabs'
 import { ErstnachrichtenListe } from '../components/ErstnachrichtenListe'
 import { FunnelStufen } from '../components/linkedin/FunnelStufen'
+import { LeadAkte } from '../components/linkedin/LeadAkte'
+import { LeadPipeline } from '../components/linkedin/LeadPipeline'
+import { Tagesjournal } from '../components/linkedin/Tagesjournal'
+import { useLeads } from '../../hooks/useLeads'
 import { useActiveBrand } from '../lib/activeBrand'
 import { buildLinkedinFollowupInput } from '../lib/approvalDrafts'
 import { bucketOf, coverage, FOLLOWUP_THRESHOLDS_DAYS, istWeckbar } from '../lib/linkedinFollowups'
@@ -361,7 +365,22 @@ export function LinkedinArea({ eingebettet = false }: { eingebettet?: boolean } 
   // den Auftrag über Supabase (0059), den der Runner abholen muss. `direkt`
   // entscheidet nur, WELCHER Weg — ob überhaupt einer trägt, sagt `runnerState`.
   const direkt = runnerDirekt()
-  const [ansicht, setAnsicht] = useState<'erst' | 'followup'>('erst')
+  const [ansicht, setAnsicht] = useState<'erst' | 'followup' | 'pipeline' | 'journal'>('erst')
+  /** Welche Lead-Akte offen ist — aus Pipeline UND Journal heraus erreichbar. */
+  const [offenerLead, setOffenerLead] = useState<string | null>(null)
+  const leadsQuery = useLeads(slug)
+  /**
+   * Threads nach `lead_id` — die Brücke zwischen Postfach und Lead. Ohne sie
+   * würde `leadStation` jeden Lead in den stillen Zweig schicken, auch den,
+   * mit dem Kevin längst schreibt.
+   */
+  const threadsJeLead = useMemo(() => {
+    const karte = new Map<string, LinkedinThread>()
+    for (const t of threadsQuery.items) {
+      if (t.lead_id) karte.set(t.lead_id, t)
+    }
+    return karte
+  }, [threadsQuery.items])
   const [syncing, setSyncing] = useState(false)
   const [syncMessage, setSyncMessage] = useState<string | null>(null)
   // Überlebt den Reload, damit der Unvollständigkeits-Hinweis nicht nur direkt
@@ -507,7 +526,14 @@ export function LinkedinArea({ eingebettet = false }: { eingebettet?: boolean } 
       {eingebettet ? null : <HeuteTabs />}
 
       <div style={{ display: 'flex', gap: 6 }}>
-        {([['erst', 'Erstnachrichten'], ['followup', 'Follow-ups']] as const).map(([wert, label]) => (
+        {(
+          [
+            ['erst', 'Erstnachrichten'],
+            ['followup', 'Follow-ups'],
+            ['pipeline', 'Pipeline'],
+            ['journal', 'Heute raus'],
+          ] as const
+        ).map(([wert, label]) => (
           <button
             key={wert}
             type="button"
@@ -523,6 +549,37 @@ export function LinkedinArea({ eingebettet = false }: { eingebettet?: boolean } 
       </div>
 
       {ansicht === 'erst' ? <ErstnachrichtenListe brandSlug={slug} /> : null}
+
+      {/* Pipeline und Tagesjournal (20.08.2026, Migration 0076). Beide leben
+          von denselben Leads und Ereignissen — deshalb ein Hook, zwei Sichten:
+          die Pipeline fragt „wer steckt wo", das Journal „was ist heute
+          rausgegangen". */}
+      {ansicht === 'pipeline' || ansicht === 'journal' ? (
+        leadsQuery.tableMissing ? (
+          <div className="ck-panel" style={{ padding: '28px 14px', textAlign: 'center', fontSize: 13, color: 'var(--ck-text-3)' }}>
+            Noch keine Leads — Migration 0076 muss zuerst gepusht werden (supabase db push).
+          </div>
+        ) : leadsQuery.loading ? (
+          <div style={{ fontSize: 12, color: 'var(--ck-text-3)', padding: 12 }}>Lädt …</div>
+        ) : (
+          <div className="ck-panel" style={{ padding: 14 }}>
+            {ansicht === 'pipeline' ? (
+              <LeadPipeline
+                leads={leadsQuery.leads}
+                ereignisseJeLead={leadsQuery.ereignisseJeLead}
+                threadsJeLead={threadsJeLead}
+                onLeadOeffnen={setOffenerLead}
+              />
+            ) : (
+              <Tagesjournal
+                leads={leadsQuery.leads}
+                ereignisse={leadsQuery.ereignisse}
+                onLeadOeffnen={setOffenerLead}
+              />
+            )}
+          </div>
+        )
+      ) : null}
 
       <div style={{ display: ansicht === 'followup' ? 'flex' : 'none', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -703,6 +760,27 @@ export function LinkedinArea({ eingebettet = false }: { eingebettet?: boolean } 
           ) : null}
         </>
       )}
+
+      {offenerLead
+        ? (() => {
+            const lead = leadsQuery.leads.find((l) => l.id === offenerLead)
+            if (!lead) return null
+            return (
+              <LeadAkte
+                lead={lead}
+                ereignisse={leadsQuery.ereignisseJeLead.get(lead.id) ?? []}
+                thread={threadsJeLead.get(lead.id) ?? null}
+                onClose={() => setOffenerLead(null)}
+                onWiedervorlage={(datum, grund) => leadsQuery.setzeWiedervorlage(lead.id, datum, grund)}
+                onDisqualifizieren={(grund) => leadsQuery.disqualifiziere(lead.id, grund)}
+                onReaktivieren={() => leadsQuery.reaktiviere(lead.id)}
+                onMarkieren={(markiert) => leadsQuery.markiere(lead.id, markiert)}
+                onNotiz={(notiz) => leadsQuery.speichereNotiz(lead.id, notiz)}
+                onProtokolliere={(typ) => leadsQuery.protokolliere(lead.id, typ)}
+              />
+            )
+          })()
+        : null}
     </div>
   )
 }
