@@ -13,6 +13,7 @@ import { mkdir, readdir, readFile, realpath, rename, stat, unlink, writeFile } f
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { syncThreads, TIEFENSCAN_TAGE } from './linkedin/sync.mjs'
 import { upsertThreads } from './linkedin/upsert.mjs'
 import { ladeErstnachrichten } from './linkedin/erstnachrichten.mjs'
@@ -2427,6 +2428,30 @@ const CHROME_START_ABSTAND_MS = 60 * 60 * 1000
  */
 const CHROME_START_MARKE = join(LOG_DIR, '.letzter-chrome-start')
 
+/**
+ * Zeitmarken, die einen Runner-Neustart ueberleben (20.08.).
+ *
+ * Gleicher Grund wie bei der Chrome-Sperre darunter: launchd startet den
+ * Runner bei jedem Schlaf-/Wach-Zyklus neu. Jede reine Modul-Variable faellt
+ * dabei auf 0 zurueck — und eine Routine, die alle zwei Stunden laufen soll,
+ * lief in Wahrheit nach jedem Aufwachen wieder los.
+ */
+function markeLies(name) {
+  try {
+    return Number(readFileSync(join(LOG_DIR, `.${name}`), 'utf8').trim()) || 0
+  } catch {
+    return 0
+  }
+}
+
+function markeSchreib(name, wert = Date.now()) {
+  try {
+    writeFileSync(join(LOG_DIR, `.${name}`), String(wert))
+  } catch {
+    /* Ohne Marke bleibt es beim alten Verhalten — kein Grund, den Lauf zu verhindern. */
+  }
+}
+
 function letzterChromeStartAus() {
   try {
     return Number(readFileSync(CHROME_START_MARKE, 'utf8').trim()) || 0
@@ -2670,15 +2695,25 @@ async function maybeAntwortEntwuerfe() {
 const POSTFACH_AB_STUNDE = Number(process.env.POSTFACH_STUNDE ?? 6)
 const POSTFACH_BIS_STUNDE = Number(process.env.POSTFACH_BIS_STUNDE ?? 20)
 const POSTFACH_ABSTAND_MS = Number(process.env.POSTFACH_ABSTAND_MS ?? 2 * 60 * 60 * 1000)
-let letzterPostfachSync = 0
 /**
- * Der Tiefenscan läuft beim ERSTEN Postfach-Sync nach dem Start und danach
- * wöchentlich. Bewusst kein persistenter Zustand: ein Neustart darf ihn ruhig
- * auslösen — er kostet ~12 Sekunden, und die Lücke, die er schließt, hat Kevin
- * drei Wochen lang falsche Zahlen gezeigt.
+ * Auf Platte, nicht im Prozess (20.08.): Als Modul-Variable war der Zwei-
+ * Stunden-Takt wirkungslos — nach jedem Runner-Neustart (Schlaf/Wach, laut Log
+ * 171 Starts) sprang der Sync sofort wieder an, riss den Sync-Chrome per
+ * `Page.bringToFront` nach vorn und lud LinkedIn. Kevin sah das als "staendlich
+ * geht Chrome auf".
+ */
+let letzterPostfachSync = markeLies('letzter-postfach-sync')
+/**
+ * Der Tiefenscan läuft wöchentlich — seit 20.08. mit Marke auf Platte.
+ *
+ * Vorher hing er am Prozess-Start, was bei einem einmal täglich startenden
+ * Runner stimmt, bei einem, der nach jedem Aufwachen neu startet, aber nicht:
+ * Jeder Neustart blätterte das ganze Postfach neu durch (239 Threads, sichtbar
+ * im Sync-Chrome). Die Lücke, die er schließt, bleibt geschlossen — er läuft
+ * weiter, nur wieder wirklich wöchentlich.
  */
 const TIEFENSCAN_ABSTAND_MS = Number(process.env.TIEFENSCAN_ABSTAND_MS ?? 7 * 24 * 60 * 60 * 1000)
-let letzterTiefenscan = 0
+let letzterTiefenscan = markeLies('letzter-tiefenscan')
 
 async function maybePostfachSync() {
   try {
@@ -2690,6 +2725,7 @@ async function maybePostfachSync() {
     if (!(await warteAufRechner('postfach-sync', { brauchtChrome: true }))) return
     linkedinSyncRunning = true
     letzterPostfachSync = Date.now()
+    markeSchreib('letzter-postfach-sync', letzterPostfachSync)
     try {
       // Einmal pro Woche weit zurückblättern statt nur 30 Tage. Grund steht in
       // sync.mjs: ein reines Vorwärtsfenster holt Threads, die es einmal
@@ -2698,7 +2734,10 @@ async function maybePostfachSync() {
       const tief = Date.now() - letzterTiefenscan > TIEFENSCAN_ABSTAND_MS
       const synced = await syncThreads(tief ? { scanTage: TIEFENSCAN_TAGE } : {})
       const result = await upsertThreads(synced.threads, {})
-      if (tief) letzterTiefenscan = Date.now()
+      if (tief) {
+        letzterTiefenscan = Date.now()
+        markeSchreib('letzter-tiefenscan', letzterTiefenscan)
+      }
       console.log(
         `[runner] postfach-sync${tief ? ' (Tiefenscan)' : ''}: ${result.geschrieben ?? synced.threads.length} Threads` +
           (result.inserted ? ` · ${result.inserted} neu` : '') +
@@ -2949,9 +2988,17 @@ async function maybeLeadsSync() {
     if (!SNAPSHOT_ENABLED) return // ohne service_role kein Schreibweg
     if (Date.now() - letzterLeadsLauf < LEADS_ABSTAND_MS) return
     letzterLeadsLauf = Date.now()
-    const wurzel = new URL('..', import.meta.url).pathname
+    // `fileURLToPath`, nicht `.pathname`: Der Repo-Pfad enthält ein Leerzeichen
+    // („Kevin OS"), und `.pathname` liefert es prozentkodiert zurück. spawn
+    // sucht dann wörtlich nach „Kevin%20OS" und scheitert mit ENOENT —
+    // genau so im Runner-Log vom 20.08., 14:42 zu sehen.
+    const wurzel = fileURLToPath(new URL('..', import.meta.url))
     await new Promise((fertig) => {
-      const proc = spawn(`${wurzel}node_modules/.bin/tsx`, ['scripts/leads-sync.ts'], {
+      // Nicht das tsx-Binary direkt: dessen Shebang ist `#!/usr/bin/env node`,
+      // und der LaunchAgent hat kein node im PATH (nvm) — im Log vom 20.08.,
+      // 14:54 als „env: node: No such file or directory". `process.execPath`
+      // ist der node, mit dem dieser Runner gerade selbst läuft.
+      const proc = spawn(process.execPath, [join(wurzel, 'node_modules/tsx/dist/cli.mjs'), 'scripts/leads-sync.ts'], {
         cwd: wurzel,
         env: process.env,
         stdio: ['ignore', 'pipe', 'pipe'],

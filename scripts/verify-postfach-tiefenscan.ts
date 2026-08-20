@@ -74,8 +74,16 @@ check(
 )
 check(
   'nach einem Tieflauf wird der Zeitpunkt vermerkt',
-  /if \(tief\) letzterTiefenscan = Date\.now\(\)/.test(runner),
+  /if \(tief\) \{\s*letzterTiefenscan = Date\.now\(\)/.test(runner),
   'Ohne das liefe jeder Sync als Tiefenscan — zehn Seitenaufrufe alle zwei Stunden durch Kevins Postfach.',
+)
+check(
+  // Nachgefuehrt am 20.08.: Die Marke liegt jetzt auf Platte, weil der Runner
+  // bei jedem Schlaf-/Wach-Zyklus neu startet und eine Modul-Variable dabei
+  // auf 0 zurueckfaellt — dann lief der Tiefenscan nach jedem Aufwachen.
+  'der Zeitpunkt ueberlebt einen Runner-Neustart',
+  /markeSchreib\('letzter-tiefenscan'/.test(runner) && /markeLies\('letzter-tiefenscan'\)/.test(runner),
+  'Ohne Marke auf Platte blaettert jeder Neustart das ganze Postfach neu durch.',
 )
 check(
   'das Log sagt, welcher Lauf es war',
