@@ -354,4 +354,56 @@ await schreibe(
 
 const anzahl = await alle<{ id: string }>(`lead_ereignisse?brand_id=eq.${bid}&select=id`)
 console.log(`Ereignisse in der Datenbank: ${anzahl.length}`)
+
+/* ── Runde 5: Erstnachrichten verbuchen, die beweisbar raus sind ───────────
+ *
+ * Kevins wiederkehrendes Ärgernis (20.08.): *„Diese 78 offenen Erstnachrichten
+ * tauchen immer wieder auf, aber die gibt's gar nicht mehr — die hab ich alle
+ * rausgeschickt."* Er hat recht. Der Status in `linkedin_erstnachrichten` war
+ * nie eine Aussage über die Wirklichkeit, sondern über einen Haken im Cockpit:
+ * Wer vom Handy schreibt, hakt nicht ab. Die Arbeitsliste rechnet das seit dem
+ * 17.08. über `erstnachrichtenOffen.ts` heraus, der Widerspruchs-Wächter liest
+ * die Tabelle aber roh — und meldet sie deshalb bei jedem Sitzungsstart erneut.
+ *
+ * Statt eine dritte Leseregel zu bauen, wird die **Tabelle selbst wahr**: Wo
+ * ein Thread den Versand beweist, wird verbucht. Danach stimmen alle Leser
+ * überein, ohne dass irgendwer 78-mal klickt.
+ *
+ * **Die eine Ausnahme, die bleiben muss** (Kevins Einwand vom 18.08.): Steht
+ * die Einladung noch auf `offen`, kann der Thread nur aus der InMail-Welle
+ * stammen — dann ist die vorbereitete Erstnachricht ungenutzt, nicht
+ * verschickt, und Abhaken würde einen Text abschließen, den nie jemand gelesen
+ * hat. Solche Fälle bleiben offen und sichtbar. */
+
+const leadsMitAnnahme = new Set(
+  (await alle<{ lead_id: string; typ: string }>(`lead_ereignisse?brand_id=eq.${bid}&select=lead_id,typ&typ=eq.angenommen`))
+    .map((e) => e.lead_id),
+)
+const threadLeads = new Set(
+  (await alle<{ lead_id: string | null }>(`linkedin_threads?brand_id=eq.${bid}&select=lead_id`))
+    .map((t) => t.lead_id)
+    .filter((x): x is string => Boolean(x)),
+)
+
+let verbucht = 0
+let ausInMail = 0
+for (const e of erstFrisch) {
+  if (e.status !== 'offen' || !e.lead_id) continue
+  if (!threadLeads.has(e.lead_id)) continue
+  if (!leadsMitAnnahme.has(e.lead_id)) {
+    ausInMail++
+    continue
+  }
+  await patch(`linkedin_erstnachrichten?id=eq.${e.id}`, {
+    status: 'gesendet',
+    // Der Thread ist der Beweis; sein Datum ist die beste verfügbare Näherung.
+    sent_at: e.sent_at ?? new Date().toISOString(),
+  })
+  verbucht++
+}
+console.log(
+  `Erstnachrichten automatisch verbucht: ${verbucht}` +
+    (ausInMail ? ` · ${ausInMail} bleiben offen (Einladung noch offen → InMail-Fall)` : ''),
+)
+
 console.log('\nleads-sync: fertig.')

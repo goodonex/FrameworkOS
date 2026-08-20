@@ -9,6 +9,7 @@
     "build": "npm run build --prefix app"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "concurrently": "^9.1.2",
+    "tsx": "^4.23.12"
   }
 }

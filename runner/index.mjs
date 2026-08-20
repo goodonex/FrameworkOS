@@ -2925,6 +2925,59 @@ async function maybeNetzwerkSync() {
 }
 
 /**
+ * Die Lead-Pflege als laufende Routine (20.08.2026, Migration 0076).
+ *
+ * `scripts/leads-sync.ts` legt fehlende Leads an, verheiratet die Spiegel und
+ * schreibt neue Ereignisse fort. Ohne diesen Takt hätte das Lead-System einen
+ * Backfill-Stand von heute und würde ab morgen auseinanderlaufen: jede neue
+ * Einladung, jeder neue Thread stünde ohne Lead da.
+ *
+ * Läuft VOR dem Widerspruchs-Wächter, nicht danach — die Routine verbucht
+ * Erstnachrichten, die ein Thread beweist, und der Wächter soll das Ergebnis
+ * sehen statt den alten Stand zu melden.
+ *
+ * Der Umweg über einen Kindprozess ist Absicht: Die Identitäts-Regeln liegen
+ * in TypeScript, weil die Oberfläche sie fürs Handverbinden ebenfalls braucht.
+ * Eine zweite Fassung in .mjs wäre eine zweite Wahrheit — teurer als ein
+ * Prozessstart alle 30 Minuten.
+ */
+let letzterLeadsLauf = 0
+const LEADS_ABSTAND_MS = 30 * 60 * 1000
+
+async function maybeLeadsSync() {
+  try {
+    if (!SNAPSHOT_ENABLED) return // ohne service_role kein Schreibweg
+    if (Date.now() - letzterLeadsLauf < LEADS_ABSTAND_MS) return
+    letzterLeadsLauf = Date.now()
+    const wurzel = new URL('..', import.meta.url).pathname
+    await new Promise((fertig) => {
+      const proc = spawn(`${wurzel}node_modules/.bin/tsx`, ['scripts/leads-sync.ts'], {
+        cwd: wurzel,
+        env: process.env,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      })
+      let letzte = ''
+      proc.stdout.on('data', (d) => {
+        const text = String(d).trim()
+        if (text) letzte = text.split('\n').pop() ?? letzte
+      })
+      proc.stderr.on('data', (d) => console.error('[runner] leads-sync:', String(d).trim().slice(0, 300)))
+      proc.on('error', (e) => {
+        console.error('[runner] leads-sync nicht startbar:', e?.message ?? e)
+        fertig()
+      })
+      proc.on('close', (code) => {
+        if (code === 0) console.log(`[runner] leads-sync durch (${letzte})`)
+        else console.error(`[runner] leads-sync endete mit Code ${code}`)
+        fertig()
+      })
+    })
+  } catch (e) {
+    console.error('[runner] leads-sync übersprungen:', e?.message ?? e)
+  }
+}
+
+/**
  * Der Widerspruchs-Wächter als laufende Routine (17.08.2026).
  *
  * Er braucht kein Chrome und keine Uhrzeit-Schwelle: Er liest nur, was in der
@@ -3026,6 +3079,12 @@ server.listen(PORT, '127.0.0.1', () => {
   // über Kevins LinkedIn; der erste Tick in fünf Minuten reicht vollkommen.
   const nw = setInterval(() => void maybeNetzwerkSync(), MORGENBRIEF_CHECK_MS)
   nw.unref?.()
+
+  // Lead-Pflege vor dem Wächter: sie verbucht, was ein Thread beweist, damit
+  // der Wächter nicht den Stand von vorgestern meldet.
+  setTimeout(() => void maybeLeadsSync(), 25_000)
+  const ls = setInterval(() => void maybeLeadsSync(), MORGENBRIEF_CHECK_MS)
+  ls.unref?.()
 
   // Der Widerspruchs-Wächter: kurz nach dem Start einmal, danach im 15-Minuten-
   // Takt (er selbst bremst über `WAECHTER_ABSTAND_MS`). Reines Lesen der
