@@ -368,3 +368,37 @@ Tagesjournal mit Datums-Blättern, Pipeline mit CSV-Export je Station.
    Runner-Neustarts, datiert 20.08.); das Prüfskript sucht noch den alten
    Code-Pfad `if (tief) letzterTiefenscan = Date.now()`. Die Datei wurde
    deshalb in dieser Runde nicht committet.
+
+
+---
+
+## Sichtprüfung im Browser (20.08., nach Kevins Login)
+
+Fünf Befunde, alle am laufenden Cockpit gesehen statt abgeleitet — und alle
+behoben:
+
+1. **Die „dran"-Badges waren unlesbar.** `--ck-accent-text` auf `--ck-accent`
+   sind zwei fast identische Grüntöne (~1,1:1, im Browser gemessen). `Badge.tsx`
+   hatte dieselbe Lehre schon notiert; jetzt gilt sie auch hier.
+2. **„Erstnachricht fällig: 440"** — darunter 71 Recruiter, Consultants und
+   Coaches. Die Pipeline wendet jetzt `icp.ts` an wie der Rest des Cockpits:
+   **369** statt 440, die anderen zugeklappt unter „Nicht in der Zielgruppe".
+3. **„Antwort da"** enthielt Post von vor der Makler-Akquise, ganz oben ein
+   Recruiter vom Januar 2025, der Kevin anwarb. `AKQUISE_START` importiert
+   statt nachgebaut: **11** statt 20.
+4. **Norbert Reichentrog stand als frischer Lead da**, obwohl er Kunde ist —
+   exakt der Befund vom 18.08. Runde 6 schreibt `lead_status: 'kunde'` jetzt am
+   Lead fest, statt ihn nur beim Anzeigen wegzufiltern.
+5. **Das Tagesjournal zeigte 76 Erstnachrichten „heute 14:36"** — ein
+   Arbeitstag, den es nie gab. Der Backfill hatte `new Date()` als Versanddatum
+   gesetzt. Jetzt gilt das Thread-Datum; ohne belastbares Datum wird
+   übersprungen statt falsch gestempelt. Die 76 Altfälle sind repariert.
+
+Dazu zwei Kleinigkeiten: `useLeads` blättert nach `id` statt nach `name` (bei 14
+doppelten Namen kann eine nicht-eindeutige Sortierung über die Seitengrenze eine
+Zeile doppelt und eine gar nicht liefern), und die Akte zeigt den nächsten
+Schritt nicht mehr, wenn er wortgleich neben der Station steht.
+
+**Die Lehre für die nächste Runde:** Jede Liste in diesem Cockpit braucht
+dieselbe Filter-Kaskade — ICP, Akquise-Beginn, Kundenabgleich. Wer eine neue
+Ansicht baut und sie vergisst, baut zuverlässig wieder einen Berg aus Rauschen.
