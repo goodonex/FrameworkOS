@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { Lead, LeadEreignis, LinkedinThread } from '../../../types/db'
+import { icpUrteil, istArbeitsVorrat } from '../../lib/icp'
+import { AKQUISE_START } from '../../lib/arbeitsmodusQuellen'
 import {
   STATION_REIHENFOLGE,
   STATION_TITEL,
@@ -19,6 +21,22 @@ import {
  * Deshalb ist jede Station aufklappbar und als CSV exportierbar. Der Export
  * ist die Delegations-Funktion dieser Runde — keine Accounts, keine Rollen,
  * sondern eine Liste, die man weitergeben kann.
+ *
+ * **Der ICP-Filter gehört hierher, nicht in `leadStation`.** Die Station sagt,
+ * wo jemand im Ablauf steht — das ist unabhängig davon, ob er Kevins Zielgruppe
+ * ist. Ob er in die Arbeitsliste gehört, ist eine zweite Frage, und sie wird
+ * mit derselben Regel beantwortet wie überall sonst (`icp.ts`, seit 18.08.).
+ * Ohne diesen Filter stand hier „Erstnachricht fällig: 440", darunter 71
+ * Recruiter, Consultants und Coaches — dieselbe Sorte Rauschen, die Kevin am
+ * 18.08. aus der Antworten-Spur werfen ließ. Sie verschwinden nicht, sie stehen
+ * zugeklappt unter „Nicht in der Zielgruppe".
+ *
+ * **Dasselbe gilt für die Zeit vor `AKQUISE_START`.** Kevin arbeitet erst seit
+ * Januar 2026 auf Makler; was davor im Postfach liegt, ist Post von Leuten, die
+ * IHN akquiriert haben. Beim ersten Blick auf diese Pipeline stand „Antwort da:
+ * 20", ganz oben ein Recruiter vom Januar 2025 („ich suche ehrgeizige
+ * Vertriebler wie Dich"). Die Regel ist dieselbe wie in `arbeitsmodusQuellen`,
+ * importiert statt nachgebaut.
  */
 
 export interface LeadPipelineProps {
@@ -32,6 +50,19 @@ export interface LeadPipelineProps {
 interface Reihe {
   lead: Lead
   stand: StationErgebnis
+  /** Gehört der Lead in Kevins Arbeitsvorrat? `unklar` zählt bewusst als Ja. */
+  imVorrat: boolean
+}
+
+/**
+ * Eingegangen, bevor Kevin auf Makler umgestellt hat. Nur Threads, in denen die
+ * ANDERE Seite zuletzt geschrieben hat, zählen hier — bei einem Thread, den
+ * Kevin selbst angefangen hat, gilt weiter seine Regel „nichts, was liegen
+ * geblieben ist, fällt weg".
+ */
+function istVorDerAkquise(thread: LinkedinThread | null): boolean {
+  if (!thread || thread.last_from !== 'them') return false
+  return thread.last_message_at != null && thread.last_message_at < AKQUISE_START
 }
 
 function csvFeld(wert: string): string {
@@ -42,12 +73,16 @@ function csvFeld(wert: string): string {
 export function LeadPipeline({ leads, ereignisseJeLead, threadsJeLead, onLeadOeffnen }: LeadPipelineProps) {
   const [offen, setOffen] = useState<Station | null>(null)
   const [nurFaellige, setNurFaellige] = useState(false)
+  const [zeigeAusserhalb, setZeigeAusserhalb] = useState(false)
   const jetzt = useMemo(() => new Date(), [])
 
   const reihen = useMemo<Reihe[]>(
     () =>
       leads.map((lead) => ({
         lead,
+        imVorrat:
+          istArbeitsVorrat(icpUrteil(lead.headline, lead.name).urteil) &&
+          !istVorDerAkquise(threadsJeLead.get(lead.id) ?? null),
         stand: leadStation(
           {
             lead_status: lead.lead_status,
@@ -64,6 +99,7 @@ export function LeadPipeline({ leads, ereignisseJeLead, threadsJeLead, onLeadOef
   const jeStation = useMemo(() => {
     const karte = new Map<Station, Reihe[]>()
     for (const r of reihen) {
+      if (!r.imVorrat) continue
       if (nurFaellige && !r.stand.faellig) continue
       const liste = karte.get(r.stand.station)
       if (liste) liste.push(r)
@@ -76,7 +112,8 @@ export function LeadPipeline({ leads, ereignisseJeLead, threadsJeLead, onLeadOef
     return karte
   }, [reihen, nurFaellige])
 
-  const inmailPool = useMemo(() => reihen.filter((r) => r.stand.imInmailPool), [reihen])
+  const inmailPool = useMemo(() => reihen.filter((r) => r.imVorrat && r.stand.imInmailPool), [reihen])
+  const ausserhalb = useMemo(() => reihen.filter((r) => !r.imVorrat), [reihen])
   const markierte = useMemo(() => reihen.filter((r) => r.lead.markiert), [reihen])
 
   function exportiere(station: Station, liste: Reihe[]) {
@@ -107,7 +144,9 @@ export function LeadPipeline({ leads, ereignisseJeLead, threadsJeLead, onLeadOef
     <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
         <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--ck-text-1)' }}>Pipeline</div>
-        <span style={{ fontSize: 13, color: 'var(--ck-text-3)' }}>{leads.length} Leads</span>
+        <span style={{ fontSize: 13, color: 'var(--ck-text-3)' }}>
+          {leads.length - ausserhalb.length} in der Zielgruppe · {leads.length} gesamt
+        </span>
         <label style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
           <input type="checkbox" checked={nurFaellige} onChange={(e) => setNurFaellige(e.target.checked)} />
           nur was heute dran ist
@@ -183,7 +222,10 @@ export function LeadPipeline({ leads, ereignisseJeLead, threadsJeLead, onLeadOef
                       padding: '2px 8px',
                       borderRadius: 'var(--ck-radius-pille)',
                       background: 'var(--ck-accent)',
-                      color: 'var(--ck-accent-text)',
+                      // Dunkel auf dem Akzent, nicht hell: der Salbei ist eine helle Farbe,
+                      // `--ck-accent-text` darauf kam auf ~1,1:1 (am 20.08. im Browser
+                      // gemessen). Dieselbe Lehre steht schon in Badge.tsx.
+                      color: 'var(--ck-bg)',
                     }}
                   >
                     {faellige} dran
@@ -251,6 +293,87 @@ export function LeadPipeline({ leads, ereignisseJeLead, threadsJeLead, onLeadOef
             </div>
           )
         })}
+
+        {/* Die Aussortierten der Zielgruppen-Regel — sichtbar, aber nicht im Weg.
+            Sie stehen hier, damit ein Filterfehler auffällt, statt still 71
+            Leute verschwinden zu lassen (die Lehre vom 19.08.: „ich bin mir
+            nicht sicher, ob die Leute, die rein müssen, auch reingekommen sind"). */}
+        {ausserhalb.length > 0 ? (
+          <div
+            style={{
+              border: '1px solid var(--ck-border)',
+              borderRadius: 'var(--ck-radius-innen)',
+              background: 'var(--ck-panel)',
+              overflow: 'hidden',
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setZeigeAusserhalb((v) => !v)}
+              aria-expanded={zeigeAusserhalb}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                width: '100%',
+                padding: '12px 14px',
+                minHeight: 44,
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                textAlign: 'left',
+              }}
+            >
+              <span aria-hidden="true" style={{ color: 'var(--ck-text-3)', fontSize: 12 }}>
+                {zeigeAusserhalb ? '▾' : '▸'}
+              </span>
+              <span style={{ flex: 1, color: 'var(--ck-text-3)', fontSize: 14 }}>Nicht in der Zielgruppe</span>
+              <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--ck-text-3)', minWidth: 40, textAlign: 'right' }}>
+                {ausserhalb.length}
+              </span>
+            </button>
+            {zeigeAusserhalb ? (
+              <ul style={{ listStyle: 'none', margin: 0, padding: '0 14px 14px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {ausserhalb.slice(0, 200).map((r) => (
+                  <li key={r.lead.id}>
+                    <button
+                      type="button"
+                      onClick={() => onLeadOeffnen(r.lead.id)}
+                      style={{
+                        display: 'flex',
+                        gap: 10,
+                        width: '100%',
+                        textAlign: 'left',
+                        background: 'transparent',
+                        border: 'none',
+                        borderBottom: '1px solid var(--ck-border)',
+                        padding: '8px 0',
+                        minHeight: 40,
+                        cursor: 'pointer',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: 'var(--ck-text-2)' }}>{r.lead.name}</span>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: 'var(--ck-text-3)',
+                          flexShrink: 0,
+                          maxWidth: '55%',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {r.lead.headline}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </section>
   )

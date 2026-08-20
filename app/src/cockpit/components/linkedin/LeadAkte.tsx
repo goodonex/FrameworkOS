@@ -186,12 +186,17 @@ export function LeadAkte({
                   padding: '3px 10px',
                   borderRadius: 'var(--ck-radius-pille)',
                   background: stand.faellig ? 'var(--ck-accent)' : 'var(--ck-panel-2)',
-                  color: stand.faellig ? 'var(--ck-accent-text)' : 'var(--ck-text-2)',
+                  // Dunkel auf dem hellen Akzent — siehe Badge.tsx.
+                  color: stand.faellig ? 'var(--ck-bg)' : 'var(--ck-text-2)',
                 }}
               >
                 {STATION_TITEL[stand.station]}
               </span>
-              <span style={{ fontSize: 12, color: 'var(--ck-text-3)' }}>{stand.naechsterSchritt}</span>
+              {/* Nur zeigen, wenn er mehr sagt als das Etikett daneben —
+                  „Wartet auf Antwort · Wartet auf Antwort" liest sich wie ein Fehler. */}
+              {stand.naechsterSchritt !== STATION_TITEL[stand.station] ? (
+                <span style={{ fontSize: 12, color: 'var(--ck-text-3)' }}>{stand.naechsterSchritt}</span>
+              ) : null}
             </div>
           </div>
           <button type="button" className="ck-btn" onClick={onClose} aria-label="Schließen">

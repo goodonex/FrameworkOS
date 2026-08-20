@@ -27,6 +27,7 @@ import {
   type LeadKandidat,
 } from '../app/src/cockpit/lib/leadIdentitaet'
 import { verlaufVon } from '../app/src/cockpit/lib/linkedinVerlauf'
+import { istKunde, kundenSchluessel, type KundenKontakt } from '../app/src/cockpit/lib/kundenAbgleich'
 
 const SUPABASE_URL = (process.env.SUPABASE_URL ?? '').replace(/\/$/, '')
 const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? ''
@@ -385,8 +386,17 @@ const threadLeads = new Set(
     .filter((x): x is string => Boolean(x)),
 )
 
+/** lead_id → bester bekannter Zeitpunkt aus dem Thread. */
+const threadDatum = new Map<string, string>()
+for (const t of threadsFrisch) {
+  if (!t.lead_id) continue
+  const wert = t.last_message_at ?? t.first_seen_at
+  if (wert) threadDatum.set(t.lead_id, wert)
+}
+
 let verbucht = 0
 let ausInMail = 0
+let ohneDatum = 0
 for (const e of erstFrisch) {
   if (e.status !== 'offen' || !e.lead_id) continue
   if (!threadLeads.has(e.lead_id)) continue
@@ -394,16 +404,55 @@ for (const e of erstFrisch) {
     ausInMail++
     continue
   }
+  /**
+   * **Niemals `new Date()` als Versanddatum.** Der erste Lauf tat genau das —
+   * und stempelte 76 Erstnachrichten auf „heute 14:36". Im Tagesjournal stand
+   * damit ein Arbeitstag, den es nie gab. Das Datum des Threads ist die einzige
+   * belastbare Näherung: Wann zuletzt in diesem Gespräch etwas passiert ist.
+   * Fehlt selbst das, bleibt die Zeile lieber undatiert offen als falsch datiert.
+   */
+  const beweis = threadDatum.get(e.lead_id)
+  if (!beweis) {
+    ohneDatum++
+    continue
+  }
   await patch(`linkedin_erstnachrichten?id=eq.${e.id}`, {
     status: 'gesendet',
-    // Der Thread ist der Beweis; sein Datum ist die beste verfügbare Näherung.
-    sent_at: e.sent_at ?? new Date().toISOString(),
+    sent_at: e.sent_at ?? beweis,
   })
   verbucht++
 }
 console.log(
   `Erstnachrichten automatisch verbucht: ${verbucht}` +
-    (ausInMail ? ` · ${ausInMail} bleiben offen (Einladung noch offen → InMail-Fall)` : ''),
+    (ausInMail ? ` · ${ausInMail} bleiben offen (Einladung noch offen → InMail-Fall)` : '') +
+    (ohneDatum ? ` · ${ohneDatum} ohne belastbares Datum uebersprungen` : ''),
 )
+
+/* ── Runde 6: Kunden sind keine Leads ──────────────────────────────────────
+ *
+ * Kevins Satz vom 18.08.: *„Reichentrog ist mein ICP, aber auch schon mein
+ * Kunde — und das hättest du vielleicht checken können."* Beim ersten Blick auf
+ * die neue Pipeline stand er prompt wieder unter „Antwort da". Die Regel dafür
+ * existiert längst (`kundenAbgleich.ts`); neu ist, dass sie nicht nur beim
+ * Anzeigen greift, sondern **am Lead festgeschrieben** wird. `lead_status:
+ * 'kunde'` ist in `leadStation` eine Endstation — damit fällt der Lead aus
+ * jeder Akquise-Liste heraus, in jeder Ansicht, ein für alle Mal. */
+
+const kontakte = await alle<KundenKontakt & { name: string }>(
+  `contacts?brand_id=eq.${bid}&select=name,pipeline_stage,won_at,contact_type&order=name`,
+)
+const kunden = kundenSchluessel(kontakte)
+let alsKundeMarkiert = 0
+for (const lead of await alle<{ id: string; name: string; lead_status: string }>(
+  `leads?brand_id=eq.${bid}&select=id,name,lead_status&order=id`,
+)) {
+  if (lead.lead_status === 'kunde') continue
+  // Aussortierte bleiben aussortiert — Kevins Entscheidung sticht die Ableitung.
+  if (lead.lead_status === 'disqualifiziert') continue
+  if (!istKunde(lead.name, kunden)) continue
+  await patch(`leads?id=eq.${lead.id}`, { lead_status: 'kunde', updated_at: new Date().toISOString() })
+  alsKundeMarkiert++
+}
+console.log(`Als Kunde erkannt und aus der Akquise genommen: ${alsKundeMarkiert}`)
 
 console.log('\nleads-sync: fertig.')

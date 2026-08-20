@@ -50,6 +50,14 @@ export function useLeads(brandSlug: string | undefined): UseLeadsResult {
    * schlicht die Hälfte, ohne dass irgendwo ein Fehler auftaucht.
    */
   const ladeAlle = useCallback(
+    /**
+     * **Sortiert wird nach `id`, nicht nach Name oder Datum.** Beim Blättern
+     * muss die Sortierspalte eindeutig sein: Bei 14 doppelten Namen im Bestand
+     * kann PostgreSQL zwei Zeilen mit gleichem Wert über die Seitengrenze
+     * hinweg in beliebiger Reihenfolge liefern — dann erscheint eine Zeile
+     * zweimal und eine gar nicht, ohne dass irgendwo ein Fehler auftaucht.
+     * Sortiert wird deshalb hier stabil; die Anzeige sortiert sich selbst.
+     */
     async <T,>(tabelle: string, sortSpalte: string): Promise<T[] | 'fehlt' | null> => {
       if (!supabase || !brandId) return []
       const alle: T[] = []
@@ -83,7 +91,7 @@ export function useLeads(brandSlug: string | undefined): UseLeadsResult {
     }
     setLoading(true)
 
-    const geladeneLeads = await ladeAlle<Lead>('leads', 'name')
+    const geladeneLeads = await ladeAlle<Lead>('leads', 'id')
     if (geladeneLeads === 'fehlt') {
       setTableMissing(true)
       setLeads([])
@@ -97,7 +105,7 @@ export function useLeads(brandSlug: string | undefined): UseLeadsResult {
       return
     }
 
-    const geladeneEreignisse = await ladeAlle<LeadEreignis>('lead_ereignisse', 'at')
+    const geladeneEreignisse = await ladeAlle<LeadEreignis>('lead_ereignisse', 'id')
     setTableMissing(false)
     setError(null)
     setLeads(geladeneLeads)
