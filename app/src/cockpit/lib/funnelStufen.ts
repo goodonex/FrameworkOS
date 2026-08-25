@@ -207,6 +207,26 @@ export function wartetAufLoom(threads: LinkedinThread[], jetzt: Date = new Date(
 }
 
 /**
+ * **Stufe 4a — zugesagt, aber Entscheider ungeklärt.**
+ *
+ * Seit dem 24.08.2026 (Fall Ludwig Cords) geht die Analyse nicht mehr
+ * automatisch an jeden, der Ja sagt. Ist der Lead angestellt und entscheidet
+ * nicht selbst über die Website, wandert er hierher: zugesagt, aber noch nicht
+ * freigegeben. `wartetAufLoom` fragt weiterhin nur `'offen'` ab und lässt ihn
+ * dadurch aussen vor, auch in Jophiels Bauliste.
+ *
+ * Diese Stufe ist der Grund, warum die Loom-Zahl sinkt und die Antwortzahl
+ * steigt. Beides ist gewollt: eine Analyse an einen Nicht-Entscheider ist
+ * verschenkte Arbeit, eine Zuständigkeitsfrage bringt eine Antwort.
+ */
+export function zustaendigkeitOffen(threads: LinkedinThread[], jetzt: Date = new Date()): FunnelPerson[] {
+  return threads
+    .filter((t) => t.starred && t.loom_status === 'zustaendigkeit')
+    .map((t) => personAusThread(t, jetzt))
+    .sort((a, b) => (b.tage ?? -1) - (a.tage ?? -1))
+}
+
+/**
  * **Stufe 5 — die Einladung wurde nie angenommen (InMail-Kandidaten).**
  *
  * `letzterVollerLauf` ist die Schutzklausel (D4): Nur Einträge, die im letzten
@@ -244,11 +264,13 @@ export interface FunnelStufen {
   angenommenOffen: FunnelPerson[]
   ohneAntwortErst: FunnelPerson[]
   ohneAntwortNachgefasst: FunnelPerson[]
+  /** 0077: zugesagt, aber Entscheider noch ungeklärt. */
+  zustaendigkeit: FunnelPerson[]
   loomOffen: FunnelPerson[]
   inmail: FunnelPerson[]
 }
 
-/** Alle fünf Listen auf einmal — der eine Aufruf für die Oberfläche. */
+/** Alle Listen auf einmal — der eine Aufruf für die Oberfläche. */
 export function funnelStufen(
   {
     netzwerk,
@@ -268,6 +290,7 @@ export function funnelStufen(
     angenommenOffen: angenommenOhneErstnachricht(netzwerk, threads, erstnachrichten, jetzt),
     ohneAntwortErst: antwort.erstkontakt,
     ohneAntwortNachgefasst: antwort.nachgefasst,
+    zustaendigkeit: zustaendigkeitOffen(threads, jetzt),
     loomOffen: wartetAufLoom(threads, jetzt),
     inmail: inmailKandidaten(netzwerk, letzterVollerEinladungsLauf, jetzt),
   }

@@ -22,6 +22,10 @@ interface UseLinkedinThreadsResult {
   markDone: (thread: LinkedinThread) => Promise<void>
   /** Loom aufgenommen und verschickt (Migration 0061, Wargame-Arbeitsmodus Zug 4). */
   markLoomVerschickt: (id: string) => Promise<void>
+  /** 0077: zugesagt, aber jemand anderes entscheidet über die Website. */
+  markEntscheiderOffen: (id: string) => Promise<void>
+  /** 0077: Zuständigkeit geklärt — zurück in die Loom-Bauliste. */
+  markLoomFreigegeben: (id: string) => Promise<void>
 }
 
 /** Liest linkedin_threads für die aktive Brand (Wargame Zug 7, docs/wargames/linkedin-followups.md). */
@@ -130,5 +134,24 @@ export function useLinkedinThreads(brandSlug: string | undefined): UseLinkedinTh
     [applyPatch],
   )
 
-  return { items, loading, tableMissing, error, reload, snooze, wake, markDone, markLoomVerschickt }
+  /**
+   * 0077: Der Lead hat zugesagt, entscheidet aber nicht selbst über die
+   * Website. Er verschwindet damit aus der Loom-Bauliste, bis geklärt ist, wer
+   * zuständig ist. Der Stern bleibt: die Zusage gilt weiter.
+   */
+  const markEntscheiderOffen = useCallback(
+    (id: string) => applyPatch(id, { loom_status: 'zustaendigkeit' }),
+    [applyPatch],
+  )
+
+  /** Zuständigkeit geklärt: zurück in die Bauliste. */
+  const markLoomFreigegeben = useCallback(
+    (id: string) => applyPatch(id, { loom_status: 'offen' }),
+    [applyPatch],
+  )
+
+  return {
+    items, loading, tableMissing, error, reload, snooze, wake, markDone,
+    markLoomVerschickt, markEntscheiderOffen, markLoomFreigegeben,
+  }
 }

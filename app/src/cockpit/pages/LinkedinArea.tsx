@@ -52,6 +52,8 @@ function ThreadCard({
   onMarkDone,
   onGenerateDraft,
   onLoomVerschickt,
+  onEntscheiderOffen,
+  onLoomFreigeben,
 }: {
   thread: LinkedinThread
   now: number
@@ -60,6 +62,8 @@ function ThreadCard({
   onMarkDone: (t: LinkedinThread) => void
   onGenerateDraft: (t: LinkedinThread) => void
   onLoomVerschickt: (t: LinkedinThread) => void
+  onEntscheiderOffen: (t: LinkedinThread) => void
+  onLoomFreigeben: (t: LinkedinThread) => void
 }) {
   const days = daysSince(thread.last_message_at, now)
   // Der Stern ist die Zusage zur Loom-Analyse; erledigt ist sie erst, wenn das
@@ -151,6 +155,30 @@ function ThreadCard({
             onClick={() => onLoomVerschickt(thread)}
           >
             Loom verschickt ✓
+          </button>
+        ) : null}
+        {/* 0077: Wer nicht selbst über die Website entscheidet, bekommt keine
+            Analyse. Der Stern bleibt, der Lead fällt nur aus der Bauliste. */}
+        {thread.starred && thread.loom_status === 'offen' ? (
+          <button
+            type="button"
+            className="ck-btn"
+            style={{ fontSize: 10 }}
+            title="Entscheidet nicht selbst über die Website — nimmt ihn aus der Loom-Bauliste, bis geklärt ist, wer zuständig ist"
+            onClick={() => onEntscheiderOffen(thread)}
+          >
+            Entscheider offen
+          </button>
+        ) : null}
+        {thread.starred && thread.loom_status === 'zustaendigkeit' ? (
+          <button
+            type="button"
+            className="ck-btn"
+            style={{ fontSize: 10, color: 'var(--ck-accent)', borderColor: 'var(--ck-accent)' }}
+            title="Zuständigkeit ist geklärt — zurück in die Loom-Bauliste"
+            onClick={() => onLoomFreigeben(thread)}
+          >
+            Zuständigkeit geklärt
           </button>
         ) : null}
         <button type="button" className="ck-btn" style={{ fontSize: 10 }} onClick={() => onSnoozeTomorrow(thread)}>
@@ -287,6 +315,8 @@ function ThreadSection({
   onMarkDone,
   onGenerateDraft,
   onLoomVerschickt,
+  onEntscheiderOffen,
+  onLoomFreigeben,
 }: {
   titel: string
   hinweis?: string
@@ -298,6 +328,8 @@ function ThreadSection({
   onMarkDone: (t: LinkedinThread) => void
   onGenerateDraft: (t: LinkedinThread) => void
   onLoomVerschickt: (t: LinkedinThread) => void
+  onEntscheiderOffen: (t: LinkedinThread) => void
+  onLoomFreigeben: (t: LinkedinThread) => void
 }) {
   const [alleZeigen, setAlleZeigen] = useState(false)
   if (threads.length === 0 && !leerText) return null
@@ -324,6 +356,8 @@ function ThreadSection({
               onMarkDone={onMarkDone}
               onGenerateDraft={onGenerateDraft}
               onLoomVerschickt={onLoomVerschickt}
+              onEntscheiderOffen={onEntscheiderOffen}
+              onLoomFreigeben={onLoomFreigeben}
             />
           ))}
           {rest > 0 ? (
@@ -674,6 +708,8 @@ export function LinkedinArea({ eingebettet = false }: { eingebettet?: boolean } 
             onMarkDone={(th) => void threadsQuery.markDone(th)}
             onGenerateDraft={(th) => void generateDraft(th)}
             onLoomVerschickt={(th) => void threadsQuery.markLoomVerschickt(th.id)}
+            onEntscheiderOffen={(th) => void threadsQuery.markEntscheiderOffen(th.id)}
+            onLoomFreigeben={(th) => void threadsQuery.markLoomFreigegeben(th.id)}
           />
 
           <ThreadSection
@@ -687,6 +723,8 @@ export function LinkedinArea({ eingebettet = false }: { eingebettet?: boolean } 
             onMarkDone={(th) => void threadsQuery.markDone(th)}
             onGenerateDraft={(th) => void generateDraft(th)}
             onLoomVerschickt={(th) => void threadsQuery.markLoomVerschickt(th.id)}
+            onEntscheiderOffen={(th) => void threadsQuery.markEntscheiderOffen(th.id)}
+            onLoomFreigeben={(th) => void threadsQuery.markLoomFreigegeben(th.id)}
           />
 
           <ThreadSection
@@ -699,6 +737,8 @@ export function LinkedinArea({ eingebettet = false }: { eingebettet?: boolean } 
             onMarkDone={(th) => void threadsQuery.markDone(th)}
             onGenerateDraft={(th) => void generateDraft(th)}
             onLoomVerschickt={(th) => void threadsQuery.markLoomVerschickt(th.id)}
+            onEntscheiderOffen={(th) => void threadsQuery.markEntscheiderOffen(th.id)}
+            onLoomFreigeben={(th) => void threadsQuery.markLoomFreigegeben(th.id)}
           />
 
           {/* Der eigene Altlasten-Abschnitt ist am 14.08.2026 entfallen: was über

@@ -6,7 +6,8 @@ import type { Erstnachricht } from '../../../hooks/useErstnachrichten'
 import type { LinkedinThread } from '../../../types/db'
 
 /**
- * Der Trichter als vier Kacheln (12.08.2026).
+ * Der Trichter als fünf Kacheln (12.08.2026, seit 24.08. mit der Stufe
+ * „Entscheider offen“ vor dem Loom).
  *
  * Kevins Frage war: „wie viele Vernetzungsanfragen sind noch offen, wer wartet
  * auf Antwort, auf ein Loom, wer hat nie angenommen." Genau diese vier Zahlen
@@ -145,7 +146,7 @@ export function FunnelStufen({
     [netzwerk, threads, erstnachrichten, letzterVollerEinladungsLauf, jetzt],
   )
 
-  /** Ohne Netzwerk-Daten sind zwei der vier Kacheln blind — das wird gesagt, nicht mit 0 kaschiert. */
+  /** Ohne Netzwerk-Daten sind zwei der fünf Kacheln blind — das wird gesagt, nicht mit 0 kaschiert. */
   const netzwerkDa = netzwerk.length > 0
   const frische = frischeText(letzterVollerEinladungsLauf, jetzt)
 
@@ -161,6 +162,12 @@ export function FunnelStufen({
       titel: 'Angeschrieben · keine Antwort',
       hinweis: `${stufen.ohneAntwortErst.length} noch nie nachgefasst · ${stufen.ohneAntwortNachgefasst.length} schon`,
       personen: [...stufen.ohneAntwortErst, ...stufen.ohneAntwortNachgefasst],
+    },
+    {
+      id: 'zustaendigkeit',
+      titel: 'Zugesagt · Entscheider offen',
+      hinweis: 'Wartet auf die Antwort, wer über die Website entscheidet.',
+      personen: stufen.zustaendigkeit,
     },
     {
       id: 'loom',
