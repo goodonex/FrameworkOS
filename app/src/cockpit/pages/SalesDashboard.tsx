@@ -24,6 +24,7 @@ import { bereiteDatenVor, salesSerie, type SalesStreak } from '../lib/salesStrea
 import {
   TAGES_FLOW,
   ersteOffeneStufe,
+  flowFortschritt,
   flowQuellen,
   type Stufe,
   type StufenId,
@@ -250,7 +251,24 @@ export function FlowZeile({ zeile, onOeffnen }: { zeile: FlowZeileDef; onOeffnen
   )
 }
 
-export function KachelFenster({ kachel, onClose }: { kachel: KachelDef; onClose: () => void }) {
+export function KachelFenster({
+  kachel,
+  onClose,
+  layoutId,
+}: {
+  kachel: KachelDef
+  onClose: () => void
+  /**
+   * Aus welchem Element das Fenster wächst.
+   *
+   * Muss von aussen kommen, seit dasselbe Fenster von zwei Stellen aufgeht:
+   * von einer Canvas-Karte und von der Flow-Zeile darunter. Trügen beide
+   * dieselbe `layoutId`, versuchte framer-motion zwischen ihnen zu morphen —
+   * bei offenen Balken geisterten Karte und Zeile ineinander (am 25.08. im
+   * Browser gesehen). Zwei Kennungen, und das Fenster nimmt die des Auslösers.
+   */
+  layoutId?: string
+}) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -276,7 +294,7 @@ export function KachelFenster({ kachel, onClose }: { kachel: KachelDef; onClose:
       }}
     >
       <motion.div
-        layoutId={`kachel-${kachel.id}`}
+        layoutId={layoutId ?? `kachel-${kachel.id}`}
         transition={{ duration: 0.22, ease: 'easeOut' }}
         onClick={(e) => e.stopPropagation()}
         className="ck-panel"
@@ -397,6 +415,8 @@ export function SalesDashboard() {
   const { runner, runs, refresh: refreshRuns } = useRunnerData()
 
   const [offenKachelId, setOffenKachelId] = useState<string | null>(null)
+  /** Die `layoutId` des Auslösers — Karte oder Balken, siehe `KachelFenster`. */
+  const [offenVon, setOffenVon] = useState<string | null>(null)
   /** Snapshot beim Öffnen — die Live-Listen schrumpfen beim Abhaken (optimistische
       Updates) und würden sonst unter dem laufenden Index wegrutschen: jeder
       zweite Posten würde übersprungen und nie angezeigt. */
@@ -1073,6 +1093,24 @@ export function SalesDashboard() {
     loom_offen: 'looms',
   }
 
+  /**
+   * Die alten Flow-Balken sind seit dem Canvas eine Rückfrage, kein Ausgangspunkt:
+   * Sie zeigen dasselbe Tagespensum, das oben schon an den Karten steht. Sie
+   * bleiben trotzdem — die InMail-Welle und der Anfragen-Zähler wohnen dort,
+   * und die Serien („n Werktage in Folge") gibt es auf den Karten nicht.
+   *
+   * Der Zustand liegt in `ui_settings` (0068), damit er das Löschen-und-neu-
+   * Hinzufügen der PWA überlebt. **Nie ungeprüft übernehmen:** Der Wert kommt
+   * aus einer Key-Value-Tabelle und war dort schon alles Mögliche. `=== true`
+   * statt Truthiness — sonst klappte ein versehentliches `"nein"` die Balken auf.
+   */
+  const { wert: balkenRoh, setzen: setzeBalken } = useUiSetting<boolean>('salesBalkenOffen', false)
+  const balkenOffen = balkenRoh === true
+
+  /** Wie viele Menschen stehen überhaupt in Kevins Kosmos — inklusive der Aussortierten. */
+  const leadZahl = leadsQuery.leads.length
+  const tagesFortschritt = flowFortschritt(staende)
+
   const rohKarten = useMemo(
     () => funnelKarten({ leads: funnelLeads, staende, jetzt }),
     [funnelLeads, staende, jetzt],
@@ -1154,9 +1192,10 @@ export function SalesDashboard() {
       // erste offene Zeile des Rituals. Solange der Flow lädt: warten.
       if (flow.laedt) return
       const ziel = aktivIndex >= 0 ? flowZeilen[aktivIndex] : null
-      if (ziel) setOffenKachelId(ziel.id)
+      // Ohne Auslöser im Bild gibt es nichts, woraus das Fenster wachsen könnte.
+      if (ziel) oeffneKachel(ziel.id)
     } else if (kachelParam && alleZeilen.some((k) => k.id === kachelParam)) {
-      setOffenKachelId(kachelParam)
+      oeffneKachel(kachelParam)
     }
 
     const next = new URLSearchParams(suchParams)
@@ -1170,13 +1209,15 @@ export function SalesDashboard() {
   }, [kachelParam, modusParam, isMobile, geordnet.length, postenLaedt, flow.laedt, aktivIndex])
 
   const oeffneKachel = useCallback(
-    (id: string) => {
+    /** `von` ist die `layoutId` des Auslösers — ohne sie wächst das Fenster aus dem Nichts. */
+    (id: string, von?: string) => {
       // Der Anfragen-Zähler ist am Handy ein Vollbild mit einem Knopf —
       // genau dafür war das Vollbild gedacht, nirgendwo sonst.
       if (id === 'vernetzungsanfragen' && isMobile) {
         setAnfragenVollbild(true)
         return
       }
+      setOffenVon(von ?? null)
       setOffenKachelId(id)
     },
     [isMobile],
@@ -1196,6 +1237,31 @@ export function SalesDashboard() {
           </div>
         ) : null}
 
+        {/* Die eine Zeile über dem Funnel: wie groß ist der Kosmos, und wie
+            weit ist der Tag. Bewusst keine Kachel — sie steht über allem und
+            konkurriert nicht mit den Karten darunter. */}
+        <div
+          className="ck-zahl"
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            gap: 10,
+            flexWrap: 'wrap',
+            fontSize: 13,
+            color: 'var(--ck-text-2)',
+            paddingInline: 4,
+          }}
+        >
+          <span>
+            {leadsQuery.loading ? '…' : leadZahl.toLocaleString('de-DE')} Leads im Kosmos
+          </span>
+          <span style={{ color: flow.laedt ? 'var(--ck-text-3)' : undefined }}>
+            {flow.laedt
+              ? 'Tag lädt …'
+              : `Tag ${tagesFortschritt.erledigt} von ${tagesFortschritt.gesamt}`}
+          </span>
+        </div>
+
         {/* Das Canvas: der Funnel als Karten. Bestand rechts, Tagespensum
             klein darunter — die Balken darunter zeigen dasselbe Pensum noch
             einmal, bis Z4 sie einklappt. */}
@@ -1204,32 +1270,71 @@ export function SalesDashboard() {
         ) : (
           <FunnelCanvas
             karten={karten}
-            onOeffnen={(k) => oeffneKachel(ALT_KACHEL[k.id] ?? k.id)}
+            onOeffnen={(k) => oeffneKachel(ALT_KACHEL[k.id] ?? k.id, `canvas-${k.id}`)}
             // Öffenbar ist, wofür es eine Arbeitsliste oder ein bestehendes
             // Fenster gibt. Eine Karte, die auf Klick nichts zeigt, ist
             // schlimmer als eine, die gar nicht erst klickbar aussieht.
             oeffenbar={(k) => listeJeKarte.has(k.id) || ALT_KACHEL[k.id] !== undefined}
-            layoutIdFuer={(k) => `kachel-${ALT_KACHEL[k.id] ?? k.id}`}
+            // Eigener Namensraum: Die Flow-Balken darunter tragen `kachel-…`
+            // für dieselbe Sache. Gleiche Kennung zweimal im Bild heisst
+            // Geister-Morph, sobald die Balken aufgeklappt sind.
+            layoutIdFuer={(k) => `canvas-${k.id}`}
           />
         )}
 
-        <div className="ck-label" style={{ marginTop: 10 }}>
-          Tagespensum
-        </div>
-        {flowZeilen.map((z) => (
-          <FlowZeile key={z.id} zeile={z} onOeffnen={() => oeffneKachel(z.id)} />
-        ))}
+        {/* Das Tagespensum steht jetzt an den Karten. Die Balken bleiben als
+            Rückfrage erreichbar — mit Serien, Anfragen-Zähler und InMail-Welle,
+            die es auf den Karten nicht gibt. Standardmäßig zu. */}
+        <button
+          type="button"
+          onClick={() => setzeBalken(!balkenOffen)}
+          aria-expanded={balkenOffen}
+          className="ck-label"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            width: '100%',
+            minHeight: 40,
+            marginTop: 10,
+            padding: '6px 4px',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            textAlign: 'left',
+          }}
+        >
+          <span aria-hidden="true">{balkenOffen ? '▾' : '▸'}</span>
+          <span>Tagespensum</span>
+          <span className="ck-zahl" style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 400 }}>
+            {flow.laedt ? '' : `${tagesFortschritt.erledigt} von ${tagesFortschritt.gesamt} Stufen stehen`}
+          </span>
+        </button>
+        {balkenOffen
+          ? flowZeilen.map((z) => (
+              <FlowZeile key={z.id} zeile={z} onOeffnen={() => oeffneKachel(z.id, `kachel-${z.id}`)} />
+            ))
+          : null}
 
         <div className="ck-label" style={{ marginTop: 10 }}>
           Neben dem Ritual
         </div>
         {projektZeilen.map((z) => (
-          <FlowZeile key={z.id} zeile={z} onOeffnen={() => oeffneKachel(z.id)} />
+          <FlowZeile key={z.id} zeile={z} onOeffnen={() => oeffneKachel(z.id, `kachel-${z.id}`)} />
         ))}
       </div>
 
       <AnimatePresence>
-        {offenKachel ? <KachelFenster kachel={offenKachel} onClose={() => setOffenKachelId(null)} /> : null}
+        {offenKachel ? (
+          <KachelFenster
+            kachel={offenKachel}
+            layoutId={offenVon ?? undefined}
+            onClose={() => {
+              setOffenKachelId(null)
+              setOffenVon(null)
+            }}
+          />
+        ) : null}
       </AnimatePresence>
 
       {anfragenVollbild ? (
