@@ -304,24 +304,49 @@ function merke(lead_id: string | null, typ: string, at: string | null, details: 
  * `erstnachricht`/`followup`/`loom_gesendet`-Ereignisse selbst, im Moment des
  * Hakens (`quelle: 'ui'`). Der Unique-Index `(lead_id, typ, at)` dedupliziert
  * nur bei EXAKT gleichem Zeitstempel — ein UI-Ereignis trägt die Klick-Zeit,
- * ein hier aus dem Verlauf/den Spalten abgeleitetes einen eigenen Zeitpunkt
- * (bei `loom_gesendet` `t.loom_erledigt_at`, von `markLoomVerschickt` selbst
- * Millisekunden vor dem UI-Ereignis gesetzt — also fast, aber nicht exakt
- * gleich). Ohne diese Sperre entstünde für denselben realen Vorgang eine
+ * ein hier aus dem Verlauf/den Spalten abgeleitetes die Zeit der
+ * LinkedIn-Nachricht. Ohne Sperre entstünde für denselben realen Vorgang eine
  * zweite Zeile, und jede Rate, die daraus gerechnet wird, zählt zu hoch.
  *
- * Deshalb: Sobald ein Lead für einen Typ schon ein UI-Ereignis hat, leitet
- * diese Routine für genau diesen Typ nichts mehr aus dem Verlauf/den Spalten
- * ab — die bleiben nur die Quelle für Leads, die das Cockpit noch nie selbst
- * verbucht hat (Altbestand, oder Erstnachrichten aus der Vault-Vorlage statt
- * aus der Arbeitsliste).
+ * **Die Sperre gilt je Vorgang, nicht je Lead.** Die erste Fassung vom
+ * 25.08. sperrte auf `lead_id + typ` — und hätte damit einen echten
+ * Datenverlust gebaut: Ein Lead hat bis zu DREI `followup`-Ereignisse. Hakt
+ * Kevin heute das dritte ab und der Chrome-Sync spiegelt morgen den Verlauf
+ * mit den beiden älteren nach, wären die für immer verloren gewesen — die
+ * Historie zeigte 1 statt 3, und genau daraus soll die Conversion gerechnet
+ * werden. Der Fehler war nicht sichtbar, weil `followup` bei 0 Zeilen stand:
+ * Es gab noch nichts zu verlieren.
+ *
+ * Deshalb entscheidet die ZEITNÄHE: Ein UI-Ereignis und ein abgeleitetes sind
+ * derselbe Vorgang, wenn sie höchstens {@link UI_FENSTER_TAGE} auseinander
+ * liegen. Kevin hakt ab, wenn er die Nachricht verschickt — Minuten bis
+ * Stunden Abstand, nie Wochen. Ein Follow-up vom Juli bleibt damit
+ * ableitbar, während der heutige Klick sich nicht verdoppelt.
  */
-const uiEreignisse = await alle<{ lead_id: string; typ: string }>(
-  `lead_ereignisse?brand_id=eq.${bid}&quelle=eq.ui&typ=in.(erstnachricht,followup,loom_gesendet)&select=lead_id,typ`,
+const UI_FENSTER_TAGE = 1
+const UI_FENSTER_MS = UI_FENSTER_TAGE * 24 * 60 * 60 * 1000
+
+const uiEreignisse = await alle<{ lead_id: string; typ: string; at: string }>(
+  `lead_ereignisse?brand_id=eq.${bid}&quelle=eq.ui&typ=in.(erstnachricht,followup,loom_gesendet)&select=lead_id,typ,at`,
 )
-const uiSchonDa = new Set(uiEreignisse.map((e) => `${e.lead_id}|${e.typ}`))
-function schonPerUiErfasst(lead_id: string | null, typ: string): boolean {
-  return lead_id != null && uiSchonDa.has(`${lead_id}|${typ}`)
+/** Je `lead_id|typ` die Zeitpunkte, die das Cockpit selbst verbucht hat. */
+const uiZeiten = new Map<string, number[]>()
+for (const e of uiEreignisse) {
+  const t = new Date(e.at).getTime()
+  if (Number.isNaN(t)) continue
+  const key = `${e.lead_id}|${e.typ}`
+  const liste = uiZeiten.get(key)
+  if (liste) liste.push(t)
+  else uiZeiten.set(key, [t])
+}
+
+function schonPerUiErfasst(lead_id: string | null, typ: string, at: string | null): boolean {
+  if (!lead_id || !at) return false
+  const zeiten = uiZeiten.get(`${lead_id}|${typ}`)
+  if (!zeiten) return false
+  const t = new Date(at).getTime()
+  if (Number.isNaN(t)) return false
+  return zeiten.some((ui) => Math.abs(ui - t) <= UI_FENSTER_MS)
 }
 
 const netzFrisch = await alle<NetzZeile>(
@@ -350,7 +375,7 @@ for (const t of threadsFrisch) {
     if (nachricht.sender === 'me') {
       vonKevin++
       const typ = vonKevin === 1 ? 'erstnachricht' : 'followup'
-      if (!schonPerUiErfasst(t.lead_id, typ)) {
+      if (!schonPerUiErfasst(t.lead_id, typ, nachricht.ts)) {
         merke(t.lead_id, typ, nachricht.ts, { auszug: nachricht.text.slice(0, 200) })
       }
     } else if (nachricht.sender === 'them') {
@@ -360,14 +385,17 @@ for (const t of threadsFrisch) {
   // Kein Verlauf, aber eine letzte Nachricht: wenigstens diese festhalten.
   if (!verlauf.length && t.last_message_at) {
     if (t.last_from === 'them') merke(t.lead_id, 'antwort_erhalten', t.last_message_at)
-    else if (!schonPerUiErfasst(t.lead_id, 'erstnachricht')) merke(t.lead_id, 'erstnachricht', t.last_message_at)
+    else if (!schonPerUiErfasst(t.lead_id, 'erstnachricht', t.last_message_at))
+      merke(t.lead_id, 'erstnachricht', t.last_message_at)
   }
   if (t.starred && t.last_message_at) merke(t.lead_id, 'loom_zugesagt', t.last_message_at)
-  if (!schonPerUiErfasst(t.lead_id, 'loom_gesendet')) merke(t.lead_id, 'loom_gesendet', t.loom_erledigt_at)
+  if (!schonPerUiErfasst(t.lead_id, 'loom_gesendet', t.loom_erledigt_at))
+    merke(t.lead_id, 'loom_gesendet', t.loom_erledigt_at)
 }
 
 for (const e of erstFrisch) {
-  if (e.status === 'gesendet' && !schonPerUiErfasst(e.lead_id, 'erstnachricht')) merke(e.lead_id, 'erstnachricht', e.sent_at)
+  if (e.status === 'gesendet' && !schonPerUiErfasst(e.lead_id, 'erstnachricht', e.sent_at))
+    merke(e.lead_id, 'erstnachricht', e.sent_at)
 }
 
 console.log(`Ereignisse vorbereitet: ${ereignisse.length}`)

@@ -568,7 +568,10 @@ export function SalesDashboard() {
         },
       })
     },
-    [metrics.bump, erstnachrichten, linkedinThreads, tasks, schreibeDauer, leadsQuery],
+    // `leadsQuery.protokolliere` statt `leadsQuery`: der Hook gibt bei jedem
+    // Render ein neues Objektliteral zurück, die Funktion darin ist ein
+    // useCallback auf [brandId] und damit stabil.
+    [metrics.bump, erstnachrichten, linkedinThreads, tasks, schreibeDauer, leadsQuery.protokolliere],
   )
 
   const aktiveAgenten = useMemo(() => runs.filter((r) => r.status === 'running').map((r) => r.agent), [runs])
