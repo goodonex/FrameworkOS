@@ -2508,6 +2508,22 @@ const warteLog = new Map()
 const CHROME_AUTOSTART = process.env.CHROME_AUTOSTART !== '0'
 const CHROME_START_ABSTAND_MS = 60 * 60 * 1000
 /**
+ * Wie lange die Sperre gilt, wenn der Start NICHT geklappt hat (25.08.).
+ *
+ * Am 24.08. stand der Postfach-Sync 26 Stunden still. Der Runner hatte um
+ * 13:20 ein Chrome gestartet, das nie hochkam — und weil die Marke schon vor
+ * dem Start geschrieben wird, galt danach trotzdem die volle Stundensperre.
+ * Eine Stunde Blindheit als Preis für einen Versuch, der nachweislich
+ * gescheitert ist, ist zu teuer.
+ *
+ * Die Marke bleibt bewusst VOR dem Start stehen: Sie ist der Schutz gegen den
+ * Start-Sturm, der Kevin am 20.08. genervt hat („immer wieder geht Chrome
+ * auf"). Nur wird sie jetzt zurückdatiert, wenn die Nachprüfung zeigt, dass
+ * kein Chrome hochgekommen ist. Gelungener Start: eine Stunde Ruhe.
+ * Gescheiterter: zehn Minuten.
+ */
+const CHROME_FEHLSTART_ABSTAND_MS = 10 * 60 * 1000
+/**
  * Die Stunden-Sperre liegt auf Platte, nicht im Prozess (20.08.).
  *
  * Als reine Modul-Variable war sie wirkungslos: Der Runner laeuft unter
@@ -2550,7 +2566,15 @@ function letzterChromeStartAus() {
   }
 }
 
-function starteSyncChrome() {
+/** Sperre zurückdatieren, damit der nächste Tick es früher erneut versuchen darf. */
+function chromeFehlstartVermerken() {
+  markeSchreib(
+    'letzter-chrome-start',
+    Date.now() - (CHROME_START_ABSTAND_MS - CHROME_FEHLSTART_ABSTAND_MS),
+  )
+}
+
+async function starteSyncChrome() {
   const stunde = new Date().getHours()
   if (!CHROME_AUTOSTART || stunde < 6 || stunde >= 20) return
   if (Date.now() - letzterChromeStartAus() < CHROME_START_ABSTAND_MS) return
@@ -2582,7 +2606,24 @@ function starteSyncChrome() {
     console.log('[runner] Sync-Chrome war zu — selbst gestartet, der nächste Tick prüft nach')
   } catch (e) {
     console.error('[runner] Sync-Chrome konnte nicht starten:', e?.message ?? e)
+    chromeFehlstartVermerken()
+    return
   }
+
+  // Nachfassen statt hoffen: `open` meldet Erfolg, sobald der Startbefehl
+  // abgesetzt ist — ob Chrome auch oben bleibt, steht damit noch nicht fest.
+  // Auf einem Rechner mit 8 GB beendet macOS es unter Speicherdruck gern
+  // gleich wieder, und genau dieser Fall sah bisher aus wie ein Erfolg.
+  for (let i = 0; i < 6; i++) {
+    await new Promise((r) => setTimeout(r, 5000))
+    if (await chromeErreichbar()) return
+  }
+  console.error(
+    '[runner] Sync-Chrome kam nicht hoch — nächster Versuch in ' +
+      Math.round(CHROME_FEHLSTART_ABSTAND_MS / 60000) +
+      ' Minuten',
+  )
+  chromeFehlstartVermerken()
 }
 
 /**
@@ -2656,7 +2697,7 @@ async function warteAufRechner(agent, { brauchtChrome = false } = {}) {
   const chrome = wach && brauchtChrome ? await chromeErreichbar() : true
   // Fehlt nur noch Chrome, ist das der eine Punkt, den der Runner selbst
   // erledigen kann — starten und beim nächsten Tick nachsehen.
-  if (wach && netz && brauchtChrome && !chrome) starteSyncChrome()
+  if (wach && netz && brauchtChrome && !chrome) void starteSyncChrome()
   let stand = startBereitAus({ wach, netz, chrome, brauchtChrome })
   // Steht der Rechner, entscheidet die Schleuse — das, was alle Agenten
   // gemeinsam brauchen, wird einmal geprüft und nicht von jedem einzeln.

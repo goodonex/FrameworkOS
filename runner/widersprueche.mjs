@@ -25,12 +25,31 @@ const STUNDE_MS = 3_600_000
 
 /** Ab wann ist ein Stand alt? Getrennt, weil die Quellen verschieden schnell altern. */
 export const GRENZEN = {
-  /** Das Postfach trägt Antworten — es ist die eiligste Quelle. */
-  postfachStunden: 48,
+  /**
+   * Das Postfach trägt Antworten — es ist die eiligste Quelle.
+   *
+   * 18 statt 48 Stunden (25.08.). Bei 48 blieb ein Ausfall vom 24.08. still:
+   * Der Sync stand 26 Stunden, die Loom-Warteschlange zeigte weiter den Stand
+   * von vorgestern, und der Wächter schwieg — die Schwelle war so großzügig,
+   * dass sie fast nur noch tote Setups gefunden hätte. 18 Stunden lassen die
+   * normale Nachtlücke durch (letzter Sync ~19 Uhr, erster ~9 Uhr = 14 Stunden),
+   * schlagen aber an, sobald ein ganzer Arbeitstag ohne Sync vergangen ist.
+   */
+  postfachStunden: 18,
   /** Das Netzwerk wächst langsam; eine Woche ist hier normal. */
   netzwerkTage: 7,
   /** Nachts laufen Routinen; anderthalb Tage ohne Erfolg heißt: etwas klemmt. */
   agentenStunden: 36,
+}
+
+/**
+ * Alter in Worten. Unter zwei Tagen in Stunden, darüber in Tagen: Seit die
+ * Postfach-Schwelle bei 18 Stunden liegt, hätte `Math.floor(alter / 24)` einen
+ * 26-Stunden-Ausfall als „1 Tagen" gemeldet — zu ungenau, um zu handeln.
+ */
+function alterText(stunden) {
+  if (stunden < 48) return `${Math.round(stunden)} Stunden`
+  return `${Math.floor(stunden / 24)} Tagen`
 }
 
 /** Namen vergleichbar machen — dieselbe Regel wie `funnelStufen.normName`. */
@@ -261,7 +280,7 @@ export function pruefeWidersprueche(daten, jetzt = new Date()) {
     melde(
       'postfach_alt',
       'hoch',
-      `LinkedIn-Postfach seit ${Math.floor(postfachAlter / 24)} Tagen nicht gesynct — alle Antwort- und Follow-up-Zahlen sind so alt`,
+      `LinkedIn-Postfach seit ${alterText(postfachAlter)} nicht gesynct — alle Antwort- und Follow-up-Zahlen sind so alt`,
       Math.round(postfachAlter),
       '`chrome-sync` starten und offen lassen',
     )
