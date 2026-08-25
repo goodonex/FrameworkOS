@@ -18,6 +18,7 @@ import { syncThreads, TIEFENSCAN_TAGE } from './linkedin/sync.mjs'
 import { upsertThreads } from './linkedin/upsert.mjs'
 import { ladeErstnachrichten } from './linkedin/erstnachrichten.mjs'
 import { baueAntwortInput, holeAntwortThreads } from './linkedin/antwortThreads.mjs'
+import { baueSortierInput, holeSortierThreads } from './linkedin/sortierThreads.mjs'
 import { parseDraftsRoh, parseUrteileRoh, schreibeEntwuerfe, schreibeUrteile } from './linkedin/entwuerfe.mjs'
 import { neuerLauf, nimmBrocken, protokollText } from './agentStream.mjs'
 import { bewerteTagesLaeufe, darfRoutineStarten } from './routineGuard.mjs'
@@ -275,6 +276,23 @@ const AGENT_CATALOG = [
     modell: 'claude-opus-5',
     effort: 'high',
     tools: 'Read,Glob,Grep,WebFetch,WebSearch',
+  },
+  {
+    id: 'linkedin-sortierer',
+    label: 'Lead-Sortierer (LinkedIn)',
+    description:
+      'Urteilt, wer in die Akquise-Liste gehört (lead/kontakt/akquise). Schreibt keine Nachrichten.',
+    kind: 'readonly',
+    // Kevins Vorgabe: „Da darf keiner wegfallen. Lieber einer zu viel als einer
+    // zu wenig, aber auch nicht zu lasch." Ein aussortierter Lead wird Kevin nie
+    // wieder vorgelegt — die Entscheidung ist dauerhaft und damit teuer. Deshalb
+    // dieselbe Einstellung wie beim Antwort-Agenten. Ohne WebFetch/WebSearch,
+    // mit Absicht: Geurteilt wird über Headline und Verlauf, nicht über eine
+    // Website-Recherche je Person. Sechzig Threads mal Websuche wären ein
+    // garantiertes Zeitlimit.
+    modell: 'claude-opus-5',
+    effort: 'high',
+    tools: 'Read,Glob,Grep',
   },
   {
     id: 'lead-research',
@@ -652,6 +670,47 @@ async function antwortEntwuerfeInput(now = new Date()) {
 }
 
 /**
+ * Nach einem fertigen `linkedin-sortierer`-Lauf: nur die Urteile wegschreiben.
+ *
+ * Bewusst nicht über `entwuerfeAnThreads`: Der Sortierer liefert keine Entwürfe,
+ * und ein gemeinsamer Pfad würde bei ihm jedes Mal „kein verwertbarer json-Block"
+ * loggen, sobald sich am Entwurfs-Format etwas ändert. Zwei Agenten, zwei
+ * Ergebnisse, zwei Schreiber — dieselbe Tabelle.
+ */
+async function urteileAnThreads(runId, markdown) {
+  if (!SNAPSHOT_ENABLED) return
+  try {
+    const urteile = parseUrteileRoh(markdown)
+    if (!urteile.length) {
+      console.warn(`[runner] ${runId}: Sortierer ohne verwertbare Urteile`)
+      return
+    }
+    const brandSlug = process.env.LINKEDIN_BRAND_SLUG ?? 'herrmann'
+    const br = await fetch(
+      `${SUPABASE_URL}/rest/v1/brands?slug=eq.${encodeURIComponent(brandSlug)}&select=id&limit=1`,
+      { headers: supabaseHeaders() },
+    )
+    const [brand] = br.ok ? await br.json() : []
+    if (!brand?.id) return
+
+    const r = await schreibeUrteile({
+      supabaseUrl: SUPABASE_URL,
+      headers: supabaseHeaders(),
+      brandId: brand.id,
+      urteile,
+    })
+    const je = urteile.reduce((k, u) => ({ ...k, [u.urteil]: (k[u.urteil] ?? 0) + 1 }), {})
+    console.log(
+      `[runner] Sortierer: ${r.geschrieben} Urteile geschrieben · ` +
+        `${je.lead ?? 0} bleiben, ${je.kontakt ?? 0} Kontakt, ${je.akquise ?? 0} aussortiert`,
+    )
+  } catch (e) {
+    // Ein Urteil ist Zusatznutzen. Der Bericht steht bereits in der Run-Datei.
+    console.error(`[runner] ${runId}: Urteile nicht geschrieben:`, e?.message ?? e)
+  }
+}
+
+/**
  * Nach einem fertigen `linkedin-antwort-entwuerfe`-Lauf: Entwürfe aus dem
  * Markdown lösen und an die Threads schreiben. Erst damit klebt der Entwurf am
  * Posten statt im Run — der Unterschied zwischen „ist irgendwo" und „ist da".
@@ -874,6 +933,7 @@ async function startRun(agent, input) {
         if (agent === 'linkedin-antwort-entwuerfe' || agent === 'linkedin-followup-entwuerfe') {
           await entwuerfeAnThreads(id, ergebnis)
         }
+        if (agent === 'linkedin-sortierer') await urteileAnThreads(id, ergebnis)
       } else {
         // O17: Statt „kein Output" steht hier jetzt, wie weit der Lauf kam.
         // 143 = 128+SIGTERM, 137 = 128+SIGKILL, null = per Signal beendet.
@@ -2398,6 +2458,7 @@ function planeNachDemAufwachen() {
     void maybePostfachSync()
     void maybeMorgenbrief()
     void maybeAntwortEntwuerfe()
+    void maybeSortierer()
   }, WACH_KARENZ_MS + 10_000)
   wachTimer.unref?.()
 }
@@ -2701,6 +2762,61 @@ async function maybeAntwortEntwuerfe() {
     await startRun('linkedin-antwort-entwuerfe', gebaut.input)
   } catch (e) {
     console.error('[runner] antwort-entwuerfe übersprungen:', e?.message ?? e)
+  }
+}
+
+/**
+ * Der Sortierer als Zeit-Routine (25.08.2026).
+ *
+ * Kevins Auftrag: *„Den Agenten, der vorsortiert, mach den auf jeden Fall. Den
+ * werden wir brauchen."* Die Wortlisten erwischten am 25.08. nur 12 von 177
+ * fälligen Threads; „Als Unternehmer 5-10KG Fett in 90 Tagen" stand mitten in
+ * der Arbeitsliste. Umgekehrt warf derselbe Filter Makler raus, die sich
+ * ungewöhnlich beschreiben. Beide Fehler kann nur jemand korrigieren, der die
+ * Nachrichten liest.
+ *
+ * **Zwei Stunden nach den Antwort-Entwürfen** (Standard 8:00). Der Sortierer
+ * ist der unwichtigste der drei Läufe — sein Ergebnis wirkt erst auf die
+ * Listen von morgen, während eine unbeantwortete Nachricht heute wartet. Er
+ * geht deshalb zuletzt und nie gleichzeitig mit einem anderen CLI-Lauf.
+ */
+const SORTIERER_AB_STUNDE = Number(process.env.SORTIERER_STUNDE ?? ENTWUERFE_AB_STUNDE + 2)
+
+async function maybeSortierer() {
+  try {
+    if (!SNAPSHOT_ENABLED) return
+    const jetzt = new Date()
+    const wochentag = jetzt.getDay()
+    if (wochentag === 0 || wochentag === 6) return
+    if (jetzt.getHours() < SORTIERER_AB_STUNDE) return
+    const heute = nowStamp().slice(0, 10)
+    if (!(await routineFaellig('linkedin-sortierer', heute))) return
+    if (!(await warteAufRechner('linkedin-sortierer'))) return
+    // Erst das Postfach: Ein Urteil gilt dauerhaft, also soll es auf dem
+    // vollständigen Verlauf beruhen und nicht auf dem Stand von gestern.
+    if (!(await postfachFrisch())) {
+      console.log('[runner] sortierer wartet — Postfach ist noch nicht frisch gesynct')
+      void maybePostfachSync()
+      return
+    }
+
+    const { threads } = await holeSortierThreads({
+      supabaseUrl: SUPABASE_URL,
+      headers: supabaseHeaders(),
+      brandSlug: process.env.LINKEDIN_BRAND_SLUG ?? 'herrmann',
+    })
+    if (!threads.length) return
+
+    const gebaut = baueSortierInput(threads)
+    if (!gebaut.input.threads.length) return
+
+    console.log(
+      `[runner] sortierer startet — ${gebaut.input.threads.length} Threads ohne Urteil` +
+        (gebaut.weitereWarten ? ` (+${gebaut.weitereWarten} warten auf den nächsten Lauf)` : ''),
+    )
+    await startRun('linkedin-sortierer', gebaut.input)
+  } catch (e) {
+    console.error('[runner] sortierer übersprungen:', e?.message ?? e)
   }
 }
 
@@ -3149,6 +3265,12 @@ server.listen(PORT, '127.0.0.1', () => {
   setTimeout(() => void maybeAntwortEntwuerfe(), 20_000)
   const ae = setInterval(() => void maybeAntwortEntwuerfe(), MORGENBRIEF_CHECK_MS)
   ae.unref?.()
+
+  // Der Sortierer im selben Takt, zwei Stunden später. Versetzter Start (50 statt
+  // 20 Sekunden), damit auf 8 GB nie zwei CLI-Läufe gleichzeitig hochfahren.
+  setTimeout(() => void maybeSortierer(), 50_000)
+  const so = setInterval(() => void maybeSortierer(), MORGENBRIEF_CHECK_MS)
+  so.unref?.()
 
   // Netzwerk-Sync einmal täglich — NUR über den regulären Tick. Ein Lauf kurz
   // nach dem Start wäre bei jedem Runner-Neustart ein neuer Fünf-Minuten-Lauf

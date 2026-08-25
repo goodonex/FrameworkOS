@@ -1,6 +1,86 @@
 # Uriel — Backlog (die eine Quelle der Wahrheit)
 
-**Stand:** 2026-08-25 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
+**Stand:** 2026-08-25 · Branch `main` (cockpit-rebuild liegt zurück) · Repo `~/Kevin OS/02 Projekte/uriel`
+
+## **GEBAUT 25.08.2026 — Der Sortier-Agent: keiner fällt weg, aber nicht lasch**
+
+Kevins Auftrag, wörtlich: *„Den Agenten, der vorsortiert, mach den auf jeden
+Fall. Den werden wir brauchen. Und der muss gut sein. Da darf keiner wegfallen.
+Lieber einer zu viel als einer zu wenig, aber auch nicht zu lasch."*
+
+Zwei Anforderungen, die sich widersprechen. Aufgelöst über **Begründungspflicht**
+statt über eine Schwelle: Jedes Urteil braucht einen Halbsatz, und bei `akquise`
+muss er benennen, **was** die Person verkauft. „Passt nicht" ist kein Grund,
+sondern eine Wiederholung des Urteils — wer es nicht benennen kann, urteilt
+`lead`. Ein Urteil, das man begründen muss, fällt vorsichtiger aus als eines,
+das man ankreuzt.
+
+**Die Entscheidung, die den Agenten von allen bisherigen Filtern unterscheidet:
+er sieht auch die, die der Wortfilter schon aussortiert hat.** `icpUrteil` liest
+nur die Headline und irrt in beide Richtungen — er lässt „Als Unternehmer
+5-10KG Fett in 90 Tagen" durch und wirft Makler raus, die sich ungewöhnlich
+beschreiben („Addicted to selling Houses and deep Housemusic", „Do what you
+love"). Ein Agent, der nur die Durchgelassenen prüft, kann den zweiten Fehler
+nie korrigieren — und genau der ist der teure. Er bekommt deshalb den ganzen
+Stapel, mit dem Wortlisten-Urteil als **Hinweis, dem er widersprechen soll**.
+
+**Was gebaut ist:**
+
+- **`runner/linkedin/sortierThreads.mjs`** — `brauchtUrteil` (genau einmal je
+  Thread, ein Urteil gilt dauerhaft) und `baueSortierInput`. Reihenfolge:
+  `unklar` → `off` → `rand` → `kern`, also die Zweifelsfälle zuerst. Deckel
+  `SORTIER_MAX = 60`: Urteilen ohne Formulieren ist ein Bruchteil des Aufwands
+  eines Entwurfs, deshalb passen sechzig statt zwanzig in einen Lauf.
+- **Skill `linkedin-sortierer`** im Vault. Drei Urteile (`lead`/`kontakt`/
+  `akquise`), Kevins echte Bestandsbeispiele in beide Richtungen, eine
+  Grenzfall-Tabelle (Home Staging → `lead`, PropTech-Vertrieb → `akquise`,
+  Bankberater → `lead`, Versicherung → `akquise`) und die heimtückischste
+  Gruppe explizit: **Makler-Coaches als Wettbewerb**, namentlich Marvin Jeske
+  und Daniela Hargarten aus dem Vault. Regel: **der Verlauf schlägt die
+  Headline** — die Selbstbeschreibung ist Werbung, die Nachricht ist Verhalten.
+- **`maybeSortierer`** im Runner: werktags, zwei Stunden nach den
+  Antwort-Entwürfen (Standard 8:00). Der Sortierer ist der unwichtigste der
+  drei Läufe — sein Ergebnis wirkt erst auf die Listen von morgen, während eine
+  unbeantwortete Nachricht heute wartet. Nie zwei CLI-Läufe gleichzeitig.
+- **`urteileAnThreads`** als eigener Rückschreiber neben `entwuerfeAnThreads`.
+  Bewusst getrennt: Der Sortierer liefert keine Entwürfe, ein gemeinsamer Pfad
+  würde bei ihm dauerhaft „kein verwertbarer json-Block" loggen.
+- **`verify-sortierer`, 24 Prüfungen** — vor allem darauf, dass **nichts**
+  weggefiltert wird, bevor der Agent es gesehen hat. Der teuerste Fehler dieses
+  Moduls wäre ein stiller: Wer nicht vorgelegt wird, bekommt nie ein Urteil.
+- Der Agent läuft ohne `WebFetch`/`WebSearch`, mit Absicht: Geurteilt wird über
+  Headline und Verlauf. Sechzig Threads mal Website-Recherche wären ein
+  garantiertes Zeitlimit.
+
+**Erster echter Lauf (25.08., 20 Threads, alle vom Wortfilter als `unklar`
+eingestuft — also genau die Fälle, bei denen er passt):**
+
+| Urteil | Anzahl |
+|---|---|
+| `lead` (bleiben drin) | 7 |
+| `kontakt` | 2 |
+| `akquise` (aussortiert) | 11 |
+
+Alle 20 beurteilt, alle 20 in der Datenbank. Die Qualität stimmt an genau den
+Stellen, an denen es zählt:
+
+- **Quentin Schäfer** („Alte Werte wahren - neue Chancen nutzen") wäre nach der
+  Headline ein Kandidat zum Aussortieren gewesen. Der Agent las den Verlauf —
+  Objekte, Käufer-Leads, Vermarktung — und ließ ihn drin.
+- **Nick Gundoroff** (`--`) und **Christian Bartelheimer** („Hamburg") bleiben
+  drin: ohne Information fällt niemand raus.
+- **Dario Scafaro Gücük** bekam `kontakt` statt `akquise`, obwohl die Headline
+  ein Bildungsträger-Pitch ist — im Verlauf steht „du hast doch meine
+  WhatsApp". Ein persönlicher Bekannter wird nicht dauerhaft aussortiert.
+- **Dennis Janko** (designside.de) wurde als **Wettbewerb** erkannt, nicht nur
+  als Off-ICP.
+
+**Stand:** 33 `lead`, 7 `kontakt`, 19 `akquise` verbucht; **180 warten noch**.
+Bei 60 pro Lauf ist der Bestand in drei Werktagen durch, danach laufen nur noch
+die paar neuen Threads pro Tag mit.
+
+---
+
 
 ## **GEBAUT 25.08.2026 — Der Nachfass-Trichter war trockengelegt, jetzt läuft er**
 
