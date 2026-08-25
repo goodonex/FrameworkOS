@@ -294,3 +294,33 @@ export function funnelKarten(eingabe: FunnelEingabe): FunnelKarte[] {
     }
   })
 }
+
+/**
+ * Welche Karten teilen sich EIN Tagespensum?
+ *
+ * Steht hier und nicht in der Oberfläche, weil es keine Frage der Optik ist,
+ * sondern der Zähl-Wahrheit: Die drei Follow-up-Karten zählen auf dieselbe
+ * `daily_metrics`-Spalte. Nennt die Ansicht „heute 5 von 13" auf jeder der
+ * drei, liest Kevin 39 — dieselbe Zahl, dreimal ausgegeben, sieht aus wie drei
+ * Zahlen. Genau diese Verwechslung soll gar nicht erst möglich sein, deshalb
+ * ist sie hier prüfbar statt im Markup.
+ *
+ * Gruppiert werden nur **benachbarte** Karten: Der Bauplan garantiert die
+ * Nachbarschaft, und eine Regel über die ganze Liste würde bei einer späteren
+ * Umsortierung stillschweigend Karten zusammenziehen, die im Bild weit
+ * auseinanderstehen.
+ */
+export interface FunnelGruppe {
+  stufenId: StufenId | null
+  karten: FunnelKarte[]
+}
+
+export function funnelGruppen(karten: FunnelKarte[]): FunnelGruppe[] {
+  const gruppen: FunnelGruppe[] = []
+  for (const karte of karten) {
+    const letzte = gruppen[gruppen.length - 1]
+    if (letzte && karte.stufenId !== null && letzte.stufenId === karte.stufenId) letzte.karten.push(karte)
+    else gruppen.push({ stufenId: karte.stufenId, karten: [karte] })
+  }
+  return gruppen
+}

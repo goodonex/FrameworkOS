@@ -12,6 +12,7 @@
 import type { LeadEreignisTyp } from '../app/src/types/db'
 import {
   FUNNEL_BAUPLAN,
+  funnelGruppen,
   funnelKarten,
   kartenIdFuer,
   type FunnelEingabe,
@@ -303,6 +304,36 @@ function eingabe(leads: FunnelLead[], faelligHeute = 8): FunnelEingabe {
     kartenIdFuer(eigener, JETZT) !== ('ausserhalb' as FunnelKartenId),
     kartenIdFuer(eigener, JETZT),
   )
+}
+
+/* ── Ein Pensum, drei Texte: die 39-statt-13-Falle ─────────────────────── */
+
+{
+  const karten = funnelKarten(eingabe([]))
+  const aktivWieImBild = karten.filter((k) => k.id !== 'ausserhalb')
+  const gruppen = funnelGruppen(aktivWieImBild)
+
+  const followupGruppe = gruppen.find((g) => g.stufenId === 'followups')
+  check('die drei Follow-up-Karten bilden EINE Gruppe', followupGruppe?.karten.length === 3, JSON.stringify(gruppen.map((g) => [g.stufenId, g.karten.length])))
+
+  // Das ist der eigentliche Schutz: Jede Zaehl-Stufe darf im Bild genau einmal
+  // eine Kopfzeile mit ihrem Pensum bekommen. Zwei Gruppen mit derselben
+  // stufenId hiessen: dieselbe daily_metrics-Spalte steht zweimal auf der Seite.
+  const stufenIds = gruppen.map((g) => g.stufenId).filter((id) => id !== null)
+  check('keine Zaehl-Stufe kommt in zwei Gruppen vor', new Set(stufenIds).size === stufenIds.length, JSON.stringify(stufenIds))
+
+  check(
+    'jede Gruppe traegt genau ein Soll',
+    gruppen.every((g) => new Set(g.karten.map((k) => k.soll)).size === 1),
+  )
+  check(
+    'Karten ohne Zaehl-Stufe werden NICHT zusammengefasst',
+    gruppen.filter((g) => g.stufenId === null).every((g) => g.karten.length === 1),
+  )
+}
+
+{
+  check('leere Liste ergibt keine Gruppe', funnelGruppen([]).length === 0)
 }
 
 console.log(`\nverify-funnel-karten: ${pass} ok, ${fail} fehlgeschlagen`)
