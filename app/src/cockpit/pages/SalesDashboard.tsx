@@ -84,53 +84,6 @@ export interface FlowZeileDef extends KachelDef {
   streak?: SalesStreak
 }
 
-/**
- * Das Grid-Kärtchen der alten Ansicht. Das Board rendert es nicht mehr —
- * es bleibt exportiert, weil die Dev-Vorschau (`src/dev/SalesVorschau.tsx`)
- * damit Layout-Varianten durchspielt.
- */
-export function KachelCard({ kachel, onOeffnen }: { kachel: KachelDef; onOeffnen: () => void }) {
-  return (
-    <motion.button
-      type="button"
-      layoutId={`kachel-${kachel.id}`}
-      transition={{ duration: 0.22, ease: 'easeOut' }}
-      onClick={onOeffnen}
-      className="ck-panel"
-      style={{
-        padding: 14,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'stretch',
-        textAlign: 'left',
-        gap: 8,
-        cursor: 'pointer',
-        minHeight: 96,
-        font: 'inherit',
-        color: 'inherit',
-      }}
-    >
-      <div className="ck-label">{kachel.titel}</div>
-      <div style={{ fontSize: 18, fontWeight: 600, color: kachel.kennzahlFarbe ?? 'var(--ck-text-1)' }}>
-        {kachel.kennzahl}
-      </div>
-      {kachel.unterzeile ? (
-        <div
-          style={{
-            fontSize: 12,
-            color: 'var(--ck-text-2)',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {kachel.unterzeile}
-        </div>
-      ) : null}
-    </motion.button>
-  )
-}
-
 /** Der grüne Haken einer stehenden Zeile. */
 function HakenZeichen() {
   return (
@@ -423,7 +376,7 @@ export function SalesDashboard() {
   const [arbeitsmodus, setArbeitsmodus] = useState<{ spur: Spur | 'alle'; posten: Posten[] } | null>(null)
   const [anfragenVollbild, setAnfragenVollbild] = useState(false)
 
-  const kundenaufgabePosten = quellen.kundenaufgabe ?? []
+  const kundenaufgabePosten = useMemo(() => quellen.kundenaufgabe ?? [], [quellen.kundenaufgabe])
   // Kundenaufgaben (mit Projekt) und eigene Aufgaben (ohne) landen in derselben
   // Zeile — für Kevin ist beides „was ich noch schulde". Die Rangfolge trennt
   // sie trotzdem: `aufgabe` steht hinter LinkedIn.
@@ -431,11 +384,21 @@ export function SalesDashboard() {
     () => [...kundenaufgabePosten, ...(quellen.aufgabe ?? [])],
     [kundenaufgabePosten, quellen.aufgabe],
   )
-  const kundeLiegtListe = quellen.kunde_liegt ?? []
-  const antwortListe = quellen.antwort ?? []
-  const loomListe = quellen.loom ?? []
-  const followupListe = quellen.followup ?? []
-  const erstnachrichtListe = quellen.erstnachricht ?? []
+  /**
+   * Die Spur-Listen als STABILE Referenzen.
+   *
+   * Bis zum 25.08. stand hier `quellen.antwort ?? []` — ein neues Array bei
+   * jedem Render, sobald die Quelle leer war. Das war harmlos, solange die
+   * Listen nur angezeigt wurden. Mit dem Canvas hängt daran eine Rechnung
+   * über 1.788 Leads (`funnelKarten` ruft je Lead `leadStation` auf): Ein
+   * frisches Array pro Render hätte jedes `useMemo` darüber wertlos gemacht
+   * und die ganze Kette bei jedem Tastendruck neu gerechnet.
+   */
+  const kundeLiegtListe = useMemo(() => quellen.kunde_liegt ?? [], [quellen.kunde_liegt])
+  const antwortListe = useMemo(() => quellen.antwort ?? [], [quellen.antwort])
+  const loomListe = useMemo(() => quellen.loom ?? [], [quellen.loom])
+  const followupListe = useMemo(() => quellen.followup ?? [], [quellen.followup])
+  const erstnachrichtListe = useMemo(() => quellen.erstnachricht ?? [], [quellen.erstnachricht])
 
   /**
    * Der Bestand des Canvas kommt aus einer anderen Quelle als das Tagespensum,
@@ -1164,6 +1127,21 @@ export function SalesDashboard() {
   const ansage = geordnet.length ? tagesansage(geordnet, dauern, jetzt) : undefined
   const frische = vorZeit(postfachStand)
 
+  const oeffneKachel = useCallback(
+    /** `von` ist die `layoutId` des Auslösers — ohne sie wächst das Fenster aus dem Nichts. */
+    (id: string, von?: string) => {
+      // Der Anfragen-Zähler ist am Handy ein Vollbild mit einem Knopf —
+      // genau dafür war das Vollbild gedacht, nirgendwo sonst.
+      if (id === 'vernetzungsanfragen' && isMobile) {
+        setAnfragenVollbild(true)
+        return
+      }
+      setOffenVon(von ?? null)
+      setOffenKachelId(id)
+    },
+    [isMobile],
+  )
+
   // Sprung aus dem Heute-Deck: `/sales?kachel=antworten` öffnet direkt das
   // zuständige Fenster. Der Parameter wird danach entfernt, sonst öffnete sich
   // die Zeile nach jedem Schließen wieder. `kachel=jetzt-dran` (alte Links aus
@@ -1208,20 +1186,6 @@ export function SalesDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kachelParam, modusParam, isMobile, geordnet.length, postenLaedt, flow.laedt, aktivIndex])
 
-  const oeffneKachel = useCallback(
-    /** `von` ist die `layoutId` des Auslösers — ohne sie wächst das Fenster aus dem Nichts. */
-    (id: string, von?: string) => {
-      // Der Anfragen-Zähler ist am Handy ein Vollbild mit einem Knopf —
-      // genau dafür war das Vollbild gedacht, nirgendwo sonst.
-      if (id === 'vernetzungsanfragen' && isMobile) {
-        setAnfragenVollbild(true)
-        return
-      }
-      setOffenVon(von ?? null)
-      setOffenKachelId(id)
-    },
-    [isMobile],
-  )
 
   return (
     <MotionConfig reducedMotion="user">
