@@ -495,7 +495,21 @@
   line-height: 1;
   color: var(--ck-text-1);
 }
-.ck-zaehl-ziel { font-size: 14px; color: var(--ck-text-2); }
+.ck-zaehl-ziel { font-size: 14px; color: var(--ck-text-2); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
+/* Das Tagesziel ist änderbar (25.08.2026) — als stiller Knopf, nicht als Feld:
+   er wird selten benutzt und darf die große Zahl nicht stören. */
+.ck-zaehl-zielknopf {
+  background: none; border: 0; padding: 4px 8px; min-height: 32px;
+  font: inherit; color: var(--ck-text-3); cursor: pointer;
+  border-bottom: 1px dashed var(--ck-line);
+}
+.ck-zaehl-zielknopf:hover { color: var(--ck-text-1); }
+.ck-zaehl-zielfeld { display: inline-flex; align-items: center; gap: 6px; }
+.ck-zaehl-zielfeld input {
+  width: 72px; min-height: 40px; padding: 4px 8px; text-align: center;
+  font: inherit; color: var(--ck-text-1);
+  background: var(--ck-bg-2); border: 1px solid var(--ck-line); border-radius: 8px;
+}
 /* Der „Stufe steht"-Moment vor dem Weiterschieben (D5). Er tritt an die Stelle
    der Ziel-Zeile, statt sich darüber zu legen — so springt die Mitte nicht. */
 .ck-zaehl-uebergang {

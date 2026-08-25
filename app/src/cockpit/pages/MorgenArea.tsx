@@ -11,6 +11,9 @@ import { eventsByDate, termineAmTag, ymd, type CalEvent } from '../lib/termineEv
 import { tagesansage } from '../lib/tagesansage'
 import { CALENDAR_ICAL_KEY, useCalendarFeed } from '../lib/useCalendarFeed'
 import { useDailyMetrics } from '../lib/useDailyMetrics'
+import { ANFRAGEN_LIMIT_TAG } from '../lib/prioritaet'
+import { TAGES_FLOW_ZIELE, type ZielUeberschreibung } from '../lib/tagesFlow'
+import { useUiSetting } from '../lib/uiSettings'
 import { useRunnerData } from '../lib/useRunnerData'
 import { Benachrichtigungen } from '../components/Benachrichtigungen'
 import { BefundZeile } from '../components/home/BefundZeile'
@@ -27,7 +30,16 @@ import { BefundZeile } from '../components/home/BefundZeile'
  * am Rechner, und keine wäre verbindlich.
  */
 
-const ANFRAGEN_ZIEL = 30
+/**
+ * Das Anfragen-Ziel steht seit 25.08.2026 nicht mehr hier, sondern in
+ * `ui_settings` (gesetzt im Zähl-Modus). Die Konstante wäre eine zweite
+ * Wahrheit gewesen: Kevin hebt auf 40, und die Morgenzeile bliebe bei 30.
+ */
+function useAnfragenZiel(): number {
+  const { wert } = useUiSetting<ZielUeberschreibung>(TAGES_FLOW_ZIELE, {})
+  const eigen = wert.anfragen
+  return typeof eigen === 'number' && Number.isInteger(eigen) && eigen > 0 ? eigen : ANFRAGEN_LIMIT_TAG
+}
 
 function datumLang(d: Date): string {
   return d.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long' })
@@ -51,6 +63,7 @@ export function MorgenArea() {
   const bookings = useBookings(slug)
   const content = useContentPieces(slug)
   const metrics = useDailyMetrics()
+  const anfragenZiel = useAnfragenZiel()
   const { runs } = useRunnerData()
 
   const icalUrl = (() => {
@@ -146,7 +159,7 @@ export function MorgenArea() {
       </section>
 
       <p style={{ margin: 0, fontSize: 12, color: 'var(--ck-text-3)' }}>
-        Vernetzungsanfragen {anfragen}/{ANFRAGEN_ZIEL} — am Laptop.
+        Vernetzungsanfragen {anfragen}/{anfragenZiel} — am Laptop.
       </p>
 
       {/* Die Morgenlese steht VOR dem Loslegen — dieselbe Reihenfolge wie in

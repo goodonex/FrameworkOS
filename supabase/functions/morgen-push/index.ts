@@ -147,6 +147,51 @@ Deno.serve(async (req) => {
     .maybeSingle()
   const analyseFrisch = Boolean(juengster?.entwurf_at && juengster.entwurf_at >= heuteBeginn)
 
+  /**
+   * Sind die Nacht-Läufe durchgekommen? (25.08.2026, auf Kevins Wort)
+   *
+   * Bisher stand das nur im Cockpit und im SessionStart-Hook — beides sieht er
+   * erst, wenn er ohnehin am Rechner sitzt. Ein gescheiterter Nacht-Lauf ist
+   * aber genau die Nachricht, die er VOR dem Aufklappen braucht.
+   *
+   * Dieselbe Regel wie im Hook `uriel-status.mjs`: Ein Fehler zählt nur, wenn
+   * seit ihm kein Lauf mehr durchgekommen ist. Läuft wieder etwas, ist eine
+   * kontoweite Ursache (abgelaufene Anmeldung) behoben und der alte Fehler
+   * Geschichte statt Handlungsbedarf.
+   */
+  const { data: spiegel } = await db
+    .from('runner_snapshots')
+    .select('data')
+    .eq('key', 'runs')
+    .maybeSingle()
+  // deno-lint-ignore no-explicit-any
+  const laeufe: any[] = Array.isArray((spiegel?.data as any)?.runs) ? (spiegel!.data as any).runs : []
+  const erfolge = laeufe.filter((r) => r.status === 'done')
+  const neuesterErfolg = erfolge.map((r) => String(r.started ?? r.id ?? '')).sort().pop()
+  const offenerFehler = laeufe
+    .filter((r) => r.status === 'error')
+    .filter((r) => !neuesterErfolg || String(r.started ?? r.id ?? '') > neuesterErfolg)
+    .map((r) => ({ agent: String(r.agent ?? 'Agent'), kurz: String(r.grund?.kurz ?? 'Lauf abgebrochen') }))[0]
+
+  /**
+   * „Alles durchgelaufen" heißt nicht „irgendetwas lief", sondern: JEDE
+   * getaktete Routine hat heute einen erfolgreichen Lauf. Der teurere Fall ist
+   * nämlich nicht der Fehler (den sieht man), sondern der Lauf, der gar nicht
+   * erst startete — schlief der Mac, meldet der Runner nichts, und der Morgen
+   * sähe ohne diese Prüfung genauso aus wie ein guter.
+   *
+   * Die Liste spiegelt die Takte in `runner/index.mjs` (MORGENBRIEF_STUNDE,
+   * ANTWORT_ENTWUERFE_STUNDE, dream-check). Kommt dort eine Routine dazu,
+   * gehört sie hierher.
+   */
+  const ROUTINEN = ['morgenbrief', 'linkedin-antwort-entwuerfe'] as const
+  const heuteDurch = (agent: string) =>
+    laeufe.some(
+      (r) => r.agent === agent && r.status === 'done' && String(r.started ?? r.id ?? '') >= datum,
+    )
+  const ausgefallen = ROUTINEN.filter((a) => !heuteDurch(a))
+  const nachtOk = !offenerFehler && ausgefallen.length === 0
+
   const { data: metrik } = await db
     .from('daily_metrics')
     .select('li_anfragen')
@@ -154,28 +199,57 @@ Deno.serve(async (req) => {
     .maybeSingle()
   const anfragenHeute = Number(metrik?.li_anfragen ?? 0)
 
+  /**
+   * Das Anfragen-Tagesziel setzt Kevin im Zähl-Modus (`ui_settings.tagesFlowZiele`).
+   * Stünde die 30 hier fest, zeigte der Push nach dem Anheben auf 40 weiter das
+   * alte Ziel — und der Push wäre die einzige Stelle, die lügt.
+   */
+  const { data: zielZeile } = await db
+    .from('ui_settings')
+    .select('setting_value')
+    .eq('setting_key', 'tagesFlowZiele')
+    .limit(1)
+    .maybeSingle()
+  // deno-lint-ignore no-explicit-any
+  const eigenesZiel = Number((zielZeile?.setting_value as any)?.anfragen)
+  const anfragenZiel = Number.isInteger(eigenesZiel) && eigenesZiel > 0 ? eigenesZiel : 30
+
   const posten = wartendeAntworten + faelligeFollowups + erstnachrichtenOffen
 
   // ---------- Text (D5, zweistufig) ----------
   // Kevins Regel vom 06.08.: „0 Entwürfe fertig" darf NIE im Push stehen — eine
   // Null ist kein Morgen-Erlebnis. Lief die Analyse nicht, sagt der Push
   // stattdessen, was zu tun ist, damit sie läuft.
-  const nutzlast = analyseFrisch
+  // Ein hängender Agent schlägt jede andere Meldung: Was Kevin dann tun muss,
+  // steht vor dem, was Uriel für ihn vorbereitet hat.
+  const nutzlast = offenerFehler
     ? {
-        title: `Analyse abgeschlossen — ${posten} Posten bereit`,
-        body: `${entwuerfeFertig} Entwürfe fertig · Anfragen ${anfragenHeute}/30`,
-        url: '/morgen',
+        title: `Uriel hing heute Nacht — ${offenerFehler.agent}`,
+        body: `${offenerFehler.kurz} · ${posten} Posten warten trotzdem`,
+        url: '/agenten',
       }
-    : {
-        title: `${posten} Posten warten`,
-        body: `MacBook aufklappen — dann bereitet Uriel die Entwürfe vor · Anfragen ${anfragenHeute}/30`,
-        url: '/morgen',
+    : ausgefallen.length > 0
+    ? {
+        title: `Nicht gelaufen: ${ausgefallen.join(', ')}`,
+        body: `Kein Fehler, der Lauf kam nie — MacBook aufklappen · ${posten} Posten warten`,
+        url: '/agenten',
       }
+    : analyseFrisch
+      ? {
+          title: `Analyse abgeschlossen — ${posten} Posten bereit`,
+          body: `${entwuerfeFertig} Entwürfe fertig${nachtOk ? ' · Nacht sauber durch' : ''} · Anfragen ${anfragenHeute}/${anfragenZiel}`,
+          url: '/morgen',
+        }
+      : {
+          title: `${posten} Posten warten`,
+          body: `MacBook aufklappen — dann bereitet Uriel die Entwürfe vor · Anfragen ${anfragenHeute}/${anfragenZiel}`,
+          url: '/morgen',
+        }
 
   // ---------- Versand ----------
   const { data: abos } = await db.from('push_subscriptions').select('id, endpoint, p256dh, auth')
   if (!abos?.length) {
-    return json(200, { sent: 0, hinweis: 'keine Abonnements', nutzlast, analyseFrisch })
+    return json(200, { sent: 0, hinweis: 'keine Abonnements', nutzlast, analyseFrisch, nachtOk, offenerFehler, ausgefallen })
   }
   if (!vapidJwk) return json(500, { error: 'VAPID_JWK fehlt' })
 

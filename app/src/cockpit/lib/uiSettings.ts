@@ -17,6 +17,21 @@ import { supabase } from '../../lib/supabase'
 
 const CACHE_PREFIX = 'cockpit.ui.'
 
+/**
+ * Dieselbe Einstellung wird an mehreren Stellen gelesen (die Tagesziele z. B.
+ * vom Tages-Flow UND vom Zähl-Modus, der sie setzt). Jeder `useUiSetting`-Aufruf
+ * hält seinen eigenen React-State — ohne diese Nachricht stünde nach dem
+ * Speichern die eine Stelle auf dem neuen Wert und die andere bis zum nächsten
+ * Laden auf dem alten. Genau dieser Widerspruch („Ziel 40 gesetzt, Ring rechnet
+ * weiter mit 30") wäre das Ende des Vertrauens in die Zahl.
+ */
+const RUNDRUF = 'cockpit:ui-setting'
+
+interface RundrufDetail {
+  schluessel: string
+  wert: unknown
+}
+
 function leseCache<T>(schluessel: string): T | null {
   try {
     const roh = localStorage.getItem(CACHE_PREFIX + schluessel)
@@ -74,10 +89,22 @@ export function useUiSetting<T>(schluessel: string, standard: T): UiSetting<T> {
     }
   }, [user?.id, schluessel])
 
+  useEffect(() => {
+    const auf = (e: Event) => {
+      const detail = (e as CustomEvent<RundrufDetail>).detail
+      if (detail?.schluessel === schluessel) setWert(detail.wert as T)
+    }
+    window.addEventListener(RUNDRUF, auf)
+    return () => window.removeEventListener(RUNDRUF, auf)
+  }, [schluessel])
+
   const setzen = useCallback(
     (neu: T) => {
       setWert(neu)
       schreibeCache(schluessel, neu)
+      window.dispatchEvent(
+        new CustomEvent<RundrufDetail>(RUNDRUF, { detail: { schluessel, wert: neu } }),
+      )
       if (!supabase || !user?.id) return
       void supabase
         .from('ui_settings')

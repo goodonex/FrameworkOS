@@ -266,6 +266,15 @@ const AGENT_CATALOG = [
     description:
       'Entwirft Antworten auf Leads, die geschrieben haben und auf Kevin warten. Läuft nachts von selbst.',
     kind: 'readonly',
+    // 24.08.2026: Der teuerste Agent im Funnel — eine Antwort an einen Lead, der
+    // schon geschrieben hat. Der Lauf betrifft eine Handvoll Threads pro Nacht,
+    // deshalb ist die teure Einstellung hier billig. `tools` ausdrücklich am
+    // Aufruf: die Vault-settings.json allein griff headless nicht (siehe die
+    // gleiche Lehre bei den write-Agenten), und ohne WebFetch/WebSearch kann der
+    // Agent die Website des Leads nicht ansehen — genau das fehlte den Entwürfen.
+    modell: 'claude-opus-5',
+    effort: 'high',
+    tools: 'Read,Glob,Grep,WebFetch,WebSearch',
   },
   {
     id: 'lead-research',
@@ -406,7 +415,17 @@ function agentConfig(agent) {
       ],
     }
   }
-  return { cwd: VAULT, buildPrompt: (inputBlock) => `/${agent}${inputBlock}`, extraArgs: [] }
+  // readonly: Vault-Skill als Slash-Command. Modell, Denktiefe und Werkzeuge
+  // sind je Agent optional — ohne Angabe bleibt es beim CLI-Standard.
+  return {
+    cwd: VAULT,
+    buildPrompt: (inputBlock) => `/${agent}${inputBlock}`,
+    extraArgs: [
+      ...(a.modell ? ['--model', a.modell] : []),
+      ...(a.effort ? ['--effort', a.effort] : []),
+      ...(a.tools ? ['--allowedTools', a.tools] : []),
+    ],
+  }
 }
 
 // ---------- Zustand ----------

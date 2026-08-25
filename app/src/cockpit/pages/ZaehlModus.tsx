@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { TAGES_FLOW, naechsteZaehlbareStufe } from '../lib/tagesFlow'
+import {
+  TAGES_FLOW,
+  TAGES_FLOW_ZIELE,
+  naechsteZaehlbareStufe,
+  type StufenId,
+  type ZielUeberschreibung,
+} from '../lib/tagesFlow'
+import { useUiSetting } from '../lib/uiSettings'
 import { useFlowLiveQuellen, useTagesFlow, type TagesFlowStand } from '../lib/useTagesFlow'
 import { ZAEHL_FELDER, zaehlFeldFuer, type ZaehlFeld } from '../lib/zaehlFelder'
 import { useDailyMetrics } from '../lib/useDailyMetrics'
@@ -51,6 +58,109 @@ type Metrics = ReturnType<typeof useDailyMetrics>
  * (siehe `.ck-zaehl-vollbild` in cockpit.css).
  */
 const STUFE_STEHT_MS = 800
+
+/** Ohne Eintrag gelten die Standard-Ziele — Modul-Konstante, damit die Referenz steht. */
+const KEINE_ZIELE: ZielUeberschreibung = {}
+
+/**
+ * Das Tagesziel einer Stufe hier ändern (25.08.2026).
+ *
+ * Bis heute stand jedes Ziel im Code (`ANFRAGEN_LIMIT_TAG = 30`). Kevin hebt
+ * seinen Takt aber an, sobald er sieht, dass er ihn hält — und dann darf das
+ * keine Code-Änderung sein. Geändert wird da, wo die Zahl weh tut: im Zähl-Modus
+ * unter der großen Zahl, ein Tipp auf „Ziel 30".
+ *
+ * Geschrieben wird in dieselbe `ui_settings`-Zeile, aus der der Tages-Flow seine
+ * Ziele ohnehin liest (`TAGES_FLOW_ZIELE`) — es entsteht keine zweite Zahlenreihe.
+ * „Zurück auf Standard" löscht den Eintrag wieder, statt den Standardwert
+ * einzufrieren; wird er im Code je angepasst, zieht die Stufe mit.
+ */
+function ZielFeld({ stufenId, soll }: { stufenId: StufenId; soll: number }) {
+  const { wert: ziele, setzen } = useUiSetting<ZielUeberschreibung>(TAGES_FLOW_ZIELE, KEINE_ZIELE)
+  const [offen, setOffen] = useState(false)
+  const [entwurf, setEntwurf] = useState(String(soll))
+
+  useEffect(() => {
+    if (!offen) setEntwurf(String(soll))
+  }, [offen, soll])
+
+  const eigenesZiel = ziele[stufenId] != null
+  // Die Fläche zählt bei jedem Tipp — alles hier drin muss die Weitergabe stoppen.
+  const stopp = {
+    onPointerDown: (e: React.PointerEvent) => e.stopPropagation(),
+    onPointerUp: (e: React.PointerEvent) => e.stopPropagation(),
+  }
+
+  const speichern = () => {
+    const zahl = Number.parseInt(entwurf, 10)
+    // Unbrauchbares wird verworfen, nicht gerettet: ein leeres oder krummes Feld
+    // darf das Ziel nicht auf NaN stellen und die Stufe „nie fertig" machen.
+    if (!Number.isInteger(zahl) || zahl < 0 || zahl > 1000) {
+      setEntwurf(String(soll))
+      setOffen(false)
+      return
+    }
+    setzen({ ...ziele, [stufenId]: zahl })
+    setOffen(false)
+  }
+
+  if (!offen) {
+    return (
+      <button
+        type="button"
+        className="ck-zaehl-zielknopf"
+        onClick={(e) => {
+          e.stopPropagation()
+          setOffen(true)
+        }}
+        {...stopp}
+        title="Tagesziel ändern"
+      >
+        Ziel {soll} ändern
+      </button>
+    )
+  }
+
+  return (
+    <span className="ck-zaehl-zielfeld" {...stopp}>
+      <input
+        type="number"
+        inputMode="numeric"
+        min={0}
+        max={1000}
+        value={entwurf}
+        autoFocus
+        onChange={(e) => setEntwurf(e.target.value)}
+        onKeyDown={(e) => {
+          e.stopPropagation()
+          if (e.key === 'Enter') speichern()
+          if (e.key === 'Escape') setOffen(false)
+        }}
+        onClick={(e) => e.stopPropagation()}
+        aria-label="Tagesziel"
+      />
+      <button type="button" className="ck-btn" onClick={(e) => { e.stopPropagation(); speichern() }} {...stopp}>
+        Setzen
+      </button>
+      {eigenesZiel ? (
+        <button
+          type="button"
+          className="ck-btn"
+          onClick={(e) => {
+            e.stopPropagation()
+            const rest = { ...ziele }
+            delete rest[stufenId]
+            setzen(rest)
+            setOffen(false)
+          }}
+          {...stopp}
+        >
+          Standard
+        </button>
+      ) : null}
+    </span>
+  )
+}
 
 /**
  * Das Soll einer Kachel/Stufe für heute. Steht das Feld im Tages-Flow, gilt
@@ -324,7 +434,14 @@ function Vollbild({
           </span>
         ) : rest !== null ? (
           <span className="ck-zaehl-ziel ck-zahl">
-            {rest === 0 ? 'Tagesziel steht.' : `noch ${rest} · Ziel ${soll}`}
+            {rest === 0 ? 'Tagesziel steht.' : `noch ${rest}`}
+            {/* Nur die Stufen des Tages-Flows tragen ein setzbares Ziel — die
+                Kanäle dahinter haben keine Stufe, an der es hängen könnte. */}
+            {stufenIndex >= 0 && soll !== null ? (
+              <ZielFeld stufenId={TAGES_FLOW[stufenIndex].id} soll={soll} />
+            ) : (
+              ` · Ziel ${soll}`
+            )}
           </span>
         ) : soll === 0 ? (
           <span className="ck-zaehl-ziel ck-zahl">Heute ist nichts fällig.</span>
