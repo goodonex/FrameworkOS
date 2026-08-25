@@ -11,11 +11,14 @@ import { Arbeitsliste, type LoomSkriptAktionen } from '../components/Arbeitslist
 import { Arbeitsmodus, type ArbeitsmodusErgebnis } from '../components/Arbeitsmodus'
 import { InmailPanel } from '../components/InmailPanel'
 import { FunnelCanvas } from '../components/sales/FunnelCanvas'
+import { GebauteSeiten } from '../components/sales/GebauteSeiten'
 import { VorlagenKopf } from '../components/sales/VorlagenKopf'
 import { useActiveBrand } from '../lib/activeBrand'
 import { antwortPostenAusgeblendet, zeilenId } from '../lib/arbeitsmodusQuellen'
 import { erledigePosten } from '../lib/arbeitsmodusTracking'
 import { funnelKarten, type FunnelKartenId, type FunnelLead } from '../lib/funnelKarten'
+import { fetchJophielProjekte } from '../lib/jophielApi'
+import { mitVorschau, verknuepfeProjekte, type JophielStand } from '../lib/jophielProjekte'
 import { ausAltemWert, poolAbleitung, type InmailStand } from '../lib/inmailStand'
 import { heutigesMetrikDatum } from '../lib/metricsDates'
 import { INMAIL_CREDITS_STAND, type Posten, type Spur } from '../lib/prioritaet'
@@ -1070,6 +1073,30 @@ export function SalesDashboard() {
   const { wert: balkenRoh, setzen: setzeBalken } = useUiSetting<boolean>('salesBalkenOffen', false)
   const balkenOffen = balkenRoh === true
 
+  /**
+   * Jophiels gebaute Seiten.
+   *
+   * Einmal beim Betreten geladen, danach nicht mehr: Eine Website entsteht in
+   * zwanzig Minuten, nicht in zwanzig Sekunden — ein Intervall darauf wäre
+   * Verkehr ohne Erkenntnis. Wirft nie (siehe `jophielApi`); ist der Generator
+   * aus, steht dort eine stille Zeile statt eines Fehlers.
+   */
+  const [jophiel, setJophiel] = useState<JophielStand>({ projekte: [], jophielErreichbar: false })
+  useEffect(() => {
+    let lebt = true
+    void fetchJophielProjekte().then((stand) => {
+      if (lebt) setJophiel(stand)
+    })
+    return () => {
+      lebt = false
+    }
+  }, [])
+
+  const gebauteSeiten = useMemo(
+    () => mitVorschau(verknuepfeProjekte(jophiel.projekte, leadsQuery.leads)),
+    [jophiel.projekte, leadsQuery.leads],
+  )
+
   /** Wie viele Menschen stehen überhaupt in Kevins Kosmos — inklusive der Aussortierten. */
   const leadZahl = leadsQuery.leads.length
   const tagesFortschritt = flowFortschritt(staende)
@@ -1245,6 +1272,15 @@ export function SalesDashboard() {
             layoutIdFuer={(k) => `canvas-${k.id}`}
           />
         )}
+
+        {/* Die gebauten Seiten: Ergebnisse, keine Aufgaben. Sie stehen bewusst
+            NICHT im Funnel — ein Jophiel-Projekt ist ein Artefakt, kein Mensch,
+            und würde als Karte den Lead doppelt zählen, der oben schon unter
+            „Loom offen" steht. */}
+        <div className="ck-label" style={{ marginTop: 10, paddingInline: 4 }}>
+          Gebaute Seiten
+        </div>
+        <GebauteSeiten projekte={gebauteSeiten} erreichbar={jophiel.jophielErreichbar} />
 
         {/* Das Tagespensum steht jetzt an den Karten. Die Balken bleiben als
             Rückfrage erreichbar — mit Serien, Anfragen-Zähler und InMail-Welle,
