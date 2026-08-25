@@ -546,9 +546,29 @@ export function SalesDashboard() {
         loomVerschickt: (id) => linkedinThreads.markLoomVerschickt(id),
         taskErledigt: (id) => tasks.toggle(id),
         schreibeDauer,
+        /**
+         * Die Lead-Historie fortschreiben (0076, Zug 1 der Pipeline-Board-
+         * Blaupause). `rowId` ist je Spur eine andere Tabelle — bei
+         * `erstnachricht` eine Zeile in `linkedin_erstnachrichten`, bei
+         * `followup`/`loom` ein Thread —, deshalb wird hier nachgeschlagen
+         * statt in `arbeitsmodusTracking.ts`, das keine Supabase-Tabellen
+         * kennen soll.
+         *
+         * Fehlt die Verknüpfung (kein `lead_id` am Thread/an der Zeile), wird
+         * STILLSCHWEIGEND nichts protokolliert — ein Lead ohne Klammer ist
+         * kein Grund, den Haken selbst scheitern zu lassen.
+         */
+        protokolliere: async (rowId, spur, typ) => {
+          const leadId =
+            spur === 'erstnachricht'
+              ? erstnachrichten.items.find((e) => e.id === rowId)?.lead_id
+              : linkedinThreads.items.find((t) => t.id === rowId)?.lead_id
+          if (!leadId) return
+          await leadsQuery.protokolliere(leadId, typ)
+        },
       })
     },
-    [metrics.bump, erstnachrichten, linkedinThreads, tasks, schreibeDauer],
+    [metrics.bump, erstnachrichten, linkedinThreads, tasks, schreibeDauer, leadsQuery],
   )
 
   const aktiveAgenten = useMemo(() => runs.filter((r) => r.status === 'running').map((r) => r.agent), [runs])

@@ -299,6 +299,31 @@ function merke(lead_id: string | null, typ: string, at: string | null, details: 
   ereignisse.push({ brand_id: bid, lead_id, typ, at, quelle: 'backfill', details })
 }
 
+/**
+ * Seit dem 25.08.2026 (Pipeline-Board-Blaupause, Zug 1) schreibt das Cockpit
+ * `erstnachricht`/`followup`/`loom_gesendet`-Ereignisse selbst, im Moment des
+ * Hakens (`quelle: 'ui'`). Der Unique-Index `(lead_id, typ, at)` dedupliziert
+ * nur bei EXAKT gleichem Zeitstempel — ein UI-Ereignis trägt die Klick-Zeit,
+ * ein hier aus dem Verlauf/den Spalten abgeleitetes einen eigenen Zeitpunkt
+ * (bei `loom_gesendet` `t.loom_erledigt_at`, von `markLoomVerschickt` selbst
+ * Millisekunden vor dem UI-Ereignis gesetzt — also fast, aber nicht exakt
+ * gleich). Ohne diese Sperre entstünde für denselben realen Vorgang eine
+ * zweite Zeile, und jede Rate, die daraus gerechnet wird, zählt zu hoch.
+ *
+ * Deshalb: Sobald ein Lead für einen Typ schon ein UI-Ereignis hat, leitet
+ * diese Routine für genau diesen Typ nichts mehr aus dem Verlauf/den Spalten
+ * ab — die bleiben nur die Quelle für Leads, die das Cockpit noch nie selbst
+ * verbucht hat (Altbestand, oder Erstnachrichten aus der Vault-Vorlage statt
+ * aus der Arbeitsliste).
+ */
+const uiEreignisse = await alle<{ lead_id: string; typ: string }>(
+  `lead_ereignisse?brand_id=eq.${bid}&quelle=eq.ui&typ=in.(erstnachricht,followup,loom_gesendet)&select=lead_id,typ`,
+)
+const uiSchonDa = new Set(uiEreignisse.map((e) => `${e.lead_id}|${e.typ}`))
+function schonPerUiErfasst(lead_id: string | null, typ: string): boolean {
+  return lead_id != null && uiSchonDa.has(`${lead_id}|${typ}`)
+}
+
 const netzFrisch = await alle<NetzZeile>(
   `linkedin_netzwerk?brand_id=eq.${bid}&select=id,name,profil_key,profile_url,status,headline,eingeladen_at,angenommen_at,lead_id&order=id`,
 )
@@ -324,23 +349,25 @@ for (const t of threadsFrisch) {
     if (!nachricht.ts) continue
     if (nachricht.sender === 'me') {
       vonKevin++
-      merke(t.lead_id, vonKevin === 1 ? 'erstnachricht' : 'followup', nachricht.ts, {
-        auszug: nachricht.text.slice(0, 200),
-      })
+      const typ = vonKevin === 1 ? 'erstnachricht' : 'followup'
+      if (!schonPerUiErfasst(t.lead_id, typ)) {
+        merke(t.lead_id, typ, nachricht.ts, { auszug: nachricht.text.slice(0, 200) })
+      }
     } else if (nachricht.sender === 'them') {
       merke(t.lead_id, 'antwort_erhalten', nachricht.ts, { auszug: nachricht.text.slice(0, 200) })
     }
   }
   // Kein Verlauf, aber eine letzte Nachricht: wenigstens diese festhalten.
   if (!verlauf.length && t.last_message_at) {
-    merke(t.lead_id, t.last_from === 'them' ? 'antwort_erhalten' : 'erstnachricht', t.last_message_at)
+    if (t.last_from === 'them') merke(t.lead_id, 'antwort_erhalten', t.last_message_at)
+    else if (!schonPerUiErfasst(t.lead_id, 'erstnachricht')) merke(t.lead_id, 'erstnachricht', t.last_message_at)
   }
   if (t.starred && t.last_message_at) merke(t.lead_id, 'loom_zugesagt', t.last_message_at)
-  merke(t.lead_id, 'loom_gesendet', t.loom_erledigt_at)
+  if (!schonPerUiErfasst(t.lead_id, 'loom_gesendet')) merke(t.lead_id, 'loom_gesendet', t.loom_erledigt_at)
 }
 
 for (const e of erstFrisch) {
-  if (e.status === 'gesendet') merke(e.lead_id, 'erstnachricht', e.sent_at)
+  if (e.status === 'gesendet' && !schonPerUiErfasst(e.lead_id, 'erstnachricht')) merke(e.lead_id, 'erstnachricht', e.sent_at)
 }
 
 console.log(`Ereignisse vorbereitet: ${ereignisse.length}`)

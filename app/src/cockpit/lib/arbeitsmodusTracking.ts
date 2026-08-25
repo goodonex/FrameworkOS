@@ -9,6 +9,7 @@
  * `kundenaufgabe` und `kunde_liegt` zählen bewusst NICHT — kein neues Feld in
  * METRIC_FIELDS erfinden, wenn eine Spur auf keins passt.
  */
+import type { LeadEreignisTyp } from '../../types/db'
 import type { Spur } from './prioritaet'
 import { zeilenId } from './arbeitsmodusQuellen'
 import type { ArbeitsmodusErgebnis } from '../components/Arbeitsmodus'
@@ -27,6 +28,40 @@ export function metrikFeldFuer(spur: Spur): MetricField | null {
     case 'inmail':
       return 'inmails'
     case 'antwort':
+    case 'kundenaufgabe':
+    case 'aufgabe':
+    case 'kunde_liegt':
+      return null
+  }
+}
+
+/**
+ * Welches Lead-Ereignis ein Haken automatisch protokolliert (25.08.2026,
+ * Blaupause docs/wargames/pipeline-board.md, Zug 1). Abgeleitet aus derselben
+ * Spur-Tabelle wie `metrikFeldFuer`, aber eine eigene Funktion — nicht jede
+ * Spur mit einem Metrikfeld hat auch ein passendes Ereignis:
+ *
+ * - **`antwort` bleibt aussen vor**, obwohl sie denselben Statusweg nimmt wie
+ *   `followup` (`followupErledigt`). Es gibt keinen Ereignis-Typ für „Kevin
+ *   hat geantwortet" — `antwort_erhalten` bedeutet das GEGENTEIL (der LEAD hat
+ *   geschrieben). Ihn hier zu schreiben wäre eine Lüge über die Historie.
+ * - **`inmail` bleibt aussen vor.** Der Plan sah „beim Buchen einer InMail"
+ *   vor, aber die Buchung läuft über `InmailPanel.onBuchen` als reiner
+ *   Pool-Zähler (+1/-1) ohne ausgewählten Lead — es gibt dort gar keine
+ *   `rowId`, an die sich ein Ereignis hängen liesse. Fund aus der Recon zu
+ *   diesem Zug, nicht aus dem ursprünglichen Plan.
+ */
+export function ereignisTypFuer(spur: Spur): LeadEreignisTyp | null {
+  switch (spur) {
+    case 'erstnachricht':
+      return 'erstnachricht'
+    case 'followup':
+      return 'followup'
+    case 'loom':
+      return 'loom_gesendet'
+    case 'antwort':
+    case 'anfrage':
+    case 'inmail':
     case 'kundenaufgabe':
     case 'aufgabe':
     case 'kunde_liegt':
@@ -65,6 +100,17 @@ export interface ArbeitsmodusTrackingDeps {
   taskErledigt: (taskId: string) => void
   /** arbeits_dauern-Insert — vom Aufrufer injiziert (kennt brandId + Supabase-Client). */
   schreibeDauer: (input: { spur: Spur; postenId: string; sekunden: number }) => Promise<void> | void
+  /**
+   * Das Lead-Ereignis zum Haken protokollieren (0076) — OPTIONAL, weil nicht
+   * jeder Aufrufer eine Lead-Historie führt (die alte Testvorgabe in
+   * `verify-arbeitsmodus-tracking.ts` lässt das Feld weg und bleibt gültig).
+   *
+   * `rowId` ist DIESELBE Zeile wie in `erstnachrichtGesendet`/
+   * `followupErledigt`/`loomVerschickt` — welche Tabelle das ist (Thread oder
+   * Erstnachricht), weiss nur der Aufrufer, deshalb bekommt er die Spur mit
+   * statt dass diese Datei Supabase-Tabellen kennen muss.
+   */
+  protokolliere?: (rowId: string, spur: Spur, typ: LeadEreignisTyp) => Promise<void> | void
 }
 
 /**
@@ -121,6 +167,12 @@ export async function erledigePosten(
     case 'inmail':
       break
   }
+
+  // Die Lead-Historie VOR dem Metrik-Bump: „was ist passiert" zuerst,
+  // „wie zählt es" danach. Ohne deps.protokolliere (alter Aufrufer, Tests)
+  // passiert hier nichts — kein zweiter Pfad, keine Pflicht.
+  const ereignisTyp = ereignisTypFuer(posten.spur)
+  if (ereignisTyp && deps.protokolliere) await deps.protokolliere(rowId, posten.spur, ereignisTyp)
 
   const feld = metrikFeldFuer(posten.spur)
   if (feld) deps.bump(feld, 1)
