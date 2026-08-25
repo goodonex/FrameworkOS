@@ -15,6 +15,7 @@ import { istKunde, kundenSchluessel, type KundenKontakt } from './kundenAbgleich
 import { bucketOf } from './linkedinFollowups'
 import { verlaufVon } from './linkedinVerlauf'
 import type { Posten, PostenEntwurf } from './prioritaet'
+import { followupVorlage } from './followupVorlagen'
 
 /**
  * Entwurf des Nacht-Agenten am Thread (Migration 0065), sofern einer anliegt.
@@ -208,7 +209,22 @@ export function followupPosten(
     .filter((t) => !istKunde(t.name, kunden))
     .map((t) => ({
       ...threadZuPosten(t, 'followup', 'thread', t.preview || `Follow-up an ${t.name || 'den Lead'}.`),
-      entwurf: entwurfVon(t),
+      /**
+       * Ein Agent-Entwurf schlägt die Vorlage — aber die Vorlage springt ein,
+       * wenn keiner da ist (25.08.2026).
+       *
+       * Der Grund, warum das hier steht und nicht in einem nächtlichen Lauf:
+       * An diesem Morgen standen 177 fällige Follow-ups ohne einen einzigen
+       * Entwurf, und Kevins Arbeitsweise ist Cockpit öffnen, Text kopieren,
+       * in LinkedIn einfügen. Kein Text, keine Handlung — das hat den
+       * Nachfass-Trichter monatelang trockengelegt.
+       *
+       * Ein Agent hätte davon zwanzig am Tag bedient. Die Vorlage bedient
+       * alle, sofort, ohne Lauf. Und sie verliert dabei nichts: Wer nie
+       * geantwortet hat, gibt einem Agenten keinen Anhaltspunkt, auf den er
+       * individuell eingehen könnte.
+       */
+      entwurf: entwurfVon(t) ?? followupVorlage(t),
     }))
 }
 

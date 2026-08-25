@@ -20,51 +20,78 @@ An Prod gemessen (25.08.):
 
 Der Trichter füllte sich oben und lief unten nicht ab. Kevins Arbeitsweise ist
 Cockpit öffnen, Text kopieren, in LinkedIn einfügen — steht kein Text da,
-passiert nichts. Der Agent `linkedin-followup-entwuerfe` existierte die ganze
-Zeit, hing aber an einem Knopf, den man erst drücken muss. Die Antwort-Entwürfe
-laufen seit dem 18.08. werktags von selbst; die Follow-ups nicht.
+passiert nichts.
+
+### Die Lösung ist keine Automatik, sondern drei feste Texte
+
+Der erste Anlauf war eine nächtliche Agenten-Routine, die zwanzig Entwürfe pro
+Tag schreibt. Kevins Einwand kippte den Ansatz, und er hatte recht:
+
+> *„So ein kurzer Follow-up muss doch nicht individuell gemacht werden. Reicht
+> da nicht immer derselbe Satz?"*
+
+**Bei diesen Leuten gibt es nichts zu individualisieren.** Sie haben auf die
+Erstnachricht nie geantwortet — es existiert kein Gesprächsverlauf, auf den ein
+Agent eingehen könnte, und der Website-Aufhänger ist in der Erstnachricht
+bereits verbraucht. Ein Agent hätte hier Pseudo-Individualität produziert und
+dafür Zeit und Token gekostet.
+
+| | Agenten-Routine | feste Vorlagen |
+|---|---|---|
+| verfügbar | 20/Tag | **alle 177 sofort** |
+| Latenz | ein CLI-Lauf | keine |
+| Token | je Nachricht | keine |
+| Ausfallrisiko | Zeitlimit, API-Fehler | keins |
 
 **Was gebaut ist:**
 
-- **`runner/linkedin/followupThreads.mjs`** — Zwilling von `antwortThreads.mjs`.
-  `istFaellig` ist der Spiegel von `isDue`, gegengeprüft über **1.620
-  Kombinationen** in `verify-followup-entwuerfe` (Status × Absender × Stufe ×
-  Alter × Schlummer). Weicht eine Seite ab, schlägt das Skript fehl.
-- **`maybeFollowupEntwuerfe`** im Runner: werktags, eine Stunde nach den
-  Antwort-Entwürfen (`FOLLOWUP_ENTWUERFE_STUNDE`, Standard 7:00). Antworten
-  sind dringlicher, und zwei CLI-Läufe gleichzeitig auf 8 GB wären ein
-  garantiertes Zeitlimit. Postfach-Frische wird wie beim Zwilling vorausgesetzt.
-- **`entwuerfeAnThreads` gilt jetzt für beide Entwurfs-Agenten.** Ohne diese
-  Zeile landet ein Follow-up-Entwurf nur in der Run-Datei — also genau dort, wo
-  Kevin ihn nicht kopiert.
-- **Deckel `FOLLOWUP_MAX = 20`**, gleich Kevins Tagesportion. Mehr zu entwerfen
-  hiesse, Token für Text auszugeben, der bis morgen veraltet.
-- **Sortierung in drei Stufen: Stern → Makler-Ära → ältester zuerst.** Der
-  Trockenlauf zeigte, dass reines „ältester zuerst" die ersten zwanzig Entwürfe
-  an Altlasten von bis zu 539 Tagen vergibt („Vertriebs-Champion", „salesHAX
-  Consulting"). Gefiltert wird dabei **nicht** — Kevins Regel „nichts, was
-  liegen geblieben ist, fällt weg" gilt für eigene Threads ausdrücklich weiter
-  (`arbeitsmodusQuellen`, Kommentar zu `AKQUISE_START`). Die Altlast rutscht
-  ans Ende und kommt dran, wenn der Rückstau davor abgetragen ist.
-- **Der Agent urteilt jetzt mit** (`lead`/`kontakt`/`akquise`, Migration 0075),
-  wie sein Antwort-Zwilling seit dem 19.08. Der Wortlisten-Filter sortierte nur
-  12 von 177 aus; den Rest erkennt nur, wer die Nachrichten liest. `akquise`
-  fliegt danach dauerhaft aus der Spur. Dafür geht `verlauf` mit in den Input:
-  beim Follow-up ist `preview` Kevins **eigene** letzte Nachricht und sagt über
-  die Gegenseite nichts.
-- **Der Break-up-Ton ist aus dem Skill raus.** Stufe 2 ist nicht mehr die
-  letzte Nachricht überhaupt, sondern die letzte auf LinkedIn — danach kommt
-  der Kanalwechsel. „Ich will nicht nerven" würde jedem der vier folgenden
-  Schritte widersprechen (Kevins Verbotstabelle vom 19.08.).
+- **`app/src/cockpit/lib/followupVorlagen.ts`** — drei Texte, einer je Stufe
+  (3 / 7 / 14 Tage). Stufe 0 ist der harmlose Anstupser, Stufe 1 ein Befund,
+  der für praktisch jede Maklerseite stimmt (fühlt sich individuell an, ohne es
+  zu sein), Stufe 2 nur noch eine qualifizierende Frage. **Kein Break-up** in
+  Stufe 2, obwohl es die letzte LinkedIn-Nachricht ist: Danach folgt der
+  Kanalwechsel, ein Abschiedssatz wäre gelogen.
+- **`followupPosten` nutzt sie als Fallback:** `entwurfVon(t) ?? followupVorlage(t)`.
+  Ein echter Agent-Entwurf schlägt die Vorlage weiterhin. Nichts wird in die
+  Datenbank geschrieben — der Text entsteht beim Anzeigen und gilt damit sofort
+  auch für jeden neuen Thread.
+- **`vornameAus`** löst den Vornamen (Titel weg, Mehrfach-Leerzeichen, `Sven-Oliver`
+  bleibt ganz). Bei unbrauchbaren Namen (`--`, leer) gibt es **keinen** Entwurf:
+  „Moin --," ist schlimmer als gar kein Text, weil Kevin ihn womöglich
+  abschickt, ohne hinzusehen.
+- **`verify-followup-vorlagen`, 70 Prüfungen** — auf Emojis, Höflichkeitsanrede,
+  Rückzugsfloskeln aus der Verbotstabelle vom 19.08., Satzlänge, Frage am Ende
+  und darauf, dass die drei Stufen wirklich drei verschiedene Nachrichten sind.
+- **Die Quelle der Wahrheit im Vault** (`Outbound-Skripte 1b`) hat die drei
+  Texte als eigenen Abschnitt „Kaskade nach der Erstnachricht" bekommen, mit
+  dem Hinweis, dass Wortlaut-Änderungen dort **und** im Code passieren müssen.
+- **`entwuerfeAnThreads` gilt jetzt für beide Entwurfs-Agenten.** Das bleibt aus
+  dem verworfenen Ansatz erhalten und verbessert den manuellen Knopf auf
+  `/linkedin`: Ein dort erzeugter Entwurf landet am Posten statt nur in der
+  Run-Datei.
 
-**Trockenlauf an Prod (25.08.):** 177 fällig → 12 vom ICP-Filter aussortiert →
-165 in der Zielgruppe → 20 gehen morgen früh in den Lauf, 145 sind Ware für die
-Folgetage. Bei 20/Tag ist der Rückstau in gut sieben Arbeitstagen abgetragen.
+**Wieder entfernt:** `runner/linkedin/followupThreads.mjs`, die Zeit-Routine
+`maybeFollowupEntwuerfe` und `verify-followup-entwuerfe`. Der manuelle Knopf
+baut seinen Input in der App (`approvalDrafts.ts`), das Runner-Modul wäre ohne
+die Automatik toter Code gewesen. Der Agent-Skill im Vault bleibt für den
+Ausnahmefall bestehen — mit den Verbesserungen vom selben Tag (`thread_key` ist
+Pflicht, Urteils-Block, kein Break-up-Ton mehr).
+
+**An echten Daten belegt:** `followupPosten` liefert für alle **177 von 177**
+fälligen Threads einen fertigen Text; keiner fällt wegen eines unbrauchbaren
+Namens aus.
 
 **Was das für die laute Kette bedeutet:** Sie bekommt jetzt überhaupt erst
 Zufluss. Ein Thread braucht drei Haken (3/7/14 Tage), um auf Stufe 3 zu
 kommen — die ersten Leads erreichen die Instagram-Stufe also frühestens in gut
 drei Wochen. Bis dahin ist ihr Bestand 0, und das ist richtig so.
+
+**Offen:** Das ICP-Rauschen bleibt sichtbar. Der Wortlisten-Filter erwischt nur
+12 von 177; „5-10KG Fett in 90 Tagen" und „Fördergelder für Superchat" stehen
+weiter in der Liste und werden von Hand übersprungen (ein Klick über
+`disqualifiziere` in der Lead-Akte). Wenn das stört, wäre der nächste Schritt
+ein Agent, der **nur urteilt** und keine Texte schreibt — deutlich billiger als
+der verworfene Entwurfs-Agent.
 
 ---
 

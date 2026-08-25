@@ -18,7 +18,6 @@ import { syncThreads, TIEFENSCAN_TAGE } from './linkedin/sync.mjs'
 import { upsertThreads } from './linkedin/upsert.mjs'
 import { ladeErstnachrichten } from './linkedin/erstnachrichten.mjs'
 import { baueAntwortInput, holeAntwortThreads } from './linkedin/antwortThreads.mjs'
-import { baueFollowupInput, holeFollowupThreads } from './linkedin/followupThreads.mjs'
 import { parseDraftsRoh, parseUrteileRoh, schreibeEntwuerfe, schreibeUrteile } from './linkedin/entwuerfe.mjs'
 import { neuerLauf, nimmBrocken, protokollText } from './agentStream.mjs'
 import { bewerteTagesLaeufe, darfRoutineStarten } from './routineGuard.mjs'
@@ -653,34 +652,6 @@ async function antwortEntwuerfeInput(now = new Date()) {
 }
 
 /**
- * Eingabe für `linkedin-followup-entwuerfe`: die Threads, in denen Kevin
- * zuletzt geschrieben hat und die Frist der aktuellen Stufe um ist.
- *
- * Zwilling von `antwortEntwuerfeInput`. Am 25.08.2026 dazugekommen, weil an
- * Prod 177 fällige Follow-ups ohne einen einzigen Entwurf standen: Der Agent
- * existierte, lief aber nur auf Knopfdruck. Kevin arbeitet über Kopieren —
- * ohne Text im Cockpit passiert nichts.
- */
-async function followupEntwuerfeInput(now = new Date()) {
-  if (!SNAPSHOT_ENABLED) return null
-  const { threads, uebersprungenOffIcp } = await holeFollowupThreads({
-    supabaseUrl: SUPABASE_URL,
-    headers: supabaseHeaders(),
-    brandSlug: process.env.LINKEDIN_BRAND_SLUG ?? 'herrmann',
-    now,
-  })
-  // Sichtbar machen, was der ICP-Filter zurückhält — unter den fälligen Threads
-  // stecken Altlasten von über 500 Tagen aus der Zeit vor der Makler-Akquise.
-  if (uebersprungenOffIcp > 0) {
-    console.log(`[runner] followup-entwuerfe: ${uebersprungenOffIcp} Off-ICP übersprungen (kein Entwurf)`)
-  }
-  if (!threads.length) return null
-  const gebaut = baueFollowupInput(threads, now)
-  if (!gebaut.input.threads.length) return null
-  return gebaut
-}
-
-/**
  * Nach einem fertigen `linkedin-antwort-entwuerfe`-Lauf: Entwürfe aus dem
  * Markdown lösen und an die Threads schreiben. Erst damit klebt der Entwurf am
  * Posten statt im Run — der Unterschied zwischen „ist irgendwo" und „ist da".
@@ -895,6 +866,11 @@ async function startRun(agent, input) {
         // Beide Entwurfs-Agenten liefern denselben json-Block am Ende und werden
         // deshalb gleich behandelt. Ohne diese Zeile landet ein Follow-up-Entwurf
         // nur in der Run-Datei — also genau dort, wo Kevin ihn nicht kopiert.
+        // Der Follow-up-Agent läuft seit dem 25.08. nur noch auf Knopfdruck
+        // (`/linkedin`); den Regelfall bedienen die festen Vorlagen in
+        // app/src/cockpit/lib/followupVorlagen.ts. Für den Ausnahmefall, in dem
+        // Kevin doch einen individuellen Text will, muss der Entwurf trotzdem
+        // am Posten landen und nicht im Protokoll.
         if (agent === 'linkedin-antwort-entwuerfe' || agent === 'linkedin-followup-entwuerfe') {
           await entwuerfeAnThreads(id, ergebnis)
         }
@@ -2422,7 +2398,6 @@ function planeNachDemAufwachen() {
     void maybePostfachSync()
     void maybeMorgenbrief()
     void maybeAntwortEntwuerfe()
-    void maybeFollowupEntwuerfe()
   }, WACH_KARENZ_MS + 10_000)
   wachTimer.unref?.()
 }
@@ -2726,62 +2701,6 @@ async function maybeAntwortEntwuerfe() {
     await startRun('linkedin-antwort-entwuerfe', gebaut.input)
   } catch (e) {
     console.error('[runner] antwort-entwuerfe übersprungen:', e?.message ?? e)
-  }
-}
-
-/**
- * Follow-up-Entwürfe als Zeit-Routine (25.08.2026) — der Zwilling von
- * `maybeAntwortEntwuerfe`, und die Lücke, die den ganzen Nachfass-Trichter
- * trockengelegt hat.
- *
- * **Der Befund, der das ausgelöst hat.** An Prod gemessen: 177 fällige
- * Follow-ups, **0** davon mit Entwurf. Alle 239 aktiven Threads auf
- * `followup_stage: 0`. `daily_metrics.li_followups` an jedem der letzten 21
- * Tage 0 — bei durchgehend 30 Anfragen und 72 Erstnachrichten im selben
- * Zeitraum. Der Trichter füllte sich oben und lief unten nicht ab.
- *
- * Der Agent `linkedin-followup-entwuerfe` gab es die ganze Zeit. Er hing nur
- * an einem Knopf auf `/linkedin`. Kevins Arbeitsweise ist Cockpit öffnen,
- * kopieren, in LinkedIn einfügen — ein Knopf, der erst Text erzeugt, ist in
- * dieser Reihenfolge einer zu viel.
- *
- * **Eine Stunde nach den Antwort-Entwürfen**, aus zwei Gründen: Antworten sind
- * dringlicher (dort wartet ein Mensch), und zwei CLI-Läufe gleichzeitig auf
- * einem M1 mit 8 GB wären ein garantiertes Zeitlimit. `routineFaellig` sorgt
- * ohnehin dafür, dass jede Routine höchstens einmal am Tag läuft.
- */
-const FOLLOWUP_ENTWUERFE_AB_STUNDE = Number(
-  process.env.FOLLOWUP_ENTWUERFE_STUNDE ?? ENTWUERFE_AB_STUNDE + 1,
-)
-
-async function maybeFollowupEntwuerfe() {
-  try {
-    if (!SNAPSHOT_ENABLED) return // ohne service_role kein Zugriff auf linkedin_threads
-    const jetzt = new Date()
-    const wochentag = jetzt.getDay()
-    if (wochentag === 0 || wochentag === 6) return
-    if (jetzt.getHours() < FOLLOWUP_ENTWUERFE_AB_STUNDE) return
-    const heute = nowStamp().slice(0, 10)
-    if (!(await routineFaellig('linkedin-followup-entwuerfe', heute))) return
-    if (!(await warteAufRechner('linkedin-followup-entwuerfe'))) return
-    // Erst das Postfach, dann die Entwürfe — sonst schreibt der Agent auf dem
-    // Stand von gestern und fasst bei jemandem nach, der heute geantwortet hat.
-    if (!(await postfachFrisch())) {
-      console.log('[runner] followup-entwuerfe wartet — Postfach ist noch nicht frisch gesynct')
-      void maybePostfachSync()
-      return
-    }
-
-    const gebaut = await followupEntwuerfeInput(jetzt)
-    if (!gebaut) return
-
-    console.log(
-      `[runner] followup-entwuerfe startet — ${gebaut.input.threads.length} fällige Threads` +
-        (gebaut.weitereWarten ? ` (+${gebaut.weitereWarten} über der Tagesportion)` : ''),
-    )
-    await startRun('linkedin-followup-entwuerfe', gebaut.input)
-  } catch (e) {
-    console.error('[runner] followup-entwuerfe übersprungen:', e?.message ?? e)
   }
 }
 
@@ -3230,13 +3149,6 @@ server.listen(PORT, '127.0.0.1', () => {
   setTimeout(() => void maybeAntwortEntwuerfe(), 20_000)
   const ae = setInterval(() => void maybeAntwortEntwuerfe(), MORGENBRIEF_CHECK_MS)
   ae.unref?.()
-
-  // Follow-up-Entwürfe im selben Takt, eine Stunde nach den Antworten. Der
-  // Versatz beim Start (35 statt 20 Sekunden) hält die beiden CLI-Läufe auch
-  // beim Aufklappen des Macs auseinander — auf 8 GB ist das kein Luxus.
-  setTimeout(() => void maybeFollowupEntwuerfe(), 35_000)
-  const fe = setInterval(() => void maybeFollowupEntwuerfe(), MORGENBRIEF_CHECK_MS)
-  fe.unref?.()
 
   // Netzwerk-Sync einmal täglich — NUR über den regulären Tick. Ein Lauf kurz
   // nach dem Start wäre bei jedem Runner-Neustart ein neuer Fünf-Minuten-Lauf
