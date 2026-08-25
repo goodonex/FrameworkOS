@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AnimatePresence, motion, MotionConfig } from 'framer-motion'
 import { useArbeitsDauern } from '../../hooks/useArbeitsDauern'
+import { useLeads } from '../../hooks/useLeads'
 import { usePosten } from '../../hooks/usePosten'
 import { useIsMobile } from '../../hooks/useViewport'
 import { supabase } from '../../lib/supabase'
@@ -9,12 +10,16 @@ import { AnfragenZaehler } from '../components/AnfragenZaehler'
 import { Arbeitsliste, type LoomSkriptAktionen } from '../components/Arbeitsliste'
 import { Arbeitsmodus, type ArbeitsmodusErgebnis } from '../components/Arbeitsmodus'
 import { InmailPanel } from '../components/InmailPanel'
+import { FunnelCanvas } from '../components/sales/FunnelCanvas'
+import { VorlagenKopf } from '../components/sales/VorlagenKopf'
 import { useActiveBrand } from '../lib/activeBrand'
 import { antwortPostenAusgeblendet, zeilenId } from '../lib/arbeitsmodusQuellen'
 import { erledigePosten } from '../lib/arbeitsmodusTracking'
+import { funnelKarten, type FunnelKartenId, type FunnelLead } from '../lib/funnelKarten'
 import { ausAltemWert, poolAbleitung, type InmailStand } from '../lib/inmailStand'
 import { heutigesMetrikDatum } from '../lib/metricsDates'
 import { INMAIL_CREDITS_STAND, type Posten, type Spur } from '../lib/prioritaet'
+import type { LinkedinThread } from '../../types/db'
 import { bereiteDatenVor, salesSerie, type SalesStreak } from '../lib/salesStreak'
 import {
   TAGES_FLOW,
@@ -411,6 +416,40 @@ export function SalesDashboard() {
   const loomListe = quellen.loom ?? []
   const followupListe = quellen.followup ?? []
   const erstnachrichtListe = quellen.erstnachricht ?? []
+
+  /**
+   * Der Bestand des Canvas kommt aus einer anderen Quelle als das Tagespensum,
+   * und das ist Absicht: `usePosten` beantwortet „was ist heute zu tun",
+   * `useLeads` beantwortet „wer steckt wo". Beide Fragen brauchen einander
+   * nicht — nur die Karte stellt sie nebeneinander.
+   *
+   * Dass hier 1.700 Leads und über 2.000 Ereignisse geladen werden, ist der
+   * Preis dafür. `/linkedin` zahlt ihn seit dem 20.08. schon; ein zweiter,
+   * abgespeckter Ladeweg wäre eine zweite Wahrheit über denselben Bestand.
+   */
+  const leadsQuery = useLeads(slug)
+  const threadsJeLead = useMemo(() => {
+    const karte = new Map<string, LinkedinThread>()
+    // Ohne diese Zuordnung schickt `leadStation` jeden Lead in den stillen
+    // Zweig — auch den, mit dem Kevin längst schreibt (dieselbe Stelle wie in
+    // LinkedinArea.tsx).
+    for (const t of linkedinThreads.items) if (t.lead_id) karte.set(t.lead_id, t)
+    return karte
+  }, [linkedinThreads.items])
+
+  const funnelLeads = useMemo<FunnelLead[]>(
+    () =>
+      leadsQuery.leads.map((l) => ({
+        id: l.id,
+        name: l.name,
+        headline: l.headline,
+        lead_status: l.lead_status,
+        wiedervorlage_am: l.wiedervorlage_am,
+        ereignisse: (leadsQuery.ereignisseJeLead.get(l.id) ?? []).map((e) => ({ typ: e.typ, at: e.at })),
+        thread: threadsJeLead.get(l.id) ?? null,
+      })),
+    [leadsQuery.leads, leadsQuery.ereignisseJeLead, threadsJeLead],
+  )
 
   /**
    * Der Tages-Flow — dieselbe Rechnung wie im Hero und im Zähl-Modus, gefüttert
@@ -963,8 +1002,121 @@ export function SalesDashboard() {
     },
   ]
 
+  /* ── Das Sales-Canvas ─────────────────────────────────────────────────
+   *
+   * Der Funnel als Karten: je Karte „wie viele stecken hier" plus „wie viele
+   * heute". Die Rechnung liegt in `lib/funnelKarten.ts`; hier wird nur
+   * verdrahtet, welche Namensliste sich hinter welcher Karte öffnet.
+   */
+
+  /** Follow-up-Stufe je Thread — sie entscheidet, welcher der drei Texte gilt. */
+  const stufeJeThread = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const t of linkedinThreads.items) m.set(t.id, t.followup_stage)
+    return m
+  }, [linkedinThreads.items])
+
+  /**
+   * Die heutige Portion, nach Stufe getrennt.
+   *
+   * **Die Drossel bleibt eine.** Aufgeteilt wird `followupPortionsListe`, nicht
+   * der ganze Rückstand: Die drei Karten sind drei Texte für ein Pensum, nicht
+   * dreimal 20 Follow-ups. Wer hier `followupListe` einsetzt, hebelt die
+   * Tagesportion aus und legt Kevin wieder 177 Namen hin.
+   */
+  const followupPortionJeStufe = useMemo(() => {
+    const m = new Map<number, Posten[]>([
+      [0, []],
+      [1, []],
+      [2, []],
+    ])
+    for (const p of followupPortionsListe) {
+      const stufe = stufeJeThread.get(zeilenId(p.id))
+      // Eine andere Stufe kann hier nicht stehen (`isDue` lässt nur 0–2 fällig
+      // werden). Falls doch je eine kaputte Zahl in der Zeile steht, landet der
+      // Posten auf der ersten Karte — lieber der falsche Text als ein Lead, der
+      // aus allen drei Fenstern verschwindet.
+      m.get(stufe === 1 || stufe === 2 ? stufe : 0)!.push(p)
+    }
+    return m
+  }, [followupPortionsListe, stufeJeThread])
+
+  /**
+   * Welche Arbeitsliste liegt hinter welcher Karte?
+   *
+   * Nur die fünf Karten, für die es eine Posten-Quelle gibt. Die Stationen aus
+   * 0078 (Instagram, PDF, Postkarte, Anruf) haben noch keine — sie zeigen
+   * ihren Bestand und bleiben vorerst unklickbar. Wer sie sehen will, findet
+   * sie mit Namen und CSV-Export in der Pipeline unter /linkedin.
+   */
+  const listeJeKarte = useMemo(() => {
+    const m = new Map<FunnelKartenId, Posten[]>()
+    m.set('erstnachricht_faellig', erstnachrichtListe)
+    m.set('antwort_da', antwortListe)
+    m.set('loom_offen', loomListe)
+    m.set('followup_0', followupPortionJeStufe.get(0) ?? [])
+    m.set('followup_1', followupPortionJeStufe.get(1) ?? [])
+    m.set('followup_2', followupPortionJeStufe.get(2) ?? [])
+    return m
+  }, [erstnachrichtListe, antwortListe, loomListe, followupPortionJeStufe])
+
+  /**
+   * Vier Karten öffnen ein Fenster, das es schon gibt — samt Anfragen-Zähler,
+   * ausgeblendeten Antworten und „Arbeitsmodus starten" am Handy. Die alten
+   * Kachel-Kennungen bleiben damit gültig, und `/sales?kachel=antworten` aus
+   * dem Heute-Deck trifft weiter.
+   */
+  const ALT_KACHEL: Partial<Record<FunnelKartenId, string>> = {
+    anfrage_offen: 'vernetzungsanfragen',
+    erstnachricht_faellig: 'erstnachrichten',
+    antwort_da: 'antworten',
+    loom_offen: 'looms',
+  }
+
+  const rohKarten = useMemo(
+    () => funnelKarten({ leads: funnelLeads, staende, jetzt }),
+    [funnelLeads, staende, jetzt],
+  )
+
+  /**
+   * „eine Abfrage, eine Zahl": Wo eine Liste hinter der Karte liegt, IST die
+   * Zahl auf dem Badge deren Länge — nicht eine zweite Rechnung daneben. Ohne
+   * das stünde auf der Follow-up-Karte „63 dran" und im Fenster lägen vier
+   * Namen, weil die Tagesportion dazwischen drosselt.
+   */
+  const karten = useMemo(
+    () =>
+      rohKarten.map((k) => {
+        const l = listeJeKarte.get(k.id)
+        return l ? { ...k, heuteFaellig: l.length } : k
+      }),
+    [rohKarten, listeJeKarte],
+  )
+
+  /** Die Fenster der drei Follow-up-Karten — Text oben, Namen darunter. */
+  const followupKacheln: KachelDef[] = karten
+    .filter((k) => k.stufenId === 'followups')
+    .map((k): KachelDef => {
+      const posten = listeJeKarte.get(k.id) ?? []
+      return {
+        id: k.id,
+        titel: k.titel,
+        kennzahl: zahl(`${posten.length} heute · ${k.bestand} in dieser Stufe`),
+        inhalt: () => (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {k.vorlage ? <VorlagenKopf text={k.vorlage} /> : null}
+            {liste(posten)()}
+          </div>
+        ),
+        fensterAktion: mobilArbeitsmodus('followup', posten),
+      }
+    })
+
   const alleZeilen = [...flowZeilen, ...projektZeilen]
-  const offenKachel = alleZeilen.find((k) => k.id === offenKachelId) ?? null
+  const offenKachel =
+    alleZeilen.find((k) => k.id === offenKachelId) ??
+    followupKacheln.find((k) => k.id === offenKachelId) ??
+    null
 
   /**
    * Die Ansage trägt nur, wenn sie mehr sagt als die Kennzahl. Ohne genug
@@ -1044,6 +1196,26 @@ export function SalesDashboard() {
           </div>
         ) : null}
 
+        {/* Das Canvas: der Funnel als Karten. Bestand rechts, Tagespensum
+            klein darunter — die Balken darunter zeigen dasselbe Pensum noch
+            einmal, bis Z4 sie einklappt. */}
+        {leadsQuery.tableMissing ? null : leadsQuery.loading ? (
+          <div style={{ fontSize: 12, color: 'var(--ck-text-3)', padding: '10px 4px' }}>Bestand lädt …</div>
+        ) : (
+          <FunnelCanvas
+            karten={karten}
+            onOeffnen={(k) => oeffneKachel(ALT_KACHEL[k.id] ?? k.id)}
+            // Öffenbar ist, wofür es eine Arbeitsliste oder ein bestehendes
+            // Fenster gibt. Eine Karte, die auf Klick nichts zeigt, ist
+            // schlimmer als eine, die gar nicht erst klickbar aussieht.
+            oeffenbar={(k) => listeJeKarte.has(k.id) || ALT_KACHEL[k.id] !== undefined}
+            layoutIdFuer={(k) => `kachel-${ALT_KACHEL[k.id] ?? k.id}`}
+          />
+        )}
+
+        <div className="ck-label" style={{ marginTop: 10 }}>
+          Tagespensum
+        </div>
         {flowZeilen.map((z) => (
           <FlowZeile key={z.id} zeile={z} onOeffnen={() => oeffneKachel(z.id)} />
         ))}

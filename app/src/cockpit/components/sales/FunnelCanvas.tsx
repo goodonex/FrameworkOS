@@ -37,10 +37,27 @@ export interface FunnelCanvasProps {
    * Ohne Angabe: alles mit Bestand.
    */
   oeffenbar?: (karte: FunnelKarte) => boolean
+  /**
+   * Die `layoutId` für den Morph Karte → Fenster. Vier Karten öffnen ein
+   * Fenster, das es schon gibt (der Anfragen-Zähler etwa); dann muss die Karte
+   * dessen Kennung tragen, sonst morpht das Fenster aus dem Nichts.
+   */
+  layoutIdFuer?: (karte: FunnelKarte) => string
 }
 
 /** „n dran" — dunkler Text auf dem Akzent. */
-function DranBadge({ anzahl }: { anzahl: number }) {
+function DranBadge({ anzahl, machbar }: { anzahl: number; machbar: boolean }) {
+  /**
+   * Grün nur, wo Kevin auch etwas tun kann.
+   *
+   * Am ersten Tag mit echten Daten stand „E-Mail fällig · 603 dran" als
+   * lautester Punkt der Seite — und dahinter lag nichts: Für den stillen Zweig
+   * sind noch keine E-Mail-Adressen beschafft (`Lead.email` ist leer, siehe
+   * `types/db.ts`), also gibt es keine Arbeitsliste und keinen Handgriff. Ein
+   * Akzent-Badge, das zu nichts führt, ist ein Alarm ohne Knopf; nach drei
+   * Tagen glaubt man auch dem grünen Badge nicht mehr, hinter dem wirklich
+   * Arbeit liegt. Die Zahl bleibt sichtbar, sie hört nur auf zu rufen.
+   */
   return (
     <span
       className="ck-zahl"
@@ -49,16 +66,17 @@ function DranBadge({ anzahl }: { anzahl: number }) {
         fontWeight: 600,
         padding: '2px 9px',
         borderRadius: 'var(--ck-radius-pille)',
-        background: 'var(--ck-accent)',
+        background: machbar ? 'var(--ck-accent)' : 'transparent',
         /**
          * Dunkel auf dem Akzent, nicht hell. Der Salbei ist eine helle Farbe;
          * `--ck-accent-text` darauf kam am 20.08. im Browser auf ~1,1:1.
          * Dieselbe Lehre steht in `Badge.tsx` und in `LeadPipeline.tsx`.
          */
-        color: 'var(--ck-bg)',
+        color: machbar ? 'var(--ck-bg)' : 'var(--ck-text-3)',
         flexShrink: 0,
         whiteSpace: 'nowrap',
       }}
+      title={machbar ? undefined : 'Fällig, aber noch ohne Arbeitsliste — die Namen stehen in der Pipeline unter /linkedin'}
     >
       {anzahl} dran
     </span>
@@ -77,6 +95,7 @@ function KartenZeile({
   onOeffnen,
   leise,
   dicht,
+  layoutId,
 }: {
   karte: FunnelKarte
   /** Der Halbsatz — null, wenn ihn die Gruppen-Kopfzeile schon trägt. */
@@ -84,6 +103,7 @@ function KartenZeile({
   onOeffnen?: () => void
   leise?: boolean
   dicht: boolean
+  layoutId: string
 }) {
   const steht = karte.soll !== null && karte.erledigtHeute !== null && karte.erledigtHeute >= karte.soll
   const inhalt = (
@@ -116,7 +136,7 @@ function KartenZeile({
           </span>
         ) : null}
       </span>
-      {karte.heuteFaellig > 0 ? <DranBadge anzahl={karte.heuteFaellig} /> : null}
+      {karte.heuteFaellig > 0 ? <DranBadge anzahl={karte.heuteFaellig} machbar={Boolean(onOeffnen)} /> : null}
       <span
         className="ck-zahl"
         title={`${karte.bestand} stecken in dieser Phase`}
@@ -160,7 +180,7 @@ function KartenZeile({
       type="button"
       // Derselbe Morph wie bei den alten Flow-Zeilen: die Karte wird zum
       // Fenster, statt dass ein Fenster darüber aufpoppt.
-      layoutId={`kachel-${karte.id}`}
+      layoutId={layoutId}
       transition={{ duration: 0.22, ease: 'easeOut' }}
       onClick={onOeffnen}
       className="ck-panel"
@@ -171,13 +191,17 @@ function KartenZeile({
   )
 }
 
-export function FunnelCanvas({ karten, onOeffnen, oeffenbar }: FunnelCanvasProps) {
+export function FunnelCanvas({ karten, onOeffnen, oeffenbar, layoutIdFuer }: FunnelCanvasProps) {
   const mobil = useIsMobile()
   const [zeigeLeere, setZeigeLeere] = useState(false)
 
   const darfOeffnen = useMemo(
     () => oeffenbar ?? ((k: FunnelKarte) => k.bestand > 0),
     [oeffenbar],
+  )
+  const morphId = useMemo(
+    () => layoutIdFuer ?? ((k: FunnelKarte) => `kachel-${k.id}`),
+    [layoutIdFuer],
   )
 
   /**
@@ -226,6 +250,7 @@ export function FunnelCanvas({ karten, onOeffnen, oeffenbar }: FunnelCanvasProps
                 karte={karte}
                 pensum={geteilt ? null : pensumText(karte)}
                 dicht={mobil}
+                layoutId={morphId(karte)}
                 onOeffnen={onOeffnen && darfOeffnen(karte) ? () => onOeffnen(karte) : undefined}
               />
             ))}
@@ -273,7 +298,7 @@ export function FunnelCanvas({ karten, onOeffnen, oeffenbar }: FunnelCanvasProps
 
       {ausserhalb && ausserhalb.bestand > 0 ? (
         <div style={{ marginTop: 2 }}>
-          <KartenZeile karte={ausserhalb} pensum={null} dicht={mobil} leise />
+          <KartenZeile karte={ausserhalb} pensum={null} dicht={mobil} leise layoutId={morphId(ausserhalb)} />
         </div>
       ) : null}
     </div>
