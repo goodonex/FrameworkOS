@@ -157,8 +157,12 @@ check('ohne Meta wird nichts behauptet',
 check('Postfach älter als 48 h wird gemeldet',
   schluessel({ ...sauber, threads: [{ name: 'X', last_from: 'me', last_synced_at: vorStunden(72) }] })
     .includes('postfach_alt'))
-check('Postfach von gestern ist in Ordnung',
-  !schluessel({ ...sauber, threads: [{ name: 'X', last_from: 'me', last_synced_at: vorStunden(30) }] })
+// 14 Stunden, nicht 30: Die Schwelle steht seit dem 25.08. auf 18 Stunden
+// (GRENZEN.postfachStunden) — vorher 48. Der Test war mit „gestern" gemeint,
+// prüfte aber die alte Grosszuegigkeit und blieb rot zurueck. 14 Stunden sind
+// die normale Nachtluecke, die durchgehen soll (letzter Sync ~19 Uhr, erster ~9 Uhr).
+check('die normale Nachtluecke ist in Ordnung',
+  !schluessel({ ...sauber, threads: [{ name: 'X', last_from: 'me', last_synced_at: vorStunden(14) }] })
     .includes('postfach_alt'))
 check('Netzwerk älter als 7 Tage wird gemeldet',
   schluessel({ ...sauber, netzwerk: [{ name: 'X', status: 'angenommen', zuletzt_gesehen_at: vorStunden(24 * 9) }] })

@@ -3,6 +3,7 @@ import { useIsMobile } from '../../hooks/useViewport'
 import { nachrichtStand, type Posten } from '../lib/prioritaet'
 import type { ArbeitsmodusErgebnis } from './Arbeitsmodus'
 import { ListenZeile } from './home/ListenZeile'
+import { inZwischenablage as textInDieAblage } from '../lib/zwischenablage'
 
 /**
  * Aufklappbare Arbeitsliste für das Kachel-Fenster (Desktop-Arbeitsfluss):
@@ -98,41 +99,14 @@ export function Arbeitsliste({ posten, onErledigt, onZaehler, morgen, loom, proj
   }, [])
 
   /**
-   * Kopieren mit Rückfallebene (18.08.2026).
+   * Kopieren mit Rückfallebene — die Mechanik liegt seit dem 25.08.2026 in
+   * `lib/zwischenablage.ts`, weil das Sales-Canvas dieselbe braucht.
    *
-   * `navigator.clipboard` ist der richtige Weg, scheitert aber je nach
-   * Browser-Zustand mit `NotAllowedError` — messbar im Vorschau-Browser, und
-   * Safari ist hier historisch eigen. Dann greift die alte Technik: ein
-   * unsichtbares Textfeld, markieren, `execCommand('copy')`. Sie ist
-   * veraltet, aber sie funktioniert genau dort, wo die moderne API aussteigt,
-   * und ein „Zwischenablage gesperrt" bei jedem zweiten Namen wäre für Kevins
-   * LinkedIn-Runde teurer als eine veraltete Zeile Code.
-   *
-   * Gibt zurück, ob es geklappt hat — die Rückmeldung am Namen hängt daran.
+   * Der Import heisst bewusst NICHT `kopiere`: weiter unten steht eine lokale
+   * Funktion dieses Namens, die einen `Posten` nimmt. Sie verdeckte den Import
+   * und der Build war rot, ohne dass die Zeile hier falsch aussah.
    */
-  const inZwischenablage = useCallback(async (text: string): Promise<boolean> => {
-    try {
-      await navigator.clipboard.writeText(text)
-      return true
-    } catch {
-      try {
-        const feld = document.createElement('textarea')
-        feld.value = text
-        // Aus dem Blick, aber im Layout — `display: none` liesse sich nicht markieren.
-        feld.setAttribute('aria-hidden', 'true')
-        feld.style.position = 'fixed'
-        feld.style.top = '-1000px'
-        feld.style.opacity = '0'
-        document.body.appendChild(feld)
-        feld.select()
-        const ok = document.execCommand('copy')
-        document.body.removeChild(feld)
-        return ok
-      } catch {
-        return false
-      }
-    }
-  }, [])
+  const inZwischenablage = useCallback((text: string) => textInDieAblage(text), [])
 
   /**
    * Der Griff auf den Namen kopiert ihn UND klappt auf (18.08.2026).
