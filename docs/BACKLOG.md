@@ -2,6 +2,57 @@
 
 **Stand:** 2026-08-25 · Branch `main` (cockpit-rebuild liegt zurück) · Repo `~/Kevin OS/02 Projekte/uriel`
 
+## **GEBAUT 25.08.2026 — Das Sales-Canvas: der Funnel als Arbeitsfläche**
+
+Kevins `/sales` war eine senkrechte Kette aus sechs Flow-Zeilen. Sie
+funktionierte, frass aber die ganze Seitenhöhe für sechs Zahlen — und zeigte nur
+das Tagespensum, nie, **wie viele Leute insgesamt in welcher Phase stecken**.
+Sein Bild dafür lag längst als `Vertriebsprozess.canvas` im Vault.
+
+Jetzt steht es als Oberfläche da: oben eine Zeile (1.788 Leads im Kosmos, Tag 1
+von 6), darunter der Funnel als Karten. Je Karte der **Bestand** gross und das
+**Tagespensum** klein — zwei Zahlen, die Verschiedenes bedeuten. Klick öffnet
+das Fenster: der Textbaustein der Stufe **einmal oben**, darunter die Namen.
+Die alten Balken sind eine Rücklage hinter einem Klick, standardmässig zu.
+
+**Der Nachrichtentext steht einmal in der Karte, nicht pro Lead** — das geht
+erst, seit die Follow-up-Texte fest sind (`c5a1d80`).
+
+**Die eine Invariante, an der alles hängt:** Jeder Lead liegt auf **genau einer**
+Karte. `leadStation()` entscheidet zuerst, der Follow-up-Bucket verfeinert nur
+noch *innerhalb* von `wartet_auf_antwort`. Wer beide nebeneinander abfragt,
+bekommt denselben Menschen zweimal, und dann ist keine Zahl der Seite mehr etwas
+wert. Festgehalten in `verify-funnel-karten.ts`.
+
+**Was gebaut ist:**
+
+- **`lib/funnelKarten.ts`** — die Rechenschicht. Verheiratet Bestand
+  (`leadStation`) und Tagespensum (`stufenStaende`), rechnet nichts nach.
+  `funnelGruppen` hält fest, welche Karten sich EIN Pensum teilen.
+- **`components/sales/FunnelCanvas.tsx`** + `VorlagenKopf` + `GebauteSeiten`.
+- **`runner/jophiel.mjs`** — `GET /jophiel/projekte` und `GET /jophiel/shot/:slug/:name`.
+  Vorschaubilder über `sips` von 1–4 MB auf 50–75 kB. Spiegel `jophiel_projekte`.
+- **Drei Prüfskripte** (80 Prüfungen), Stand jetzt **56**.
+
+**Drei Entscheidungen, die dem naiven Bau widersprechen:**
+
+1. **Die drei Follow-up-Karten teilen sich eine Kopfzeile.** Sie zählen alle auf
+   `li_followups`; stünde „heute 5 von 13" auf jeder, läse Kevin 39.
+2. **Das „n dran"-Badge ist nur grün, wo es ein Klickziel gibt.** „E-Mail fällig ·
+   603 dran" war der lauteste Punkt der Seite, und dahinter lag nichts — für den
+   stillen Zweig sind keine Adressen beschafft. Ein Alarm ohne Knopf entwertet
+   auch die Alarme, hinter denen Arbeit liegt.
+3. **Gebaute Seiten stehen NICHT im Funnel.** Ein Jophiel-Projekt ist ein
+   Artefakt, kein Mensch — als Karte würde es den Lead doppelt zählen.
+
+**Nicht gepusht.** Vollständig: [`docs/wargames/sales-canvas.md`](wargames/sales-canvas.md).
+
+**Offen:** Der Abhak-Test hat echte Daten angefasst (Christelle Franz, Stufe 0→1,
+`li_followups` des 25.08. auf 1) · „Erstnachricht fällig: 368 · heute 0 von 0" —
+368 Angenommene warten, aber kein Text liegt für sie bereit · die 0078-Stationen
+(Instagram, PDF, Postkarte, Anruf) sind noch nicht klickbar, weil sie keine
+Posten-Quelle haben.
+
 ## **GEBAUT 25.08.2026 — Der Sortier-Agent: keiner fällt weg, aber nicht lasch**
 
 Kevins Auftrag, wörtlich: *„Den Agenten, der vorsortiert, mach den auf jeden

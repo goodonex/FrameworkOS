@@ -55,7 +55,7 @@ nie im SQL-Editor — genau das hatte die Historie zerlegt.
 | `/cockpit` | Home: Heute-Deck, Vitals, OS-Graph, Agenten, Ziel | `CockpitHome.tsx` |
 | `/aufgaben` `/termine` `/freigaben` | „Heute" (Sub-Tabs `HeuteTabs`) | `AufgabenArea` · `TermineArea` · `FreigabenArea` |
 | `/linkedin` | LinkedIn-Postfach: Buckets, Sterne, Entwürfe | `LinkedinArea.tsx` |
-| `/sales` | Kachel-Dashboard „Jetzt dran" + Arbeitsmodus | `SalesDashboard.tsx` |
+| `/sales` | **Sales-Canvas** (25.08.): Funnel als Karten — Bestand je Station plus Tagespensum, Klick öffnet Text + Namensliste. Die alten Flow-Balken liegen eingeklappt darunter, die gebauten Jophiel-Seiten als Vorschau-Streifen | `SalesDashboard.tsx`, `components/sales/*`, `lib/funnelKarten.ts` |
 | `/sales/leads` `:contactId` | **Neubau nach Close** (Phase 2): Liste mit Smart Views, Lead-Detail mit Timeline mittig | `cockpit/pages/sales/LeadListe.tsx`, `LeadDetail.tsx` |
 | `/sales/pipeline` | Glass-Pipeline, **bleibt bis zum Paritäts-Entscheid** (`docs/phase2/sales-paritaet.md`) — kann neun Dinge, die der Neubau nicht kann | `pages/sales/SalesMode.tsx` |
 | `/sales/lists` `call-mode` `new` | Altes CRM, in der Shell | `pages/sales/*` (Glass-Ära) |
@@ -114,7 +114,7 @@ Skill-Änderungen brauchen das nicht (`claude -p` liest `SKILL.md` frisch).
 - **Endpoints:** `/status` `/run` `/runs` `/runs/:id` `/agents` `/vault/recent`
   `/vault/graph` `/os/map` `/os/file` `/calendar` `/ads/{overview,manifest,customers}`
   `/content/manifest` `/social/weeks` `/sales/library` `/linkedin/sync`
-  `/files/{kunden,social,sales}/…`
+  `/files/{kunden,social,sales}/…` `/jophiel/{projekte,shot/:slug/:name}`
 - **Agenten:** `weekly-content` · `wochenrecap` · `morgenbrief` · `followup-entwuerfe` ·
   `linkedin-followup-entwuerfe` · `linkedin-antwort-entwuerfe` · `lead-research` ·
   `dream-check` · `loom-skript` · `followup-pdf`. Skills liegen im **Vault**
@@ -124,7 +124,7 @@ Skill-Änderungen brauchen das nicht (`claude -p` liest `SKILL.md` frisch).
   das ist der Grund für den Selbstwecker (`pmset`) und den Heimserver-Plan.
 - **Spiegel nach Supabase** (`runner_snapshots`, damit das Handy etwas sieht):
   `runs` · `files_index` · `calendar` · `agents` · `ads_overview` · `social_weeks` ·
-  `sales_library` · `erstnachrichten_meta`. Aufträge vom Handy laufen über
+  `sales_library` · `erstnachrichten_meta` · `jophiel_projekte`. Aufträge vom Handy laufen über
   `runner_jobs` (Migration 0059), **nicht** über `System/Queue` — der Ordner ist nur
   noch Debug-Protokoll.
 - **`runner/.env`** braucht `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (sonst fallen
@@ -194,7 +194,13 @@ cd app && npx tsc -b && npm run build     # muss grün sein
    auf die CSS-Variablen — wer sie wieder hart einträgt, bricht die Schrift auf
    allen Flächen außerhalb von `.ck-root` (Anmeldung, Portal), ohne dass der
    Build meckert.
-9. **Das Foto-Band des Cockpit-Homes ist absolut positioniert** und ragt über
+9. **Zwei Elemente mit derselben `layoutId` geistern ineinander.** framer-motion
+   morpht zwischen allem, was dieselbe Kennung trägt. Als das Sales-Canvas und
+   die Flow-Balken beide `kachel-<id>` für dieselbe Sache benutzten, war das
+   unsichtbar — bis die Balken aufgeklappt waren und plötzlich beide im Bild
+   standen. Wer ein Fenster von zwei Stellen aus öffnen lässt, gibt jeder Stelle
+   einen eigenen Namensraum und sagt dem Fenster, aus welcher es wächst.
+10. **Das Foto-Band des Cockpit-Homes ist absolut positioniert** und ragt über
    den Hero hinaus, wenn dieser kürzer ist als das Band (`.ck-hero`
    `min-height`). Dann legt es sich über die Beschriftungen darunter — heller
    Text ohne Scrim auf hellem Bild. Wer am Hero-Aufbau schraubt, prüft die
