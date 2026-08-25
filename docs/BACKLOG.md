@@ -2,6 +2,57 @@
 
 **Stand:** 2026-08-25 · Branch `main` (cockpit-rebuild liegt zurück) · Repo `~/Kevin OS/02 Projekte/uriel`
 
+## **GEBAUT 25.08.2026 — Das Pipeline-Board: der Funnel als Fläche, mit Conversion**
+
+Kevins Wunsch, nachdem die Kartenreihe stand: *„ich möchte visuell das canvas.
+einmal die komplette pipeline abbilden, die ich abarbeiten kann, infos
+rausziehen kann und kleine veränderungen machen kann. mit so einem canvas
+könnte man dann auch die conversion mit im bild sehen und sehen wo optimiert
+werden muss."*
+
+Seine Pipeline ist kein Strang, sondern ein **Baum**: nach der Anfrage gabelt
+sie sich in „nie angenommen" und „angenommen", plus den Abzweig „hat
+geantwortet". Untereinander gelistet sah das aus wie neun weitere Schritte
+derselben Reihe.
+
+**Was gebaut ist** (`docs/wargames/pipeline-board.md`, Züge 1–8, **nicht
+gepusht**):
+
+- **`lib/funnelRaten.ts`** — die Conversion an den Kanten, in zwei Sorten
+  (Zeitreihe / Kohorte) mit Reifezeit gegen die Kohortenfalle.
+- **`components/sales/PipelineBoard.tsx`** — SVG-Baum, feste Anordnung,
+  Umschalter Liste/Board. Mobil bleibt die Kartenreihe.
+- **`lib/kadenz.ts` + `KadenzPanel`** — alle Wartezeiten justierbar, mit
+  **Vorschau vor dem Speichern**.
+- **`uebersprungen`** (Migration 0080) — Leads von Hand umhängen, ohne die
+  Historie zu fälschen.
+- **Der Haken protokolliert das Lead-Ereignis** (Zug 1) — vorher stand
+  `followup` bei 0 Zeilen, obwohl täglich abgehakt wurde.
+- **Vier Prüfskripte** (173 Prüfungen), Stand jetzt **60**.
+
+**Die drei Zahlen-Entscheidungen, die den Unterschied machen:**
+
+1. **Nie 0 % für „nicht gemessen".** Vier unterscheidbare Gründe statt einer
+   Null — und jeder sagt Kevin etwas anderes darüber, was zu tun ist.
+2. **`paarung_fehlt`** — an echten Daten entdeckt, nachdem alle 42 Prüfungen
+   gegen Fixtures grün waren. `erstnachricht` 267 Zeilen, `antwort_erhalten` 67,
+   aber nur **9** Leads mit beidem in der richtigen Reihenfolge:
+   `leads-sync` schreibt für Threads ohne Verlauf entweder das eine oder das
+   andere. Ohne die Prüfung stand dort „0,0 %".
+3. **Die Kadenz-Vorschau** ist der eigentliche Schutz, nicht die Validierung:
+   „1157 → 1177 (+20)", bevor gespeichert wird.
+
+**OFFEN — braucht Kevins Entscheidung:**
+
+- **Migration 0080 ist angelegt, aber NICHT angewendet.**
+  `supabase migration list` zeigt `0079_loom_ereignisse` als lokal vorhanden und
+  remote fehlend — uncommittete Arbeit aus dem Jophiel-Projekt (samt
+  `supabase/functions/loom-ping/`). Ein `db push` würde sie mitanwenden. Bis zur
+  Klärung schlägt das Umhängen am CHECK-Constraint fehl.
+- **Chrome-Sync muss Verläufe spiegeln,** sonst bleiben zwei Kanten dauerhaft
+  ohne Zahl.
+- **Benchmarks für die Kantenfärbung** — `channelRates` misst eine andere Kante.
+
 ## **GEBAUT 25.08.2026 — Das Sales-Canvas: der Funnel als Arbeitsfläche**
 
 Kevins `/sales` war eine senkrechte Kette aus sechs Flow-Zeilen. Sie

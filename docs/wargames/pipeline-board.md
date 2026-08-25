@@ -662,3 +662,110 @@ im Repo. **Zug 3 färbt die Kanten danach** — unter Benchmark in `--ck-warn`
 liegt/überfällig"), im Band neutral, darüber in `--ck-accent`. Wo keine
 Benchmark-Zahl existiert, bleibt die Kante neutral — **kein erfundener
 Richtwert.**
+
+---
+
+# Was tatsächlich passiert ist (25.08.2026)
+
+**Status: gebaut, nicht gepusht. Eine Migration wartet auf Kevins Wort.**
+
+Gebaut in einem Durchgang. Zug 1 lief auf Sonnet, der Rest auf Opus — die
+Blaupause hatte Z2/Z5/Z6 ausdrücklich reserviert, weil ihre Fehler plausibel
+aussehen und durch jedes Gate kommen. Commits: `a20163c` (Z1) · `b242ceb`
+(Review-Fix) · `8213cb2` (Z2) · `a06045d` (Z3+Z4+Z7) · `1254e7b` (Z5) ·
+`2a655eb` (Z6).
+
+## Die Arbeitsteilung hat sich gelohnt — an einer Stelle nachweisbar
+
+Sonnets Zug 1 war solide, hatte aber einen Fehler, den kein Prüfskript
+gefunden hätte: Die Sperre gegen doppelte Ereignisse griff auf `lead_id + typ`.
+Ein Lead hat bis zu **drei** `followup`-Ereignisse. Hätte Kevin das dritte
+abgehakt und der Chrome-Sync später die beiden älteren nachgeliefert, wären die
+für immer verloren gewesen — die Historie zeigte 1 statt 3, und genau daraus
+rechnet Zug 2 die Conversion. Unsichtbar, weil `followup` bei 0 Zeilen stand:
+Es gab noch nichts zu verlieren. Behoben in `b242ceb` über ein Zeitfenster
+(±1 Tag) statt „existiert je".
+
+## Was die Blaupause nicht wusste
+
+**1. Die zweite Kante ist auch nicht kohortenfähig — und das zeigte sich erst
+an echten Daten.** Alle 42 Prüfungen gegen Fixtures waren grün, und an Prod
+stand `wartet_auf_antwort → antwort_da: 0,0 %`. Die Behauptung, niemand
+antworte, während in denselben 30 Tagen 21 Antworten eingingen.
+
+Ursache in `scripts/leads-sync.ts`: Ein Thread **ohne gespiegelten Verlauf**
+bekommt ENTWEDER `erstnachricht` ODER `antwort_erhalten`, je nachdem wer
+zuletzt schrieb — nie beides. Gemessen: 267 Erstnachrichten, 67 Antworten,
+aber nur **9** Leads mit beidem in der richtigen Reihenfolge.
+
+Daraus wurde ein vierter Grund, `paarung_fehlt`. Er sagt etwas anderes als
+`sammelt_noch`: Warten hilft nicht, der Chrome-Sync muss die Verläufe
+spiegeln. Ohne diese Prüfung hätte das Board eine Zahl gezeigt, die Kevin zur
+Optimierung ans falsche Ende geschickt hätte.
+
+**2. `bestand` als dritte Ratensorte wird nicht gebraucht.** Für jede Kante, an
+der eine Bestandsquote in Frage käme, fehlen die Ereignisse ohnehin komplett.
+Eine Sorte, die nie zugewiesen wird, wäre tote Struktur — also zwei statt drei.
+
+**3. Der 700-px-Trigger griff nicht, aber aus einem anderen Grund als gedacht.**
+Der Gegenzug der Blaupause (Endstufen zusammenfassen) hätte die 1:1-Zuordnung
+Knoten↔Karte gebrochen und den Klick in Zug 4 verkompliziert. Flachere Knoten
+mit Titel und Bestand **nebeneinander** statt untereinander bringen den Baum auf
+634 px, ohne etwas zusammenzuziehen.
+
+**4. Drei Layout-Fehler, die erst im Browser sichtbar waren.** Kanten zwischen
+Knoten derselben Zeile liefen rückwärts nach oben und die Beschriftung landete
+auf dem Knoten. Der Spaltenabstand von 34 px trug die Beschriftung nicht
+(„ungepaart" ist rund 79 px breit). Und die Kartentitel sind für eine volle
+Zeile geschrieben und brachen im 168-px-Knoten ab.
+
+**5. Zug 7 musste in Zug 3 vorgezogen werden.** Ohne den Umschalter hätte das
+Board **neben** der Kartenreihe gestanden — zwei Orte für dieselbe Zahl, gegen
+Gesetz 3.
+
+**6. `inmail` lässt sich nicht protokollieren.** Der Plan nannte vier Spuren für
+Zug 1. Das Buchen einer InMail ist in `InmailPanel.onBuchen` ein reiner
+Pool-Zähler ohne ausgewählten Lead — es gibt dort keine Zeile, an die sich ein
+Ereignis hängen liesse. Gebaut sind drei.
+
+**7. Eine fremde Migration liegt im Weg.** `supabase migration list` zeigt
+`0079_loom_ereignisse` als **lokal vorhanden, remote fehlend** — uncommittete
+Arbeit aus dem Jophiel-Projekt, samt `supabase/functions/loom-ping/`. Ein
+`db push` würde sie mitanwenden. Deshalb ist `0080` angelegt, aber **nicht
+angewendet**; sie führt `loom_angesehen` vorsorglich mit, damit die Reihenfolge
+nichts kaputt macht.
+
+## Was am laufenden Cockpit gesehen wurde
+
+Mit Kevins Prod-Daten, nicht abgeleitet:
+
+1. **Zug 1:** BizBuilder als Follow-up abgehakt → genau eine Zeile
+   `lead_ereignisse` (`typ: followup`, `quelle: ui`), `li_followups` exakt +1.
+   Danach `leads-sync.ts` real gelaufen — keine zweite Zeile. Michaela Beer als
+   Loom → dieselbe Probe für `loom_gesendet`.
+2. **Zug 2:** Nach dem `paarung_fehlt`-Fix kein einziges 0,0 % mehr. Zwei Kanten
+   tragen eine Zahl (20,3 % Zeitreihe, 41,9 % Kohorte), alle anderen einen
+   Grund. Invariante `angekommen <= grundgesamtheit` an echten Daten gehalten.
+3. **Zug 3:** Baum steht, Gabelung als Gabelung lesbar, Zahlen deckungsgleich
+   mit der Liste. SVG 634 px hoch.
+4. **Zug 5:** Erste Schwelle 3 → 1 zeigt **„1157 → 1177 (+20)"** in Warnfarbe,
+   dazu „Noch ist nichts geändert." Monotonie geprüft: `20/7/14` eingetippt,
+   Feld springt geschlossen auf `3/7/14`. Nach dem Speichern zeigen Board **und**
+   Liste beide 161 / 18 dran — kein Aufrufer vergessen. Danach auf Standard
+   zurückgestellt.
+5. **Mobil 390 × 664:** Trotz gespeicherter Board-Ansicht kein Board, kein
+   Umschalter, kein Querscrollen — die Kartenreihe übernimmt.
+
+## Offen
+
+- **Migration 0080 anwenden.** Braucht eine Entscheidung zu 0079 (siehe oben).
+  Bis dahin ist die Umhängen-Bedienung in der Lead-Akte sichtbar, aber der
+  Insert schlägt am CHECK-Constraint fehl.
+- **Der Chrome-Sync muss Verläufe spiegeln,** sonst bleiben zwei Kanten
+  dauerhaft auf `paarung_fehlt`.
+- **Benchmarks fehlen.** `channelRates` trägt welche, misst aber eine andere
+  Kante. Sobald Kevin eigene Zielwerte nennt, ist die Kantenfärbung ein
+  Einzeiler im Bauplan.
+- **Zug 8 selbst:** dieser Abschnitt. `HANDOFF.md` ist nicht angefasst — keine
+  Route hat sich geändert, `/sales` ist dieselbe Adresse mit einer zweiten
+  Ansicht.
