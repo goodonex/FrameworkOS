@@ -1,4 +1,5 @@
 import type { Contact, LinkedinThread } from '../../types/db'
+import { KADENZ_STANDARD, aktiveKadenz } from './kadenz'
 
 /**
  * Fälligkeitsregeln für LinkedIn-Follow-ups (Wargame Zug 6,
@@ -9,7 +10,15 @@ import type { Contact, LinkedinThread } from '../../types/db'
  * Kalendertage — sonst kippt eine Zeitzonen-Stunde ein Follow-up einen Tag früh.
  */
 
-export const FOLLOWUP_THRESHOLDS_DAYS = [3, 7, 14] as const
+/**
+ * Die drei Schwellen — seit dem 25.08.2026 nur noch der VORGABEWERT.
+ *
+ * Die Zahlen wohnen in `kadenz.ts`, weil Kevin sie justieren können soll
+ * (Zug 5 der Pipeline-Board-Blaupause). Dieser Export bleibt, damit die
+ * bestehenden Importe und `verify-linkedin-followups.ts` unverändert gelten:
+ * Ohne gespeicherte Überschreibung rechnet alles exakt wie vorher.
+ */
+export const FOLLOWUP_THRESHOLDS_DAYS = KADENZ_STANDARD.followupTage
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -44,14 +53,23 @@ export function isTerminal(status: LinkedinThread['status']): boolean {
   return status === 'archived' || status === 'won' || status === 'lost'
 }
 
-export function isDue(thread: LinkedinThread, now: Date): boolean {
+/**
+ * `schwellen` ist seit dem 25.08.2026 übergebbar — Vorgabe ist die gerade
+ * geltende Kadenz. Wer sie explizit mitgibt (Prüfskripte, die Vorschau vor dem
+ * Speichern), umgeht das Modul-Singleton vollständig.
+ */
+export function isDue(
+  thread: LinkedinThread,
+  now: Date,
+  schwellen: readonly [number, number, number] = aktiveKadenz().followupTage,
+): boolean {
   if (thread.status !== 'active') return false
   if (thread.last_from !== 'me') return false
   if (thread.last_message_at == null) return false
   if (thread.followup_stage > 2) return false
   if (isSnoozed(thread, now.getTime())) return false
 
-  const thresholdDays = FOLLOWUP_THRESHOLDS_DAYS[thread.followup_stage]
+  const thresholdDays = schwellen[thread.followup_stage]
   const elapsedMs = now.getTime() - new Date(thread.last_message_at).getTime()
   return elapsedMs >= thresholdDays * DAY_MS
 }
@@ -67,7 +85,11 @@ export function istWeckbar(thread: LinkedinThread, now: Date): boolean {
   return isSnoozed(thread, now.getTime()) && !isTerminal(thread.status)
 }
 
-export function bucketOf(thread: LinkedinThread, now: Date): FollowupBucket {
+export function bucketOf(
+  thread: LinkedinThread,
+  now: Date,
+  schwellen: readonly [number, number, number] = aktiveKadenz().followupTage,
+): FollowupBucket {
   // Nur erledigte/schlafende Threads ruhen. `waiting_reply` darf hier NICHT
   // hineinfallen — das ist genau der Zustand, den der Sync setzt, wenn der Lead
   // geantwortet hat, und der gehört nach `du_bist_dran`.
@@ -81,7 +103,7 @@ export function bucketOf(thread: LinkedinThread, now: Date): FollowupBucket {
   // Hier stand die Altlast-Regel (> 30 Tage nie nachgefasst → eigener Bucket,
   // raus aus der Tagesliste). Sie ist am 14.08.2026 gefallen: ein alter Thread
   // ist fällig, nicht erledigt. Siehe Kommentar oben.
-  if (isDue(thread, now)) return 'faellig'
+  if (isDue(thread, now, schwellen)) return 'faellig'
   return 'wartet'
 }
 

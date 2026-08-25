@@ -21,18 +21,26 @@
  * `npx tsx scripts/verify-lead-station.ts`.
  */
 import type { LeadEreignisTyp, LeadStatus, LinkedinThread } from '../../types/db'
+import { KADENZ_STANDARD, aktiveKadenz, type Kadenz } from './kadenz'
 import { bucketOf, type FollowupBucket } from './linkedinFollowups'
 
 const TAG_MS = 24 * 60 * 60 * 1000
 
-/* ── Die Kadenz. Alle Wartezeiten stehen hier und nirgends sonst. ─────────── */
+/* ── Die Kadenz ────────────────────────────────────────────────────────────
+ *
+ * **Die Zahlen wohnen seit dem 25.08.2026 in `kadenz.ts`,** weil Kevin sie
+ * justieren können soll (Zug 5 der Pipeline-Board-Blaupause). Was hier steht,
+ * sind Re-Exporte der VORGABEWERTE — sie halten die bestehenden Importe und
+ * `verify-lead-station.ts` gültig, das mit ihnen rechnet statt gegen feste
+ * Zahlen. Ohne gespeicherte Überschreibung verhält sich alles wie vorher.
+ */
 
 /** Ab wann jemand, der die Anfrage nie angenommen hat, eine E-Mail bekommt. */
-export const STILL_EMAIL_TAGE = 30
+export const STILL_EMAIL_TAGE = KADENZ_STANDARD.stillEmailTage
 /** Abstand E-Mail → handgeschriebene Postkarte. */
-export const STILL_POSTKARTE_TAGE = 7
+export const STILL_POSTKARTE_TAGE = KADENZ_STANDARD.stillPostkarteTage
 /** Abstand Postkarte → Anruf. */
-export const STILL_ANRUF_TAGE = 7
+export const STILL_ANRUF_TAGE = KADENZ_STANDARD.stillAnrufTage
 /* Die laute Kette (0078, Kevins Diktat vom 25.08.2026).
  *
  * Sie beginnt dort, wo die LinkedIn-Follow-ups aufhoeren: nach der dritten
@@ -52,13 +60,13 @@ export const STILL_ANRUF_TAGE = 7
  * waere es ein Kaltanruf. */
 
 /** Abstand letztes LinkedIn-Follow-up -> Instagram-DM. */
-export const LAUT_INSTAGRAM_TAGE = 7
+export const LAUT_INSTAGRAM_TAGE = KADENZ_STANDARD.lautInstagramTage
 /** Abstand Instagram -> Follow-up-Analyse als PDF, ungefragt. */
-export const LAUT_PDF_TAGE = 14
+export const LAUT_PDF_TAGE = KADENZ_STANDARD.lautPdfTage
 /** Abstand PDF -> handgeschriebene Postkarte. */
-export const LAUT_POSTKARTE_TAGE = 21
+export const LAUT_POSTKARTE_TAGE = KADENZ_STANDARD.lautPostkarteTage
 /** Abstand Postkarte -> Anruf. */
-export const LAUT_ANRUF_TAGE = 7
+export const LAUT_ANRUF_TAGE = KADENZ_STANDARD.lautAnrufTage
 
 /**
  * Wie lange ein durchlaufener Lead ruht, bevor er von selbst wiederkommt.
@@ -70,7 +78,7 @@ export const LAUT_ANRUF_TAGE = 7
  * dass jemand zweimal dasselbe hoert — der zweite Durchlauf braucht ohnehin
  * einen neuen Aufhaenger.
  */
-export const RUHE_MONATE = 4
+export const RUHE_MONATE = KADENZ_STANDARD.ruheMonate
 /**
  * Mindestabstand zwischen zwei ausgehenden Kontakten, über alle Kanäle hinweg.
  *
@@ -80,7 +88,7 @@ export const RUHE_MONATE = 4
  * eine InMail setzt die 30-Tage-Uhr zurück — das hätte den Pool leerlaufend
  * wirken lassen, obwohl niemand ausscheidet.
  */
-export const MIN_ABSTAND_TAGE = 7
+export const MIN_ABSTAND_TAGE = KADENZ_STANDARD.mindestabstandTage
 
 /** Die Kanäle, die als „ausgehender Kontakt" für den Mindestabstand zählen. */
 const AUSGEHEND: LeadEreignisTyp[] = [
@@ -175,10 +183,11 @@ function hat(ereignisse: { typ: LeadEreignisTyp; at: string }[], typ: LeadEreign
 function mitAbstand(
   faelligAb: number,
   ereignisse: { typ: LeadEreignisTyp; at: string }[],
+  kadenz: Kadenz,
 ): number {
   const letzterKontakt = letztes(ereignisse, AUSGEHEND)
   if (letzterKontakt == null) return faelligAb
-  return Math.max(faelligAb, letzterKontakt + MIN_ABSTAND_TAGE * TAG_MS)
+  return Math.max(faelligAb, letzterKontakt + kadenz.mindestabstandTage * TAG_MS)
 }
 
 /** Der Teil des Ergebnisses, den ein Kettenschritt bestimmt. */
@@ -199,10 +208,11 @@ function lauteKette(
   ereignisse: { typ: LeadEreignisTyp; at: string }[],
   letzteNachricht: string | null,
   now: number,
+  kadenz: Kadenz,
 ): KettenTeil {
   /** Ein faelliger Schritt, um den Mindestabstand ergaenzt. */
   const stufe = (ziel: number, station: Station, schritt: string): KettenTeil => {
-    const mitPuffer = mitAbstand(ziel, ereignisse)
+    const mitPuffer = mitAbstand(ziel, ereignisse, kadenz)
     // Nur wenn der Abstand tatsaechlich bremst, wird das auch so genannt.
     // Sonst stuende „wartet auf den Mindestabstand" an einem Schritt, dessen
     // eigene Wartezeit schlicht noch laeuft — zwei verschiedene Gruende.
@@ -218,7 +228,7 @@ function lauteKette(
 
   const anrufAm = letztes(ereignisse, ['anruf'])
   if (anrufAm != null) {
-    const ziel = anrufAm + RUHE_MONATE * 30 * TAG_MS
+    const ziel = anrufAm + kadenz.ruheMonate * 30 * TAG_MS
     return {
       station: 'ruht',
       naechsterSchritt: now >= ziel ? 'Ruhe vorbei — mit neuem Aufhänger ansprechen' : 'Kette durch, ruht',
@@ -230,17 +240,17 @@ function lauteKette(
 
   const postkarteAm = letztes(ereignisse, ['postkarte'])
   if (postkarteAm != null) {
-    return stufe(postkarteAm + LAUT_ANRUF_TAGE * TAG_MS, 'anruf_faellig', 'Anrufen — die Karte ist der Aufhänger')
+    return stufe(postkarteAm + kadenz.lautAnrufTage * TAG_MS, 'anruf_faellig', 'Anrufen — die Karte ist der Aufhänger')
   }
 
   const pdfAm = letztes(ereignisse, ['pdf'])
   if (pdfAm != null) {
-    return stufe(pdfAm + LAUT_POSTKARTE_TAGE * TAG_MS, 'postkarte_faellig', 'Postkarte schreiben — er kennt die Analyse')
+    return stufe(pdfAm + kadenz.lautPostkarteTage * TAG_MS, 'postkarte_faellig', 'Postkarte schreiben — er kennt die Analyse')
   }
 
   const instagramAm = letztes(ereignisse, ['instagram'])
   if (instagramAm != null) {
-    return stufe(instagramAm + LAUT_PDF_TAGE * TAG_MS, 'pdf_faellig', 'Analyse-PDF ungefragt schicken')
+    return stufe(instagramAm + kadenz.lautPdfTage * TAG_MS, 'pdf_faellig', 'Analyse-PDF ungefragt schicken')
   }
 
   /* Der Anker der Kette ist die letzte Nachricht im Postfach — sie ist der
@@ -260,10 +270,19 @@ function lauteKette(
       zweig: 'laut',
     }
   }
-  return stufe(anker + LAUT_INSTAGRAM_TAGE * TAG_MS, 'instagram_faellig', 'Auf Instagram anschreiben')
+  return stufe(anker + kadenz.lautInstagramTage * TAG_MS, 'instagram_faellig', 'Auf Instagram anschreiben')
 }
 
-export function leadStation(eingabe: LeadStationEingabe, jetzt: Date): StationErgebnis {
+/**
+ * `kadenz` ist seit dem 25.08.2026 übergebbar — Vorgabe ist die gerade geltende.
+ * Die Vorschau in der Oberfläche rechnet damit gegen eine PROBEWEISE Kadenz,
+ * ohne sie zu speichern: Kevin sieht die Folge, solange sie noch reversibel ist.
+ */
+export function leadStation(
+  eingabe: LeadStationEingabe,
+  jetzt: Date,
+  kadenz: Kadenz = aktiveKadenz(),
+): StationErgebnis {
   const now = jetzt.getTime()
   const { ereignisse, thread } = eingabe
 
@@ -299,7 +318,7 @@ export function leadStation(eingabe: LeadStationEingabe, jetzt: Date): StationEr
   }
   if (eingabe.lead_status === 'ruht') {
     const seit = letztes(ereignisse, AUSGEHEND) ?? letztes(ereignisse, ['anfrage'])
-    const ziel = (seit ?? now) + RUHE_MONATE * 30 * TAG_MS
+    const ziel = (seit ?? now) + kadenz.ruheMonate * 30 * TAG_MS
     return {
       ...basis,
       station: 'ruht',
@@ -312,7 +331,7 @@ export function leadStation(eingabe: LeadStationEingabe, jetzt: Date): StationEr
   /* Hauptweg: sobald ein Thread existiert, gilt die Postfach-Logik. */
 
   if (thread) {
-    const bucket = bucketOf(thread as LinkedinThread, jetzt)
+    const bucket = bucketOf(thread as LinkedinThread, jetzt, kadenz.followupTage)
     if (thread.starred && thread.loom_status === 'offen') {
       return {
         ...basis,
@@ -340,7 +359,7 @@ export function leadStation(eingabe: LeadStationEingabe, jetzt: Date): StationEr
      * die Anfrage aber ANGENOMMEN; sie sind der guenstigste Vorrat, den Kevin
      * hat. Ab jetzt uebernimmt die laute Kette. */
     if (bucket === 'abschluss') {
-      return { ...basis, bucket, ...lauteKette(ereignisse, thread.last_message_at, now) }
+      return { ...basis, bucket, ...lauteKette(ereignisse, thread.last_message_at, now, kadenz) }
     }
 
     const faellig = bucket === 'faellig' || bucket === 'du_bist_dran'
@@ -379,7 +398,7 @@ export function leadStation(eingabe: LeadStationEingabe, jetzt: Date): StationEr
   const emailAm = letztes(ereignisse, ['email'])
 
   if (anrufAm != null) {
-    const ziel = anrufAm + RUHE_MONATE * 30 * TAG_MS
+    const ziel = anrufAm + kadenz.ruheMonate * 30 * TAG_MS
     return {
       ...basis,
       station: 'ruht',
@@ -390,7 +409,7 @@ export function leadStation(eingabe: LeadStationEingabe, jetzt: Date): StationEr
   }
 
   if (postkarteAm != null) {
-    const ziel = mitAbstand(postkarteAm + STILL_ANRUF_TAGE * TAG_MS, ereignisse)
+    const ziel = mitAbstand(postkarteAm + kadenz.stillAnrufTage * TAG_MS, ereignisse, kadenz)
     return {
       ...basis,
       station: 'anruf_faellig',
@@ -402,7 +421,7 @@ export function leadStation(eingabe: LeadStationEingabe, jetzt: Date): StationEr
   }
 
   if (emailAm != null) {
-    const ziel = mitAbstand(emailAm + STILL_POSTKARTE_TAGE * TAG_MS, ereignisse)
+    const ziel = mitAbstand(emailAm + kadenz.stillPostkarteTage * TAG_MS, ereignisse, kadenz)
     return {
       ...basis,
       station: 'postkarte_faellig',
@@ -421,8 +440,8 @@ export function leadStation(eingabe: LeadStationEingabe, jetzt: Date): StationEr
    * mitverschieben, stünde ein längst durchgelaufener Lead wieder unter
    * „Anfrage läuft" und sähe aus, als hoffe er noch auf eine Annahme.
    */
-  const emailBasis = anfrageAm + STILL_EMAIL_TAGE * TAG_MS
-  const emailZiel = mitAbstand(emailBasis, ereignisse)
+  const emailBasis = anfrageAm + kadenz.stillEmailTage * TAG_MS
+  const emailZiel = mitAbstand(emailBasis, ereignisse, kadenz)
   if (now >= emailBasis) {
     return {
       ...basis,

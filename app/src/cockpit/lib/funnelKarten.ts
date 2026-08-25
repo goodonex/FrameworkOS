@@ -30,6 +30,7 @@ import type { LeadEreignisTyp, LeadStatus, LinkedinThread } from '../../types/db
 import { AKQUISE_START } from './arbeitsmodusQuellen'
 import { FOLLOWUP_VORLAGEN } from './followupVorlagen'
 import { icpUrteil, istArbeitsVorrat } from './icp'
+import { aktiveKadenz, type Kadenz } from './kadenz'
 import { STATION_TITEL, leadStation, type Zweig } from './leadStation'
 import type { StufenId, StufenStand } from './tagesFlow'
 
@@ -64,6 +65,11 @@ export interface FunnelEingabe {
    */
   staende: StufenStand[]
   jetzt: Date
+  /**
+   * Probeweise Kadenz — nur für die Vorschau vor dem Speichern (Zug 5).
+   * Ohne Angabe gilt die aktive; das ist der Normalfall.
+   */
+  kadenz?: Kadenz
 }
 
 /**
@@ -203,8 +209,8 @@ export function imArbeitsVorrat(lead: FunnelLead): boolean {
  * Lead zweimal. Deshalb entscheidet die Station zuerst, und der Bucket darf nur
  * noch *innerhalb* von `wartet_auf_antwort` verfeinern.
  */
-export function kartenIdFuer(lead: FunnelLead, jetzt: Date): FunnelKartenId {
-  return zuordnung(lead, jetzt).id
+export function kartenIdFuer(lead: FunnelLead, jetzt: Date, kadenz: Kadenz = aktiveKadenz()): FunnelKartenId {
+  return zuordnung(lead, jetzt, kadenz).id
 }
 
 /**
@@ -214,7 +220,11 @@ export function kartenIdFuer(lead: FunnelLead, jetzt: Date): FunnelKartenId {
  * zwei getrennte Aufrufe wären nicht nur doppelte Arbeit über 1.700 Leads,
  * sondern zwei Wege, die sich beim nächsten Umbau trennen können.
  */
-function zuordnung(lead: FunnelLead, jetzt: Date): { id: FunnelKartenId; faellig: boolean } {
+function zuordnung(
+  lead: FunnelLead,
+  jetzt: Date,
+  kadenz: Kadenz = aktiveKadenz(),
+): { id: FunnelKartenId; faellig: boolean } {
   if (!imArbeitsVorrat(lead)) return { id: 'ausserhalb', faellig: false }
 
   const stand = leadStation(
@@ -225,6 +235,7 @@ function zuordnung(lead: FunnelLead, jetzt: Date): { id: FunnelKartenId; faellig
       thread: lead.thread,
     },
     jetzt,
+    kadenz,
   )
 
   const id = ((): FunnelKartenId => {
@@ -264,8 +275,9 @@ export function funnelKarten(eingabe: FunnelEingabe): FunnelKarte[] {
   const bestand = new Map<FunnelKartenId, number>()
   const faellig = new Map<FunnelKartenId, number>()
 
+  const kadenz = eingabe.kadenz ?? aktiveKadenz()
   for (const lead of eingabe.leads) {
-    const { id, faellig: heute } = zuordnung(lead, eingabe.jetzt)
+    const { id, faellig: heute } = zuordnung(lead, eingabe.jetzt, kadenz)
     bestand.set(id, (bestand.get(id) ?? 0) + 1)
     if (heute) faellig.set(id, (faellig.get(id) ?? 0) + 1)
   }

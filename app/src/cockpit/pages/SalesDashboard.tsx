@@ -12,6 +12,7 @@ import { Arbeitsmodus, type ArbeitsmodusErgebnis } from '../components/Arbeitsmo
 import { InmailPanel } from '../components/InmailPanel'
 import { FunnelCanvas } from '../components/sales/FunnelCanvas'
 import { PipelineBoard } from '../components/sales/PipelineBoard'
+import { KadenzPanel } from '../components/sales/KadenzPanel'
 import { GebauteSeiten } from '../components/sales/GebauteSeiten'
 import { VorlagenKopf } from '../components/sales/VorlagenKopf'
 import { useActiveBrand } from '../lib/activeBrand'
@@ -19,6 +20,7 @@ import { antwortPostenAusgeblendet, zeilenId } from '../lib/arbeitsmodusQuellen'
 import { erledigePosten } from '../lib/arbeitsmodusTracking'
 import { funnelKarten, type FunnelKartenId, type FunnelLead } from '../lib/funnelKarten'
 import { funnelRaten } from '../lib/funnelRaten'
+import { KADENZ_SCHLUESSEL, gueltigeKadenz, setzeAktiveKadenz, type Kadenz } from '../lib/kadenz'
 import { fetchJophielProjekte } from '../lib/jophielApi'
 import { mitVorschau, verknuepfeProjekte, type JophielStand } from '../lib/jophielProjekte'
 import { ausAltemWert, poolAbleitung, type InmailStand } from '../lib/inmailStand'
@@ -415,6 +417,23 @@ export function SalesDashboard() {
    * Preis dafür. `/linkedin` zahlt ihn seit dem 20.08. schon; ein zweiter,
    * abgespeckter Ladeweg wäre eine zweite Wahrheit über denselben Bestand.
    */
+  /**
+   * Die einstellbare Kadenz (Zug 5).
+   *
+   * `setzeAktiveKadenz` schreibt sie ins Modul-Singleton, aus dem `bucketOf`,
+   * `isDue` und `leadStation` ihre Vorgabe ziehen — das ist Route B der
+   * Blaupause: Die Kadenz durch alle Signaturen zu fädeln hätte reine
+   * Funktionen tief in `arbeitsmodusQuellen` erfasst, die keinen Zugang zu
+   * einem Hook haben.
+   *
+   * Der Aufruf steht bewusst NICHT in einem Effekt: Er muss gelaufen sein,
+   * bevor die `useMemo`s darunter rechnen. Ein Effekt liefe erst nach dem
+   * Render, und der erste Durchgang zeigte die alten Zahlen.
+   */
+  const { wert: kadenzRoh, setzen: setzeKadenzWert } = useUiSetting<unknown>(KADENZ_SCHLUESSEL, null)
+  const kadenz = useMemo<Kadenz>(() => gueltigeKadenz(kadenzRoh), [kadenzRoh])
+  setzeAktiveKadenz(kadenz)
+
   const leadsQuery = useLeads(slug)
   const threadsJeLead = useMemo(() => {
     const karte = new Map<string, LinkedinThread>()
@@ -1127,8 +1146,8 @@ export function SalesDashboard() {
   const tagesFortschritt = flowFortschritt(staende)
 
   const rohKarten = useMemo(
-    () => funnelKarten({ leads: funnelLeads, staende, jetzt }),
-    [funnelLeads, staende, jetzt],
+    () => funnelKarten({ leads: funnelLeads, staende, jetzt, kadenz }),
+    [funnelLeads, staende, jetzt, kadenz],
   )
 
   /**
@@ -1172,6 +1191,28 @@ export function SalesDashboard() {
   const { wert: ansichtRoh, setzen: setzeAnsicht } = useUiSetting<string>('salesAnsicht', 'liste')
   const boardAnsicht = ansichtRoh === 'board' && !isMobile
 
+  /**
+   * Das Fenster für die Wartezeiten. Es hängt an denselben Leads wie das
+   * Board — die Vorschau rechnet gegen `funnelKarten`, nicht gegen eine zweite
+   * Quelle.
+   */
+  const kadenzKachel: KachelDef = {
+    id: 'kadenz',
+    titel: 'Wartezeiten',
+    kennzahl: `Follow-ups nach ${kadenz.followupTage.join(' · ')} Tagen`,
+    inhalt: () => (
+      <KadenzPanel
+        kadenz={kadenz}
+        basis={{ leads: funnelLeads, staende, jetzt }}
+        onSpeichern={(neu) => {
+          setzeKadenzWert(neu)
+          setOffenKachelId(null)
+          setOffenVon(null)
+        }}
+      />
+    ),
+  }
+
   /** Die Fenster der drei Follow-up-Karten — Text oben, Namen darunter. */
   const followupKacheln: KachelDef[] = karten
     .filter((k) => k.stufenId === 'followups')
@@ -1195,7 +1236,7 @@ export function SalesDashboard() {
   const offenKachel =
     alleZeilen.find((k) => k.id === offenKachelId) ??
     followupKacheln.find((k) => k.id === offenKachelId) ??
-    null
+    (offenKachelId === 'kadenz' ? kadenzKachel : null)
 
   /**
    * Die Ansage trägt nur, wenn sie mehr sagt als die Kennzahl. Ohne genug
@@ -1354,6 +1395,20 @@ export function SalesDashboard() {
             layoutIdFuer={(k) => `canvas-${k.id}`}
           />
         )}
+
+        {/* Der Zugang zu den Wartezeiten steht beim Board, nicht in einem
+            Einstellungs-Menü: Wer die Kadenz ändert, will vorher sehen, wie
+            der Funnel gerade aussieht. */}
+        {boardAnsicht ? (
+          <button
+            type="button"
+            className="ck-btn"
+            style={{ alignSelf: 'flex-start', minHeight: 40 }}
+            onClick={() => oeffneKachel('kadenz')}
+          >
+            Wartezeiten … {kadenz.followupTage.join(' · ')} Tage
+          </button>
+        ) : null}
 
         {/* Die gebauten Seiten: Ergebnisse, keine Aufgaben. Sie stehen bewusst
             NICHT im Funnel — ein Jophiel-Projekt ist ein Artefakt, kein Mensch,
