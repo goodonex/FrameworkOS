@@ -138,7 +138,31 @@ export function markDonePatch(thread: LinkedinThread, now: Date = new Date()): M
     }
   }
 
-  if (thread.followup_stage >= 3) return { ...entwurfWeg, status: 'archived' }
+  /**
+   * **Hier wurde bis zum 25.08.2026 archiviert — das war das Ende der Fahne.**
+   *
+   * Die Regel stammt aus einer Zeit, in der nach dem dritten Follow-up
+   * tatsaechlich nichts mehr kam: LinkedIn durch, also Thread zu. Seit 0078
+   * beginnt an genau dieser Stelle die laute Kette (Instagram, Analyse-PDF,
+   * Postkarte, Anruf — `leadStation.lauteKette`), und die haengt an
+   * `bucketOf(thread) === 'abschluss'`. Ein archivierter Thread ist
+   * `isTerminal` und liefert `ruht`: Wer hier archiviert, kappt die neue Kette
+   * in dem Moment, in dem sie anfangen soll.
+   *
+   * Der Thread bleibt deshalb aktiv auf Stufe 3 stehen. Er faellt trotzdem aus
+   * jeder LinkedIn-Arbeitsliste heraus, weil `isDue` ab Stufe 3 false liefert
+   * und `followupPosten` nur den Bucket `faellig` zeigt — es entsteht also
+   * kein Rueckstau im Postfach. Der Zeitstempel wird mitgesetzt, weil er der
+   * Anker der lauten Kette ist: Instagram ist sieben Tage nach der letzten
+   * LinkedIn-Nachricht dran.
+   *
+   * Wer einen Thread wirklich schliessen will, hat dafuer weiterhin
+   * `status: 'won' | 'lost' | 'archived'` von Hand — das ist eine Aussage
+   * ueber den Lead, kein Nebeneffekt des dritten Hakens.
+   */
+  if (thread.followup_stage >= 3) {
+    return { ...entwurfWeg, followup_stage: 3, last_from: 'me', last_message_at: now.toISOString() }
+  }
 
   // O4 (06.08.2026): Der Zeitstempel muss mit. `isDue` rechnet die Frist der
   // nächsten Stufe ab `last_message_at` — blieb der auf der alten Nachricht

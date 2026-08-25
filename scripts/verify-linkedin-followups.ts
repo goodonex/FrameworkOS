@@ -257,13 +257,15 @@ check('11b knapp über Schwelle', isDue(makeThread({ followup_stage: 0, last_mes
   })
   check('13g Snooze wird aufgehoben', markDonePatch(geschlummert, NOW)?.snoozed_until, null)
 
-  // Unveraendertes Verhalten: eigener Thread auf Stufe 3 wird archiviert.
+  // Geaendert am 25.08.2026 (0078): Stufe 3 archiviert NICHT mehr. Dort faengt
+  // die laute Kette an (Instagram, PDF, Postkarte, Anruf), und die haengt an
+  // bucketOf === 'abschluss'. Ein archivierter Thread ist isTerminal und
+  // liefert 'ruht' — Archivieren haette die Kette gekappt, bevor sie beginnt.
   const abschluss = makeThread({ last_from: 'me', last_message_at: dayAgo(20), followup_stage: 3, status: 'active' })
-  check('13h Break-up faellig -> archiviert', markDonePatch(abschluss, NOW), {
-    entwurf: null,
-    entwurf_at: null,
-    status: 'archived',
-  })
+  check('13h Stufe 3 wird NICHT mehr archiviert', markDonePatch(abschluss, NOW)?.status, undefined)
+  check('13h2 Stufe 3 bleibt auf 3 stehen', markDonePatch(abschluss, NOW)?.followup_stage, 3)
+  check('13h3 der Zeitstempel wird gesetzt (Anker der lauten Kette)', typeof markDonePatch(abschluss, NOW)?.last_message_at, 'string')
+  check('13h4 der Thread bleibt im Bucket abschluss', bucketOf({ ...abschluss, ...markDonePatch(abschluss, NOW) } as LinkedinThread, NOW), 'abschluss')
 
   // Unveraendertes Verhalten: faelliger eigener Thread geht eine Stufe weiter.
   const faellig = makeThread({ last_from: 'me', last_message_at: dayAgo(5), followup_stage: 0, status: 'active' })

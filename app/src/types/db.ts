@@ -384,7 +384,12 @@ export interface Contact {
 
 export type LinkedinThreadStatus = 'active' | 'waiting_reply' | 'won' | 'lost' | 'archived'
 export type LinkedinLastFrom = 'me' | 'them' | 'unknown'
-export type LoomStatus = 'offen' | 'aufgenommen' | 'verschickt' | 'entfaellt'
+/**
+ * `zustaendigkeit` (0077) ist die Stufe zwischen Zusage und Bauen: Der Lead hat
+ * Ja gesagt, aber es ist ungeklärt, ob er über die Website entscheidet. Alle
+ * Loom-Filter fragen auf `'offen'` ab und lassen ihn dadurch aussen vor.
+ */
+export type LoomStatus = 'offen' | 'zustaendigkeit' | 'aufgenommen' | 'verschickt' | 'entfaellt'
 
 /** Eine Nachricht im gespiegelten Gesprächsverlauf (0064). */
 export interface LinkedinNachricht {
@@ -1197,6 +1202,10 @@ export type LeadEreignisTyp =
   | 'email'
   | 'postkarte'
   | 'anruf'
+  /** Kanalwechsel im lauten Zweig (0078): Instagram-DM statt vierter LinkedIn-Nachricht. */
+  | 'instagram'
+  /** Die Follow-up-Analyse als PDF, ungefragt geschickt (0078). */
+  | 'pdf'
   | 'wiedervorlage_gesetzt'
   | 'disqualifiziert'
   | 'reaktiviert'

@@ -9,7 +9,12 @@
  */
 import type { LeadEreignisTyp, LinkedinThread } from '../app/src/types/db'
 import {
+  LAUT_ANRUF_TAGE,
+  LAUT_INSTAGRAM_TAGE,
+  LAUT_PDF_TAGE,
+  LAUT_POSTKARTE_TAGE,
   MIN_ABSTAND_TAGE,
+  RUHE_MONATE,
   STILL_ANRUF_TAGE,
   STILL_EMAIL_TAGE,
   STILL_POSTKARTE_TAGE,
@@ -210,6 +215,155 @@ function thread(teil: Partial<LinkedinThread> = {}): LinkedinThread {
 {
   const r = leadStation(eingabe({ lead_status: 'kunde', thread: thread({ last_from: 'them' }) }), JETZT)
   check('Kunde ist eine Endstation', r.station === 'kunde' && !r.faellig, JSON.stringify(r))
+}
+
+/* ── Lauter Zweig: was nach dem dritten Follow-up passiert (0078) ──────── */
+
+/** Ein Thread, dessen LinkedIn-Follow-ups durch sind — `bucketOf` sagt `abschluss`. */
+function ausgereizt(tageSeitLetzterNachricht: number, teil: Partial<LinkedinThread> = {}): LinkedinThread {
+  return thread({ followup_stage: 3, last_from: 'me', last_message_at: vorTagen(tageSeitLetzterNachricht), ...teil })
+}
+
+{
+  const r = leadStation(eingabe({ ereignisse: [ereignis('angenommen', 60)], thread: ausgereizt(3) }), JETZT)
+  check(
+    'Follow-ups durch, aber noch keine Woche her — Instagram wartet',
+    r.station === 'instagram_faellig' && !r.faellig && r.zweig === 'laut',
+    JSON.stringify(r),
+  )
+}
+
+{
+  const r = leadStation(
+    eingabe({ ereignisse: [ereignis('angenommen', 60)], thread: ausgereizt(LAUT_INSTAGRAM_TAGE + 3) }),
+    JETZT,
+  )
+  check(
+    'Follow-ups durch und die Woche um — Instagram ist dran',
+    r.station === 'instagram_faellig' && r.faellig,
+    JSON.stringify(r),
+  )
+  check('der ausgereizte Thread landet nicht mehr in „wartet auf Antwort"', r.station !== 'wartet_auf_antwort')
+}
+
+{
+  const r = leadStation(
+    eingabe({ ereignisse: [ereignis('instagram', LAUT_PDF_TAGE + 2)], thread: ausgereizt(40) }),
+    JETZT,
+  )
+  check('nach Instagram folgt die PDF', r.station === 'pdf_faellig' && r.faellig, JSON.stringify(r))
+}
+
+{
+  const r = leadStation(eingabe({ ereignisse: [ereignis('instagram', 4)], thread: ausgereizt(40) }), JETZT)
+  check('die PDF wartet ihre zwei Wochen ab', r.station === 'pdf_faellig' && !r.faellig, JSON.stringify(r))
+}
+
+{
+  const r = leadStation(
+    eingabe({ ereignisse: [ereignis('instagram', 60), ereignis('pdf', LAUT_POSTKARTE_TAGE + 2)], thread: ausgereizt(70) }),
+    JETZT,
+  )
+  check('nach der PDF folgt die Postkarte', r.station === 'postkarte_faellig' && r.faellig, JSON.stringify(r))
+  check(
+    'die Postkarte im lauten Zweig wird als solche erkannt',
+    r.zweig === 'laut' && r.naechsterSchritt.includes('Analyse'),
+    JSON.stringify(r),
+  )
+}
+
+{
+  const r = leadStation(
+    eingabe({ ereignisse: [ereignis('pdf', 40), ereignis('postkarte', LAUT_ANRUF_TAGE + 1)], thread: ausgereizt(80) }),
+    JETZT,
+  )
+  check('nach der Postkarte folgt der Anruf', r.station === 'anruf_faellig' && r.faellig, JSON.stringify(r))
+  check('die Karte ist der Aufhänger des Anrufs', r.naechsterSchritt.includes('Karte'), JSON.stringify(r))
+}
+
+{
+  const r = leadStation(eingabe({ ereignisse: [ereignis('anruf', 10)], thread: ausgereizt(90) }), JETZT)
+  check('nach dem Anruf ist die Kette durch', r.station === 'ruht' && !r.faellig, JSON.stringify(r))
+}
+
+{
+  const r = leadStation(
+    eingabe({ ereignisse: [ereignis('anruf', RUHE_MONATE * 30 + 5)], thread: ausgereizt(200) }),
+    JETZT,
+  )
+  check(`nach ${RUHE_MONATE} Monaten Ruhe kommt der Lead von selbst wieder`, r.station === 'ruht' && r.faellig, JSON.stringify(r))
+}
+
+{
+  // Ein uebersprungener Schritt haelt die Kette nicht an: Postkarte ohne PDF.
+  const r = leadStation(eingabe({ ereignisse: [ereignis('postkarte', 10)], thread: ausgereizt(60) }), JETZT)
+  check(
+    'übersprungene Stufe blockiert nicht — nach der Postkarte kommt der Anruf, nicht die nachgeholte PDF',
+    r.station === 'anruf_faellig' && r.faellig,
+    JSON.stringify(r),
+  )
+}
+
+{
+  // Doppelbeschuss: Die Postkarte waere faellig, aber gestern ging eine InMail raus.
+  const r = leadStation(
+    eingabe({ ereignisse: [ereignis('pdf', LAUT_POSTKARTE_TAGE + 2), ereignis('inmail', 1)], thread: ausgereizt(60) }),
+    JETZT,
+  )
+  check(
+    'der Mindestabstand bremst auch die laute Kette',
+    r.station === 'postkarte_faellig' && !r.faellig,
+    JSON.stringify(r),
+  )
+  check('und sagt auch, dass er es tut', r.naechsterSchritt.includes('Mindestabstand'), JSON.stringify(r))
+}
+
+{
+  const r = leadStation(eingabe({ ereignisse: [], thread: ausgereizt(40, { last_from: 'them' }) }), JETZT)
+  check('eine Antwort sticht die ganze Kette', r.station === 'antwort_da' && r.faellig, JSON.stringify(r))
+}
+
+{
+  const r = leadStation(
+    eingabe({ ereignisse: [], thread: ausgereizt(40, { starred: true, loom_status: 'offen' }) }),
+    JETZT,
+  )
+  check('eine Loom-Zusage sticht die ganze Kette', r.station === 'loom_offen', JSON.stringify(r))
+}
+
+{
+  const r = leadStation(
+    eingabe({ lead_status: 'wiedervorlage', wiedervorlage_am: '2026-12-01', thread: ausgereizt(60) }),
+    JETZT,
+  )
+  check('eine gesetzte Wiedervorlage sticht die laute Kette', r.station === 'wiedervorlage' && !r.faellig, JSON.stringify(r))
+}
+
+{
+  // Dieselbe Station, zwei Aeste — der Unterschied muss ablesbar bleiben.
+  const laut = leadStation(eingabe({ ereignisse: [ereignis('pdf', 30)], thread: ausgereizt(60) }), JETZT)
+  const still = leadStation(
+    eingabe({ ereignisse: [ereignis('anfrage', 60), ereignis('email', STILL_POSTKARTE_TAGE + 2)] }),
+    JETZT,
+  )
+  check(
+    'Postkarte laut und Postkarte still sind unterscheidbar',
+    laut.station === 'postkarte_faellig' &&
+      still.station === 'postkarte_faellig' &&
+      laut.zweig === 'laut' &&
+      still.zweig === 'still' &&
+      laut.naechsterSchritt !== still.naechsterSchritt,
+    JSON.stringify({ laut, still }),
+  )
+}
+
+{
+  const r = leadStation(eingabe({ ereignisse: [], thread: ausgereizt(0, { last_message_at: null }) }), JETZT)
+  check(
+    'ein ausgereizter Thread ohne Datum wird sichtbar statt still zu warten',
+    r.station === 'instagram_faellig' && r.faellig,
+    JSON.stringify(r),
+  )
 }
 
 /* ── Randfälle ─────────────────────────────────────────────────────────── */

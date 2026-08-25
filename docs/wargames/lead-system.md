@@ -402,3 +402,58 @@ Schritt nicht mehr, wenn er wortgleich neben der Station steht.
 **Die Lehre für die nächste Runde:** Jede Liste in diesem Cockpit braucht
 dieselbe Filter-Kaskade — ICP, Akquise-Beginn, Kundenabgleich. Wer eine neue
 Ansicht baut und sie vergisst, baut zuverlässig wieder einen Berg aus Rauschen.
+
+---
+
+## Nachtrag 25.08.2026 — die laute Kette (Migration 0078)
+
+Die Runde vom 20.08. hat den **stillen** Zweig gebaut (nie angenommen: E-Mail →
+Postkarte → Anruf) und den Hauptweg bei den Follow-ups belassen. Was dabei
+niemandem auffiel: Der Hauptweg hat **kein Ende**. Nach der dritten
+Follow-up-Stufe liefert `bucketOf` den Bucket `abschluss`, und `leadStation`
+schob ihn in `wartet_auf_antwort` mit `faellig: false`. Ein Lead, der die
+Anfrage angenommen und danach nie geantwortet hat, verschwand damit lautlos.
+
+Das ist die falsche Menge zum Verlieren. Diese Leute haben schon Ja zum Kontakt
+gesagt — ihre Ausbeute je Handgriff ist die höchste im ganzen Bestand, höher
+als bei jedem Nie-Annehmer im stillen Zweig.
+
+Kevins Kette dafür (Diktat 25.08., verdichtet):
+
+| Nach | Kanal | Warum an dieser Stelle |
+|---|---|---|
+| +7 Tagen | **Instagram-DM** | Kanalwechsel schlägt die vierte LinkedIn-Nachricht. Derselbe Mensch an einem anderen Ort liest sich als Zufall, vier Anläufe im selben Postfach als Kampagne. **Nicht** parallel zur Erstnachricht — zwei gleichzeitige Kanäle wirken bedürftig. |
+| +14 Tagen | **Analyse-PDF, ungefragt** | Material statt Nachfrage. Wer dreimal nicht geantwortet hat, reagiert eher auf etwas Fertiges als auf eine weitere Frage. |
+| +21 Tagen | **handgeschriebene Postkarte** | Der teuerste Schritt, deshalb der späteste. Kevins Deckel: 5 pro Woche, nur die besten Leads. |
+| +7 Tagen | **Anruf** | Die Karte ist der Aufhänger („ich hab Ihnen letzte Woche geschrieben"). Ohne sie wäre es ein Kaltanruf — deshalb steht sie davor, nicht danach. |
+| danach | **Ruhe 4 Monate**, dann mit neuem Aufhänger | Von 6 auf 4 gesenkt: Mit sieben Berührungen über vier Kanäle ist der Lead eindeutig durch. |
+
+### Zwei Entscheidungen, die im Code stehen
+
+**Die Kette wird rückwärts gelesen.** `lauteKette` fragt zuerst nach dem
+spätesten Ereignis (Anruf, dann Postkarte, dann PDF, dann Instagram) und leitet
+daraus den nächsten Schritt ab. Eine übersprungene Stufe hält damit nichts an:
+Hat Kevin die Postkarte geschrieben, ohne dass je eine PDF rausging, steht als
+Nächstes der Anruf — nicht die nachgeholte PDF. Die Kadenz ist ein Vorschlag
+mit Gedächtnis, kein Formular, das ausgefüllt werden muss.
+
+**`zweig: 'still' | 'laut'` am Ergebnis.** Postkarte und Anruf sind jetzt
+Stationen mit zwei Zuflüssen, und der Unterschied ist kein Detail: Wer nie
+angenommen hat, kennt Kevin überhaupt nicht. Wer angenommen und nie geantwortet
+hat, hat Erstnachricht, drei Follow-ups, eine Instagram-Nachricht und eine
+fertige Analyse von ihm gesehen. Dieselbe Postkarte an beide zu schreiben, wäre
+in einem der zwei Fälle falsch. Verworfen wurde, dafür vier getrennte Stationen
+anzulegen — das hätte die Pipeline aufgebläht, ohne mehr zu sagen als ein Feld.
+
+### Was diese Runde bewusst offen lässt
+
+- **Keine eigene Tages-Flow-Stufe.** Sie hätte ein neues `daily_metrics`-Feld
+  gebraucht; die Regel dagegen steht im HANDOFF. Inhaltlich ist die Kette ein
+  Follow-up, und `FOLLOWUP_PORTION_TAG = 20` ist exakt die Zahl, die Kevin am
+  25.08. unabhängig noch einmal genannt hat („so zwanzig am Tag").
+- **Der Anfangsbestand ist ungemessen.** Wie viele Threads heute auf
+  `followup_stage >= 3` stehen, entscheidet, ob die Kette in `followupPosten`
+  einlaufen muss oder in der Pipeline richtig aufgehoben ist. Erst messen.
+- **Instagram-Handles fehlen** — dieselbe Lücke wie E-Mail, Anschrift und
+  Telefon. Die Station zeigt den fälligen Schritt, die Beschaffung ist eine
+  eigene Runde.

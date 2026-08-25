@@ -29,18 +29,28 @@ const EREIGNIS_TITEL: Record<LeadEreignisTyp, string> = {
   email: 'E-Mail geschickt',
   postkarte: 'Postkarte geschickt',
   anruf: 'Angerufen',
+  instagram: 'Auf Instagram geschrieben',
+  pdf: 'Analyse-PDF geschickt',
   wiedervorlage_gesetzt: 'Wiedervorlage gesetzt',
   disqualifiziert: 'Aussortiert',
   reaktiviert: 'Wieder aufgenommen',
   notiz: 'Notiz',
 }
 
-/** Ereignisse, die Kevin selbst auslöst — die Knopfleiste des stillen Zweigs. */
+/**
+ * Ereignisse, die Kevin selbst auslöst — alles, was kein Sync mitbekommt.
+ *
+ * In Kadenz-Reihenfolge, nicht alphabetisch: Wer die Akte offen hat, sucht den
+ * Knopf zu dem Schritt, der oben als nächster Schritt steht. InMail steht
+ * bewusst am Ende — sie ist der Nebenstrom und hakt nichts ab.
+ */
 const HANDGRIFFE: { typ: LeadEreignisTyp; titel: string }[] = [
-  { typ: 'inmail', titel: 'InMail raus' },
+  { typ: 'instagram', titel: 'Instagram raus' },
+  { typ: 'pdf', titel: 'Analyse-PDF raus' },
   { typ: 'email', titel: 'E-Mail raus' },
   { typ: 'postkarte', titel: 'Postkarte raus' },
   { typ: 'anruf', titel: 'Angerufen' },
+  { typ: 'inmail', titel: 'InMail raus' },
 ]
 
 function datumLang(iso: string): string {
@@ -113,7 +123,9 @@ export function LeadAkte({
   const kontakte = useMemo(
     () =>
       ereignisse.filter((e) =>
-        (['erstnachricht', 'followup', 'inmail', 'email', 'postkarte', 'anruf'] as LeadEreignisTyp[]).includes(e.typ),
+        (
+          ['erstnachricht', 'followup', 'instagram', 'pdf', 'inmail', 'email', 'postkarte', 'anruf'] as LeadEreignisTyp[]
+        ).includes(e.typ),
       ).length,
     [ereignisse],
   )

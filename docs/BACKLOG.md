@@ -1,6 +1,226 @@
 # Uriel — Backlog (die eine Quelle der Wahrheit)
 
-**Stand:** 2026-08-19 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
+**Stand:** 2026-08-25 · Branch `cockpit-rebuild` · Repo `~/Kevin OS/02 Projekte/uriel`
+
+## **GEBAUT 25.08.2026 — Der Nachfass-Trichter war trockengelegt, jetzt läuft er**
+
+Der eigentliche Fund des Tages, gefunden beim Messen für die laute Kette und
+gravierender als sie: **Kevin fasst nicht nach — nicht aus Disziplin, sondern
+weil im Cockpit nichts zum Kopieren stand.**
+
+An Prod gemessen (25.08.):
+
+| Messung | Ergebnis |
+|---|---|
+| Fällige Follow-ups | **177** |
+| davon mit einem Entwurf | **0** |
+| Aktive Threads auf `followup_stage: 0` | **239 von 239** |
+| `daily_metrics.li_followups`, letzte 21 Tage | **0 an jedem Tag** |
+| zum Vergleich, selber Zeitraum | `li_anfragen` 30/Tag, `li_nachrichten` 72 |
+
+Der Trichter füllte sich oben und lief unten nicht ab. Kevins Arbeitsweise ist
+Cockpit öffnen, Text kopieren, in LinkedIn einfügen — steht kein Text da,
+passiert nichts. Der Agent `linkedin-followup-entwuerfe` existierte die ganze
+Zeit, hing aber an einem Knopf, den man erst drücken muss. Die Antwort-Entwürfe
+laufen seit dem 18.08. werktags von selbst; die Follow-ups nicht.
+
+**Was gebaut ist:**
+
+- **`runner/linkedin/followupThreads.mjs`** — Zwilling von `antwortThreads.mjs`.
+  `istFaellig` ist der Spiegel von `isDue`, gegengeprüft über **1.620
+  Kombinationen** in `verify-followup-entwuerfe` (Status × Absender × Stufe ×
+  Alter × Schlummer). Weicht eine Seite ab, schlägt das Skript fehl.
+- **`maybeFollowupEntwuerfe`** im Runner: werktags, eine Stunde nach den
+  Antwort-Entwürfen (`FOLLOWUP_ENTWUERFE_STUNDE`, Standard 7:00). Antworten
+  sind dringlicher, und zwei CLI-Läufe gleichzeitig auf 8 GB wären ein
+  garantiertes Zeitlimit. Postfach-Frische wird wie beim Zwilling vorausgesetzt.
+- **`entwuerfeAnThreads` gilt jetzt für beide Entwurfs-Agenten.** Ohne diese
+  Zeile landet ein Follow-up-Entwurf nur in der Run-Datei — also genau dort, wo
+  Kevin ihn nicht kopiert.
+- **Deckel `FOLLOWUP_MAX = 20`**, gleich Kevins Tagesportion. Mehr zu entwerfen
+  hiesse, Token für Text auszugeben, der bis morgen veraltet.
+- **Sortierung in drei Stufen: Stern → Makler-Ära → ältester zuerst.** Der
+  Trockenlauf zeigte, dass reines „ältester zuerst" die ersten zwanzig Entwürfe
+  an Altlasten von bis zu 539 Tagen vergibt („Vertriebs-Champion", „salesHAX
+  Consulting"). Gefiltert wird dabei **nicht** — Kevins Regel „nichts, was
+  liegen geblieben ist, fällt weg" gilt für eigene Threads ausdrücklich weiter
+  (`arbeitsmodusQuellen`, Kommentar zu `AKQUISE_START`). Die Altlast rutscht
+  ans Ende und kommt dran, wenn der Rückstau davor abgetragen ist.
+- **Der Agent urteilt jetzt mit** (`lead`/`kontakt`/`akquise`, Migration 0075),
+  wie sein Antwort-Zwilling seit dem 19.08. Der Wortlisten-Filter sortierte nur
+  12 von 177 aus; den Rest erkennt nur, wer die Nachrichten liest. `akquise`
+  fliegt danach dauerhaft aus der Spur. Dafür geht `verlauf` mit in den Input:
+  beim Follow-up ist `preview` Kevins **eigene** letzte Nachricht und sagt über
+  die Gegenseite nichts.
+- **Der Break-up-Ton ist aus dem Skill raus.** Stufe 2 ist nicht mehr die
+  letzte Nachricht überhaupt, sondern die letzte auf LinkedIn — danach kommt
+  der Kanalwechsel. „Ich will nicht nerven" würde jedem der vier folgenden
+  Schritte widersprechen (Kevins Verbotstabelle vom 19.08.).
+
+**Trockenlauf an Prod (25.08.):** 177 fällig → 12 vom ICP-Filter aussortiert →
+165 in der Zielgruppe → 20 gehen morgen früh in den Lauf, 145 sind Ware für die
+Folgetage. Bei 20/Tag ist der Rückstau in gut sieben Arbeitstagen abgetragen.
+
+**Was das für die laute Kette bedeutet:** Sie bekommt jetzt überhaupt erst
+Zufluss. Ein Thread braucht drei Haken (3/7/14 Tage), um auf Stufe 3 zu
+kommen — die ersten Leads erreichen die Instagram-Stufe also frühestens in gut
+drei Wochen. Bis dahin ist ihr Bestand 0, und das ist richtig so.
+
+---
+
+
+## **GEBAUT 25.08.2026, MIGRATION OFFEN — Die Kette hört nach dem dritten Follow-up nicht mehr auf**
+
+Anlass: Kevins Diktat vom 25.08. Der Hauptweg endete im Nichts. Nach drei
+LinkedIn-Follow-ups (3/7/14 Tage) steht ein Thread im Bucket `abschluss`,
+`leadStation` schob ihn nach `wartet_auf_antwort` mit `faellig: false` — und
+dort lag er für immer. Das war der teuerste tote Punkt im Ablauf: Diese Leute
+haben die Anfrage **angenommen**. Der Zugang ist bezahlt, nur die Antwort fehlt.
+
+**Die laute Kette** (neu, `leadStation.lauteKette`), Zeiten ab dem letzten
+Follow-up: **+7 Instagram-DM · +14 Analyse-PDF ungefragt · +21 handgeschriebene
+Postkarte · +7 Anruf · dann Ruhe.** Danach kommt der Lead von selbst wieder.
+
+Kevins Begründungen, die den Zuschnitt bestimmen:
+
+- **Instagram steht vor der PDF, nicht parallel zur Erstnachricht.** Zwei
+  Kanäle gleichzeitig lesen sich als bedürftig; derselbe Mensch an einem
+  anderen Ort liest sich als Zufall. Der Kanalwechsel schlägt die vierte
+  LinkedIn-Nachricht.
+- **Die Postkarte steht vor dem Anruf.** Sie macht den Anruf warm — „ich hab
+  Ihnen letzte Woche eine Karte geschrieben" ist ein Aufhänger, ohne sie wäre
+  es ein Kaltanruf.
+- **`RUHE_MONATE` von 6 auf 4.** Sechs Monate waren die vorsichtige Zahl, als
+  die Kette nach dem dritten Follow-up endete. Jetzt hat ein Lead bis zur Ruhe
+  sieben Berührungen über vier Kanäle hinter sich und ist eindeutig durch.
+  Vier Monate heißt drei Zyklen im Jahr statt zwei.
+
+**Was gebaut ist:**
+
+- **Migration `0078`** erweitert `lead_ereignisse.typ` um `instagram` und
+  `pdf`. Rein additiv, der CHECK wird nur weiter. Die Wartezeiten stehen
+  bewusst **nicht** in der Datenbank, sondern an einer Stelle im Code —
+  sie sind Kevins Einstellung, kein Schema.
+- **`leadStation.ts`**: fünf neue Konstanten (`LAUT_*`), zwei neue Stationen
+  (`instagram_faellig`, `pdf_faellig`), und `StationErgebnis.zweig`
+  (`'still' | 'laut'`). Postkarte und Anruf kommen jetzt aus **beiden** Ästen,
+  und der Unterschied bestimmt den Text: Wer nie angenommen hat, kennt Kevin
+  überhaupt nicht; wer angenommen und nie geantwortet hat, hat Erstnachricht,
+  Follow-ups, eine Instagram-Nachricht und eine fertige Analyse gesehen.
+- Die Kette wird **rückwärts gelesen**: Was zuletzt raus ist, bestimmt den
+  nächsten Schritt. Eine übersprungene Stufe hält damit nichts an — Postkarte
+  ohne PDF führt zum Anruf, nicht zur nachgeholten PDF.
+- `MIN_ABSTAND_TAGE = 7` gilt auch hier, und der neue Schritt **sagt es auch**,
+  statt still zu warten (die Lehre vom 20.08.: Station und Fälligkeit sind
+  zwei Dinge).
+- Lead-Akte: Knöpfe „Instagram raus" und „Analyse-PDF raus", in
+  Kadenz-Reihenfolge; InMail rutscht ans Ende, weil sie Nebenstrom ist.
+  Die Kontakt-Zählung („wie oft habe ich den geschrieben") zählt beide mit.
+- Pipeline und Tagesjournal übernehmen die neuen Stationen von selbst
+  (`STATION_REIHENFOLGE`/`STATION_TITEL`); der laute Zweig steht vor dem
+  stillen, weil seine Ausbeute je Handgriff die höchste im Bestand ist.
+- Geprüft: `verify-lead-station` **47 ok** (vorher 28, 19 neue Prüffälle
+  inklusive Doppelbeschuss, übersprungener Stufe und Zweig-Unterscheidung),
+  alle **51** `verify-*`-Skripte grün, `tsc -b` und `npm run build` sauber.
+
+**Bewusst NICHT gebaut — und warum:**
+
+Die neue Kette bekommt **keine eigene Tages-Flow-Stufe.** Das hätte ein neues
+`daily_metrics`-Feld gebraucht, und die Regel dagegen steht seit dem Rebuild im
+HANDOFF („Keine neuen Metrikfelder"). Sie ist außerdem inhaltlich ein
+Follow-up — Kevins Deckel von **20 am Tag** (`FOLLOWUP_PORTION_TAG`) ist genau
+die Zahl, die er am 25.08. unabhängig noch einmal genannt hat. Die fälligen
+Schritte stehen in der Pipeline unter „nur was heute dran ist"; ob sie
+zusätzlich in `followupPosten` einlaufen sollen, ist erst nach einer Messung
+zu entscheiden (siehe „Offen").
+
+**Zwei Funde beim Messen an Prod (25.08.), beide gravierender als der Bau selbst:**
+
+**1 · Die Archivierung kappte die neue Kette in dem Moment, in dem sie beginnt.**
+`markDonePatch` archivierte einen Thread beim dritten Haken
+(`followup_stage >= 3` → `status: 'archived'`). Ein archivierter Thread ist
+`isTerminal`, `bucketOf` liefert `ruht` statt `abschluss` — die laute Kette
+wäre nie erreichbar gewesen. Die Regel stammt aus der Zeit, als nach dem
+dritten Follow-up tatsächlich nichts mehr kam. Der Thread bleibt jetzt **aktiv
+auf Stufe 3** stehen und behält seinen Zeitstempel (er ist der Anker der
+Kette: Instagram ist sieben Tage nach der letzten LinkedIn-Nachricht dran).
+Ein Rückstau entsteht nicht, weil `isDue` ab Stufe 3 false liefert und
+`followupPosten` nur `faellig` zeigt. Wer einen Thread wirklich schließen will,
+setzt weiterhin von Hand `won`/`lost`/`archived` — das ist eine Aussage über
+den Lead, kein Nebeneffekt des dritten Hakens. Prüffall 13h umgeschrieben,
+`verify-linkedin-followups` **78/78**.
+
+**2 · Die Follow-up-Ratsche läuft leer — und zwar vollständig.** An Prod
+gemessen:
+
+- **Alle 239 aktiven Threads stehen auf `followup_stage: 0`.** Kein einziger
+  wurde je eine Stufe weitergeschaltet. Der Sync fasst die Spalte nicht an
+  (`upsert.mjs` lässt sie bewusst aus dem Payload) — sie kann also nur durch
+  Kevins Haken steigen.
+- **`daily_metrics.li_followups` ist an jedem der letzten 21 Tage 0.**
+  Zum Vergleich derselbe Zeitraum: `li_anfragen` konstant 30/Tag,
+  `li_nachrichten` 72 gesamt. `inmails` und `looms` ebenfalls durchgehend 0.
+
+Anfragen und Erstnachrichten laufen also, die gesamte Nachfass-Stufe nicht.
+**Damit hängt die neue Kette hinter einem Schritt, der heute nicht stattfindet
+— und dieselbe Diagnose trifft die 3/7/14-Follow-ups, die es seit Wochen
+gibt.** Der Engpass sitzt eine Stufe früher als der Auftrag vom 25.08. annahm.
+Das ist die nächste Runde, nicht diese: erst klären, warum der Haken nicht
+gesetzt wird (Weg zu umständlich? falscher Ort? wird außerhalb des Cockpits
+nachgefasst?), dann die Kette verdrahten.
+
+**Offen:**
+
+1. ~~Migration 0078 anwenden~~ — **erledigt 25.08.**, zusammen mit 0077 über
+   `supabase db push`. Historie 0001–0078 lückenlos.
+2. **Die Ratsche zum Laufen bringen** (Fund 2). Bis dahin ist der
+   Anfangsbestand der lauten Kette **0** — sie ist gebaut und geprüft, aber
+   ohne Zufluss.
+3. **Instagram-Handles fehlen** — dieselbe Lücke wie bei E-Mail, Anschrift und
+   Telefon im stillen Zweig. Die Station zeigt den fälligen Schritt, die
+   Beschaffung ist eine eigene Runde.
+
+---
+
+
+## **GEBAUT 24.08.2026, MIGRATION OFFEN — Zuständigkeits-Stufe vor dem Loom**
+
+Anlass: Ludwig Cords sagte „moin! klar!" zur Analyse. Er ist Senior
+Investmentmakler beim Zinshausteam & Kenbo, einem Haus mit rund zehn
+geschäftsführenden Gesellschaftern. Kevins Einwand: *„Wenn ich dem das jetzt
+schicke, packt er es in seinen Ordner und geht damit zur Geschäftsführung. Und
+ich werde nie wieder was von denen hören."* Der ICP ist ausdrücklich GF/Inhaber.
+
+Ein „ja, schick rüber" von einem Angestellten ist damit kein Auftrag zum
+Schicken mehr, sondern der Anlass für genau eine Rückfrage: wer entscheidet.
+
+**Was gebaut ist:**
+
+- **Migration `0077`** erweitert `loom_status` um den Wert `zustaendigkeit`.
+  Der Stern bleibt unangetastet, er heißt weiter „hat zugesagt".
+- Alle bestehenden Filter fragen auf `loom_status = 'offen'` ab. Ein Lead auf
+  `zustaendigkeit` fällt dadurch **automatisch** aus der Loom-Spur, aus
+  `arbeitsmodusQuellen.loomPosten`, aus `leadStation` und aus **Jophiels**
+  Bauliste (`server/uriel.mjs` fragt dieselbe Bedingung ab). Kein zweiter
+  Wahrheitsort.
+- `funnelStufen.zustaendigkeitOffen` als eigene Stufe, im Trichter als fünfte
+  Kachel „Zugesagt · Entscheider offen".
+- Zwei Knöpfe an der Thread-Karte: **Entscheider offen** (nimmt ihn aus der
+  Bauliste) und **Zuständigkeit geklärt** (gibt ihn frei).
+- Geprüft: `verify-funnel-stufen` 38 ok, `verify-arbeitsmodus-quellen` 21/21,
+  `verify-linkedin-followups` 75/75, `verify-wochenkontrolle` 14 ok, `tsc` sauber.
+
+**Was die Zahlen tun werden:** Die Loom-Zahl sinkt, die Antwortzahl steigt.
+Beides ist gewollt und kein Einbruch. Eine Analyse an einen Nicht-Entscheider
+ist verschenkte Arbeit; eine Zuständigkeitsfrage erzeugt eine Antwort und
+führt zur richtigen Person.
+
+**Offen:** Migration 0077 ist noch nicht auf Supabase angewendet. Solange sie
+fehlt, weist der CHECK-Constraint den neuen Wert ab und die Knöpfe laufen ins
+Leere. Danach: Ludwig Cords und Jan Pieter Brünjes auf `zustaendigkeit` setzen.
+
+---
+
 
 ## **FERTIG 19.08.2026 — Die Antworten-Spur zeigte die falschen Leute UND schrieb den falschen Ton**
 
