@@ -29,6 +29,7 @@ import { upsertNetzwerk } from './linkedin/netzwerkUpsert.mjs'
 import { installiereLogHygiene, kuerzeLogDatei } from './logHygiene.mjs'
 import { WACH_KARENZ_MS, bewerteWachheit, chromeErreichbar, netzErreichbar, startBereitAus } from './startBereit.mjs'
 import { bewerteSchleuse, pruefeAnmeldung, pruefeDurchgang, pruefeSupabase, pruefeVault } from './schleuse.mjs'
+import { jophielProjekte, jophielShot } from './jophiel.mjs'
 
 // ---------- Lokale .env (nur für Secrets wie den Supabase-Key; gitignored) ----------
 // Minimaler Parser (zero-dependency). Prozess-Env hat Vorrang vor der Datei.
@@ -1495,6 +1496,18 @@ async function mirrorAll() {
     return { entries }
   })
   await pushSnapshotKey('social_weeks', async () => ({ weeks: await socialWeeks() }))
+  /**
+   * Jophiel-Projekte spiegeln - aber NUR, wenn Jophiel gerade laeuft.
+   *
+   * Sonst ueberschriebe jeder Tick, an dem der Generator aus ist, die letzte
+   * gute Liste mit einer leeren. Auf dem Handy waeren Kevins gebaute Seiten
+   * dann verschwunden, sobald er Jophiel schliesst. Ein alter Spiegel ist
+   * besser als ein leerer; wie alt er ist, steht in `updated_at`.
+   */
+  {
+    const stand = await jophielProjekte()
+    if (stand.jophielErreichbar) await pushSnapshotKey('jophiel_projekte', async () => stand)
+  }
   await pushSnapshotKey('sales_library', async () => await salesLibrary())
   await spiegleErstnachrichten()
   await pushSnapshotKey('agents', async () => {
@@ -2196,6 +2209,32 @@ const server = createServer(async (req, res) => {
     // ---------- Sales-Bibliothek: Liste (Vault-Erstnachrichten + Vorlagen/PDFs) ----------
     if (req.method === 'GET' && url.pathname === '/sales/library') {
       return json(res, 200, await salesLibrary())
+    }
+
+    // ---------- Jophiel: der Website-Generator nebenan ----------
+    // Kevins Loom-Demos entstehen dort; die Klammer zu Uriel ist `leadName`.
+    // Laeuft Jophiel nicht, kommt eine leere Liste plus `jophielErreichbar:
+    // false` zurueck - NIE ein 500. Ein Nebendienst, der aus ist, darf die
+    // Sales-Seite nicht mit einer roten Zeile zumachen.
+    if (req.method === 'GET' && url.pathname === '/jophiel/projekte') {
+      return json(res, 200, await jophielProjekte())
+    }
+
+    // Das Vorschaubild, verkleinert und zwischengespeichert (siehe jophiel.mjs).
+    if (req.method === 'GET' && url.pathname.startsWith('/jophiel/shot/')) {
+      const teile = url.pathname.slice('/jophiel/shot/'.length).split('/')
+      if (teile.length !== 2) return json(res, 404, { error: 'Aufnahme nicht gefunden' })
+      const bild = await jophielShot(decodeURIComponent(teile[0]), decodeURIComponent(teile[1]))
+      if (!bild) return json(res, 404, { error: 'Aufnahme nicht gefunden' })
+      res.writeHead(200, {
+        'Content-Type': bild.mime,
+        // Der Zeitstempel der Quelle steckt im Zwischenspeicher-Namen, nicht in
+        // der URL - deshalb hier kein langes Caching, sonst zeigt die Karte nach
+        // einem Neubau tagelang die alte Seite.
+        'Cache-Control': 'no-cache',
+        'Access-Control-Allow-Origin': '*',
+      })
+      return res.end(bild.buf)
     }
 
     // ---------- Kunden-Ads: Register + Manifest ----------
