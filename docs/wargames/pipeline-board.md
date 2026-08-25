@@ -4,8 +4,55 @@
 > durchgespielt, nicht ausgeführt. Der Vorgänger — die senkrechte Kartenreihe —
 > steht und ist in [`sales-canvas.md`](sales-canvas.md) beschrieben.
 
-**Executor:** blind ausführbar · **Repo:** `~/Kevin OS/02 Projekte/uriel`
-**Branch:** `main` · **Nicht pushen** — Livegang ist Kevins Wort.
+**Repo:** `~/Kevin OS/02 Projekte/uriel` · **Branch:** `main`
+**Nicht pushen** — Livegang ist Kevins Wort.
+
+---
+
+## AUFTRAG AN DEN EXECUTOR — vor dem ersten Edit lesen
+
+Du arbeitest diese Blaupause ab. Sie ist so geschrieben, dass du **keine Frage
+stellen musst**: Jeder Zug nennt, was du sehen wirst, was wahrscheinlich
+schiefgeht und was du dann tust.
+
+**Reihenfolge:** Z0 → Z8, keine Sprünge. Z1 muss vor Z2 stehen, Z2 vor Z3.
+
+**Nach JEDEM Zug, ohne Ausnahme:**
+```bash
+cd app && npx tsc -b && npm run build
+```
+```bash
+cd ~/Kevin\ OS/02\ Projekte/uriel && for f in scripts/verify-*.ts; do npx tsx "$f" >/dev/null 2>&1 || echo "ROT $f"; done
+```
+Erwartung: keine Ausgabe. Dann **ein Commit je Zug**, deutsche Nachricht mit
+Typ-Prefix. **Niemals pushen.**
+
+**Vor jedem Edit die Datei frisch lesen.** Zeilennummern in diesem Dokument sind
+Wegweiser, keine Wahrheit.
+
+### Diese drei Züge baust du NICHT — sie brauchen das grosse Modell
+
+| Zug | Warum |
+|---|---|
+| **Z2** (Conversion-Rechnung) | Eine falsche Kohortenbildung liefert eine plausible Zahl. Alle Prüfskripte bleiben grün, und Kevin entscheidet nach einer Zahl, die falsch ist. Kein Gate der Welt fängt das. |
+| **Z5** (Kadenz justierbar) | Greift in `bucketOf`/`leadStation` ein — die Fälligkeitslogik, an der **jede** Zahl im Cockpit hängt. Sechs Aufrufstellen, und eine vergessene erzeugt zwei Wahrheiten. |
+| **Z6** (Lead umhängen) | Ändert die Auswertungsreihenfolge in `leadStation` und braucht die einzige Migration dieser Runde. Ein Fehler hier verschiebt Leads still an falsche Stationen. |
+
+**Wenn du bei Z2, Z5 oder Z6 ankommst: STOPP.** Committe den letzten fertigen
+Zug, schreib in einem Satz, wo du stehst, und melde: *„Z<n> braucht das grosse
+Modell."* Fang nicht an — auch nicht „nur das Gerüst".
+
+**Deine Züge sind Z0, Z1, Z3, Z4, Z7, Z8.** Das ist die Mehrheit der Arbeit:
+die Ereignis-Schreibung, die ganze Fläche, das Fenster, der Umschalter, die Doku.
+
+### Die vier Sätze, die dich retten
+
+1. **Keine erfundene Zahl.** Wo Daten fehlen, steht ein Satz — nie 0 %.
+2. **Keine zweite Wahrheit.** Wenn du etwas nachrechnest, das es schon gibt,
+   ist der Zug falsch. Such die vorhandene Funktion.
+3. **Melde, was du nicht gebaut hast.** Ein ausgelassener Teil, der genannt
+   wird, ist in Ordnung. Einer, der verschwiegen wird, kostet Tage.
+4. **Bei einer Abbruchbedingung: stoppen und melden.** Nicht improvisieren.
 
 ---
 
