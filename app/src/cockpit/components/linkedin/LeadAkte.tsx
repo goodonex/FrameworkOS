@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState, type CSSProperties } from 'react'
 import { useIsMobile } from '../../../hooks/useViewport'
 import type { Lead, LeadEreignis, LeadEreignisTyp, LinkedinThread } from '../../../types/db'
-import { STATION_TITEL, leadStation } from '../../lib/leadStation'
+import { SPRUNG_ZIELE, STATION_TITEL, leadStation, type Station } from '../../lib/leadStation'
 
 /**
  * Die Lead-Akte — ein Klick auf einen Namen, und die ganze Geschichte steht da.
@@ -31,6 +31,9 @@ const EREIGNIS_TITEL: Record<LeadEreignisTyp, string> = {
   anruf: 'Angerufen',
   instagram: 'Auf Instagram geschrieben',
   pdf: 'Analyse-PDF geschickt',
+  // Bewusst als Korrektur benannt, nicht als Vorgang: Die Zeile darf sich in
+  // sechs Wochen nicht wie ein verschickter Kanal lesen (0080).
+  uebersprungen: 'Stufe übersprungen (Handkorrektur)',
   wiedervorlage_gesetzt: 'Wiedervorlage gesetzt',
   disqualifiziert: 'Aussortiert',
   reaktiviert: 'Wieder aufgenommen',
@@ -82,6 +85,12 @@ export interface LeadAkteProps {
   onMarkieren: (markiert: boolean) => void | Promise<void>
   onNotiz: (notiz: string) => void | Promise<void>
   onProtokolliere: (typ: LeadEreignisTyp) => void | Promise<void>
+  /**
+   * Von Hand auf eine Stufe setzen (0080). Getrennt von `onProtokolliere`,
+   * weil es KEIN Kanal-Ereignis ist: Es behauptet nicht, dass etwas
+   * rausgegangen ist, sondern dass Kevin entschieden hat.
+   */
+  onUmhaengen?: (nach: Station, grund: string) => void | Promise<void>
 }
 
 export function LeadAkte({
@@ -95,10 +104,13 @@ export function LeadAkte({
   onMarkieren,
   onNotiz,
   onProtokolliere,
+  onUmhaengen,
 }: LeadAkteProps) {
   const mobil = useIsMobile()
   const jetzt = useMemo(() => new Date(), [])
   const [notiz, setNotiz] = useState(lead.notiz)
+  const [sprungZiel, setSprungZiel] = useState('')
+  const [sprungGrund, setSprungGrund] = useState('')
   const [wvDatum, setWvDatum] = useState('')
   const [wvGrund, setWvGrund] = useState('')
   const [dqGrund, setDqGrund] = useState('')
@@ -111,7 +123,7 @@ export function LeadAkte({
         {
           lead_status: lead.lead_status,
           wiedervorlage_am: lead.wiedervorlage_am,
-          ereignisse: ereignisse.map((e) => ({ typ: e.typ, at: e.at })),
+          ereignisse: ereignisse.map((e) => ({ typ: e.typ, at: e.at, details: e.details })),
           thread,
         },
         jetzt,
@@ -331,6 +343,58 @@ export function LeadAkte({
               ))}
             </div>
           </div>
+
+          {/* Von Hand umhaengen (0080). Bewusst UNTER „Was ist rausgegangen?"
+              und optisch ruhiger: Es ist eine Korrektur, kein Vorgang — und es
+              soll sich nicht wie ein weiterer Kanal-Knopf anfuehlen. */}
+          {onUmhaengen ? (
+            <div>
+              <div className="ck-label" style={{ marginBottom: 4 }}>
+                Von Hand auf eine Stufe setzen
+              </div>
+              <div style={{ fontSize: 11.5, color: 'var(--ck-text-3)', marginBottom: 8 }}>
+                Trägt keinen Kanal ein — die Akte hält fest, dass du es entschieden hast.
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                <select
+                  className="ck-input"
+                  value={sprungZiel}
+                  onChange={(ev) => setSprungZiel(ev.target.value)}
+                  style={{ minHeight: 40 }}
+                  aria-label="Stufe wählen"
+                >
+                  <option value="">Stufe wählen …</option>
+                  {SPRUNG_ZIELE.map((z) => (
+                    <option key={z} value={z}>
+                      {STATION_TITEL[z]}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  className="ck-input"
+                  value={sprungGrund}
+                  onChange={(ev) => setSprungGrund(ev.target.value)}
+                  placeholder="Grund (optional)"
+                  style={{ minHeight: 40, flex: 1, minWidth: 160 }}
+                  aria-label="Grund"
+                />
+                <button
+                  type="button"
+                  className="ck-btn"
+                  style={{ minHeight: 40 }}
+                  disabled={!sprungZiel}
+                  onClick={() => {
+                    if (!sprungZiel) return
+                    void onUmhaengen(sprungZiel as Station, sprungGrund.trim())
+                    setSprungZiel('')
+                    setSprungGrund('')
+                  }}
+                >
+                  Umhängen
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           <div>
             <div className="ck-label" style={{ marginBottom: 8 }}>

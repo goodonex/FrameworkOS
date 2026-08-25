@@ -1206,6 +1206,13 @@ export type LeadEreignisTyp =
   | 'instagram'
   /** Die Follow-up-Analyse als PDF, ungefragt geschickt (0078). */
   | 'pdf'
+  /**
+   * Handkorrektur (0080): Kevin hat einen Lead von Hand eine oder mehrere
+   * Stufen weitergesetzt. **Kein Kanal** — dieser Typ behauptet ausdrücklich
+   * NICHT, dass etwas verschickt wurde. `details` trägt `von`, `nach` und
+   * `grund`; `funnelRaten` zählt ihn nirgends als Kontakt mit.
+   */
+  | 'uebersprungen'
   | 'wiedervorlage_gesetzt'
   | 'disqualifiziert'
   | 'reaktiviert'

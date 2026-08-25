@@ -9,6 +9,7 @@ import { ErstnachrichtenListe } from '../components/ErstnachrichtenListe'
 import { FunnelStufen } from '../components/linkedin/FunnelStufen'
 import { LeadAkte } from '../components/linkedin/LeadAkte'
 import { LeadPipeline } from '../components/linkedin/LeadPipeline'
+import { leadStation } from '../lib/leadStation'
 import { Tagesjournal } from '../components/linkedin/Tagesjournal'
 import { useLeads } from '../../hooks/useLeads'
 import { useActiveBrand } from '../lib/activeBrand'
@@ -817,6 +818,30 @@ export function LinkedinArea({ eingebettet = false }: { eingebettet?: boolean } 
                 onMarkieren={(markiert) => leadsQuery.markiere(lead.id, markiert)}
                 onNotiz={(notiz) => leadsQuery.speichereNotiz(lead.id, notiz)}
                 onProtokolliere={(typ) => leadsQuery.protokolliere(lead.id, typ)}
+                /**
+                 * Die Handkorrektur (0080). `von` haelt fest, wo der Lead
+                 * herkam — sonst liest man in sechs Wochen nur, wo er
+                 * hingesetzt wurde, und nicht, was er vorher war.
+                 */
+                onUmhaengen={(nach, grund) =>
+                  leadsQuery.protokolliere(lead.id, 'uebersprungen', {
+                    von: leadStation(
+                      {
+                        lead_status: lead.lead_status,
+                        wiedervorlage_am: lead.wiedervorlage_am,
+                        ereignisse: (leadsQuery.ereignisseJeLead.get(lead.id) ?? []).map((e) => ({
+                          typ: e.typ,
+                          at: e.at,
+                          details: e.details,
+                        })),
+                        thread: threadsJeLead.get(lead.id) ?? null,
+                      },
+                      new Date(),
+                    ).station,
+                    nach,
+                    grund,
+                  })
+                }
               />
             )
           })()

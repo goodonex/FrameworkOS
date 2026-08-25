@@ -452,7 +452,7 @@ export function SalesDashboard() {
         headline: l.headline,
         lead_status: l.lead_status,
         wiedervorlage_am: l.wiedervorlage_am,
-        ereignisse: (leadsQuery.ereignisseJeLead.get(l.id) ?? []).map((e) => ({ typ: e.typ, at: e.at })),
+        ereignisse: (leadsQuery.ereignisseJeLead.get(l.id) ?? []).map((e) => ({ typ: e.typ, at: e.at, details: e.details })),
         thread: threadsJeLead.get(l.id) ?? null,
       })),
     [leadsQuery.leads, leadsQuery.ereignisseJeLead, threadsJeLead],

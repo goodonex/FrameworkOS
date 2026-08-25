@@ -121,8 +121,12 @@ export type Station =
 export interface LeadStationEingabe {
   lead_status: LeadStatus
   wiedervorlage_am: string | null
-  /** Nur die Typen und Zeitpunkte — Texte spielen für die Station keine Rolle. */
-  ereignisse: { typ: LeadEreignisTyp; at: string }[]
+  /**
+   * Typ und Zeitpunkt — Texte spielen für die Station keine Rolle. `details`
+   * ist die eine Ausnahme: `uebersprungen` (0080) trägt dort, wohin Kevin den
+   * Lead gesetzt hat.
+   */
+  ereignisse: { typ: LeadEreignisTyp; at: string; details?: Record<string, unknown> | null }[]
   /** Der Thread, wenn es einen gibt. Ohne Thread läuft der stille Zweig. */
   thread?: Pick<
     LinkedinThread,
@@ -161,7 +165,9 @@ export interface StationErgebnis {
   zweig: Zweig | null
 }
 
-function letztes(ereignisse: { typ: LeadEreignisTyp; at: string }[], typen: LeadEreignisTyp[]): number | null {
+type Ereignis = LeadStationEingabe['ereignisse'][number]
+
+function letztes(ereignisse: Ereignis[], typen: LeadEreignisTyp[]): number | null {
   let neuestes: number | null = null
   for (const e of ereignisse) {
     if (!typen.includes(e.typ)) continue
@@ -172,7 +178,7 @@ function letztes(ereignisse: { typ: LeadEreignisTyp; at: string }[], typen: Lead
   return neuestes
 }
 
-function hat(ereignisse: { typ: LeadEreignisTyp; at: string }[], typ: LeadEreignisTyp): boolean {
+function hat(ereignisse: Ereignis[], typ: LeadEreignisTyp): boolean {
   return ereignisse.some((e) => e.typ === typ)
 }
 
@@ -180,11 +186,7 @@ function hat(ereignisse: { typ: LeadEreignisTyp; at: string }[], typ: LeadEreign
  * Den Mindestabstand anwenden: Ein an sich fälliger Zug wartet, wenn erst
  * kürzlich ein anderer Kanal bedient wurde.
  */
-function mitAbstand(
-  faelligAb: number,
-  ereignisse: { typ: LeadEreignisTyp; at: string }[],
-  kadenz: Kadenz,
-): number {
+function mitAbstand(faelligAb: number, ereignisse: Ereignis[], kadenz: Kadenz): number {
   const letzterKontakt = letztes(ereignisse, AUSGEHEND)
   if (letzterKontakt == null) return faelligAb
   return Math.max(faelligAb, letzterKontakt + kadenz.mindestabstandTage * TAG_MS)
@@ -205,7 +207,7 @@ type KettenTeil = Pick<StationErgebnis, 'station' | 'naechsterSchritt' | 'faelli
  * werden muss.
  */
 function lauteKette(
-  ereignisse: { typ: LeadEreignisTyp; at: string }[],
+  ereignisse: Ereignis[],
   letzteNachricht: string | null,
   now: number,
   kadenz: Kadenz,
@@ -278,6 +280,52 @@ function lauteKette(
  * Die Vorschau in der Oberfläche rechnet damit gegen eine PROBEWEISE Kadenz,
  * ohne sie zu speichern: Kevin sieht die Folge, solange sie noch reversibel ist.
  */
+/**
+ * Die Ereignisse, die einen Sprung „verbrauchen": echte ausgehende Kontakte
+ * plus die Antwort des Leads. Passiert eines davon NACH dem Umhängen, ist die
+ * Handkorrektur überholt und die Kette rechnet wieder selbst.
+ */
+const KANAL_EREIGNISSE: LeadEreignisTyp[] = [...AUSGEHEND, 'antwort_erhalten', 'angenommen']
+
+/** Stationen, die es nur im stillen Ast gibt — für den `zweig` nach einem Sprung. */
+const STILLE_STATIONEN: Station[] = ['email_faellig']
+/** Und die des lauten. `postkarte_faellig`/`anruf_faellig` fehlen bewusst: Sie
+ *  kommen aus BEIDEN Ästen, und nach einer Handkorrektur ist nicht mehr zu
+ *  entscheiden, welcher gemeint war. Dann lieber kein Zweig als ein geratener. */
+const LAUTE_STATIONEN: Station[] = ['instagram_faellig', 'pdf_faellig']
+
+/** Alle Stationen, auf die von Hand gesetzt werden darf. */
+export const SPRUNG_ZIELE: Station[] = [
+  'erstnachricht_faellig',
+  'instagram_faellig',
+  'pdf_faellig',
+  'email_faellig',
+  'postkarte_faellig',
+  'anruf_faellig',
+]
+
+/**
+ * Der jüngste Sprung — oder `null`, wenn keiner brauchbar ist.
+ *
+ * `details.nach` kommt aus einer jsonb-Spalte und ist damit Fremdeingabe:
+ * Steht dort Unsinn, wird das Ereignis ignoriert statt den Lead auf eine
+ * Station ohne Namen zu setzen.
+ */
+function juengsterSprung(ereignisse: Ereignis[]): { at: number; nach: Station; grund: string } | null {
+  let treffer: { at: number; nach: Station; grund: string } | null = null
+  for (const e of ereignisse) {
+    if (e.typ !== 'uebersprungen') continue
+    const at = new Date(e.at).getTime()
+    if (Number.isNaN(at)) continue
+    const nach = e.details?.nach
+    if (typeof nach !== 'string' || !SPRUNG_ZIELE.includes(nach as Station)) continue
+    if (treffer && treffer.at >= at) continue
+    const grund = typeof e.details?.grund === 'string' ? e.details.grund : ''
+    treffer = { at, nach: nach as Station, grund }
+  }
+  return treffer
+}
+
 export function leadStation(
   eingabe: LeadStationEingabe,
   jetzt: Date,
@@ -325,6 +373,40 @@ export function leadStation(
       naechsterSchritt: now >= ziel ? 'Ruhe vorbei — neu ansprechen' : 'Ruht',
       faelligAm: new Date(ziel).toISOString(),
       faellig: now >= ziel,
+    }
+  }
+
+  /**
+   * Handkorrektur (0080) — ganz vorn, vor jeder Kettenrechnung.
+   *
+   * Kevin hat den Lead von Hand auf eine Stufe gesetzt. Das ist eine Ansage,
+   * keine Ableitung: Solange danach nichts Echtes passiert ist, steht der Lead
+   * dort. Sobald ein echtes Ereignis folgt (die Postkarte geht wirklich raus),
+   * rechnet die Kette normal weiter — deshalb zählt nur, was NACH dem Sprung
+   * liegt.
+   *
+   * **Warum hier und nicht unten:** `lauteKette` liest die Ereignisse
+   * rückwärts. Stünde die Auswertung dort, gewänne das jüngste Kanal-Ereignis
+   * und der Sprung wäre wirkungslos — der Lead stünde nach dem Umhängen
+   * unverändert da. Genau dieser Fehler steht als „wahrscheinlichster" in der
+   * Blaupause.
+   */
+  const sprung = juengsterSprung(ereignisse)
+  if (sprung) {
+    const spaeter = ereignisse.some((e) => {
+      if (e.typ === 'uebersprungen' || !KANAL_EREIGNISSE.includes(e.typ)) return false
+      const t = new Date(e.at).getTime()
+      return !Number.isNaN(t) && t > sprung.at
+    })
+    if (!spaeter) {
+      return {
+        ...basis,
+        station: sprung.nach,
+        naechsterSchritt: `Von Hand hierher gesetzt${sprung.grund ? ` — ${sprung.grund}` : ''}`,
+        faelligAm: new Date(sprung.at).toISOString(),
+        faellig: true,
+        zweig: STILLE_STATIONEN.includes(sprung.nach) ? 'still' : LAUTE_STATIONEN.includes(sprung.nach) ? 'laut' : null,
+      }
     }
   }
 

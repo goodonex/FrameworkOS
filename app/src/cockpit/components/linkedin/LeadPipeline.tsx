@@ -87,7 +87,9 @@ export function LeadPipeline({ leads, ereignisseJeLead, threadsJeLead, onLeadOef
           {
             lead_status: lead.lead_status,
             wiedervorlage_am: lead.wiedervorlage_am,
-            ereignisse: (ereignisseJeLead.get(lead.id) ?? []).map((e) => ({ typ: e.typ, at: e.at })),
+            // `details` muss mit: dort steht bei `uebersprungen` (0080), wohin
+            // Kevin den Lead von Hand gesetzt hat.
+            ereignisse: (ereignisseJeLead.get(lead.id) ?? []).map((e) => ({ typ: e.typ, at: e.at, details: e.details })),
             thread: threadsJeLead.get(lead.id) ?? null,
           },
           jetzt,

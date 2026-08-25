@@ -52,7 +52,8 @@ export interface FunnelLead {
   headline: string
   lead_status: LeadStatus
   wiedervorlage_am: string | null
-  ereignisse: { typ: LeadEreignisTyp; at: string }[]
+  /** `details` traegt bei `uebersprungen` (0080) das Ziel der Handkorrektur. */
+  ereignisse: { typ: LeadEreignisTyp; at: string; details?: Record<string, unknown> | null }[]
   /** Der Thread, wenn es einen gibt. Ohne Thread läuft der stille Zweig. */
   thread: FunnelThread | null
 }
