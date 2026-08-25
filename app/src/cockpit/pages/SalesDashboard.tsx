@@ -11,12 +11,14 @@ import { Arbeitsliste, type LoomSkriptAktionen } from '../components/Arbeitslist
 import { Arbeitsmodus, type ArbeitsmodusErgebnis } from '../components/Arbeitsmodus'
 import { InmailPanel } from '../components/InmailPanel'
 import { FunnelCanvas } from '../components/sales/FunnelCanvas'
+import { PipelineBoard } from '../components/sales/PipelineBoard'
 import { GebauteSeiten } from '../components/sales/GebauteSeiten'
 import { VorlagenKopf } from '../components/sales/VorlagenKopf'
 import { useActiveBrand } from '../lib/activeBrand'
 import { antwortPostenAusgeblendet, zeilenId } from '../lib/arbeitsmodusQuellen'
 import { erledigePosten } from '../lib/arbeitsmodusTracking'
 import { funnelKarten, type FunnelKartenId, type FunnelLead } from '../lib/funnelKarten'
+import { funnelRaten } from '../lib/funnelRaten'
 import { fetchJophielProjekte } from '../lib/jophielApi'
 import { mitVorschau, verknuepfeProjekte, type JophielStand } from '../lib/jophielProjekte'
 import { ausAltemWert, poolAbleitung, type InmailStand } from '../lib/inmailStand'
@@ -1144,6 +1146,32 @@ export function SalesDashboard() {
     [rohKarten, listeJeKarte],
   )
 
+  /**
+   * Die Conversion an den Kanten (Zug 2). Dieselben Ereignisse, die schon für
+   * den Bestand geladen sind — keine zweite Abfrage.
+   */
+  const raten = useMemo(
+    () =>
+      funnelRaten({
+        ereignisse: leadsQuery.ereignisse,
+        tageszeilen: metrics.windowRows,
+        netzwerk: netzwerk.items,
+        jetzt,
+      }),
+    [leadsQuery.ereignisse, metrics.windowRows, netzwerk.items, jetzt],
+  )
+
+  /**
+   * Board oder Liste — **nie beides** (Gesetz 3: eine Sales-Ansicht).
+   *
+   * Der Umschalter gehört laut Blaupause in Zug 7, steht aber hier: Ohne ihn
+   * hätte das Board neben der Kartenreihe gestanden, und damit gäbe es zwei
+   * Orte für dieselbe Zahl. `=== 'board'` statt Truthiness — der Wert kommt
+   * aus einer Key-Value-Tabelle und war dort schon alles Mögliche.
+   */
+  const { wert: ansichtRoh, setzen: setzeAnsicht } = useUiSetting<string>('salesAnsicht', 'liste')
+  const boardAnsicht = ansichtRoh === 'board' && !isMobile
+
   /** Die Fenster der drei Follow-up-Karten — Text oben, Namen darunter. */
   const followupKacheln: KachelDef[] = karten
     .filter((k) => k.stufenId === 'followups')
@@ -1276,11 +1304,42 @@ export function SalesDashboard() {
           </span>
         </div>
 
-        {/* Das Canvas: der Funnel als Karten. Bestand rechts, Tagespensum
-            klein darunter — die Balken darunter zeigen dasselbe Pensum noch
-            einmal, bis Z4 sie einklappt. */}
+        {/* Board oder Liste, nie beides. Am Handy fehlt der Umschalter — dort
+            gibt es das Board nicht (ein Baum mit zwei Ästen wird auf 390 px zur
+            Briefmarke), und ein Knopf für eine Ansicht, die nicht kommt, wäre
+            eine Lüge. */}
+        {!isMobile && !leadsQuery.loading && !leadsQuery.tableMissing ? (
+          <div style={{ display: 'flex', gap: 6, paddingInline: 4 }}>
+            {(
+              [
+                ['liste', 'Liste'],
+                ['board', 'Board'],
+              ] as const
+            ).map(([wert, label]) => (
+              <button
+                key={wert}
+                type="button"
+                className={`ck-btn${(wert === 'board') === boardAnsicht ? ' ck-btn--primary' : ''}`}
+                onClick={() => setzeAnsicht(wert)}
+                aria-pressed={(wert === 'board') === boardAnsicht}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {/* Das Canvas: der Funnel als Karten (mobil und in der Listen-Ansicht),
+            oder der Baum mit der Conversion an den Kanten. */}
         {leadsQuery.tableMissing ? null : leadsQuery.loading ? (
           <div style={{ fontSize: 12, color: 'var(--ck-text-3)', padding: '10px 4px' }}>Bestand lädt …</div>
+        ) : boardAnsicht ? (
+          <PipelineBoard
+            karten={karten}
+            raten={raten}
+            onOeffnen={(k) => oeffneKachel(ALT_KACHEL[k.id] ?? k.id, `board-${k.id}`)}
+            oeffenbar={(k) => listeJeKarte.has(k.id) || ALT_KACHEL[k.id] !== undefined}
+          />
         ) : (
           <FunnelCanvas
             karten={karten}
