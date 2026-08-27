@@ -146,8 +146,13 @@ export function karteZuEintrag({ zeilen, href, nameAusBild }, jetzt = new Date()
  */
 export function gesamtzahlAus(text) {
   const s = String(text ?? '')
-  const a = s.match(/Personen\s*\((\d+)\)/i)
-  if (a) return Number(a[1])
+  // Der Tausenderpunkt (27.08.). Die Einladungsseite schreibt "Personen (1.052)",
+  // und `\d+` matcht daran nicht - die Zahl blieb null, der Lauf galt als
+  // abgebrochen, und der Waechter meldete Kevin taeglich einen Abbruch, den es
+  // nicht gab. Der Kontakte-Zweig darunter behandelte den Punkt seit jeher; nur
+  // dieser hier nicht. Unter tausend Einladungen faellt so ein halber Fix nicht auf.
+  const a = s.match(/Personen\s*\(([\d.]+)\)/i)
+  if (a) return Number(a[1].replace(/\./g, ''))
   const b = s.match(/([\d.]+)\s*Kontakte/i)
   if (b) return Number(b[1].replace(/\./g, ''))
   return null

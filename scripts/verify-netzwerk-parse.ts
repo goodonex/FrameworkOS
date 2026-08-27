@@ -202,5 +202,17 @@ check('0 von 882 ist nicht vollständig', !istVollstaendig(0, 882))
 check('ohne Gesamtzahl nie vollständig', !istVollstaendig(100, null as unknown as number))
 check('Gesamtzahl 0 ist nie vollständig', !istVollstaendig(0, 0))
 
+{
+  // 27.08.: Die Einladungsseite schreibt "Personen (1.052)" mit Tausenderpunkt.
+  // Das alte Muster verlangte reine Ziffern, lieferte null, und der Waechter
+  // meldete daraufhin taeglich einen Abbruch, den es nie gab. Unter tausend
+  // Einladungen faellt dieser halbe Fix nicht auf - deshalb steht die Zahl hier.
+  check('Personen mit Tausenderpunkt', gesamtzahlAus('Personen (1.052)') === 1052, String(gesamtzahlAus('Personen (1.052)')))
+  check('Personen ohne Punkt', gesamtzahlAus('Personen (882)') === 882)
+  check('Kontakte mit Tausenderpunkt', gesamtzahlAus('1.234 Kontakte') === 1234)
+  check('ohne Zahl bleibt null', gesamtzahlAus('nichts hier') === null)
+  check('null gilt nie als vollstaendig', istVollstaendig(500, null as unknown as number) === false)
+}
+
 console.log(`\nverify-netzwerk-parse: ${pass} ok, ${fail} fehlgeschlagen`)
 process.exit(fail === 0 ? 0 : 1)
