@@ -28,6 +28,7 @@ import { baueMorgenbriefInput } from './morgenbriefInput.mjs'
 import { upsertNetzwerk } from './linkedin/netzwerkUpsert.mjs'
 import { installiereLogHygiene, kuerzeLogDatei } from './logHygiene.mjs'
 import { WACH_KARENZ_MS, bewerteWachheit, chromeErreichbar, netzErreichbar, startBereitAus } from './startBereit.mjs'
+import { beurteileWache, meldungsText } from './chromeWache.mjs'
 import { bewerteSchleuse, pruefeAnmeldung, pruefeDurchgang, pruefeSupabase, pruefeVault } from './schleuse.mjs'
 import { jophielProjekte, jophielShot } from './jophiel.mjs'
 
@@ -2544,7 +2545,11 @@ const warteLog = new Map()
  * Profil ausgeloggt ist, kann das hier NICHT heilen — dann bleibt es bei der
  * Meldung aus `sync.mjs`, und Kevin muss sich einmal von Hand anmelden.
  */
-const CHROME_AUTOSTART = process.env.CHROME_AUTOSTART !== '0'
+/**
+ * Seit dem 27.08. standardmaessig AUS (siehe runner/chromeWache.mjs).
+ * Wer das alte Verhalten zurueckwill, setzt CHROME_AUTOSTART=1.
+ */
+const CHROME_AUTOSTART = process.env.CHROME_AUTOSTART === '1'
 const CHROME_START_ABSTAND_MS = 60 * 60 * 1000
 /**
  * Wie lange die Sperre gilt, wenn der Start NICHT geklappt hat (25.08.).
@@ -2722,6 +2727,77 @@ async function schleuseOffen() {
 }
 
 /**
+ * Die Chrome-Wache (27.08.) — der Ersatz fuer den Selbststart.
+ *
+ * Laeuft im Minutentakt. Zwei Aufgaben, beide aus Kevins Ablauf abgeleitet:
+ *
+ * 1. Fehlt Chrome waehrend der Wachzeit, meldet sie sich EINMAL auf dem
+ *    Bildschirm — nicht jede Minute. Kevin liest die Meldung, tippt
+ *    `chrome-sync`, macht Kaffee.
+ * 2. Taucht Chrome auf, werden die Zeitmarken zurueckgesetzt und die Routinen
+ *    sofort angestossen. Ohne das wuerde die Warteschlange bis zum naechsten
+ *    regulaeren Takt liegenbleiben, obwohl der Rechner bereitsteht.
+ *
+ * Der Zustand liegt auf Platte, nicht im Prozess: launchd startet den Runner
+ * nach jedem Schlaf-Wach-Zyklus neu (171 Starts im Log). Eine Modul-Variable
+ * waere nach jedem Aufwachen wieder "war nicht da" und wuerde erneut melden.
+ */
+async function chromeWacheTick() {
+  const { wach } = wachStand()
+  if (!wach) return
+
+  const jetzt = Date.now()
+  const urteil = beurteileWache({
+    chromeDa: await chromeErreichbar(),
+    warVorherDa: markeLies('chrome-war-da') === 1,
+    letzteErinnerung: markeLies('letzte-chrome-erinnerung'),
+    jetzt,
+    stunde: new Date().getHours(),
+  })
+
+  if (urteil.grund === 'chrome-erschienen') markeSchreib('chrome-war-da', 1)
+  else if (!urteil.aufholen && urteil.grund !== 'chrome-laeuft') markeSchreib('chrome-war-da', 0)
+
+  if (urteil.erinnern) {
+    markeSchreib('letzte-chrome-erinnerung', jetzt)
+    meldeAufDemBildschirm(meldungsText())
+    console.log('[runner] Chrome fehlt — Kevin benachrichtigt')
+  }
+
+  if (urteil.aufholen) {
+    // Zurueck auf null: Der naechste Tick jeder Routine sieht "lange her" und
+    // laeuft, statt auf sein Stundenfenster zu warten. Die Fenster selbst
+    // (6-20 Uhr beim Postfach) bleiben unangetastet.
+    markeSchreib('letzter-postfach-sync', 0)
+    markeSchreib('letzter-tiefenscan', 0)
+    console.log('[runner] Chrome ist da — Warteschlange wird nachgeholt')
+    void maybePostfachSync()
+    setTimeout(() => void maybeAntwortEntwuerfe(), 30_000)
+    setTimeout(() => void maybeNetzwerkSync(), 90_000)
+  }
+}
+
+/**
+ * Eine Meldung auf Kevins Bildschirm. Bewusst `display notification` und kein
+ * Dialog: Ein Dialog klaut den Fokus mitten in seiner Arbeit, genau das war ja
+ * die Beschwerde ueber das aufpoppende Chrome-Fenster.
+ */
+function meldeAufDemBildschirm(text) {
+  try {
+    const sicher = String(text).replace(/["\\]/g, '')
+    const p = spawn(
+      '/usr/bin/osascript',
+      ['-e', `display notification "${sicher}" with title "Uriel" sound name "Ping"`],
+      { detached: true, stdio: 'ignore' },
+    )
+    p.on('error', () => {})
+    p.unref()
+  } catch {
+    /* Eine ausgefallene Meldung darf den Runner nicht anhalten. */
+  }
+}
+
+/**
  * Darf dieser Agent JETZT starten — oder wartet er auf den Rechner?
  *
  * Ein „nein" ist hier ausdrücklich **kein Fehlversuch**: Es entsteht keine
@@ -2734,9 +2810,10 @@ async function warteAufRechner(agent, { brauchtChrome = false } = {}) {
   // weder Netz- noch Chrome-Anfrage.
   const netz = wach ? await netzErreichbar() : false
   const chrome = wach && brauchtChrome ? await chromeErreichbar() : true
-  // Fehlt nur noch Chrome, ist das der eine Punkt, den der Runner selbst
-  // erledigen kann — starten und beim nächsten Tick nachsehen.
-  if (wach && netz && brauchtChrome && !chrome) void starteSyncChrome()
+  // Fehlendes Chrome macht der Runner NICHT mehr selbst auf (27.08.). Die
+  // Wache meldet sich bei Kevin und holt nach, sobald er es gestartet hat;
+  // nur mit CHROME_AUTOSTART=1 gilt wieder das alte Verhalten.
+  if (CHROME_AUTOSTART && wach && netz && brauchtChrome && !chrome) void starteSyncChrome()
   let stand = startBereitAus({ wach, netz, chrome, brauchtChrome })
   // Steht der Rechner, entscheidet die Schleuse — das, was alle Agenten
   // gemeinsam brauchen, wird einmal geprüft und nicht von jedem einzeln.
@@ -3328,6 +3405,12 @@ server.listen(PORT, '127.0.0.1', () => {
   wachTick()
   const wt = setInterval(wachTick, WACH_TICK_MS)
   wt.unref?.()
+
+  // Die Chrome-Wache im selben Minutentakt, direkt nach der Wachheit: Sie
+  // braucht deren Urteil, und sie soll den Moment nicht verpassen, in dem
+  // Kevin morgens `chrome-sync` startet.
+  const cw = setInterval(() => void chromeWacheTick(), WACH_TICK_MS)
+  cw.unref?.()
 
   // Morgenbrief: kurz nach dem Start prüfen (Mac gerade aufgeklappt) und dann
   // alle 5 Minuten — so kommt er auch, wenn der Rechner erst um 9 angeht.
