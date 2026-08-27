@@ -12,7 +12,7 @@ import { createServer } from 'node:http'
 import { mkdir, readdir, readFile, realpath, rename, stat, unlink, writeFile } from 'node:fs/promises'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join, resolve, sep } from 'node:path'
+import { dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { syncThreads, TIEFENSCAN_TAGE } from './linkedin/sync.mjs'
 import { upsertThreads } from './linkedin/upsert.mjs'
@@ -3045,11 +3045,59 @@ async function maybePostfachSync() {
           (result.inserted ? ` · ${result.inserted} neu` : '') +
           (synced.partial ? ' · TEILWEISE (Lauf brach ab)' : ''),
       )
+      // Direkt hinterher die Verlaeufe nachziehen (27.08.). Der Sync liest die
+      // Postfach-LISTE, und die traegt je Gespraech nur die letzte Nachricht -
+      // ohne diesen Schritt bleibt jeder Verlauf bei Laenge 1, und `leads-sync`
+      // kann fuer denselben Lead nie Erstnachricht UND Antwort ableiten. Genau
+      // daran stand im Board 0,0 Prozent, wo in Wahrheit jeder Vierte antwortet.
+      //
+      // Als eigener Prozess, nicht inline: Der Lauf braucht mehrere Minuten und
+      // haelt sonst den Sync-Zweig besetzt. Der Deckel begrenzt ihn auf die
+      // Threads, die seit dem letzten Mal dazugekommen sind.
+      void verlaufNachziehen()
     } finally {
       linkedinSyncRunning = false
     }
   } catch (e) {
     console.error('[runner] postfach-sync übersprungen:', e?.message ?? e)
+  }
+}
+
+/**
+ * Den Verlauf-Tiefenlauf als Kindprozess anstossen.
+ *
+ * Bewusst dasselbe Skript, das am 27.08. von Hand gegen alle 261 Threads lief
+ * und dabei 98 echte Verlaeufe geholt hat - kein zweiter Codepfad, der
+ * auseinanderlaufen kann. Fehler werden geloggt und nicht geworfen: Ein
+ * misslungener Nachlauf darf den Postfach-Sync nicht entwerten, seine Daten
+ * sind ja schon geschrieben.
+ */
+let verlaufLaeuft = false
+/** Repo-Wurzel aus dem eigenen Modulpfad, nicht aus process.cwd(): launchd
+ *  setzt zwar ein WorkingDirectory, aber ein Handstart aus einem anderen
+ *  Ordner wuerde den Pfad sonst still zerlegen. */
+const REPO_WURZEL = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+function verlaufNachziehen() {
+  if (verlaufLaeuft) return
+  verlaufLaeuft = true
+  try {
+    const p = spawn(process.execPath, [join(REPO_WURZEL, 'scripts', 'verlauf-nachziehen.mjs'), '--limit=60'], {
+      cwd: REPO_WURZEL,
+      env: process.env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    let letzteZeile = ''
+    p.stdout.on('data', (d) => { const t = String(d).trim(); if (t) letzteZeile = t.split('\n').pop() })
+    p.stderr.on('data', (d) => console.error('[runner] verlauf-nachziehen:', String(d).trim().slice(0, 200)))
+    p.on('close', (code) => {
+      verlaufLaeuft = false
+      if (code === 0 && letzteZeile) console.log('[runner] ' + letzteZeile.replace(/^\[[^\]]+\]\s*/, 'verlauf-nachziehen: '))
+      else if (code !== 0) console.error('[runner] verlauf-nachziehen endete mit Code ' + code)
+    })
+    p.on('error', (e) => { verlaufLaeuft = false; console.error('[runner] verlauf-nachziehen:', e?.message ?? e) })
+  } catch (e) {
+    verlaufLaeuft = false
+    console.error('[runner] verlauf-nachziehen konnte nicht starten:', e?.message ?? e)
   }
 }
 
