@@ -1,8 +1,64 @@
 # Uriel — Backlog (die eine Quelle der Wahrheit)
 
-**Stand:** 2026-08-25 · Branch `main` (cockpit-rebuild liegt zurück) · Repo `~/Kevin OS/02 Projekte/uriel`
+**Stand:** 2026-08-27 · Branch `main` · Repo `~/Kevin OS/02 Projekte/uriel`
 
-## **GEBAUT 25.08.2026 — Das Pipeline-Board: der Funnel als Fläche, mit Conversion**
+> **Am 27.08. eingesammelt, was auseinandergelaufen war.** Drei Behauptungen in
+> diesem Dokument waren überholt und sind unten korrigiert: Die Migrationen
+> `0077`–`0080` sind **alle angewendet** (`supabase migration list`: lokal und
+> remote bis 0080), die 24 Commits aus den Runden vom 24./25.08. sind
+> **gepusht und live**, und die Loom-Arbeit aus dem Jophiel-Projekt
+> (`0079` + `supabase/functions/loom-ping/`) liegt nicht mehr uncommittet im
+> Baum. Wer hier etwas als „offen" liest, prüft es bitte zuerst gegen den
+> laufenden Stand — genau diese Drift hat zwei Sessions blockiert.
+
+## **LIVE seit 27.08.2026 — Der Runner macht Chrome nicht mehr selbst auf**
+
+Kevins Bilanz nach einer Woche Autostart, woertlich: *„Wenn mein Laptop an ist
+und ich arbeite dadran, geht jede Stunde einmal Chrome auf mit drei
+verschiedenen Fenstern. Aber trotzdem ist es halt nicht perfekt
+synchronisiert. Das sind zwei Gegensaetze, das macht keinen Sinn."*
+
+Beide Haelften stimmten, und sie hatten dieselbe Ursache: Der Runner startete
+Chrome selbst, um nicht auf Kevin warten zu muessen — und die Laeufe brachen
+trotzdem ab, weil der Laptop dazwischen schlief. Der Preis wurde bezahlt, die
+Gegenleistung kam nie.
+
+**Umgekehrt statt nachgebessert** (`runner/chromeWache.mjs`):
+
+- `CHROME_AUTOSTART` ist **opt-in** statt opt-out. Der Runner macht nichts mehr
+  von selbst auf.
+- Fehlt Chrome waehrend der Wachzeit (6–21 Uhr), kommt **eine** Systemmeldung
+  mit dem Befehl darin — dann 45 Minuten Ruhe. Nicht im Minutentakt, das waere
+  die alte Beschwerde in neuer Form.
+- Taucht Chrome auf, werden die Zeitmarken zurueckgesetzt und Postfach,
+  Entwuerfe und Netzwerk-Sync **sofort** angestossen, statt bis zum naechsten
+  Takt zu warten. Das ist Kevins Ablauf: Laptop auf, Meldung lesen,
+  `chrome-sync` tippen, Kaffee machen, waehrenddessen arbeitet der Runner.
+- Der Zustand liegt auf Platte. launchd startet den Runner nach jedem
+  Schlaf-Wach-Zyklus neu (171 Starts im Log); eine Modul-Variable haette nach
+  jedem Aufwachen erneut gemeldet.
+
+**Am laufenden System bewiesen, nicht behauptet:** 13:13:57 Chrome erschienen,
+Warteschlange sofort nachgeholt. 13:14:57 Chrome geschlossen, Meldung
+ausgeloest, Marke gesetzt. Dazu 15 Pruefungen in `verify-chrome-wache.ts`.
+
+**Das ist die Uebergangsloesung bis zum Mac Mini** (Kevin kauft in drei bis
+vier Wochen). Die Dauerloesung ist eine Maschine, die nicht schlaeft; der
+Vergleich Mac Mini / Raspberry Pi / NAS steht in der Sitzung vom 27.08. Kurz:
+Pi und NAS scheitern nicht an der Rechenleistung, sondern an 21 Stellen im
+Code, die macOS-Werkzeuge benutzen (`sips`, `caffeinate`, `pmset`,
+`launchctl`, `open`), und am Browser-Fingerabdruck gegenueber LinkedIn.
+
+**Offen aus dieser Runde — der eigentliche Datenbug:** Der Sync liest die
+Postfach-**Liste**, und die liefert je Gespraech nur die letzte Nachricht.
+Ergebnis: **261 Threads, davon 0 mit mehr als einer Nachricht im Verlauf.**
+Deshalb traegt ein Lead entweder `erstnachricht` ODER `antwort_erhalten`, nie
+beides (267 zu 67, nur 9 mit beidem in der richtigen Reihenfolge) — und
+deshalb steht im Board „0,0 %". Solange das so ist, ist jede Conversion-Zahl
+zwischen diesen beiden Stationen wertlos. Der Fix braucht eine zweite Abfrage
+je Thread und ist ein eigener Bau.
+
+## **LIVE seit 27.08.2026 — Das Pipeline-Board: der Funnel als Fläche, mit Conversion**
 
 Kevins Wunsch, nachdem die Kartenreihe stand: *„ich möchte visuell das canvas.
 einmal die komplette pipeline abbilden, die ich abarbeiten kann, infos
@@ -42,18 +98,16 @@ gepusht**):
 3. **Die Kadenz-Vorschau** ist der eigentliche Schutz, nicht die Validierung:
    „1157 → 1177 (+20)", bevor gespeichert wird.
 
-**OFFEN — braucht Kevins Entscheidung:**
+**OFFEN:**
 
-- **Migration 0080 ist angelegt, aber NICHT angewendet.**
-  `supabase migration list` zeigt `0079_loom_ereignisse` als lokal vorhanden und
-  remote fehlend — uncommittete Arbeit aus dem Jophiel-Projekt (samt
-  `supabase/functions/loom-ping/`). Ein `db push` würde sie mitanwenden. Bis zur
-  Klärung schlägt das Umhängen am CHECK-Constraint fehl.
+- ~~Migration 0080 nicht angewendet~~ — **erledigt.** Am 27.08. gegen die
+  laufende Datenbank geprüft: `0077`–`0080` stehen lokal UND remote. Das
+  Umhängen funktioniert, `0079` und `loom-ping` sind committet.
 - **Chrome-Sync muss Verläufe spiegeln,** sonst bleiben zwei Kanten dauerhaft
   ohne Zahl.
 - **Benchmarks für die Kantenfärbung** — `channelRates` misst eine andere Kante.
 
-## **GEBAUT 25.08.2026 — Das Sales-Canvas: der Funnel als Arbeitsfläche**
+## **LIVE seit 27.08.2026 — Das Sales-Canvas: der Funnel als Arbeitsfläche**
 
 Kevins `/sales` war eine senkrechte Kette aus sechs Flow-Zeilen. Sie
 funktionierte, frass aber die ganze Seitenhöhe für sechs Zahlen — und zeigte nur
@@ -278,7 +332,9 @@ der verworfene Entwurfs-Agent.
 ---
 
 
-## **GEBAUT 25.08.2026, MIGRATION OFFEN — Die Kette hört nach dem dritten Follow-up nicht mehr auf**
+## **LIVE seit 27.08.2026 — Die Kette hört nach dem dritten Follow-up nicht mehr auf**
+
+> Migration 0078 angewendet, Code gepusht. Der Eintrag darunter stammt vom 25.08.
 
 Anlass: Kevins Diktat vom 25.08. Der Hauptweg endete im Nichts. Nach drei
 LinkedIn-Follow-ups (3/7/14 Tage) steht ein Thread im Bucket `abschluss`,
@@ -392,7 +448,9 @@ nachgefasst?), dann die Kette verdrahten.
 ---
 
 
-## **GEBAUT 24.08.2026, MIGRATION OFFEN — Zuständigkeits-Stufe vor dem Loom**
+## **LIVE seit 27.08.2026 — Zuständigkeits-Stufe vor dem Loom**
+
+> Migration 0077 angewendet, Code gepusht. Der Eintrag darunter stammt vom 24.08.
 
 Anlass: Ludwig Cords sagte „moin! klar!" zur Analyse. Er ist Senior
 Investmentmakler beim Zinshausteam & Kenbo, einem Haus mit rund zehn
@@ -424,9 +482,9 @@ Beides ist gewollt und kein Einbruch. Eine Analyse an einen Nicht-Entscheider
 ist verschenkte Arbeit; eine Zuständigkeitsfrage erzeugt eine Antwort und
 führt zur richtigen Person.
 
-**Offen:** Migration 0077 ist noch nicht auf Supabase angewendet. Solange sie
-fehlt, weist der CHECK-Constraint den neuen Wert ab und die Knöpfe laufen ins
-Leere. Danach: Ludwig Cords und Jan Pieter Brünjes auf `zustaendigkeit` setzen.
+**Offen:** ~~Migration 0077~~ — angewendet (Stand 27.08.). Ludwig Cords steht
+seit dem 26.08. auf `entfaellt`, weil Kevin die Sterne durchgesehen hat; Jan
+Pieter Brünjes ebenfalls.
 
 ---
 
