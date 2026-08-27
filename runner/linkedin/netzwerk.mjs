@@ -298,7 +298,13 @@ const ERNTE_EXPR = `(() => {
   }
   return {
     karten,
-    kopfText: (document.body.innerText || '').slice(0, 300),
+    // 3000 statt 300 (27.08.). Gemessen an der echten Seite: LinkedIns
+    // Navigationsleiste ist laenger als der alte Ausschnitt, "701 Kontakte"
+    // steht an Position 686. Damit kam gesamtzahlAus immer auf null, jeder
+    // Lauf galt als unvollstaendig, und der Waechter meldete Kevin taeglich
+    // einen Abbruch, der keiner war. Der ganze Seitentext misst rund 2400
+    // Zeichen, 3000 deckt ihn ab.
+    kopfText: (document.body.innerText || '').slice(0, 3000),
     href: location.href,
   };
 })()`
