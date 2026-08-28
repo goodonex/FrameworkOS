@@ -4,13 +4,14 @@ import { AnimatePresence, motion, MotionConfig } from 'framer-motion'
 import { useArbeitsDauern } from '../../hooks/useArbeitsDauern'
 import { useLeads } from '../../hooks/useLeads'
 import { usePosten } from '../../hooks/usePosten'
-import { useIsMobile } from '../../hooks/useViewport'
+import { SALES_ZWEISPALTIG_AB, useViewport } from '../../hooks/useViewport'
 import { supabase } from '../../lib/supabase'
 import { AnfragenZaehler } from '../components/AnfragenZaehler'
 import { Arbeitsliste, type LoomSkriptAktionen } from '../components/Arbeitsliste'
 import { Arbeitsmodus, type ArbeitsmodusErgebnis } from '../components/Arbeitsmodus'
 import { InmailPanel } from '../components/InmailPanel'
 import { FunnelCanvas } from '../components/sales/FunnelCanvas'
+import { TagesListe } from '../components/sales/TagesListe'
 import { PipelineBoard } from '../components/sales/PipelineBoard'
 import { KadenzPanel } from '../components/sales/KadenzPanel'
 import { GebauteSeiten } from '../components/sales/GebauteSeiten'
@@ -352,7 +353,9 @@ function vorZeit(iso: string | null): string | null {
 
 export function SalesDashboard() {
   const navigate = useNavigate()
-  const isMobile = useIsMobile()
+  const { width: fensterBreite, isMobile } = useViewport()
+  /** Nebeneinander oder gestapelt — die Grenze wohnt in `useViewport.ts`. */
+  const zweiSpalten = fensterBreite >= SALES_ZWEISPALTIG_AB
   const { activeBrand } = useActiveBrand()
   const slug = activeBrand?.slug
   const metrics = useDailyMetrics()
@@ -1103,19 +1106,15 @@ export function SalesDashboard() {
     loom_offen: 'looms',
   }
 
-  /**
-   * Die alten Flow-Balken sind seit dem Canvas eine Rückfrage, kein Ausgangspunkt:
-   * Sie zeigen dasselbe Tagespensum, das oben schon an den Karten steht. Sie
-   * bleiben trotzdem — die InMail-Welle und der Anfragen-Zähler wohnen dort,
-   * und die Serien („n Werktage in Folge") gibt es auf den Karten nicht.
-   *
-   * Der Zustand liegt in `ui_settings` (0068), damit er das Löschen-und-neu-
-   * Hinzufügen der PWA überlebt. **Nie ungeprüft übernehmen:** Der Wert kommt
-   * aus einer Key-Value-Tabelle und war dort schon alles Mögliche. `=== true`
-   * statt Truthiness — sonst klappte ein versehentliches `"nein"` die Balken auf.
+  /*
+   * Die eingeklappten Flow-Balken sind am 28.08.2026 gefallen (Blaupause
+   * `docs/wargames/sales-canvas-v2.md`, Zug 2). Sie zeigten dieselben sechs
+   * `flowZeilen`, die jetzt offen in der Tagesliste stehen — inklusive
+   * Anfragen-Zaehler, InMail-Welle und Serien, die alle im Fenster wohnen und
+   * mitgewandert sind. Ihre Einstellung `salesBalkenOffen` bleibt als Zeile in
+   * `ui_settings` liegen und wird von niemandem mehr gelesen; eine Migration,
+   * die eine ungenutzte Zeile loescht, waere Aufwand ohne Gegenwert.
    */
-  const { wert: balkenRoh, setzen: setzeBalken } = useUiSetting<boolean>('salesBalkenOffen', false)
-  const balkenOffen = balkenRoh === true
 
   /**
    * Jophiels gebaute Seiten.
@@ -1306,159 +1305,195 @@ export function SalesDashboard() {
   }, [kachelParam, modusParam, isMobile, geordnet.length, postenLaedt, flow.laedt, aktivIndex])
 
 
-  return (
-    <MotionConfig reducedMotion="user">
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 760 }}>
-        {/* Kopf: Tagesansage + Daten-Frische — eine Zeile, keine Kachel. */}
-        {(ansage && ansage !== `${geordnet.length} offen`) || frische ? (
-          <div
-            className="ck-label"
-            style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}
-          >
-            <span>{!postenLaedt && ansage && ansage !== `${geordnet.length} offen` ? ansage : ''}</span>
-            {frische ? <span title="Letzter Postfach-Sync">Postfach-Stand: {frische}</span> : null}
-          </div>
-        ) : null}
-
-        {/* Die eine Zeile über dem Funnel: wie groß ist der Kosmos, und wie
-            weit ist der Tag. Bewusst keine Kachel — sie steht über allem und
-            konkurriert nicht mit den Karten darunter. */}
+  /**
+   * Die zwei Spalten des Canvas (28.08.2026, Blaupause
+   * `docs/wargames/sales-canvas-v2.md`, Zuege 1 und 2).
+   *
+   * **Links der Bestand, rechts der Tag — und keine Karte beantwortet mehr
+   * beides.** Kevins Wort am 28.08.: *„hier werden, glaub ich, die zwei
+   * versucht zu vermischen und das ist mir zu viel."* Die Trennung ist
+   * raeumlich statt als Umschalter geloest: Ein Umschalter macht aus zwei
+   * Blicken zwei Klicks — und liesse das rechte Viertel weiter leer, das
+   * Kevin im selben Atemzug bemaengelt hat.
+   *
+   * Die Kartenspalte behaelt ihre 760 px. Eine 900 px breite Karte mit einer
+   * Zahl am rechten Rand sieht nicht grosszuegig aus, sondern leer.
+   */
+  const funnelSpalte = (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 760 }}>
+      {/* Kopf: Tagesansage + Daten-Frische — eine Zeile, keine Kachel. */}
+      {(ansage && ansage !== `${geordnet.length} offen`) || frische ? (
         <div
-          className="ck-zahl"
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            gap: 10,
-            flexWrap: 'wrap',
-            fontSize: 13,
-            color: 'var(--ck-text-2)',
-            paddingInline: 4,
-          }}
+          className="ck-label"
+          style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}
         >
-          <span>
-            {leadsQuery.loading ? '…' : leadZahl.toLocaleString('de-DE')} Leads im Kosmos
-          </span>
-          <span style={{ color: flow.laedt ? 'var(--ck-text-3)' : undefined }}>
-            {flow.laedt
-              ? 'Tag lädt …'
-              : `Tag ${tagesFortschritt.erledigt} von ${tagesFortschritt.gesamt}`}
-          </span>
+          <span>{!postenLaedt && ansage && ansage !== `${geordnet.length} offen` ? ansage : ''}</span>
+          {frische ? <span title="Letzter Postfach-Sync">Postfach-Stand: {frische}</span> : null}
         </div>
-
-        {/* Board oder Liste, nie beides. Am Handy fehlt der Umschalter — dort
-            gibt es das Board nicht (ein Baum mit zwei Ästen wird auf 390 px zur
-            Briefmarke), und ein Knopf für eine Ansicht, die nicht kommt, wäre
-            eine Lüge. */}
-        {!isMobile && !leadsQuery.loading && !leadsQuery.tableMissing ? (
-          <div style={{ display: 'flex', gap: 6, paddingInline: 4 }}>
-            {(
-              [
-                ['liste', 'Liste'],
-                ['board', 'Board'],
-              ] as const
-            ).map(([wert, label]) => (
-              <button
-                key={wert}
-                type="button"
-                className={`ck-btn${(wert === 'board') === boardAnsicht ? ' ck-btn--primary' : ''}`}
-                onClick={() => setzeAnsicht(wert)}
-                aria-pressed={(wert === 'board') === boardAnsicht}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        ) : null}
-
-        {/* Das Canvas: der Funnel als Karten (mobil und in der Listen-Ansicht),
-            oder der Baum mit der Conversion an den Kanten. */}
-        {leadsQuery.tableMissing ? null : leadsQuery.loading ? (
-          <div style={{ fontSize: 12, color: 'var(--ck-text-3)', padding: '10px 4px' }}>Bestand lädt …</div>
-        ) : boardAnsicht ? (
-          <PipelineBoard
-            karten={karten}
-            raten={raten}
-            onOeffnen={(k) => oeffneKachel(ALT_KACHEL[k.id] ?? k.id, `board-${k.id}`)}
-            oeffenbar={(k) => listeJeKarte.has(k.id) || ALT_KACHEL[k.id] !== undefined}
-          />
-        ) : (
-          <FunnelCanvas
-            karten={karten}
-            onOeffnen={(k) => oeffneKachel(ALT_KACHEL[k.id] ?? k.id, `canvas-${k.id}`)}
-            // Öffenbar ist, wofür es eine Arbeitsliste oder ein bestehendes
-            // Fenster gibt. Eine Karte, die auf Klick nichts zeigt, ist
-            // schlimmer als eine, die gar nicht erst klickbar aussieht.
-            oeffenbar={(k) => listeJeKarte.has(k.id) || ALT_KACHEL[k.id] !== undefined}
-            // Eigener Namensraum: Die Flow-Balken darunter tragen `kachel-…`
-            // für dieselbe Sache. Gleiche Kennung zweimal im Bild heisst
-            // Geister-Morph, sobald die Balken aufgeklappt sind.
-            layoutIdFuer={(k) => `canvas-${k.id}`}
-          />
-        )}
-
-        {/* Der Zugang zu den Wartezeiten steht beim Board, nicht in einem
-            Einstellungs-Menü: Wer die Kadenz ändert, will vorher sehen, wie
-            der Funnel gerade aussieht. */}
-        {boardAnsicht ? (
-          <button
-            type="button"
-            className="ck-btn"
-            style={{ alignSelf: 'flex-start', minHeight: 40 }}
-            onClick={() => oeffneKachel('kadenz')}
-          >
-            Wartezeiten … {kadenz.followupTage.join(' · ')} Tage
-          </button>
-        ) : null}
-
-        {/* Die gebauten Seiten: Ergebnisse, keine Aufgaben. Sie stehen bewusst
-            NICHT im Funnel — ein Jophiel-Projekt ist ein Artefakt, kein Mensch,
-            und würde als Karte den Lead doppelt zählen, der oben schon unter
-            „Loom offen" steht. */}
-        <div className="ck-label" style={{ marginTop: 10, paddingInline: 4 }}>
-          Gebaute Seiten
+      ) : null}
+      {/* Die eine Zeile über dem Funnel: wie groß ist der Kosmos, und wie
+          weit ist der Tag. Bewusst keine Kachel — sie steht über allem und
+          konkurriert nicht mit den Karten darunter. */}
+      <div
+        className="ck-zahl"
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          gap: 10,
+          flexWrap: 'wrap',
+          fontSize: 13,
+          color: 'var(--ck-text-2)',
+          paddingInline: 4,
+        }}
+      >
+        <span>
+          {leadsQuery.loading ? '…' : leadZahl.toLocaleString('de-DE')} Leads im Kosmos
+        </span>
+        <span style={{ color: flow.laedt ? 'var(--ck-text-3)' : undefined }}>
+          {flow.laedt
+            ? 'Tag lädt …'
+            : `Tag ${tagesFortschritt.erledigt} von ${tagesFortschritt.gesamt}`}
+        </span>
+      </div>
+      {/* Board oder Liste, nie beides. Am Handy fehlt der Umschalter — dort
+          gibt es das Board nicht (ein Baum mit zwei Ästen wird auf 390 px zur
+          Briefmarke), und ein Knopf für eine Ansicht, die nicht kommt, wäre
+          eine Lüge. */}
+      {!isMobile && !leadsQuery.loading && !leadsQuery.tableMissing ? (
+        <div style={{ display: 'flex', gap: 6, paddingInline: 4 }}>
+          {(
+            [
+              ['liste', 'Liste'],
+              ['board', 'Board'],
+            ] as const
+          ).map(([wert, label]) => (
+            <button
+              key={wert}
+              type="button"
+              className={`ck-btn${(wert === 'board') === boardAnsicht ? ' ck-btn--primary' : ''}`}
+              onClick={() => setzeAnsicht(wert)}
+              aria-pressed={(wert === 'board') === boardAnsicht}
+            >
+              {label}
+            </button>
+          ))}
         </div>
-        <GebauteSeiten projekte={gebauteSeiten} erreichbar={jophiel.jophielErreichbar} />
-
-        {/* Das Tagespensum steht jetzt an den Karten. Die Balken bleiben als
-            Rückfrage erreichbar — mit Serien, Anfragen-Zähler und InMail-Welle,
-            die es auf den Karten nicht gibt. Standardmäßig zu. */}
+      ) : null}
+      {/* Das Canvas: der Funnel als Karten (mobil und in der Listen-Ansicht),
+          oder der Baum mit der Conversion an den Kanten. */}
+      {leadsQuery.tableMissing ? null : leadsQuery.loading ? (
+        <div style={{ fontSize: 12, color: 'var(--ck-text-3)', padding: '10px 4px' }}>Bestand lädt …</div>
+      ) : boardAnsicht ? (
+        <PipelineBoard
+          karten={karten}
+          raten={raten}
+          onOeffnen={(k) => oeffneKachel(ALT_KACHEL[k.id] ?? k.id, `board-${k.id}`)}
+          oeffenbar={(k) => listeJeKarte.has(k.id) || ALT_KACHEL[k.id] !== undefined}
+        />
+      ) : (
+        <FunnelCanvas
+          karten={karten}
+          onOeffnen={(k) => oeffneKachel(ALT_KACHEL[k.id] ?? k.id, `canvas-${k.id}`)}
+          // Öffenbar ist, wofür es eine Arbeitsliste oder ein bestehendes
+          // Fenster gibt. Eine Karte, die auf Klick nichts zeigt, ist
+          // schlimmer als eine, die gar nicht erst klickbar aussieht.
+          oeffenbar={(k) => listeJeKarte.has(k.id) || ALT_KACHEL[k.id] !== undefined}
+          // Eigener Namensraum: Die Flow-Balken darunter tragen `kachel-…`
+          // für dieselbe Sache. Gleiche Kennung zweimal im Bild heisst
+          // Geister-Morph, sobald die Balken aufgeklappt sind.
+          layoutIdFuer={(k) => `canvas-${k.id}`}
+        />
+      )}
+      {/* Der Zugang zu den Wartezeiten steht beim Board, nicht in einem
+          Einstellungs-Menü: Wer die Kadenz ändert, will vorher sehen, wie
+          der Funnel gerade aussieht. */}
+      {boardAnsicht ? (
         <button
           type="button"
-          onClick={() => setzeBalken(!balkenOffen)}
-          aria-expanded={balkenOffen}
-          className="ck-label"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            width: '100%',
-            minHeight: 40,
-            marginTop: 10,
-            padding: '6px 4px',
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            textAlign: 'left',
-          }}
+          className="ck-btn"
+          style={{ alignSelf: 'flex-start', minHeight: 40 }}
+          onClick={() => oeffneKachel('kadenz')}
         >
-          <span aria-hidden="true">{balkenOffen ? '▾' : '▸'}</span>
-          <span>Tagespensum</span>
-          <span className="ck-zahl" style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 400 }}>
-            {flow.laedt ? '' : `${tagesFortschritt.erledigt} von ${tagesFortschritt.gesamt} Stufen stehen`}
-          </span>
+          Wartezeiten … {kadenz.followupTage.join(' · ')} Tage
         </button>
-        {balkenOffen
-          ? flowZeilen.map((z) => (
-              <FlowZeile key={z.id} zeile={z} onOeffnen={() => oeffneKachel(z.id, `kachel-${z.id}`)} />
-            ))
-          : null}
+      ) : null}
+      {/* Neben dem Ritual: Kundenarbeit, Ads, die Wochenkontrolle. Bewusst
+          unter dem Funnel und bewusst leise — das ist kein Posten fuer heute. */}
+      <div className="ck-label" style={{ marginTop: 10 }}>
+        Neben dem Ritual
+      </div>
+      {projektZeilen.map((z) => (
+        <FlowZeile key={z.id} zeile={z} onOeffnen={() => oeffneKachel(z.id, `kachel-${z.id}`)} />
+      ))}
+    </div>
+  )
 
-        <div className="ck-label" style={{ marginTop: 10 }}>
-          Neben dem Ritual
+  /**
+   * Die Tagesliste — dieselben `flowZeilen`, aus denen bis zum 28.08. die
+   * eingeklappten Balken am Seitenfuss gebaut wurden.
+   *
+   * **Die Balken sind deshalb gefallen.** Sie haetten dasselbe ein zweites Mal
+   * gezeigt, nur zugeklappt: dieselben sechs Zeilen, dieselben Zahlen,
+   * dieselben Fenster. Zwei Orte fuer dieselbe Zahl sind genau die Vermischung,
+   * die dieser Umbau beseitigt — und die Tagesliste soll offen dastehen, nicht
+   * hinter einem Dreieck. Die Einstellung `salesBalkenOffen` in `ui_settings`
+   * wird damit nicht mehr gelesen; sie bleibt als tote Zeile stehen, statt eine
+   * Migration fuer nichts zu schreiben.
+   */
+  const heuteSpalte = (
+    <TagesListe
+      zeilen={flowZeilen}
+      onOeffnen={(id) => oeffneKachel(id, `kachel-${id}`)}
+      fortschritt={tagesFortschritt}
+      laedt={flow.laedt}
+    />
+  )
+
+  return (
+    <MotionConfig reducedMotion="user">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+        {/* Nebeneinander, sobald das Fenster es traegt — sonst gestapelt, und
+            dann steht der Tag OBEN. Die Reihenfolge wird hier im Markup
+            entschieden und nicht per CSS `order`: So bleibt die Tab-Reihenfolge
+            immer die, die man auch sieht. */}
+        <div
+          style={
+            zweiSpalten
+              ? { display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 340px', gap: 18, alignItems: 'start' }
+              : { display: 'flex', flexDirection: 'column', gap: 18 }
+          }
+        >
+          {zweiSpalten ? (
+            <>
+              {funnelSpalte}
+              {/* Klebt beim Scrollen — der Tag ist der Einstieg und soll nicht
+                  weglaufen, waehrend man im Funnel unterwegs ist. `alignItems:
+                  start` am Raster ist die Bedingung dafuer: ein gestrecktes
+                  Grid-Item ist so hoch wie die Zeile und hat nichts zum Kleben. */}
+              <div style={{ position: 'sticky', top: 0 }}>{heuteSpalte}</div>
+            </>
+          ) : (
+            <>
+              {heuteSpalte}
+              {funnelSpalte}
+            </>
+          )}
         </div>
-        {projektZeilen.map((z) => (
-          <FlowZeile key={z.id} zeile={z} onOeffnen={() => oeffneKachel(z.id, `kachel-${z.id}`)} />
-        ))}
+
+        {/* Die gebauten Seiten bekommen die ganze Breite, nicht die 760 der
+            Kartenspalte: Ihr Raster ist `auto-fill` und macht aus jedem
+            zusaetzlichen Pixel eine weitere Vorschau. Genau hier hatte Kevin
+            das leere rechte Viertel bemaengelt. */}
+        <div>
+          {/* Die gebauten Seiten: Ergebnisse, keine Aufgaben. Sie stehen bewusst
+              NICHT im Funnel — ein Jophiel-Projekt ist ein Artefakt, kein Mensch,
+              und würde als Karte den Lead doppelt zählen, der oben schon unter
+              „Loom offen" steht. */}
+          <div className="ck-label" style={{ marginTop: 10, paddingInline: 4 }}>
+            Gebaute Seiten
+          </div>
+          <GebauteSeiten projekte={gebauteSeiten} erreichbar={jophiel.jophielErreichbar} />
+        </div>
       </div>
 
       <AnimatePresence>

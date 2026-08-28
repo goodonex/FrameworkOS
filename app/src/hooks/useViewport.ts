@@ -17,6 +17,24 @@ import { useEffect, useState } from 'react'
  */
 export const MOBILE_MAX_WIDTH = 900
 
+/**
+ * Ab hier tragen Funnel und Tagesliste nebeneinander (28.08.2026, Blaupause
+ * `docs/wargames/sales-canvas-v2.md`, Zug 1).
+ *
+ * Gerechnet, nicht geschaetzt: 148 (Nav-Rail) + 36 (Innenabstand von
+ * `.ck-main`) + 760 (die Kartenspalte, so breit wie bisher die ganze Seite)
+ * + 18 (Spalte) + 340 (Tagesliste) = 1302. 1180 ist der Punkt, ab dem beides
+ * nebeneinander noch atmet; eine eingeklappte Nav-Rail verschafft zusaetzlich
+ * 96 px Luft.
+ *
+ * **Steht hier und nicht im Sales-Bereich**, obwohl nur der sie benutzt: Das
+ * Cockpit hat seine Viewport-Grenzen an genau einer Stelle (O10), und
+ * `scripts/verify-breakpoint.ts` haelt das fest. Eine zweite Zahl irgendwo in
+ * `cockpit/pages/` waere der Anfang derselben Drift, die am 06.08. eine halbe
+ * Welt zwischen 768 und 900 aufgemacht hat.
+ */
+export const SALES_ZWEISPALTIG_AB = 1180
+
 /** Passende Media-Query-Zeichenkette, damit niemand die Zahl abtippt. */
 export const MOBILE_MEDIA_QUERY = `(max-width: ${MOBILE_MAX_WIDTH}px)`
 

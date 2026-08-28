@@ -9,7 +9,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join, relative } from 'node:path'
-import { MOBILE_MAX_WIDTH, MOBILE_MEDIA_QUERY } from '../app/src/hooks/useViewport'
+import { MOBILE_MAX_WIDTH, MOBILE_MEDIA_QUERY, SALES_ZWEISPALTIG_AB } from '../app/src/hooks/useViewport'
 
 const wurzel = join(dirname(fileURLToPath(import.meta.url)), '..')
 const src = join(wurzel, 'app/src')
@@ -65,7 +65,10 @@ check('3 keine abgetippte Grenze in app/src (ohne Portal)', abtipper, [])
 // 4. Die drei Konsumenten aus dem Backlog hängen wirklich am Hook.
 for (const [datei, muster] of [
   ['App.tsx', 'useViewport()'],
-  ['cockpit/pages/SalesDashboard.tsx', 'useIsMobile()'],
+  // Seit dem 28.08.2026 braucht das Dashboard die Breite selbst (zweispaltiges
+  // Canvas) und nimmt deshalb `useViewport()` statt `useIsMobile()`. Beide
+  // haengen an derselben Grenze — `useIsMobile` ist nur die Kurzform davon.
+  ['cockpit/pages/SalesDashboard.tsx', 'useViewport()'],
   ['pages/sales/ContactPage.tsx', 'useViewport()'],
 ] as const) {
   check(`4 ${datei} nutzt ${muster}`, readFileSync(join(src, datei), 'utf8').includes(muster), true)
@@ -74,6 +77,22 @@ for (const [datei, muster] of [
 // 5. Bottom-Bar und isMobile schalten am selben Punkt.
 const navRail = readFileSync(join(src, 'cockpit/components/NavRail.tsx'), 'utf8')
 check('5 NavRail importiert die geteilte Query', navRail.includes('MOBILE_MEDIA_QUERY'), true)
+
+// 6. Die Sales-Grenze (zweispaltiges Canvas) ist eine EIGENE Frage — aber sie
+//    wohnt am selben Ort und wird nirgends abgetippt. Ohne diesen Check waere
+//    O10 fuer die Mobil-Grenze geschuetzt und daneben eine zweite Zahl frei im
+//    Umlauf, was genau die Drift von damals in neuem Gewand waere.
+check('6a Sales-Grenze steht auf 1180', SALES_ZWEISPALTIG_AB, 1180)
+check('6b Sales-Grenze liegt ueber der Mobil-Grenze', SALES_ZWEISPALTIG_AB > MOBILE_MAX_WIDTH, true)
+const sales = readFileSync(join(src, 'cockpit/pages/SalesDashboard.tsx'), 'utf8')
+check('6c SalesDashboard importiert die Grenze', sales.includes('SALES_ZWEISPALTIG_AB'), true)
+check(
+  '6d niemand tippt 1180 ab',
+  tsFiles
+    .filter((f) => new RegExp(`[^\\d]${SALES_ZWEISPALTIG_AB}[^\\d]`).test(readFileSync(f, 'utf8')))
+    .map((f) => relative(wurzel, f)),
+  [],
+)
 
 console.log(`${pass} bestanden, ${fail} fehlgeschlagen`)
 if (fail > 0) process.exit(1)

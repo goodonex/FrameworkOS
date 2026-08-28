@@ -311,6 +311,13 @@ export function funnelKarten(eingabe: FunnelEingabe): FunnelKarte[] {
 /**
  * Welche Karten teilen sich EIN Tagespensum?
  *
+ * **Seit dem 28.08.2026 fragt die Oberflaeche das nicht mehr** (Blaupause
+ * `sales-canvas-v2.md`, Zug 2): Das Tagespensum steht nicht mehr auf den
+ * Karten, sondern in der `TagesListe` — und dort nennt es jede Stufe ohnehin
+ * genau einmal. Die Funktion bleibt samt Pruefung stehen, weil sie die
+ * Nachbarschafts-Regel des Bauplans festhaelt; wer das Pensum je wieder an die
+ * Karten haengt, braucht sie unveraendert.
+ *
  * Steht hier und nicht in der Oberfläche, weil es keine Frage der Optik ist,
  * sondern der Zähl-Wahrheit: Die drei Follow-up-Karten zählen auf dieselbe
  * `daily_metrics`-Spalte. Nennt die Ansicht „heute 5 von 13" auf jeder der

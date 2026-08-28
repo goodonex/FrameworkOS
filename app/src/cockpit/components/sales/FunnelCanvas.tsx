@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useIsMobile } from '../../../hooks/useViewport'
-import { funnelGruppen, type FunnelKarte } from '../../lib/funnelKarten'
+import type { FunnelKarte } from '../../lib/funnelKarten'
 
 /**
  * Das Sales-Canvas (25.08.2026, Blaupause `docs/wargames/sales-canvas.md`).
@@ -11,16 +11,18 @@ import { funnelGruppen, type FunnelKarte } from '../../lib/funnelKarten'
  * Diese Datei ist die lebendige Fassung davon — sie **zeigt** nur, gerechnet
  * wird in `lib/funnelKarten.ts`.
  *
- * **Zwei Zahlen je Karte, und sie bedeuten Verschiedenes.** Rechts groß steht
- * der Bestand: wie viele Menschen stecken in dieser Phase. Klein darunter das
- * Tagespensum: wie viele davon heute. Der Bestand ist ein Vorrat und darf
- * dreistellig sein, ohne dass etwas falsch läuft; das Pensum ist die einzige
- * Zahl, die heute grün werden soll.
+ * **Eine Karte, eine Zahl** (28.08.2026, `sales-canvas-v2.md` Zug 2). Bis dahin
+ * trug jede Karte drei Angaben übereinander: den Bestand, das Tagespensum
+ * („heute 3 von 20") und ein Badge „18 dran". Kevins Wort dazu: *„hier werden,
+ * glaub ich, die zwei versucht zu vermischen und das ist mir zu viel."* Die
+ * Karte beantwortet ab jetzt **nur noch den Bestand** — wie gross ist dieser
+ * Topf, wen können wir auf diesem Weg überhaupt angehen. Was heute zu tun ist,
+ * steht vollständig in der `TagesListe` daneben.
  *
- * **Die drei Follow-up-Karten teilen sich EIN Tagespensum.** Sie stehen
- * deshalb unter einer gemeinsamen Kopfzeile, die es genau einmal nennt. Stünde
- * „heute 5 von 13" auf jeder der drei Karten, läse Kevin 39 — und die Zahl,
- * die aus einer einzigen `daily_metrics`-Spalte kommt, sähe aus wie drei.
+ * **Ein Hinweis bleibt, und zwar genau einer:** Karten mit heute fälliger
+ * Arbeit tragen den Akzent-Rahmen. Eine Farbe ist keine zweite Zahl — ohne sie
+ * wäre der Funnel eine stumme Bestandsliste, und der Einstieg ins Bild ginge
+ * verloren.
  *
  * **Leere Stufen verschwinden.** Zwölf Karten à 100 px sind 1.200 px
  * Scrollstrecke und damit nicht besser als die sechs Balken vorher. Was
@@ -45,67 +47,19 @@ export interface FunnelCanvasProps {
   layoutIdFuer?: (karte: FunnelKarte) => string
 }
 
-/** „n dran" — dunkler Text auf dem Akzent. */
-function DranBadge({ anzahl, machbar }: { anzahl: number; machbar: boolean }) {
-  /**
-   * Grün nur, wo Kevin auch etwas tun kann.
-   *
-   * Am ersten Tag mit echten Daten stand „E-Mail fällig · 603 dran" als
-   * lautester Punkt der Seite — und dahinter lag nichts: Für den stillen Zweig
-   * sind noch keine E-Mail-Adressen beschafft (`Lead.email` ist leer, siehe
-   * `types/db.ts`), also gibt es keine Arbeitsliste und keinen Handgriff. Ein
-   * Akzent-Badge, das zu nichts führt, ist ein Alarm ohne Knopf; nach drei
-   * Tagen glaubt man auch dem grünen Badge nicht mehr, hinter dem wirklich
-   * Arbeit liegt. Die Zahl bleibt sichtbar, sie hört nur auf zu rufen.
-   */
-  return (
-    <span
-      className="ck-zahl"
-      style={{
-        fontSize: 12,
-        fontWeight: 600,
-        padding: '2px 9px',
-        borderRadius: 'var(--ck-radius-pille)',
-        background: machbar ? 'var(--ck-accent)' : 'transparent',
-        /**
-         * Dunkel auf dem Akzent, nicht hell. Der Salbei ist eine helle Farbe;
-         * `--ck-accent-text` darauf kam am 20.08. im Browser auf ~1,1:1.
-         * Dieselbe Lehre steht in `Badge.tsx` und in `LeadPipeline.tsx`.
-         */
-        color: machbar ? 'var(--ck-bg)' : 'var(--ck-text-3)',
-        flexShrink: 0,
-        whiteSpace: 'nowrap',
-      }}
-      title={machbar ? undefined : 'Fällig, aber noch ohne Arbeitsliste — die Namen stehen in der Pipeline unter /linkedin'}
-    >
-      {anzahl} dran
-    </span>
-  )
-}
-
-/** Das Tagespensum als Halbsatz — oder nichts, wo es keins gibt. */
-function pensumText(karte: FunnelKarte): string | null {
-  if (karte.soll === null || karte.erledigtHeute === null) return null
-  return `heute ${karte.erledigtHeute} von ${karte.soll}`
-}
-
 function KartenZeile({
   karte,
-  pensum,
   onOeffnen,
   leise,
   dicht,
   layoutId,
 }: {
   karte: FunnelKarte
-  /** Der Halbsatz — null, wenn ihn die Gruppen-Kopfzeile schon trägt. */
-  pensum: string | null
   onOeffnen?: () => void
   leise?: boolean
   dicht: boolean
   layoutId: string
 }) {
-  const steht = karte.soll !== null && karte.erledigtHeute !== null && karte.erledigtHeute >= karte.soll
   const inhalt = (
     <>
       <span style={{ flex: 1, minWidth: 0 }}>
@@ -122,21 +76,7 @@ function KartenZeile({
         >
           {karte.titel}
         </span>
-        {pensum ? (
-          <span
-            style={{
-              display: 'block',
-              fontSize: 11.5,
-              marginTop: 2,
-              color: steht ? 'var(--ck-accent)' : 'var(--ck-text-3)',
-            }}
-            className="ck-zahl"
-          >
-            {pensum}
-          </span>
-        ) : null}
       </span>
-      {karte.heuteFaellig > 0 ? <DranBadge anzahl={karte.heuteFaellig} machbar={Boolean(onOeffnen)} /> : null}
       <span
         className="ck-zahl"
         title={`${karte.bestand} stecken in dieser Phase`}
@@ -184,7 +124,13 @@ function KartenZeile({
       transition={{ duration: 0.22, ease: 'easeOut' }}
       onClick={onOeffnen}
       className="ck-panel"
-      style={{ ...flaeche, cursor: 'pointer', borderColor: karte.heuteFaellig > 0 ? 'var(--ck-accent)' : undefined }}
+      style={{
+        ...flaeche,
+        cursor: 'pointer',
+        // Der einzige verbliebene Tageshinweis auf der Karte — siehe Kopf.
+        borderColor: karte.heuteFaellig > 0 ? 'var(--ck-accent)' : undefined,
+      }}
+      title={karte.heuteFaellig > 0 ? `${karte.heuteFaellig} davon sind heute dran` : undefined}
     >
       {inhalt}
     </motion.button>
@@ -214,9 +160,16 @@ export function FunnelCanvas({ karten, onOeffnen, oeffenbar, layoutIdFuer }: Fun
   const ausserhalb = karten.find((k) => k.id === 'ausserhalb') ?? null
   const funnel = karten.filter((k) => k.id !== 'ausserhalb')
 
+  /**
+   * Flach statt gruppiert (28.08.2026). Die Gruppierung nach `stufenId` gab es
+   * nur, damit sich drei Follow-up-Karten EINE Pensum-Kopfzeile teilen konnten.
+   * Das Pensum steht jetzt in der Tagesliste; die Kopfzeile hat damit nichts
+   * mehr zu sagen, und die drei Karten stehen als drei Bestände nebeneinander
+   * wie alle anderen auch. `funnelGruppen()` bleibt in `funnelKarten.ts`
+   * erhalten und geprüft — die Oberfläche braucht sie nur nicht mehr.
+   */
   const aktiv = funnel.filter((k) => k.bestand > 0 || k.heuteFaellig > 0)
   const leer = funnel.filter((k) => k.bestand === 0 && k.heuteFaellig === 0)
-  const gruppen = useMemo(() => funnelGruppen(aktiv), [aktiv])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -226,37 +179,15 @@ export function FunnelCanvas({ karten, onOeffnen, oeffenbar, layoutIdFuer }: Fun
         </div>
       ) : null}
 
-      {gruppen.map((gruppe) => {
-        // Eine gemeinsame Kopfzeile gibt es nur, wo sich mehrere Karten ein
-        // Pensum teilen. Bei einer einzelnen Karte steht der Halbsatz in ihr.
-        const geteilt = gruppe.karten.length > 1
-        const pensum = geteilt ? pensumText(gruppe.karten[0]) : null
-        return (
-          <div key={gruppe.karten[0].id} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {geteilt && pensum ? (
-              <div
-                className="ck-label ck-zahl"
-                style={{ display: 'flex', gap: 8, alignItems: 'baseline', paddingInline: 4, marginTop: 4 }}
-              >
-                <span>{pensum}</span>
-                <span style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 400 }}>
-                  — ein Pensum, {gruppe.karten.length} Texte
-                </span>
-              </div>
-            ) : null}
-            {gruppe.karten.map((karte) => (
-              <KartenZeile
-                key={karte.id}
-                karte={karte}
-                pensum={geteilt ? null : pensumText(karte)}
-                dicht={mobil}
-                layoutId={morphId(karte)}
-                onOeffnen={onOeffnen && darfOeffnen(karte) ? () => onOeffnen(karte) : undefined}
-              />
-            ))}
-          </div>
-        )
-      })}
+      {aktiv.map((karte) => (
+        <KartenZeile
+          key={karte.id}
+          karte={karte}
+          dicht={mobil}
+          layoutId={morphId(karte)}
+          onOeffnen={onOeffnen && darfOeffnen(karte) ? () => onOeffnen(karte) : undefined}
+        />
+      ))}
 
       {/* Was keinen Bestand hat, kostet eine Zeile statt einer Karte. Nicht
           weggelassen: „Instagram fällig: 0" ist eine Information, nur keine,
@@ -298,7 +229,13 @@ export function FunnelCanvas({ karten, onOeffnen, oeffenbar, layoutIdFuer }: Fun
 
       {ausserhalb && ausserhalb.bestand > 0 ? (
         <div style={{ marginTop: 2 }}>
-          <KartenZeile karte={ausserhalb} pensum={null} dicht={mobil} leise layoutId={morphId(ausserhalb)} />
+          <KartenZeile
+            karte={ausserhalb}
+            dicht={mobil}
+            leise
+            layoutId={morphId(ausserhalb)}
+            onOeffnen={onOeffnen && darfOeffnen(ausserhalb) ? () => onOeffnen(ausserhalb) : undefined}
+          />
         </div>
       ) : null}
     </div>
