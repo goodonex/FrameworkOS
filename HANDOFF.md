@@ -55,7 +55,7 @@ nie im SQL-Editor — genau das hatte die Historie zerlegt.
 | `/cockpit` | Home: Heute-Deck, Vitals, OS-Graph, Agenten, Ziel | `CockpitHome.tsx` |
 | `/aufgaben` `/termine` `/freigaben` | „Heute" (Sub-Tabs `HeuteTabs`) | `AufgabenArea` · `TermineArea` · `FreigabenArea` |
 | `/linkedin` | LinkedIn-Postfach: Buckets, Sterne, Entwürfe | `LinkedinArea.tsx` |
-| `/sales` | **Sales-Canvas** (25.08.): Funnel als Karten — Bestand je Station plus Tagespensum, Klick öffnet Text + Namensliste. Die alten Flow-Balken liegen eingeklappt darunter, die gebauten Jophiel-Seiten als Vorschau-Streifen | `SalesDashboard.tsx`, `components/sales/*`, `lib/funnelKarten.ts` |
+| `/sales` | **Sales-Canvas v2** (28.08.): zweispaltig — links der Funnel mit **einer** Zahl je Karte (dem Bestand), rechts die **Tagesliste** mit den sechs Stufen des Rituals und ihrem „n von m". Jede Karte mit Bestand öffnet etwas: Arbeitsliste oder Namensliste. Gebaute Jophiel-Seiten über die volle Breite darunter. Die eingeklappten Flow-Balken sind gefallen — sie zeigten dieselben sechs Zeilen | `SalesDashboard.tsx`, `components/sales/*`, `lib/funnelKarten.ts` |
 | `/sales/leads` `:contactId` | **Neubau nach Close** (Phase 2): Liste mit Smart Views, Lead-Detail mit Timeline mittig | `cockpit/pages/sales/LeadListe.tsx`, `LeadDetail.tsx` |
 | `/sales/pipeline` | Glass-Pipeline, **bleibt bis zum Paritäts-Entscheid** (`docs/phase2/sales-paritaet.md`) — kann neun Dinge, die der Neubau nicht kann | `pages/sales/SalesMode.tsx` |
 | `/sales/lists` `call-mode` `new` | Altes CRM, in der Shell | `pages/sales/*` (Glass-Ära) |

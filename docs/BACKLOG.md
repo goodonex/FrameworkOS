@@ -11,6 +11,106 @@
 > Baum. Wer hier etwas als „offen" liest, prüft es bitte zuerst gegen den
 > laufenden Stand — genau diese Drift hat zwei Sessions blockiert.
 
+## **GEBAUT 28.08.2026 — Sales-Canvas v2: Gesamt und Heute stehen nicht mehr übereinander**
+
+> Blaupause: [`docs/wargames/sales-canvas-v2.md`](wargames/sales-canvas-v2.md).
+> **Nicht gepusht** — Livegang ist Kevins Wort.
+
+Kevins Durchsicht des Canvas, wörtlich: *„Von der Ästhetik her sehr, sehr
+schön, alles lesbar und mit den Karten hab ich mir genauso vorgestellt"* — und
+dann sieben Beanstandungen, die alle denselben Kern haben: **eine Karte
+beantwortete zwei Fragen.** *„Anfrage läuft und dann steht da 337. […] hier
+werden, glaub ich, die zwei versucht zu vermischen und das ist mir zu viel."*
+
+Gelöst räumlich statt als Umschalter — ein Umschalter hätte aus zwei Blicken
+zwei Klicks gemacht **und** das leere rechte Viertel gelassen, das Kevin im
+selben Atemzug bemängelt hat.
+
+| Beanstandung | Antwort |
+|---|---|
+| Rechtes Viertel leer | Zweispaltig ab 1180 px: Funnel links, Tagesliste rechts (klebt beim Scrollen). Grenze in `useViewport.ts`, von `verify-breakpoint.ts` mitbewacht |
+| Bestand und Tagespensum vermischt | Karte trägt **nur** den Bestand. Kein „n dran"-Badge, kein Pensum-Halbsatz. Als Tageshinweis bleibt der Akzent-Rahmen — eine Farbe ist keine zweite Zahl |
+| „Was ist jetzt zu tun?" | Neue `TagesListe`: die sechs Stufen in Kevins Reihenfolge, je „n von m". Sie **rechnet nichts** — sie bekommt dieselben `flowZeilen`, aus denen bisher die Balken gebaut wurden |
+| Seitenleiste einklappbar | 148 → 52 px, Labels bleiben über `ck-nur-vorlesen` im Baum. Zustand in `ui_settings` |
+| Sub-Nav einklappbar | Zugeklappt bleibt der Eintrag stehen, auf dem man steht. Vorgabe: zu |
+| „Ist alles klickbar?" | War es nicht: 6 von 20 Karten. Die anderen 14 bekommen Namenslisten (älteste zuerst, Klick → Lead-Akte) plus je einen Satz, **warum** dort nichts zu tun ist |
+| Gebaute Seiten zu schmal | Volle Breite statt 760 px — ihr `auto-fill`-Raster macht aus jedem Pixel eine weitere Vorschau |
+| „Vorschaubild nur am Rechner" | Der Satz sprach vom Gerät, gemeint war die Adresse. Runner spiegelt jetzt (Details unten) |
+
+**Die Balken sind gefallen, und das war ein Fund beim Bauen, kein Plan.** Die
+eingeklappte „Tagespensum"-Liste am Seitenfuss zeigte buchstäblich dieselben
+sechs `flowZeilen` wie die neue Tagesliste — also genau die Doppelung, die
+verschwinden sollte, nur zugeklappt. Anfragen-Zähler, InMail-Welle und die
+Serien wohnen in den Fenstern und sind mitgewandert. `salesBalkenOffen` liegt
+als ungelesene Zeile in `ui_settings`.
+
+### Migration 0081 — zwei Löcher, die beim Arbeiten auffallen
+
+**`daily_metrics.antworten_erledigt`.** Kevin: *„null von fünf Antworten […] am
+Ende des Tages elf von elf."* Fünf der sechs Stufen konnten das schon (Soll
+wird beim ersten Öffnen eingefroren, 0074/0075; der Tag wechselt um **4 Uhr**,
+nicht um Mitternacht). Die Antworten-Stufe nicht: Sie war als Frische-Stufe
+gebaut (`feld: null`) und fragte „wartet jemand länger als 24 h?". Es gab keine
+Spalte, die abgearbeitete Antworten zählt.
+**Nicht verwechseln:** `antworten_li` sind die *erhaltenen* Antworten
+(Kanal-Kennzahl im Trichter-Eingang). Wer beide zusammenlegt, macht daraus eine
+Erledigungsquote. Die Frische ist nicht verloren, nur entmachtet — sie steht in
+der Unterzeile und färbt ab 24 h die Zahl.
+
+**Ereignis-Typ `loom_abgelehnt`.** Kevin: *„da gibt es die Ja/Nein-Frage
+irgendwie gar nicht."* Der Code gab ihm schärfer recht, als er es sagte:
+- **„Loom ja" konnte Uriel gar nicht.** `linkedin_threads.starred` wird von der
+  App NIE geschrieben — der Stern kommt allein aus dem Voyager-Sync, und
+  `leads-sync.ts` leitet daraus `loom_zugesagt` ab. Kevins einziger Weg zur
+  Zusage führte über einen Wechsel nach LinkedIn.
+- **„Loom nein" gab es überhaupt nicht.** Eine Absage blieb unter „Antwort da",
+  bis sie auf „Erledigt" gesetzt wurde, und war danach von einer nie
+  beantworteten Antwort nicht mehr zu unterscheiden.
+
+Jetzt zwei Knöpfe an jedem Antwort-Posten; beide haken zugleich ab (wer ein
+Urteil fällt, HAT die Antwort bearbeitet). **In `leadStation` gewinnt das
+jüngste Urteil, nicht die lautere Quelle** — der Sync stempelt sein
+abgeleitetes `loom_zugesagt` mit `thread.last_message_at`, also älter als eine
+Absage von eben. Zusätzlich wandert der `loom_status` beim Nein auf
+`entfaellt`: Der Stern lebt in LinkedIn weiter, und ohne das hätte der Sync bei
+der nächsten Nachricht ein frisches, jüngeres Ja abgeleitet und den Abgesagten
+zurück in die Bauliste gestellt.
+
+### Die Vorschaubilder: der Kommentar war um Faktor 20 daneben
+
+`jophielShotUrl()` gab `null` zurück, sobald der Host nicht `localhost` ist —
+auf frameworkos.de verbietet der Browser den Zugriff auf `127.0.0.1:4711` als
+Mixed Content. Der Ersatztext sprach vom Gerät („nur am Rechner"), während
+Kevin genau dort sass. Die Begründung im Code („wären Dutzende Megabyte")
+stimmte für die Originale (1,0–4,5 MB), nicht für das, was der Runner
+ausliefert: 640 px JPEG. **Beim ersten Lauf nachgemessen: zwölf Bilder,
+23–72 kB, zusammen ~620 kB.** Der Runner spiegelt sie jetzt in den bestehenden
+Bucket `runner-files` (0063, keine neue Policy nötig), der Key trägt die mtime
+der Quelle — was schon oben liegt, wird übersprungen.
+
+### Was die Prüfskripte gesagt haben
+
+Zehn Prüfungen in sechs Skripten sind angeschlagen, alle erwartbar. Sie wurden
+auf die neue Wahrheit umgeschrieben, **nicht entschärft** — und zwei davon
+waren echte Funde:
+- `verify-breakpoint` fing die zweite, frei ins Dashboard geschriebene
+  Breiten-Grenze ab. Sie wohnt jetzt bei den anderen in `useViewport.ts` und
+  wird mitbewacht (12 statt 8 Prüfungen).
+- `verify-zaehl-modus` prüfte die InMail-Kachel über ihren **Index** (3) und
+  fiel deshalb um, obwohl an den InMails nichts war. Jetzt indexfrei.
+
+Stand: `tsc -b` sauber, Build grün, **62/62 Prüfskripte** (funnel-karten 46
+statt 38, lead-station 55 statt 47, tages-flow 107).
+
+**Zwei Nebenwirkungen, gemeldet statt versteckt:**
+1. Die Antworten-Stufe bekommt eine Kachel im Zähl-Modus, weil sie jetzt ein
+   Feld hat. Kevins Weg bleibt die Arbeitsliste; die Kachel ist der Nachtrag.
+2. `art: 'frische'` in `tagesFlow.ts` hat keinen Nutzer mehr. Der Zweig bleibt
+   stehen; ein Prüfsatz hält fest, dass zurzeit keine Stufe ihn benutzt — wer
+   eine hinzufügt, liest ihn bitte zuerst, statt ihm zu vertrauen.
+
+---
+
 ## **LIVE seit 27.08.2026 — Der Runner macht Chrome nicht mehr selbst auf**
 
 Kevins Bilanz nach einer Woche Autostart, woertlich: *„Wenn mein Laptop an ist
