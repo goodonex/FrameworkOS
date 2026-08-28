@@ -23,7 +23,7 @@ import { erledigePosten } from '../lib/arbeitsmodusTracking'
 import { funnelZuordnung, type FunnelKartenId, type FunnelLead } from '../lib/funnelKarten'
 import { funnelRaten } from '../lib/funnelRaten'
 import { KADENZ_SCHLUESSEL, gueltigeKadenz, setzeAktiveKadenz, type Kadenz } from '../lib/kadenz'
-import { fetchJophielProjekte } from '../lib/jophielApi'
+import { bereiteJophielVorschauVor, fetchJophielProjekte } from '../lib/jophielApi'
 import { mitVorschau, verknuepfeProjekte, type JophielStand } from '../lib/jophielProjekte'
 import { ausAltemWert, poolAbleitung, type InmailStand } from '../lib/inmailStand'
 import { heutigesMetrikDatum } from '../lib/metricsDates'
@@ -1237,7 +1237,13 @@ export function SalesDashboard() {
   const [jophiel, setJophiel] = useState<JophielStand>({ projekte: [], jophielErreichbar: false })
   useEffect(() => {
     let lebt = true
-    void fetchJophielProjekte().then((stand) => {
+    void fetchJophielProjekte().then(async (stand) => {
+      // Erst signieren, dann anzeigen (28.08.2026, Zug 7): Ausserhalb von
+      // localhost liegen die Vorschaubilder im privaten Bucket und brauchen
+      // eine signierte URL. Setzten wir den Stand vorher, rendert die Karte
+      // einmal mit Ersatztext und tauscht ihn eine Sekunde spaeter gegen ein
+      // Bild — ein Flackern, das nach Fehler aussieht. Wirft nie.
+      await bereiteJophielVorschauVor(stand.projekte)
       if (lebt) setJophiel(stand)
     })
     return () => {

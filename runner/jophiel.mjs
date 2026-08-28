@@ -84,6 +84,22 @@ async function hatAufnahme(slug, name) {
 }
 
 /**
+ * Wann wurde diese Aufnahme zuletzt geschrieben? `null`, wenn es sie nicht gibt.
+ *
+ * Der Spiegel (28.08.2026, `sales-canvas-v2.md` Zug 7) braucht die Zahl, um zu
+ * erkennen, ob sich etwas geaendert hat — sonst laedt er zwoelf Bilder in
+ * jedem Minutentakt erneut hoch.
+ */
+export async function shotStand(slug, name) {
+  if (!gueltigerSlug(slug) || !gueltigerShotName(name)) return null
+  try {
+    return Math.round((await stat(join(JOPHIEL_ROOT, 'projects', slug, 'shots', `${name}.png`))).mtimeMs)
+  } catch {
+    return null
+  }
+}
+
+/**
  * Die Projektliste, auf das Nötige eingedampft.
  *
  * `brief` bleibt draußen: Der ist mehrere Kilobyte lang pro Projekt (der ganze

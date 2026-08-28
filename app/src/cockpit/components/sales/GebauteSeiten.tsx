@@ -15,6 +15,14 @@ import type { VerknuepftesProjekt } from '../../lib/jophielProjekte'
  * **Kevins Unterscheidung vom 25.08.:** Ein zugesagtes Loom ohne gebaute Seite
  * ist schlicht — es gibt noch nichts zu zeigen, und ein leerer Bildrahmen wäre
  * eine Behauptung. Eine gebaute Seite bekommt das Bild.
+ *
+ * **Und zwar überall** (28.08.2026, `sales-canvas-v2.md` Zug 7). Bis dahin
+ * stand hier ausserhalb von localhost „Vorschaubild nur am Rechner" — ein
+ * Satz, der vom Gerät sprach, wo die Adresse gemeint war: Auf frameworkos.de
+ * verbietet der Browser den Zugriff auf den lokalen Runner-Port. Kevin sass
+ * die ganze Zeit an seinem Rechner und las trotzdem, das ginge nur dort.
+ * Jetzt spiegelt der Runner die verkleinerte Aufnahme (50–150 kB) in den
+ * Storage, und der Ersatztext sagt, was wirklich fehlt.
  */
 
 export interface GebauteSeitenProps {
@@ -93,7 +101,7 @@ export function GebauteSeiten({ projekte, erreichbar }: GebauteSeitenProps) {
       }}
     >
       {projekte.map(({ projekt, leadName }) => {
-        const bild = jophielShotUrl(projekt.slug)
+        const bild = jophielShotUrl(projekt)
         return (
           <a
             key={projekt.slug}
@@ -137,7 +145,9 @@ export function GebauteSeiten({ projekte, erreichbar }: GebauteSeitenProps) {
                   textAlign: 'center',
                 }}
               >
-                Vorschaubild nur am Rechner
+                {runnerDirekt()
+                  ? 'Runner liefert kein Bild — läuft er?'
+                  : 'Noch nicht gespiegelt — einmal bei laufendem Runner und Jophiel warten.'}
               </div>
             )}
             <div style={{ padding: '9px 11px', display: 'flex', flexDirection: 'column', gap: 2 }}>

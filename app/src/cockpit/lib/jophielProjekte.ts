@@ -52,6 +52,12 @@ export interface JophielProjekt {
   oldUrl: string
   /** Gibt es eine Aufnahme der NEUEN Seite? Entscheidet über die Kartensorte. */
   hatShot: boolean
+  /**
+   * 28.08.2026: Der Storage-Schlüssel des gespiegelten Vorschaubilds im Bucket
+   * `runner-files`. Fehlt, solange der Runner es noch nicht hochgeladen hat —
+   * dann gibt es ausserhalb von localhost kein Bild, und die Karte sagt das.
+   */
+  shotKey?: string
   hatAltShot: boolean
   vorschauUrl: string
 }

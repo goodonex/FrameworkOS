@@ -30,7 +30,7 @@ import { installiereLogHygiene, kuerzeLogDatei } from './logHygiene.mjs'
 import { WACH_KARENZ_MS, bewerteWachheit, chromeErreichbar, netzErreichbar, startBereitAus } from './startBereit.mjs'
 import { beurteileWache, meldungsText } from './chromeWache.mjs'
 import { bewerteSchleuse, pruefeAnmeldung, pruefeDurchgang, pruefeSupabase, pruefeVault } from './schleuse.mjs'
-import { jophielProjekte, jophielShot } from './jophiel.mjs'
+import { jophielProjekte, jophielShot, shotStand } from './jophiel.mjs'
 
 // ---------- Lokale .env (nur für Secrets wie den Supabase-Key; gitignored) ----------
 // Minimaler Parser (zero-dependency). Prozess-Env hat Vorrang vor der Datei.
@@ -1310,6 +1310,85 @@ async function holeIcals(urls) {
   return texte.join('\n')
 }
 
+// ---------- Jophiel-Vorschaubilder spiegeln ----------
+//
+// Kevins Beobachtung vom 28.08.2026: „Bei den gebauten Seiten steht
+// ‚Vorschaubild nur am Rechner', aber ich bin ja am Rechner."
+//
+// Der Satz war irrefuehrend. `jophielShotUrl()` gab `null` zurueck, sobald der
+// Host nicht `localhost` ist — und Kevin schaut auf frameworkos.de, wo der
+// Browser den Zugriff auf http://127.0.0.1:4711 als Mixed Content verbietet.
+// Es lag nie am Geraet, sondern an der Adresse.
+//
+// Der alte Kommentar begruendete das mit „Dutzende Megabyte" — richtig fuer
+// die Originale (1,0-4,5 MB je Aufnahme), falsch fuer das, was der Runner
+// tatsaechlich ausliefert: `jophielShot()` verkleinert auf 640 px JPEG, also
+// 50-150 kB. Ein Dutzend davon ist weniger als ein einziges Original.
+//
+// Gespiegelt wird nur `desktop` und nur bei Aenderung: Der Storage-Key traegt
+// die mtime der Quelle, und was schon im letzten Spiegel stand, wird
+// uebersprungen. Ohne das lieferten zwoelf Bilder im Minutentakt Verkehr ohne
+// Erkenntnis.
+const JOPHIEL_SHOT_PRAEFIX = 'jophiel/shots'
+
+/** Slug → zuletzt hochgeladener Storage-Key. Beim Start aus dem Spiegel geholt. */
+const gespiegelteShots = new Map()
+let shotsGeladen = false
+
+async function ladeGespiegelteShots() {
+  if (shotsGeladen) return
+  shotsGeladen = true
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/runner_snapshots?key=eq.jophiel_projekte&select=data`,
+      { headers: supabaseHeaders() },
+    )
+    if (!res.ok) return
+    const [row] = await res.json()
+    for (const p of row?.data?.projekte ?? []) {
+      if (p?.slug && p?.shotKey) gespiegelteShots.set(p.slug, p.shotKey)
+    }
+  } catch {
+    /* kein Spiegel lesbar → einmal alles neu hochladen, kein Drama */
+  }
+}
+
+/**
+ * Haengt `shotKey` an jedes Projekt mit Aufnahme — und laedt hoch, was fehlt.
+ *
+ * Mutiert die uebergebenen Projekte absichtlich: Der Key gehoert in denselben
+ * Spiegel, der gleich danach geschrieben wird. Ein zweiter Snapshot nur fuer
+ * die Bild-Keys waere eine zweite Wahrheit ueber dieselben Projekte.
+ *
+ * Schlaegt ein Upload fehl, bleibt `shotKey` schlicht weg — die Karte zeigt
+ * dann ihren Ersatztext. Eine Key-Angabe auf ein fehlendes Objekt waere ein
+ * toter Bildrahmen, also genau das, was der alte Zustand zu Recht vermied.
+ */
+async function spiegleJophielShots(projekte) {
+  if (!SNAPSHOT_ENABLED) return
+  await ladeGespiegelteShots()
+  for (const p of projekte) {
+    if (!p?.hatShot) continue
+    const mtime = await shotStand(p.slug, 'desktop')
+    if (mtime == null) continue
+    const key = `${JOPHIEL_SHOT_PRAEFIX}/${p.slug}__desktop__${mtime}.jpg`
+    if (gespiegelteShots.get(p.slug) === key) {
+      p.shotKey = key
+      continue
+    }
+    const bild = await jophielShot(p.slug, 'desktop')
+    if (!bild) continue
+    try {
+      await ladeDateiHoch(key, bild.buf, bild.mime)
+      gespiegelteShots.set(p.slug, key)
+      p.shotKey = key
+      console.log(`[runner] Jophiel-Vorschau gespiegelt: ${p.slug} (${Math.round(bild.buf.length / 1024)} kB)`)
+    } catch (e) {
+      console.error(`[runner] Jophiel-Vorschau "${p.slug}" fehlgeschlagen:`, e?.message ?? e)
+    }
+  }
+}
+
 // ---------- Datei-Spiegel (Supabase Storage) ----------
 // Loom-Skripte, Follow-up-PDFs, Wochen-Galerien und Ad-Creatives liegen auf der
 // Platte und hingen bisher an `/files/...` auf 127.0.0.1 — am Handy tote Links.
@@ -1507,7 +1586,10 @@ async function mirrorAll() {
    */
   {
     const stand = await jophielProjekte()
-    if (stand.jophielErreichbar) await pushSnapshotKey('jophiel_projekte', async () => stand)
+    if (stand.jophielErreichbar) {
+      await spiegleJophielShots(stand.projekte)
+      await pushSnapshotKey('jophiel_projekte', async () => stand)
+    }
   }
   await pushSnapshotKey('sales_library', async () => await salesLibrary())
   await spiegleErstnachrichten()
