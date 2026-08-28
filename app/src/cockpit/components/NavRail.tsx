@@ -7,6 +7,7 @@ import { PALETTEN_BEREICHE, bereichIcon } from '../lib/bereiche'
 import { useSocialUnread } from '../lib/socialApi'
 import { MOBILE_MEDIA_QUERY } from '../../hooks/useViewport'
 import { Benachrichtigungen } from './Benachrichtigungen'
+import { useUiSetting } from '../lib/uiSettings'
 
 interface NavItem {
   to: string
@@ -74,6 +75,30 @@ function useBottomBar(): boolean {
     }
   }, [])
   return schmal
+}
+
+/**
+ * Der Doppelpfeil des Einklapp-Knopfs. Bewusst hier und nicht in
+ * `BereichIcon`: Das ist kein Bereich, sondern eine Bedienung — die Registry
+ * traegt nur Ziele.
+ */
+function KlappZeichen({ eingeklappt }: { eingeklappt: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={17}
+      height={17}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.9}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      style={{ transform: eingeklappt ? 'scaleX(-1)' : undefined }}
+    >
+      <path d="M14.5 7.5 10 12l4.5 4.5M19 7.5 14.5 12l4.5 4.5" />
+    </svg>
+  )
 }
 
 function istAktiv(item: NavItem, pathname: string): boolean {
@@ -171,6 +196,25 @@ export function NavRail() {
   const socialUnread = useSocialUnread()
   const bottomBar = useBottomBar()
   const loc = useLocation()
+
+  /**
+   * Die Rail laesst sich einklappen (28.08.2026, Blaupause
+   * `docs/wargames/sales-canvas-v2.md`, Zug 3). Kevins Satz dazu: *„Die
+   * Seitenleiste sollte einklappbar sein links."* Die 96 px, die dabei
+   * freiwerden, gehen an den Inhalt — auf der Sales-Seite genau dorthin, wo
+   * das leere rechte Viertel war.
+   *
+   * Der Zustand liegt in `ui_settings` (0068), damit er das Loeschen-und-neu-
+   * Hinzufuegen der PWA ueberlebt. **`=== true` statt Truthiness:** Der Wert
+   * kommt aus einer Key-Value-Tabelle und war dort schon alles Moegliche.
+   *
+   * **Nur am Desktop.** Mobil ist die Rail ein Dock aus fuenf Zeichen; ein
+   * Einklapp-Knopf waere dort ein sechster Eintrag und wuerde Sales aus dem
+   * Daumenbereich draengen — dieselbe Begruendung, aus der NACHSCHLAGEN mobil
+   * hinter „Mehr" liegt.
+   */
+  const { wert: klappRoh, setzen: setzeKlapp } = useUiSetting<boolean>('navRailEingeklappt', false)
+  const eingeklappt = !bottomBar && klappRoh === true
   // Gemerkt wird die Route, auf der geöffnet wurde: damit schließt sich das
   // Sheet bei jedem Bereichswechsel von selbst (die Bar bleibt ja tippbar,
   // während es offen steht) — ohne Effekt, der Zustand nachzieht.
@@ -187,10 +231,40 @@ export function NavRail() {
 
   return (
     <>
-      <nav aria-label="Cockpit-Bereiche" className="ck-nav-rail">
+      <nav
+        id="ck-nav-rail"
+        aria-label="Cockpit-Bereiche"
+        className="ck-nav-rail"
+        data-eingeklappt={eingeklappt ? 'true' : undefined}
+      >
         {sichtbar.map((item) => (
-          <NavEintrag key={item.to} item={item} badge={badgeFuer(item.to)} nurZeichen={bottomBar} />
+          <NavEintrag
+            key={item.to}
+            item={item}
+            badge={badgeFuer(item.to)}
+            /* Eingeklappt bleibt der Bereichsname im Baum stehen (`ck-nur-vorlesen`),
+               statt ersatzlos zu verschwinden — dieselbe Regel wie im Dock. */
+            nurZeichen={bottomBar || eingeklappt}
+          />
         ))}
+        {!bottomBar ? (
+          <button
+            type="button"
+            className="ck-nav-item"
+            style={{ background: 'none', marginTop: 'auto' }}
+            aria-expanded={!eingeklappt}
+            aria-controls="ck-nav-rail"
+            title={eingeklappt ? 'Seitenleiste ausklappen' : 'Seitenleiste einklappen'}
+            onClick={() => setzeKlapp(!eingeklappt)}
+          >
+            <span aria-hidden className="ck-nav-icon">
+              <KlappZeichen eingeklappt={eingeklappt} />
+            </span>
+            <span className={`ck-nav-label${eingeklappt ? ' ck-nur-vorlesen' : ''}`}>
+              {eingeklappt ? 'Ausklappen' : 'Einklappen'}
+            </span>
+          </button>
+        ) : null}
         {bottomBar ? (
           <button
             type="button"

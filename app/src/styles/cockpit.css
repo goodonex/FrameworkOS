@@ -643,6 +643,28 @@
   border-right: 1px solid var(--ck-border);
   width: 148px;
   flex-shrink: 0;
+  /* Ruhig statt ruckartig (Kevins Standard: „Ruhe schlaegt Effekt"). Eine
+     CSS-Transition auf der Breite ist billiger als ein Motion-Wrapper und
+     stoert das Layout des Inhalts nicht. */
+  transition: width 180ms ease, padding 180ms ease;
+}
+/* Eingeklappt (28.08.2026, sales-canvas-v2.md Zug 3): nur noch die Zeichen.
+   Die Beschriftungen verschwinden NICHT aus dem Baum, sie werden per
+   `ck-nur-vorlesen` optisch entfernt — sonst verlieren Vorleseprogramme die
+   Bereichsnamen. Die freiwerdenden 96 px gehen an den Inhalt. */
+.ck-nav-rail[data-eingeklappt='true'] {
+  width: 52px;
+  padding-inline: 6px;
+}
+.ck-nav-rail[data-eingeklappt='true'] .ck-nav-item {
+  justify-content: center;
+  padding-inline: 8px;
+}
+/* Beim Umschalten soll nichts flackern: waehrend die Breite laeuft, darf kein
+   Label ueber den Rand ragen. */
+.ck-nav-rail[data-eingeklappt='true'] { overflow-x: hidden; }
+@media (prefers-reduced-motion: reduce) {
+  .ck-nav-rail { transition: none; }
 }
 /* Zeichen-Box: seit Zug A3 steckt hier ein Inline-SVG statt eines Unicode-
    Zeichens (components/BereichIcon.tsx). Damit ist die alte O13-Emoji-Falle
