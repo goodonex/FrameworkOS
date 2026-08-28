@@ -1197,6 +1197,15 @@ export type LeadEreignisTyp =
   | 'followup'
   | 'antwort_erhalten'
   | 'loom_zugesagt'
+  /**
+   * 0081: Der Lead hat auf die Analyse verzichtet — als eigene Tatsache, nicht
+   * als stilles Nichts. Bis dahin gab es die Ja/Nein-Frage in Uriel gar nicht:
+   * „Ja" ging nur ueber den Stern im LinkedIn-Postfach (die App schreibt
+   * `starred` nie), „Nein" ueberhaupt nicht — eine Absage blieb unter
+   * „Antwort da" stehen und war danach von einer unbeantworteten nicht mehr zu
+   * unterscheiden.
+   */
+  | 'loom_abgelehnt'
   | 'loom_gesendet'
   | 'inmail'
   | 'email'

@@ -51,6 +51,23 @@ interface ArbeitslisteProps {
   /** Route zum Projekt einer Kundenaufgabe (Spur `kundenaufgabe`), sonst null */
   projektLink?: (p: Posten) => string | null
   onNavigiere?: (route: string) => void
+  /**
+   * Die Ja/Nein-Frage an einer Antwort (0081, 28.08.2026).
+   *
+   * Sie fehlte bis dahin vollstaendig. „Loom ja" ging nur ueber den Stern im
+   * LinkedIn-Postfach — die App schreibt `starred` nie —, „Loom nein" gab es
+   * gar nicht: Eine Absage blieb unter „Antwort da" stehen und war danach von
+   * einer unbeantworteten Antwort nicht mehr zu unterscheiden. Kevins Wort:
+   * *„da gibt es die Ja/Nein-Frage irgendwie gar nicht."*
+   *
+   * Der Aufrufer weiss, welcher Posten an einem Lead haengt — die Liste soll
+   * keine Lead-Kenntnis bekommen. Wo `moeglich` false sagt, erscheinen die
+   * Knoepfe gar nicht erst.
+   */
+  loomUrteil?: {
+    moeglich: (posten: Posten) => boolean
+    entscheide: (posten: Posten, zugesagt: boolean) => void
+  }
 }
 
 function linkLabel(url: string): string {
@@ -80,7 +97,16 @@ export function entwurfStand(erstelltAm: string | null, jetzt: Date = new Date()
   return `vor ${tage} Tagen`
 }
 
-export function Arbeitsliste({ posten, onErledigt, onZaehler, morgen, loom, projektLink, onNavigiere }: ArbeitslisteProps) {
+export function Arbeitsliste({
+  posten,
+  onErledigt,
+  onZaehler,
+  morgen,
+  loom,
+  projektLink,
+  onNavigiere,
+  loomUrteil,
+}: ArbeitslisteProps) {
   // Nur die eingeklappte Zeile hat zwei Fassungen (O18, Zug 7). Alles darunter —
   // Text, Entwurf, Kopieren, Skript, Loom, Ins Projekt — ist auf beiden Seiten
   // dieselbe Ansicht; eine zweite Komponente hätte hier zwei Wahrheiten erzeugt.
@@ -505,6 +531,46 @@ export function Arbeitsliste({ posten, onErledigt, onZaehler, morgen, loom, proj
                     >
                       Ins Projekt
                     </button>
+                  ) : null}
+                  {/* Die Ja/Nein-Frage (0081). Sie steht VOR „Erledigt", weil
+                      sie die eigentliche Entscheidung an einer Antwort ist:
+                      „Erledigt" sagt nur, dass Kevin geantwortet hat — diese
+                      beiden sagen, was dabei herauskam. Wer nur haken will,
+                      kann das weiterhin.
+
+                      Beide haken zusaetzlich ab (`hake`), und zwar bewusst:
+                      Wer ein Urteil faellt, HAT die Antwort bearbeitet. Zwei
+                      Klicks fuer einen Vorgang waeren die Art von Reibung, an
+                      der eine Routine stirbt. Der Doppel-Bump ist dabei
+                      ausgeschlossen — `hake` steigt bei einem schon erledigten
+                      Posten sofort wieder aus. */}
+                  {loomUrteil?.moeglich(p) ? (
+                    <>
+                      <button
+                        type="button"
+                        className="ck-btn"
+                        style={{ minHeight: 40, color: 'var(--ck-accent)', borderColor: 'var(--ck-accent)' }}
+                        title="Der Lead will die Analyse — er wandert in die Loom-Bauliste"
+                        onClick={() => {
+                          loomUrteil.entscheide(p, true)
+                          hake(p)
+                        }}
+                      >
+                        Loom ja
+                      </button>
+                      <button
+                        type="button"
+                        className="ck-btn"
+                        style={{ minHeight: 40 }}
+                        title="Kein Interesse an der Analyse — er faellt zurueck in die Follow-up-Kette, statt als offene Antwort liegen zu bleiben"
+                        onClick={() => {
+                          loomUrteil.entscheide(p, false)
+                          hake(p)
+                        }}
+                      >
+                        Loom nein
+                      </button>
+                    </>
                   ) : null}
                   {/* O7: Erinnerungs-Posten bekommen GENAU EINE Aktion und
                       keinen Haken — die Wahrheit ist der Zaehler. */}

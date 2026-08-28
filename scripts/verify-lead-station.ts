@@ -383,5 +383,120 @@ function ausgereizt(tageSeitLetzterNachricht: number, teil: Partial<LinkedinThre
   check('Wiedervorlage ohne Datum fällt auf die normale Rechnung zurück', r.station === 'anfrage_offen', JSON.stringify(r))
 }
 
+/* ── Das Loom-Urteil von Hand (0081, 28.08.2026) ──────────────────────────
+ *
+ * Bis hierher gab es die Ja/Nein-Frage in Uriel nicht: „Ja" ging nur ueber den
+ * Stern im LinkedIn-Postfach, „Nein" ueberhaupt nicht. Diese Bloecke halten
+ * fest, dass Kevins Hand jetzt zaehlt — und dass der naechste Sync sie nicht
+ * ueberschreibt.
+ */
+{
+  const r = leadStation(
+    eingabe({
+      ereignisse: [ereignis('loom_zugesagt', 0)],
+      thread: thread({ starred: false, loom_status: 'offen', last_from: 'them', last_message_at: vorTagen(1) }),
+    }),
+    JETZT,
+  )
+  check(
+    'Loom ja von Hand wirkt auch ohne Stern',
+    r.station === 'loom_offen' && r.faellig,
+    JSON.stringify(r),
+  )
+}
+
+{
+  const r = leadStation(
+    eingabe({
+      ereignisse: [ereignis('loom_abgelehnt', 0)],
+      thread: thread({ starred: false, loom_status: 'offen', last_from: 'them', last_message_at: vorTagen(1) }),
+    }),
+    JETZT,
+  )
+  check(
+    'Loom nein nimmt den Lead aus „Antwort da"',
+    r.station === 'wartet_auf_antwort',
+    JSON.stringify(r),
+  )
+}
+
+{
+  /* Der Fall, an dem alles haengt: Der Sync leitet aus dem Stern ein
+   * `loom_zugesagt` ab und stempelt es mit `thread.last_message_at` — also mit
+   * dem Zeitpunkt der letzten Nachricht. Kevins Absage von heute ist juenger
+   * und muss gewinnen, sonst pendelt der Lead bei jedem Sync zurueck. */
+  const r = leadStation(
+    eingabe({
+      ereignisse: [ereignis('loom_zugesagt', 3), ereignis('loom_abgelehnt', 0)],
+      thread: thread({ starred: true, loom_status: 'offen', last_from: 'them', last_message_at: vorTagen(3) }),
+    }),
+    JETZT,
+  )
+  check(
+    'die juengere Absage sticht den Stern und sein abgeleitetes loom_zugesagt',
+    r.station === 'wartet_auf_antwort',
+    `Sonst ueberschreibt der naechste Sync Kevins Nein. Ist: ${JSON.stringify(r)}`,
+  )
+}
+
+{
+  const r = leadStation(
+    eingabe({
+      ereignisse: [ereignis('loom_abgelehnt', 3), ereignis('loom_zugesagt', 0)],
+      thread: thread({ starred: false, loom_status: 'offen', last_from: 'them', last_message_at: vorTagen(3) }),
+    }),
+    JETZT,
+  )
+  check('und umgekehrt genauso — es gewinnt immer das juengste Urteil', r.station === 'loom_offen', JSON.stringify(r))
+}
+
+{
+  /* Erst abgesagt, zwei Wochen spaeter doch geschrieben: Das Urteil ist
+   * ueberholt, Kevin entscheidet neu. Ohne diese Klausel bliebe der Lead stumm
+   * in der Kette haengen — die teuerste Art, eine Zusage zu verlieren. */
+  const r = leadStation(
+    eingabe({
+      ereignisse: [ereignis('loom_abgelehnt', 14)],
+      thread: thread({ starred: false, loom_status: 'offen', last_from: 'them', last_message_at: vorTagen(1) }),
+    }),
+    JETZT,
+  )
+  check('schreibt der Lead nach der Absage erneut, gilt wieder „Antwort da"', r.station === 'antwort_da', JSON.stringify(r))
+}
+
+{
+  /* 0077 bleibt unangetastet: Wer nicht selbst ueber die Website entscheidet,
+   * faellt aus der Bauliste — auch bei einer Zusage von Hand. */
+  const r = leadStation(
+    eingabe({
+      ereignisse: [ereignis('loom_zugesagt', 0)],
+      thread: thread({ starred: false, loom_status: 'zustaendigkeit', last_from: 'them', last_message_at: vorTagen(1) }),
+    }),
+    JETZT,
+  )
+  check('„Entscheider offen" sticht auch die Hand-Zusage', r.station !== 'loom_offen', JSON.stringify(r))
+}
+
+{
+  /* Ist das Loom raus, ist die Zusage erledigt — sie darf nicht ewig als
+   * offener Posten stehen bleiben. */
+  const r = leadStation(
+    eingabe({
+      ereignisse: [ereignis('loom_zugesagt', 5), ereignis('loom_gesendet', 2)],
+      thread: thread({ starred: true, loom_status: 'verschickt', last_from: 'them', last_message_at: vorTagen(5) }),
+    }),
+    JETZT,
+  )
+  check('ein verschicktes Loom steht nicht mehr offen', r.station !== 'loom_offen', JSON.stringify(r))
+}
+
+{
+  const r = leadStation(
+    eingabe({ ereignisse: [], thread: thread({ starred: true, loom_status: 'offen', last_from: 'them' }) }),
+    JETZT,
+  )
+  check('der Stern allein wirkt unveraendert weiter', r.station === 'loom_offen', JSON.stringify(r))
+}
+
 console.log(`\nverify-lead-station: ${pass} ok, ${fail} fehlgeschlagen`)
 process.exit(fail === 0 ? 0 : 1)

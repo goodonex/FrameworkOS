@@ -183,6 +183,35 @@ function hat(ereignisse: Ereignis[], typ: LeadEreignisTyp): boolean {
 }
 
 /**
+ * Kevins Loom-Urteil aus den Ereignissen (0081, 28.08.2026).
+ *
+ * **Warum es das braucht.** Bis hierher gab es die Ja/Nein-Frage in Uriel gar
+ * nicht. „Ja" ging ausschliesslich ueber den Stern im LinkedIn-Postfach — die
+ * App schreibt `starred` nie, der Wert kommt allein aus dem Voyager-Sync, und
+ * `scripts/leads-sync.ts` leitet daraus `loom_zugesagt` ab. Kevins einziger Weg
+ * zur Zusage fuehrte also ueber einen Wechsel nach LinkedIn. „Nein" gab es
+ * ueberhaupt nicht: Eine Absage blieb unter „Antwort da" stehen, bis sie auf
+ * „Erledigt" gesetzt wurde, und war danach von einer nie beantworteten Antwort
+ * nicht mehr zu unterscheiden. Kevins Wort: *„da gibt es die Ja/Nein-Frage
+ * irgendwie gar nicht."*
+ *
+ * **Es gewinnt das juengste Urteil, nicht die lautere Quelle.** Das ist der
+ * Grund, aus dem der naechste Sync Kevins Nein nicht ueberschreibt: Der Sync
+ * stempelt sein abgeleitetes `loom_zugesagt` mit `thread.last_message_at` —
+ * dem Zeitpunkt der letzten Nachricht, also aelter als eine Absage von eben.
+ * `verify-lead-station.ts` erzwingt das als Fixture, damit es Logik bleibt und
+ * nicht Hoffnung.
+ */
+function loomUrteil(ereignisse: Ereignis[]): { zugesagt: boolean; at: number } | null {
+  const ja = letztes(ereignisse, ['loom_zugesagt'])
+  const nein = letztes(ereignisse, ['loom_abgelehnt'])
+  if (ja == null && nein == null) return null
+  if (nein == null) return { zugesagt: true, at: ja as number }
+  if (ja == null) return { zugesagt: false, at: nein }
+  return ja >= nein ? { zugesagt: true, at: ja } : { zugesagt: false, at: nein }
+}
+
+/**
  * Den Mindestabstand anwenden: Ein an sich fälliger Zug wartet, wenn erst
  * kürzlich ein anderer Kanal bedient wurde.
  */
@@ -414,7 +443,46 @@ export function leadStation(
 
   if (thread) {
     const bucket = bucketOf(thread as LinkedinThread, jetzt, kadenz.followupTage)
-    if (thread.starred && thread.loom_status === 'offen') {
+
+    /**
+     * Das Loom-Urteil steht vor allem anderen im Thread-Zweig (0081).
+     *
+     * Hat der Lead NACH dem Urteil erneut geschrieben, ist es ueberholt — dann
+     * gilt wieder „Antwort da", und Kevin entscheidet neu. Ohne diese Klausel
+     * bliebe ein Lead, der zuerst abgesagt und zwei Wochen spaeter doch
+     * gefragt hat, stumm in der Follow-up-Kette haengen.
+     */
+    const urteil = loomUrteil(ereignisse)
+    const nachUrteil =
+      urteil != null &&
+      thread.last_from === 'them' &&
+      thread.last_message_at != null &&
+      new Date(thread.last_message_at).getTime() > urteil.at
+
+    // Absage: Kevin hat entschieden, die Antwort ist beantwortet. Der Lead
+    // faellt zurueck in die Kette, statt als offene Antwort liegen zu bleiben.
+    if (urteil && !urteil.zugesagt && !nachUrteil) {
+      if (bucket === 'abschluss') {
+        return { ...basis, bucket, ...lauteKette(ereignisse, thread.last_message_at, now, kadenz) }
+      }
+      return {
+        ...basis,
+        bucket,
+        station: 'wartet_auf_antwort',
+        naechsterSchritt: 'Kein Loom gewuenscht — laeuft in der Kette weiter',
+        faelligAm: thread.last_message_at,
+        faellig: bucket === 'faellig' || bucket === 'du_bist_dran',
+      }
+    }
+
+    /**
+     * Zusage — per Stern (aus dem Sync) ODER von Hand. `loom_status`
+     * entscheidet unveraendert, ob sie in der Bauliste steht: `zustaendigkeit`
+     * nimmt den Lead heraus, bis geklaert ist, wer ueber die Website
+     * entscheidet (0077), `verschickt`/`entfaellt` sind durch.
+     */
+    const zugesagt = thread.starred || (urteil?.zugesagt === true && !nachUrteil)
+    if (zugesagt && thread.loom_status === 'offen') {
       return {
         ...basis,
         bucket,

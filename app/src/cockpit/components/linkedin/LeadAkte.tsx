@@ -24,6 +24,7 @@ const EREIGNIS_TITEL: Record<LeadEreignisTyp, string> = {
   followup: 'Nachgefasst',
   antwort_erhalten: 'Antwort erhalten',
   loom_zugesagt: 'Loom zugesagt',
+  loom_abgelehnt: 'Loom abgelehnt',
   loom_gesendet: 'Loom geschickt',
   inmail: 'InMail geschickt',
   email: 'E-Mail geschickt',

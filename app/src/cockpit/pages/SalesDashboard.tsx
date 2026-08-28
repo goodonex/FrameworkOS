@@ -780,6 +780,61 @@ export function SalesDashboard() {
     [linkedinThreads],
   )
 
+  /**
+   * Die Ja/Nein-Frage an einer Antwort (0081, 28.08.2026).
+   *
+   * **Der Weg vom Posten zum Lead.** Ein Antwort-Posten traegt die Thread-Id
+   * (`thread:<id>`), das Ereignis gehoert aber an den Lead. Die Bruecke ist
+   * `linkedin_threads.lead_id` — dieselbe Spalte, aus der auch `threadsJeLead`
+   * gebaut wird, nur andersherum gelesen. Threads ohne Lead (noch nicht
+   * zugeordnet) bekommen die Knoepfe gar nicht erst: ein Ereignis ohne Lead
+   * haette nirgends hingeschrieben werden koennen.
+   */
+  const leadJeThread = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const t of linkedinThreads.items) if (t.lead_id) m.set(t.id, t.lead_id)
+    return m
+  }, [linkedinThreads.items])
+
+  const loomUrteilAktion = useMemo(
+    () => ({
+      moeglich: (p: Posten) => p.spur === 'antwort' && leadJeThread.has(zeilenId(p.id)),
+      entscheide: (p: Posten, zugesagt: boolean) => {
+        const threadId = zeilenId(p.id)
+        const leadId = leadJeThread.get(threadId)
+        if (!leadId) return
+        void leadsQuery.protokolliere(leadId, zugesagt ? 'loom_zugesagt' : 'loom_abgelehnt')
+        /**
+         * Der `loom_status` wandert mit — und zwar nicht als Doppelung des
+         * Ereignisses, sondern weil er eine andere Frage beantwortet: das
+         * Ereignis haelt fest, WAS der Lead gesagt hat, der Status, ob er in
+         * der Bauliste steht.
+         *
+         * Beim Nein ist das der Unterschied zwischen „wirkt" und „wirkt bis
+         * zur naechsten Nachricht": Der Stern lebt in LinkedIn weiter, und der
+         * Sync leitet daraus bei jeder neuen Nachricht ein frisches
+         * `loom_zugesagt` mit deren Zeitstempel ab. Ohne `entfaellt` waere
+         * dieses abgeleitete Ja irgendwann das juengere Urteil und der
+         * Abgesagte stuende wieder in der Liste.
+         */
+        if (!zugesagt) {
+          void linkedinThreads.markLoomEntfaellt(threadId)
+          return
+        }
+        /**
+         * Beim Ja wird der Status nur zurueckgeholt, wenn er vorher auf
+         * `entfaellt` stand — also wenn Kevin seine eigene Absage korrigiert.
+         * Blind auf `offen` zu setzen wuerde `zustaendigkeit` ueberschreiben
+         * und damit 0077 aushebeln: Wer nicht selbst ueber die Website
+         * entscheidet, gehoert nicht in die Bauliste, auch wenn er zusagt.
+         */
+        const t = linkedinThreads.items.find((x) => x.id === threadId)
+        if (t?.loom_status === 'entfaellt') void linkedinThreads.markLoomFreigegeben(threadId)
+      },
+    }),
+    [leadJeThread, leadsQuery, linkedinThreads],
+  )
+
   const liste = useCallback(
     (posten: Posten[]) => () => (
       <Arbeitsliste
@@ -790,9 +845,10 @@ export function SalesDashboard() {
         loom={loomAktionen}
         projektLink={projektLink}
         onNavigiere={navigiere}
+        loomUrteil={loomUrteilAktion}
       />
     ),
-    [onArbeitsmodusErledigt, morgenAktion, loomAktionen, projektLink, navigiere],
+    [onArbeitsmodusErledigt, morgenAktion, loomAktionen, projektLink, navigiere, loomUrteilAktion],
   )
 
   /** Am Handy: „Arbeitsmodus starten" im Fenster-Fuß — am Desktop bewusst nicht. */

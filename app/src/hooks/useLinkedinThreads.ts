@@ -26,6 +26,8 @@ interface UseLinkedinThreadsResult {
   markEntscheiderOffen: (id: string) => Promise<void>
   /** 0077: Zuständigkeit geklärt — zurück in die Loom-Bauliste. */
   markLoomFreigegeben: (id: string) => Promise<void>
+  /** 0081: „Loom nein" — der Lead will keine Analyse, unabhängig vom Stern. */
+  markLoomEntfaellt: (id: string) => Promise<void>
 }
 
 /** Liest linkedin_threads für die aktive Brand (Wargame Zug 7, docs/wargames/linkedin-followups.md). */
@@ -150,8 +152,25 @@ export function useLinkedinThreads(brandSlug: string | undefined): UseLinkedinTh
     [applyPatch],
   )
 
+  /**
+   * 0081: Der Lead will keine Analyse.
+   *
+   * **Warum das Ereignis allein nicht reicht.** `leadStation` liest zwar das
+   * jüngste Loom-Urteil, aber der Stern lebt in LinkedIn weiter, und
+   * `scripts/leads-sync.ts` leitet daraus bei JEDER neuen Nachricht ein
+   * frisches `loom_zugesagt` mit dem Zeitstempel dieser Nachricht ab. Schreibt
+   * der Lead nach der Absage nochmal, wäre dieses abgeleitete Ja plötzlich das
+   * jüngere Urteil — und der Abgesagte stünde wieder in der Bauliste. Der
+   * `loom_status` ist das Gegenmittel: `entfaellt` nimmt ihn dort heraus,
+   * unabhängig vom Stern, und ist genau dafür schon in 0061 vorgesehen.
+   */
+  const markLoomEntfaellt = useCallback(
+    (id: string) => applyPatch(id, { loom_status: 'entfaellt', loom_erledigt_at: new Date().toISOString() }),
+    [applyPatch],
+  )
+
   return {
     items, loading, tableMissing, error, reload, snooze, wake, markDone,
-    markLoomVerschickt, markEntscheiderOffen, markLoomFreigegeben,
+    markLoomVerschickt, markEntscheiderOffen, markLoomFreigegeben, markLoomEntfaellt,
   }
 }
