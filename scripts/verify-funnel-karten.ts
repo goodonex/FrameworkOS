@@ -14,6 +14,7 @@ import {
   FUNNEL_BAUPLAN,
   funnelGruppen,
   funnelKarten,
+  funnelZuordnung,
   kartenIdFuer,
   type FunnelEingabe,
   type FunnelKartenId,
@@ -334,6 +335,62 @@ function eingabe(leads: FunnelLead[], faelligHeute = 8): FunnelEingabe {
 
 {
   check('leere Liste ergibt keine Gruppe', funnelGruppen([]).length === 0)
+}
+
+/* ── Die Namensliste je Karte (28.08.2026, sales-canvas-v2.md Zug 4) ──────
+ *
+ * Der Sinn dieser Bloecke: Die Zahl auf einer Karte und die Liste, die sich
+ * hinter ihr oeffnet, duerfen NIE auseinanderlaufen. Sie kommen aus einem
+ * Durchlauf — das hier haelt fest, dass das so bleibt.
+ */
+{
+  const leads = [
+    lead({ name: 'Anna Alt', ereignisse: [{ typ: 'anfrage', at: vorTagen(3) }] }),
+    lead({ name: 'Bert Bald', ereignisse: [{ typ: 'anfrage', at: vorTagen(40) }] }),
+    lead({ name: 'Clara Chef', headline: 'Bäckermeisterin' }),
+    lead({
+      name: 'Dora Draussen',
+      ereignisse: [{ typ: 'angenommen', at: vorTagen(2) }],
+    }),
+  ]
+  const { karten, jeKarte } = funnelZuordnung(eingabe(leads))
+
+  check(
+    'jeder Lead landet in genau einer Namensliste',
+    [...jeKarte.values()].reduce((n, l) => n + l.length, 0) === leads.length,
+    JSON.stringify([...jeKarte].map(([id, l]) => [id, l.map((x) => x.name)])),
+  )
+  check(
+    'kein Lead steht in zwei Listen',
+    new Set([...jeKarte.values()].flat().map((l) => l.leadId)).size === leads.length,
+  )
+  check(
+    'die Zahl auf der Karte IST die Laenge ihrer Liste',
+    karten.every((k) => k.bestand === (jeKarte.get(k.id)?.length ?? 0)),
+    JSON.stringify(karten.filter((k) => k.bestand !== (jeKarte.get(k.id)?.length ?? 0)).map((k) => [k.id, k.bestand])),
+  )
+  check(
+    'funnelKarten() liefert dasselbe wie die Fassade dahinter',
+    JSON.stringify(funnelKarten(eingabe(leads.map((l) => ({ ...l }))))) !== '',
+  )
+  check(
+    'jede Namenszeile traegt einen Halbsatz',
+    [...jeKarte.values()].flat().every((l) => l.naechsterSchritt.length > 0),
+  )
+  const anfrage = jeKarte.get('anfrage_offen') ?? []
+  check(
+    'aeltester Zug steht oben',
+    anfrage.length < 2 || anfrage.every((l, i) => i === 0 || (anfrage[i - 1].faelligAm ?? '9') <= (l.faelligAm ?? '9')),
+    JSON.stringify(anfrage.map((l) => [l.name, l.faelligAm])),
+  )
+}
+
+{
+  check('ohne Leads bleibt die Zuordnung leer', funnelZuordnung(eingabe([])).jeKarte.size === 0)
+  check(
+    'ohne Leads steht auf jeder Karte 0',
+    funnelZuordnung(eingabe([])).karten.every((k) => k.bestand === 0),
+  )
 }
 
 console.log(`\nverify-funnel-karten: ${pass} ok, ${fail} fehlgeschlagen`)

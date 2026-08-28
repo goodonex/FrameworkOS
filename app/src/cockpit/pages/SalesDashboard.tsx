@@ -11,6 +11,7 @@ import { Arbeitsliste, type LoomSkriptAktionen } from '../components/Arbeitslist
 import { Arbeitsmodus, type ArbeitsmodusErgebnis } from '../components/Arbeitsmodus'
 import { InmailPanel } from '../components/InmailPanel'
 import { FunnelCanvas } from '../components/sales/FunnelCanvas'
+import { KartenNamen } from '../components/sales/KartenNamen'
 import { TagesListe } from '../components/sales/TagesListe'
 import { PipelineBoard } from '../components/sales/PipelineBoard'
 import { KadenzPanel } from '../components/sales/KadenzPanel'
@@ -19,7 +20,7 @@ import { VorlagenKopf } from '../components/sales/VorlagenKopf'
 import { useActiveBrand } from '../lib/activeBrand'
 import { antwortPostenAusgeblendet, zeilenId } from '../lib/arbeitsmodusQuellen'
 import { erledigePosten } from '../lib/arbeitsmodusTracking'
-import { funnelKarten, type FunnelKartenId, type FunnelLead } from '../lib/funnelKarten'
+import { funnelZuordnung, type FunnelKartenId, type FunnelLead } from '../lib/funnelKarten'
 import { funnelRaten } from '../lib/funnelRaten'
 import { KADENZ_SCHLUESSEL, gueltigeKadenz, setzeAktiveKadenz, type Kadenz } from '../lib/kadenz'
 import { fetchJophielProjekte } from '../lib/jophielApi'
@@ -70,6 +71,41 @@ import { useRunnerData } from '../lib/useRunnerData'
  * Fenster heraus) und den Ein-Knopf-Anfragen-Zähler. Am Desktop bleibt
  * alles im Fenster — Vollbild wäre dort verschenkter Platz.
  */
+
+/**
+ * Ein Satz je Station, wo er mehr sagt als ihr Titel (28.08.2026, Zug 4).
+ *
+ * Er beantwortet die zweite Frage, die eine Namensliste sofort aufwirft: *warum
+ * steht hier nichts zu tun?* Bei „Postkarte faellig · 12" ist die Antwort nicht
+ * offensichtlich, und ohne sie wirkt die Karte wie ein Rueckstand statt wie
+ * eine Stufe, deren Werkzeug noch fehlt.
+ *
+ * Karten ohne Eintrag bekommen keinen Fuelltext. Ein Hinweis, der nur den Titel
+ * wiederholt, ist Rauschen.
+ */
+const KARTEN_HINWEIS: Partial<Record<FunnelKartenId, string>> = {
+  anfrage_offen:
+    'Eingeladen, aber noch nicht angenommen. Hier ist heute nichts zu tun — sie laufen von selbst weiter: nach 30 Tagen in den stillen Zweig. Wie viele Anfragen heute rausgehen, steht in der Tagesliste.',
+  wartet_auf_antwort:
+    'Angeschrieben, Follow-ups laufen. Wer heute dran ist, steht in der Tagesliste unter „Follow-ups" — hier steht der ganze Vorrat.',
+  instagram_faellig:
+    'Drei Follow-ups sind durch, der Kanal wechselt. Eine Arbeitsliste gibt es dafuer noch nicht — die Instagram-Profile sind nicht erfasst.',
+  pdf_faellig:
+    'Die Follow-up-Analyse geht ungefragt raus. Gebaut wird sie in Jophiel; eine Arbeitsliste an dieser Stelle gibt es noch nicht.',
+  postkarte_laut:
+    'Kennt deine Analyse, hat nie geantwortet. Fuer die Karte braucht es eine Anschrift — die steht bei keinem dieser Leads (`Lead.anschrift` ist leer).',
+  anruf_laut: 'Die Postkarte ist raus und ist der Aufhaenger. Telefonnummern sind noch nicht beschafft.',
+  email_faellig:
+    'Nie angenommen, 30 Tage sind um. Diese Stufe wartet auf E-Mail-Adressen — `Lead.email` ist bei allen leer, deshalb gibt es hier keine Arbeitsliste, sondern nur die Namen.',
+  postkarte_still: 'Kennt dich noch gar nicht. Braucht eine Anschrift, die noch nicht beschafft ist.',
+  anruf_still: 'Kennt dich noch gar nicht, die Karte ist raus. Braucht eine Telefonnummer.',
+  wiedervorlage: 'Von dir auf ein Datum gelegt. Faellige stehen oben.',
+  ruht: 'Die Kadenz ist durch. Sie kommen von selbst wieder, wenn die Ruhezeit um ist.',
+  kunde: 'Laeuft ueber die Projekte, nicht mehr ueber den Funnel.',
+  disqualifiziert: 'Aussortiert. Steht hier, damit die Summe aufgeht und ein Fehlgriff auffaellt.',
+  ausserhalb:
+    'Vom ICP-Filter aussortiert. Diese Karte ist die Gegenprobe: Wer hier zu Unrecht steht, waere sonst lautlos verschwunden.',
+}
 
 export interface KachelDef {
   id: string
@@ -1100,11 +1136,17 @@ export function SalesDashboard() {
    * dem Heute-Deck trifft weiter.
    */
   const ALT_KACHEL: Partial<Record<FunnelKartenId, string>> = {
-    anfrage_offen: 'vernetzungsanfragen',
     erstnachricht_faellig: 'erstnachrichten',
     antwort_da: 'antworten',
     loom_offen: 'looms',
   }
+  /**
+   * `anfrage_offen` stand hier bis zum 28.08.2026 und oeffnete den
+   * Anfragen-Zaehler. Das war die Vermischung im Kleinen: Auf der Karte stand
+   * „337" (so viele Einladungen sind offen), im Fenster „0 von 30" (so viele
+   * schickst du heute raus) — zwei Fragen, ein Klick. Der Zaehler wohnt jetzt
+   * in der Tagesliste, wo er hingehoert; die Karte zeigt die 337 Namen.
+   */
 
   /*
    * Die eingeklappten Flow-Balken sind am 28.08.2026 gefallen (Blaupause
@@ -1144,10 +1186,17 @@ export function SalesDashboard() {
   const leadZahl = leadsQuery.leads.length
   const tagesFortschritt = flowFortschritt(staende)
 
-  const rohKarten = useMemo(
-    () => funnelKarten({ leads: funnelLeads, staende, jetzt, kadenz }),
+  /**
+   * Zahlen UND Namen in einem Durchlauf (28.08.2026, `sales-canvas-v2.md`
+   * Zug 4). `funnelZuordnung` fragt `leadStation()` je Lead genau einmal —
+   * die Zahl auf einer Karte ist damit buchstaeblich die Laenge der Liste, die
+   * sich hinter ihr oeffnet, und kann nicht davon abweichen.
+   */
+  const zuordnung = useMemo(
+    () => funnelZuordnung({ leads: funnelLeads, staende, jetzt, kadenz }),
     [funnelLeads, staende, jetzt, kadenz],
   )
+  const rohKarten = zuordnung.karten
 
   /**
    * „eine Abfrage, eine Zahl": Wo eine Liste hinter der Karte liegt, IST die
@@ -1231,10 +1280,38 @@ export function SalesDashboard() {
       }
     })
 
+  /**
+   * Die Namensliste hinter jeder uebrigen Karte (28.08.2026, Zug 4).
+   *
+   * Bis dahin oeffneten 6 von 20 Karten ein Fenster. Die anderen 14 zeigten
+   * eine Zahl und taten auf Klick nichts — Kevins Auftrag war ausdruecklich,
+   * dass jede Station anklickbar ist. Sie bekommen keine erfundene
+   * Arbeitsliste (fuer die stillen Kanaele fehlen die Adressen), sondern die
+   * ehrliche Antwort auf die Frage, die die Zahl aufwirft: wer ist das?
+   */
+  const namensKacheln: KachelDef[] = karten
+    .filter((k) => k.bestand > 0 && !ALT_KACHEL[k.id] && k.stufenId !== 'followups')
+    .map((k): KachelDef => {
+      const leute = zuordnung.jeKarte.get(k.id) ?? []
+      return {
+        id: k.id,
+        titel: k.titel,
+        kennzahl: `${k.bestand} ${k.bestand === 1 ? 'Person' : 'Personen'}`,
+        inhalt: () => (
+          <KartenNamen
+            leads={leute}
+            onOeffneLead={(id) => navigiere(`/sales/${id}`)}
+            hinweis={KARTEN_HINWEIS[k.id]}
+          />
+        ),
+      }
+    })
+
   const alleZeilen = [...flowZeilen, ...projektZeilen]
   const offenKachel =
     alleZeilen.find((k) => k.id === offenKachelId) ??
     followupKacheln.find((k) => k.id === offenKachelId) ??
+    namensKacheln.find((k) => k.id === offenKachelId) ??
     (offenKachelId === 'kadenz' ? kadenzKachel : null)
 
   /**
@@ -1388,19 +1465,19 @@ export function SalesDashboard() {
           karten={karten}
           raten={raten}
           onOeffnen={(k) => oeffneKachel(ALT_KACHEL[k.id] ?? k.id, `board-${k.id}`)}
-          oeffenbar={(k) => listeJeKarte.has(k.id) || ALT_KACHEL[k.id] !== undefined}
+          oeffenbar={(k) => k.bestand > 0 || listeJeKarte.has(k.id)}
         />
       ) : (
         <FunnelCanvas
           karten={karten}
           onOeffnen={(k) => oeffneKachel(ALT_KACHEL[k.id] ?? k.id, `canvas-${k.id}`)}
-          // Öffenbar ist, wofür es eine Arbeitsliste oder ein bestehendes
-          // Fenster gibt. Eine Karte, die auf Klick nichts zeigt, ist
-          // schlimmer als eine, die gar nicht erst klickbar aussieht.
-          oeffenbar={(k) => listeJeKarte.has(k.id) || ALT_KACHEL[k.id] !== undefined}
-          // Eigener Namensraum: Die Flow-Balken darunter tragen `kachel-…`
-          // für dieselbe Sache. Gleiche Kennung zweimal im Bild heisst
-          // Geister-Morph, sobald die Balken aufgeklappt sind.
+          // Seit dem 28.08. oeffnet JEDE Karte mit Bestand etwas: entweder ihre
+          // Arbeitsliste oder die Namen der Leute darin. Eine Karte, die auf
+          // Klick nichts zeigt, ist schlimmer als eine, die gar nicht erst
+          // klickbar aussieht — und davon gab es vierzehn.
+          oeffenbar={(k) => k.bestand > 0 || listeJeKarte.has(k.id)}
+          // Eigener Namensraum: Die Tagesliste traegt `kachel-…` fuer dieselbe
+          // Sache. Gleiche Kennung zweimal im Bild heisst Geister-Morph.
           layoutIdFuer={(k) => `canvas-${k.id}`}
         />
       )}

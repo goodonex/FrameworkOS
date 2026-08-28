@@ -225,8 +225,10 @@ function zuordnung(
   lead: FunnelLead,
   jetzt: Date,
   kadenz: Kadenz = aktiveKadenz(),
-): { id: FunnelKartenId; faellig: boolean } {
-  if (!imArbeitsVorrat(lead)) return { id: 'ausserhalb', faellig: false }
+): { id: FunnelKartenId; faellig: boolean; faelligAm: string | null; naechsterSchritt: string } {
+  if (!imArbeitsVorrat(lead)) {
+    return { id: 'ausserhalb', faellig: false, faelligAm: null, naechsterSchritt: 'Nicht in der Zielgruppe' }
+  }
 
   const stand = leadStation(
     {
@@ -263,41 +265,92 @@ function zuordnung(
     }
   })()
 
-  return { id, faellig: stand.faellig }
+  return { id, faellig: stand.faellig, faelligAm: stand.faelligAm, naechsterSchritt: stand.naechsterSchritt }
 }
 
 /**
- * Die Kartenliste — vollständig, auch die leeren. Was zusammengeklappt wird,
- * entscheidet die Oberfläche, nicht die Rechnung: eine Karte, die je nach
- * Datenlage im Ergebnis fehlt, würde beim Zählen und beim Prüfen jedes Mal
- * anders aussehen.
+ * Wer steckt hinter der Zahl? — die Namensliste je Karte (28.08.2026,
+ * Blaupause `docs/wargames/sales-canvas-v2.md`, Zug 4).
+ *
+ * **Warum das hier steht und nicht in der Oberflaeche.** Bis zum 28.08. waren
+ * 6 von 20 Karten klickbar; die uebrigen 14 zeigten eine Zahl und taten auf
+ * Klick nichts. Kevins Wort: *„guck wirklich, jede Station — ist alles
+ * klickbar."* Die Namen dafuer aus einem zweiten Durchlauf zu holen waere die
+ * teuerste Variante: zwei Wege zu derselben Zuordnung, die beim naechsten
+ * Umbau auseinanderlaufen. Deshalb faellt beides in EINEM Durchlauf an —
+ * `zuordnung()` wird je Lead genau einmal gefragt, und die Zahl auf der Karte
+ * IST die Laenge der Liste dahinter.
+ *
+ * `funnelKarten()` ist seitdem nur noch die duenne Fassade davor.
  */
-export function funnelKarten(eingabe: FunnelEingabe): FunnelKarte[] {
-  const bestand = new Map<FunnelKartenId, number>()
+export interface KartenLead {
+  leadId: string
+  name: string
+  headline: string
+  /** Wann der naechste Zug faellig ist oder war. `null`, wo es keinen gibt. */
+  faelligAm: string | null
+  /** Was als Naechstes zu tun ist — der Halbsatz aus `leadStation`. */
+  naechsterSchritt: string
+  faellig: boolean
+}
+
+export interface FunnelZuordnung {
+  karten: FunnelKarte[]
+  /** Je Karte die Menschen darin, aeltester Zug zuerst. */
+  jeKarte: Map<FunnelKartenId, KartenLead[]>
+}
+
+export function funnelZuordnung(eingabe: FunnelEingabe): FunnelZuordnung {
+  const jeKarte = new Map<FunnelKartenId, KartenLead[]>()
   const faellig = new Map<FunnelKartenId, number>()
 
   const kadenz = eingabe.kadenz ?? aktiveKadenz()
   for (const lead of eingabe.leads) {
-    const { id, faellig: heute } = zuordnung(lead, eingabe.jetzt, kadenz)
-    bestand.set(id, (bestand.get(id) ?? 0) + 1)
-    if (heute) faellig.set(id, (faellig.get(id) ?? 0) + 1)
+    const z = zuordnung(lead, eingabe.jetzt, kadenz)
+    const liste = jeKarte.get(z.id)
+    const eintrag: KartenLead = {
+      leadId: lead.id,
+      name: lead.name,
+      headline: lead.headline,
+      faelligAm: z.faelligAm,
+      naechsterSchritt: z.naechsterSchritt,
+      faellig: z.faellig,
+    }
+    if (liste) liste.push(eintrag)
+    else jeKarte.set(z.id, [eintrag])
+    if (z.faellig) faellig.set(z.id, (faellig.get(z.id) ?? 0) + 1)
+  }
+
+  /**
+   * Aeltester Zug zuerst — wer am laengsten wartet, steht oben. Ohne Datum ans
+   * Ende: Ein Lead ohne brauchbaren Zeitstempel ist nicht „ganz frisch",
+   * sondern unbekannt, und unbekannt gehoert nicht an die Spitze einer Liste,
+   * die nach Dringlichkeit sortiert.
+   */
+  for (const liste of jeKarte.values()) {
+    liste.sort((a, b) => {
+      if (a.faelligAm === b.faelligAm) return a.name.localeCompare(b.name, 'de')
+      if (a.faelligAm === null) return 1
+      if (b.faelligAm === null) return -1
+      return a.faelligAm < b.faelligAm ? -1 : 1
+    })
   }
 
   const standJeStufe = new Map<StufenId, StufenStand>()
   for (const s of eingabe.staende) standJeStufe.set(s.stufe.id, s)
 
-  return FUNNEL_BAUPLAN.map((bau): FunnelKarte => {
+  const karten = FUNNEL_BAUPLAN.map((bau): FunnelKarte => {
     const stand = bau.stufenId ? standJeStufe.get(bau.stufenId) : undefined
     /**
-     * Die Antworten-Stufe ist eine Frische-Frage, keine Zähl-Stufe: ihr `soll`
+     * Die Antworten-Stufe ist eine Frische-Frage, keine Zaehl-Stufe: ihr `soll`
      * ist 0 und ihr `wert` sagt „wie viele warten", nicht „wie viele sind
-     * erledigt". „heute 43 von 0" wäre die Zahl, die daraus entstünde.
+     * erledigt". „heute 43 von 0" waere die Zahl, die daraus entstuende.
      */
     const zaehlbar = stand?.stufe.art === 'zaehler' ? stand : null
     return {
       id: bau.id,
       titel: bau.titel,
-      bestand: bestand.get(bau.id) ?? 0,
+      bestand: jeKarte.get(bau.id)?.length ?? 0,
       heuteFaellig: faellig.get(bau.id) ?? 0,
       soll: zaehlbar ? zaehlbar.soll : null,
       erledigtHeute: zaehlbar ? zaehlbar.wert : null,
@@ -306,6 +359,22 @@ export function funnelKarten(eingabe: FunnelEingabe): FunnelKarte[] {
       zweig: bau.zweig,
     }
   })
+
+  return { karten, jeKarte }
+}
+
+/**
+ * Die Kartenliste — vollständig, auch die leeren. Was zusammengeklappt wird,
+ * entscheidet die Oberfläche, nicht die Rechnung: eine Karte, die je nach
+ * Datenlage im Ergebnis fehlt, würde beim Zählen und beim Prüfen jedes Mal
+ * anders aussehen.
+ *
+ * Seit dem 28.08.2026 nur noch die Fassade vor `funnelZuordnung()` — dort
+ * fallen Zahlen und Namen in EINEM Durchlauf an. Wer nur die Zahlen braucht,
+ * ruft weiter hier auf.
+ */
+export function funnelKarten(eingabe: FunnelEingabe): FunnelKarte[] {
+  return funnelZuordnung(eingabe).karten
 }
 
 /**
