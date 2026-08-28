@@ -8,9 +8,13 @@ import { ANFRAGEN_LIMIT_TAG } from './prioritaet'
  * Entstanden am 11.08.2026 mit fünf Stufen; am 18.08.2026 hat Kevin die
  * Reihenfolge neu diktiert und zwei Dinge getrennt, die vorher in einer Stufe
  * steckten: **Erstnachrichten** (an alle, die angenommen haben) und
- * **Antworten** (wer geschrieben hat, wartet auf Kevin) sind zwei Stationen —
- * und die Antworten sind keine Zähl-Stufe, sondern eine Frische-Frage: nicht
- * „wie viele heute", sondern „wartet jemand länger als einen Tag?".
+ * **Antworten** (wer geschrieben hat, wartet auf Kevin) sind zwei Stationen.
+ *
+ * Die Antworten waren dabei bis zum 28.08.2026 eine Frische-Frage („wartet
+ * jemand länger als einen Tag?") statt einer Zähl-Stufe. Das ist mit Migration
+ * 0081 gefallen — Kevin wollte sie abarbeiten können („null von fünf … am Ende
+ * elf von elf"), und dafür braucht es ein Soll. Die Frische steht weiter an
+ * der Zeile, nur nicht mehr als Bedingung.
  *
  * **Reine Funktionen, keine React-Importe.** Alles hier ist per
  * `npx tsx scripts/verify-tages-flow.ts` gegen Fixtures prüfbar. Die
@@ -131,12 +135,28 @@ export const TAGES_FLOW: readonly Stufe[] = [
     standardZiel: null,
   },
   {
+    /**
+     * Seit dem 28.08.2026 eine ZAEHL-Stufe (Blaupause `sales-canvas-v2.md`,
+     * Zug 5, Migration 0081).
+     *
+     * Sie war als `frische` gebaut und fragte „wartet jemand laenger als 24
+     * Stunden?" — klug, aber nicht Kevins Frage. Seine war: *„null von fuenf
+     * Antworten […] und am Ende des Tages elf von elf."* Eine Frische-Stufe
+     * hat kein Soll und kann das nicht darstellen.
+     *
+     * **Die Frische ist nicht verloren, nur entmachtet.** Wie lange der
+     * aelteste wartet, steht weiter an der Zeile (`ANTWORT_FRISCHE_STUNDEN`,
+     * `antwortenStandVon`) — es entscheidet nur nicht mehr darueber, ob die
+     * Stufe steht.
+     */
     id: 'antworten',
-    art: 'frische',
-    feld: null,
+    art: 'zaehler',
+    feld: 'antworten_erledigt',
     label: 'Antworten',
     langLabel: 'Antworten · LinkedIn',
     hinweis: 'Wer geschrieben hat, wartet auf dich.',
+    // Kein festes Ziel: es sind so viele, wie heute warten — an einem Tag
+    // zwei, am naechsten dreizehn. Siehe sollFuer().
     standardZiel: null,
   },
   {
@@ -275,6 +295,19 @@ export function sollFuer(stufe: Stufe, eingabe: FlowEingabe): number {
       // Alle raus, die da sind — heute Erledigte eingerechnet, damit das Soll
       // beim Abhaken stehen bleibt.
       return anzahl(eingabe.erstnachrichtenOffen) + wert
+    case 'antworten':
+      /**
+       * Wer wartet, wird beantwortet — alle, nicht eine Portion. Anders als
+       * bei den Follow-ups gibt es hier keinen Rueckstand-Berg, den man
+       * drosseln muesste: Eine unbeantwortete Antwort ist ein offener Faden zu
+       * jemandem, der GERADE geschrieben hat.
+       *
+       * `+ wert` wie bei den Erstnachrichten, damit das Soll beim Abhaken
+       * stehen bleibt. Ohne das schrumpfte es mit jedem Haken mit („morgens 5,
+       * drei erledigt, Soll ploetzlich 2 von 2") und die Zeile loege ueber den
+       * Tag.
+       */
+      return anzahl(eingabe.antworten?.warten) + wert
     case 'followups': {
       const drossel = gueltigesZiel(eigen) ? eigen : FOLLOWUP_PORTION_TAG
       return Math.min(drossel, anzahl(eingabe.faelligHeute) + wert)
@@ -422,8 +455,13 @@ export function flowQuellen(
  * Die Stufen, deren Soll beim ersten Öffnen des Tages eingefroren wird
  * (`sales_tagesportionen`, Migration 0074). Feste Ziele (Anfragen, InMails)
  * sind von sich aus stabil und brauchen kein Gedächtnis.
+ *
+ * `antworten` kam am 28.08.2026 dazu (0081). Ohne das Einfrieren waere die
+ * Zeile ein bewegliches Ziel: Kommt um 14 Uhr eine sechste Antwort rein,
+ * stuende „3 von 6" statt „3 von 5" — und der Tag waere nie abgearbeitet. Was
+ * nach dem Einfrieren reinkommt, ist Ware fuer morgen.
  */
-export const PORTION_STUFEN: readonly StufenId[] = ['erstnachrichten', 'followups', 'looms']
+export const PORTION_STUFEN: readonly StufenId[] = ['erstnachrichten', 'antworten', 'followups', 'looms']
 
 /**
  * Was heute einzufrieren wäre — die Live-Rechnung von `sollFuer`, ohne schon

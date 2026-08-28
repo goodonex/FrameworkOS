@@ -27,7 +27,16 @@ export function metrikFeldFuer(spur: Spur): MetricField | null {
       return 'li_anfragen'
     case 'inmail':
       return 'inmails'
+    /**
+     * Seit 0081 (28.08.2026) zaehlbar. Der Kommentar oben stand hier bis dahin
+     * mit „kein neues Feld erfinden, wenn eine Spur auf keins passt" — genau
+     * richtig, solange keins passte. Jetzt gibt es `antworten_erledigt`, weil
+     * Kevins Tagesliste ohne diese Zahl bei den Antworten nichts zeigen kann
+     * („null von fuenf Antworten"). Das Feld zaehlt ABGEARBEITETE Antworten;
+     * `antworten_li` zaehlt die erhaltenen und bleibt unberuehrt.
+     */
     case 'antwort':
+      return 'antworten_erledigt'
     case 'kundenaufgabe':
     case 'aufgabe':
     case 'kunde_liegt':

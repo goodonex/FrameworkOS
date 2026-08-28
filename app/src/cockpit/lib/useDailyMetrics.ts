@@ -29,6 +29,8 @@ export interface DailyMetricsRow {
   li_followups: number
   ig_followups: number
   call_followups: number
+  /** 0081: von Kevin ABGEARBEITETE Antworten — nicht die erhaltenen (`antworten_li`). */
+  antworten_erledigt: number
   antworten_li: number
   antworten_inmail: number
   antworten_ig: number
@@ -62,6 +64,7 @@ export function emptyRow(datum: string): DailyMetricsRow {
     li_followups: 0,
     ig_followups: 0,
     call_followups: 0,
+    antworten_erledigt: 0,
     antworten_li: 0,
     antworten_inmail: 0,
     antworten_ig: 0,

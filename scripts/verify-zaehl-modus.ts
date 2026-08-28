@@ -69,8 +69,10 @@ check('keine abgetippte Zielzahl in zaehlFelder.ts', !/tagesziel:\s*\d+/.test(za
 
 // --- 2b. Die Liste trägt den Tages-Flow (D7) ----------------------------
 const reihenfolge = ZAEHL_FELDER.map((z) => z.field)
-// Seit dem 18.08. hat der Flow eine Stufe OHNE Zähl-Feld (Antworten, Frische-
-// Stufe) — zählbar sind nur die übrigen. Genau die müssen die Liste anführen.
+// Bis zum 28.08.2026 hatte der Flow eine Stufe ohne Zähl-Feld (Antworten,
+// damals Frische-Stufe). Seit 0081 zählen alle sechs. Der Filter bleibt: er ist
+// die Regel, nicht die Beschreibung des Ist-Zustands — kommt je wieder eine
+// Stufe ohne Feld dazu, darf sie hier nicht durchrutschen.
 const zaehlbareStufen = TAGES_FLOW.filter((s) => s.feld !== null)
 check(
   'jede Zähl-Stufe des Flows hat einen Eintrag — sonst führt der Flow ins Leere',
@@ -78,9 +80,9 @@ check(
   `Fehlt: ${zaehlbareStufen.filter((s) => !reihenfolge.includes(s.feld as (typeof reihenfolge)[number])).map((s) => s.feld).join(', ')}`,
 )
 check(
-  'die Antworten-Stufe hat bewusst KEINE Zähl-Kachel',
-  !ZAEHL_FELDER.some((z) => z.langLabel === 'Antworten · LinkedIn'),
-  'Antworten werden abgearbeitet, nicht gezählt — ihr Werkzeug ist die Sales-Zeile.',
+  'die Antworten-Stufe hat seit 0081 ihre Zähl-Kachel',
+  reihenfolge.includes('antworten_erledigt'),
+  'Folge des Umbaus, keine eigene Absicht: Kevins Weg zu den Antworten fuehrt weiter ueber die Arbeitsliste — die Kachel ist der Nachtrag fuer unterwegs.',
 )
 check(
   'die Liste beginnt mit den Zähl-Stufen des Flows, in seiner Reihenfolge',
@@ -93,7 +95,8 @@ check(
 )
 check(
   'die Reaktivierung (InMails) ist als Zähl-Kachel wirklich erreichbar',
-  reihenfolge[3] === 'inmails',
+  reihenfolge.includes('inmails'),
+  'Ohne Index geprueft: der stand auf 3 und war damit an der Stufen-Reihenfolge festgenagelt — eine neue Stufe davor liess ihn fallen, ohne dass an den InMails etwas kaputt war.',
 )
 
 // --- 3. Nachschlag ------------------------------------------------------

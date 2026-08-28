@@ -30,7 +30,9 @@ const pruefe = (feld: unknown, wert: unknown, datum?: unknown) =>
   pruefeBuchung({ feld, wert, datum, heute: HEUTE, windowStart: FENSTER })
 
 // ---- Feldkarte: Enum, Labels und DB-Deckung ------------------------------
-check('19 Felder', METRIC_FIELDS.length, 19)
+// 20 seit 0081 (antworten_erledigt). Die Zahl steht hier bewusst hart: sie
+// zwingt jeden, der ein Feld ergaenzt, die DB-Spalte mitzudenken.
+check('20 Felder', METRIC_FIELDS.length, 20)
 check('jedes Feld hat ein Label', METRIC_FIELDS.filter((f) => !METRIK_LABEL[f]).length, 0)
 check('Labels sind eindeutig', new Set(Object.values(METRIK_LABEL)).size, METRIC_FIELDS.length)
 check('keine Legacy-Felder mehr', METRIC_FIELDS.filter((f) =>

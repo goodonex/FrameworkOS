@@ -70,7 +70,11 @@ check('1b followup -> li_followups', metrikFeldFuer('followup'), 'li_followups')
 check('1c loom -> looms', metrikFeldFuer('loom'), 'looms')
 check('1d anfrage -> li_anfragen', metrikFeldFuer('anfrage'), 'li_anfragen')
 check('1e inmail -> inmails', metrikFeldFuer('inmail'), 'inmails')
-check('1f antwort -> keins', metrikFeldFuer('antwort'), null)
+// Seit 0081 (28.08.2026) zaehlbar: Kevins Tagesliste braucht ein Soll auch bei
+// den Antworten. Das Feld zaehlt ABGEARBEITETE Antworten — `antworten_li`
+// zaehlt die erhaltenen und bleibt unberuehrt.
+check('1f antwort -> antworten_erledigt', metrikFeldFuer('antwort'), 'antworten_erledigt')
+check('1f2 und ausdruecklich NICHT antworten_li', metrikFeldFuer('antwort') !== 'antworten_li', true)
 check('1g kundenaufgabe -> keins', metrikFeldFuer('kundenaufgabe'), null)
 check('1h kunde_liegt -> keins', metrikFeldFuer('kunde_liegt'), null)
 
@@ -84,15 +88,17 @@ check('1h kunde_liegt -> keins', metrikFeldFuer('kunde_liegt'), null)
   check('2d dauer immer geschrieben', aufrufe[2]?.dauerSekunden, 12)
 }
 
-// 3. antwort: KEIN Feld-Bump (die Antwort zaehlt nicht als Erstnachricht), aber
-//    seit 14.08.2026 SEHR WOHL eine Statusaktion — der Haken schreibt den Thread
-//    fort, statt ihn nur optisch durchzustreichen.
+// 3. antwort: Statusaktion (seit 14.08.2026 — der Haken schreibt den Thread
+//    fort, statt ihn nur optisch durchzustreichen) UND seit 0081 ein Bump auf
+//    `antworten_erledigt`. Reihenfolge wie bei den anderen Spuren: Status,
+//    Bump, Dauer.
 {
   const { deps, aufrufe } = makeDeps()
   await erledigePosten({ posten: makePosten({ id: 'thread:t1', spur: 'antwort' }), sekunden: 5 }, deps)
-  check('3a status + dauer', aufrufe.length, 2)
+  check('3a drei aufrufe (status + bump + dauer)', aufrufe.length, 3)
   check('3a2 followup auf der thread-id ohne praefix', aufrufe[0]?.followup, 't1')
-  check('3b dauer korrekt', aufrufe[1]?.dauerSekunden, 5)
+  check('3a3 bump antworten_erledigt +1', aufrufe[1], { feld: 'antworten_erledigt', delta: 1 })
+  check('3b dauer korrekt', aufrufe[2]?.dauerSekunden, 5)
 }
 
 // 4. kundenaufgabe: Task wird erledigt, aber KEIN Metrik-Bump.

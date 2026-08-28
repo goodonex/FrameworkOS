@@ -7,8 +7,11 @@
  * `useDailyMetrics` re-exportiert `METRIC_FIELDS`/`MetricField` — bestehende
  * Import-Pfade bleiben gültig.
  *
- * Am 06.08.2026 gegen die Prod-DB abgeglichen: alle 19 Felder existieren als
- * Spalte, und `daily_metrics` hat keine zählbare Spalte, die hier fehlt. Die vier
+ * Am 06.08.2026 gegen die Prod-DB abgeglichen: alle Felder existieren als
+ * Spalte, und `daily_metrics` hat keine zählbare Spalte, die hier fehlt.
+ * Seither dazugekommen: `antworten_erledigt` (Migration 0081) — wie viele
+ * Antworten Kevin an einem Tag ABGEARBEITET hat. Nicht zu verwechseln mit
+ * `antworten_li`, das die ERHALTENEN zählt. Die vier
  * Legacy-Sammelfelder (`coldmails`, `followups`, `antworten_cold`,
  * `termine_vereinbart`) sind mit Migration 0066 gefallen.
  *
@@ -25,6 +28,7 @@ export const METRIC_FIELDS = [
   'ig_nachrichten',
   'cold_calls',
   'li_followups',
+  'antworten_erledigt',
   'ig_followups',
   'call_followups',
   'antworten_li',
@@ -54,6 +58,7 @@ export const METRIK_LABEL: Record<MetricField, string> = {
   ig_nachrichten: 'Erstnachrichten (Instagram)',
   cold_calls: 'Cold Calls',
   li_followups: 'Follow-ups (LinkedIn)',
+  antworten_erledigt: 'Antworten abgearbeitet',
   ig_followups: 'Follow-ups (Instagram)',
   call_followups: 'Follow-up-Calls (Telefon)',
   antworten_li: 'Antworten (LinkedIn)',

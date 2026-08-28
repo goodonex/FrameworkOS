@@ -118,8 +118,9 @@ check(
     ereignisTypFuer('inmail') === null,
 )
 check(
-  'antwort ist ein Sonderfall: hat schon gar kein Metrikfeld, nicht erst keinen Ereignis-Typ',
-  metrikFeldFuer('antwort') === null && ereignisTypFuer('antwort') === null,
+  'antwort zaehlt seit 0081 ein Feld, hat aber weiterhin KEINEN Ereignis-Typ',
+  metrikFeldFuer('antwort') === 'antworten_erledigt' && ereignisTypFuer('antwort') === null,
+  'Der Grund ist unveraendert: antwort_erhalten bedeutet das GEGENTEIL (der LEAD hat geschrieben). Ihn beim Haken zu schreiben waere eine Luege ueber die Historie.',
 )
 
 /* ── 4. erledigePosten ruft protokolliere GENAU EINMAL ──────────────────── */

@@ -23,6 +23,7 @@ function makeRow(datum: string, umsatz: number): DailyMetricsRow {
     li_followups: 0,
     ig_followups: 0,
     call_followups: 0,
+    antworten_erledigt: 1,
     antworten_li: 1,
     antworten_inmail: 0,
     antworten_ig: 0,

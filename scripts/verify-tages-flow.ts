@@ -21,6 +21,7 @@ import {
   ANTWORT_FRISCHE_STUNDEN,
   ARBEITSTAGE_WOCHE,
   FOLLOWUP_PORTION_TAG,
+  PORTION_STUFEN,
   REAKTIVIERUNG_ZIEL_TAG,
   TAGES_FLOW,
   TAGES_FLOW_ZIELE,
@@ -86,13 +87,20 @@ for (const s of TAGES_FLOW) {
   check(`${s.id} hat Label, Lang-Label und Hinweis`, !!s.label && !!s.langLabel && !!s.hinweis)
 }
 check(
-  'die Antworten-Stufe ist die Frische-Stufe und zählt kein Feld',
-  TAGES_FLOW[ANTWORTEN].art === 'frische' && TAGES_FLOW[ANTWORTEN].feld === null,
-  'Das Mapping antwort → null in arbeitsmodusTracking ist Kevins Tabelle wörtlich — hier darf kein Feld erfunden werden.',
+  'die Antworten-Stufe zaehlt seit 0081 abgearbeitete Antworten',
+  TAGES_FLOW[ANTWORTEN].art === 'zaehler' && TAGES_FLOW[ANTWORTEN].feld === 'antworten_erledigt',
+  'Kevin will sie abarbeiten koennen („null von fuenf … am Ende elf von elf"), und dafuer braucht die Stufe ein Soll.',
 )
 check(
-  'alle übrigen Stufen sind Zähl-Stufen',
-  TAGES_FLOW.every((s) => s.id === 'antworten' || s.art === 'zaehler'),
+  'sie zaehlt NICHT antworten_li',
+  TAGES_FLOW[ANTWORTEN].feld !== 'antworten_li',
+  'antworten_li sind die ERHALTENEN Antworten (Kanal-Kennzahl im Trichter-Eingang). Wer beide zusammenlegt, macht daraus eine Erledigungsquote.',
+)
+check('alle Stufen sind Zähl-Stufen', TAGES_FLOW.every((s) => s.art === 'zaehler'))
+check(
+  'zurzeit gibt es keine Frische-Stufe mehr',
+  TAGES_FLOW.every((s) => s.art !== 'frische'),
+  'Der frische-Zweig in stufenStaende() hat damit keinen Nutzer. Er bleibt fuer den naechsten Fall stehen — wer hier eine Stufe hinzufuegt, liest ihn bitte zuerst, statt ihm zu vertrauen.',
 )
 
 // --- 3. Ziele werden abgeleitet, nicht abgetippt -------------------------
@@ -223,19 +231,54 @@ for (const [was, wert] of [
 }
 check('der ui_settings-Schlüssel ist benannt', TAGES_FLOW_ZIELE.length > 0)
 
-// --- 7. Die Frische-Stufe (Antworten) -----------------------------------
-check('die Frische-Schwelle ist ein Tag', ANTWORT_FRISCHE_STUNDEN === 24)
-const frisch = stufenStaende(eingabe({ antworten: { warten: 43, aeltesteStunden: 3 } }))[ANTWORTEN]
+// --- 7. Die Antworten-Stufe (seit 0081 ein Zaehler) ----------------------
+//
+// Vorher war sie eine Frische-Frage: „43 duerfen warten, solange keiner ueber
+// der Schwelle ist." Das war klug und beantwortete Kevins Frage trotzdem
+// nicht. Jetzt gilt: wer wartet, wird beantwortet — alle, ohne Drossel. Eine
+// unbeantwortete Antwort ist ein offener Faden zu jemandem, der GERADE
+// geschrieben hat; da gibt es keinen Berg, den man in Portionen abtruege.
+check('die Frische-Schwelle steht weiter (fuer die Farbe an der Zeile)', ANTWORT_FRISCHE_STUNDEN === 24)
+
+const wartet43 = stufenStaende(eingabe({ antworten: { warten: 43, aeltesteStunden: 3 } }))[ANTWORTEN]
 check(
-  '43 dürfen warten, solange keiner über der Schwelle ist',
-  frisch.erledigt && frisch.wert === 43,
-  'Bei Antworten zählt Reaktionszeit, nicht Vollständigkeit.',
+  '43 Wartende sind 43 offene Antworten, nicht „frisch genug"',
+  !wartet43.erledigt && wartet43.soll === 43 && wartet43.wert === 0,
+  `Ist: erledigt=${wartet43.erledigt} soll=${wartet43.soll} wert=${wartet43.wert}`,
 )
-const abgestanden = stufenStaende(eingabe({ antworten: { warten: 2, aeltesteStunden: 26 } }))[ANTWORTEN]
-check('ein Wartender von vorgestern macht die Stufe rot', !abgestanden.erledigt)
 const niemand = stufenStaende(eingabe({ antworten: { warten: 0, aeltesteStunden: null } }))[ANTWORTEN]
-check('niemand wartet → die Stufe steht', niemand.erledigt && niemand.wert === 0)
-check('die Frische-Stufe hat nie ein Soll', frisch.soll === 0 && abgestanden.soll === 0)
+check('niemand wartet → die Stufe steht', niemand.erledigt && niemand.soll === 0)
+
+const halbFertig = stufenStaende(
+  eingabe({ today: { antworten_erledigt: 2 }, antworten: { warten: 3, aeltesteStunden: 5 } }),
+)[ANTWORTEN]
+check(
+  'das Soll bleibt beim Abhaken stehen: 2 erledigt + 3 offen = 5',
+  halbFertig.soll === 5 && halbFertig.wert === 2 && !halbFertig.erledigt,
+  `Ist: ${halbFertig.wert} von ${halbFertig.soll}. Ohne „+ wert" schrumpfte das Soll mit jedem Haken mit und die Zeile loege ueber den Tag.`,
+)
+const ganzFertig = stufenStaende(
+  eingabe({ today: { antworten_erledigt: 5 }, antworten: { warten: 0, aeltesteStunden: null } }),
+)[ANTWORTEN]
+check('5 von 5 steht', ganzFertig.erledigt && ganzFertig.wert === 5 && ganzFertig.soll === 5)
+
+check(
+  'die Antworten-Stufe friert ihr Soll ein',
+  PORTION_STUFEN.includes('antworten'),
+  'Sonst waere die Zeile ein bewegliches Ziel: kommt um 14 Uhr eine sechste Antwort, stuende „3 von 6" statt „3 von 5" — und der Tag waere nie abgearbeitet.',
+)
+const eingefroren = stufenStaende(
+  eingabe({
+    today: { antworten_erledigt: 3 },
+    antworten: { warten: 3, aeltesteStunden: 5 },
+    portionen: { antworten: 5 },
+  }),
+)[ANTWORTEN]
+check(
+  'die eingefrorene Portion sticht die Live-Rechnung',
+  eingefroren.soll === 5,
+  `Ist ${eingefroren.soll} — live waeren es 6, aber die sechste ist Ware fuer morgen.`,
+)
 
 // --- 8. Stände ----------------------------------------------------------
 const standardTag = eingabe({
@@ -249,12 +292,12 @@ const s1 = stufenStaende(standardTag)
 check('sechs Stände für sechs Stufen', s1.length === 6)
 check('Anfragen stehen bei 30/30', s1[ANFRAGEN].erledigt && s1[ANFRAGEN].wert === 30 && s1[ANFRAGEN].soll === 30)
 check('Erstnachrichten stehen (alle raus: offen 0)', s1[ERSTNACHRICHTEN].erledigt)
-check('Antworten sind frisch', s1[ANTWORTEN].erledigt)
+check('Antworten sind offen (0 von 5)', !s1[ANTWORTEN].erledigt && s1[ANTWORTEN].soll === 5)
 check('Follow-ups sind offen (0 von 3)', !s1[FOLLOWUPS].erledigt && s1[FOLLOWUPS].soll === 3)
 check('Reaktivierung ist offen (0 von 5)', !s1[REAKTIVIERUNG].erledigt && s1[REAKTIVIERUNG].soll === 5)
 check('Looms stehen bei 2/2', s1[LOOMS].erledigt)
-check('die erste offene Stufe sind die Follow-ups', ersteOffeneStufe(s1) === FOLLOWUPS)
-check('Fortschritt: 4 von 6', JSON.stringify(flowFortschritt(s1)) === JSON.stringify({ erledigt: 4, gesamt: 6 }))
+check('die erste offene Stufe sind die Antworten', ersteOffeneStufe(s1) === ANTWORTEN)
+check('Fortschritt: 3 von 6', JSON.stringify(flowFortschritt(s1)) === JSON.stringify({ erledigt: 3, gesamt: 6 }))
 
 const uebererfuellt = stufenStaende(eingabe({ today: { li_anfragen: 44 } }))
 check('mehr als das Ziel gilt als erledigt', uebererfuellt[ANFRAGEN].erledigt)
@@ -288,11 +331,11 @@ check('ein vollendeter Tag hat keine offene Stufe', ersteOffeneStufe(allesFertig
 check('Fortschritt am vollendeten Tag: 6 von 6', flowFortschritt(allesFertig).erledigt === 6)
 
 // --- 9. Auto-Advance ----------------------------------------------------
-check('von Stufe 1 aus geht es auf die nächste offene (Follow-ups)', naechsteStufe(s1, ANFRAGEN) === FOLLOWUPS)
+check('von Stufe 1 aus geht es auf die nächste offene (Antworten)', naechsteStufe(s1, ANFRAGEN) === ANTWORTEN)
 check('von den Follow-ups aus geht es weiter zur Reaktivierung', naechsteStufe(s1, FOLLOWUPS) === REAKTIVIERUNG)
 check(
   'nach der letzten offenen Stufe wird von vorne gesucht',
-  naechsteStufe(s1, LOOMS) === FOLLOWUPS,
+  naechsteStufe(s1, LOOMS) === ANTWORTEN,
   'Wer mittendrin einsteigt, darf vorne Offenes nicht verlieren.',
 )
 check('ist alles erledigt, gibt es kein Weiter (-1)', naechsteStufe(allesFertig, 0) === -1)
@@ -314,7 +357,13 @@ check(
 )
 check('ein leerer Flow bricht den Auto-Advance nicht', naechsteStufe([], 0) === -1)
 
-// Der Zähl-Advance überspringt die zähllose Antworten-Stufe.
+/**
+ * Der Zähl-Advance darf seit 0081 auf der Antworten-Stufe landen — sie hat
+ * jetzt ein Feld und damit eine Seite unter `/tracking/zaehlen`. Der Schutz,
+ * um den es hier geht, bleibt trotzdem noetig: ein Sprungziel ohne Feld waere
+ * `/tracking/zaehlen/null`, also eine Sackgasse. Dass zurzeit keine Stufe ohne
+ * Feld existiert, macht die Regel nicht ueberfluessig, sondern nur still.
+ */
 const antwortenOffen = stufenStaende(
   eingabe({
     today: { li_anfragen: 30, li_nachrichten: 2 },
@@ -324,13 +373,19 @@ const antwortenOffen = stufenStaende(
   }),
 )
 check(
-  'der Zähl-Advance landet nie auf der Antworten-Stufe',
-  naechsteZaehlbareStufe(antwortenOffen, ANFRAGEN) === FOLLOWUPS,
-  'Die Antworten-Stufe hat im Zähl-Modus keine Seite — /tracking/zaehlen/null wäre die Sackgasse.',
+  'der Zähl-Advance landet auf der Antworten-Stufe, weil sie jetzt zaehlbar ist',
+  naechsteZaehlbareStufe(antwortenOffen, ANFRAGEN) === ANTWORTEN,
 )
 check(
-  'der normale Advance darf dagegen auf ihr landen (fürs Sales-Board)',
+  'der normale Advance ebenso',
   naechsteStufe(antwortenOffen, ANFRAGEN) === ANTWORTEN,
+)
+check(
+  'kein Sprungziel ohne Feld — sonst waere es /tracking/zaehlen/null',
+  (() => {
+    const ziel = naechsteZaehlbareStufe(antwortenOffen, ANFRAGEN)
+    return ziel < 0 || TAGES_FLOW[ziel].feld !== null
+  })(),
 )
 
 // --- 10. flowQuellen: eine Abfrage, eine Zahl ---------------------------

@@ -14,9 +14,14 @@ import { TAGES_FLOW, type Stufe, type StufenId } from './tagesFlow'
  *
  * **Die Reihenfolge ist der Tages-Flow** (D7, 11.08.): vorne die Stufen aus
  * `tagesFlow.ts` in Kevins Reihenfolge, dahinter die Kanäle, die nicht Teil
- * des Rituals sind. Die Antworten-Stufe fehlt hier mit Absicht: sie hat kein
- * Zähl-Feld (Antworten werden abgearbeitet, nicht gezählt) — ihre Arbeit
- * passiert im Sales-Flow, nicht unterm Daumen.
+ * des Rituals sind.
+ *
+ * **Die Antworten-Stufe ist seit dem 28.08.2026 dabei** (Migration 0081). Sie
+ * fehlte hier, solange sie kein Zähl-Feld hatte; jetzt zählt sie
+ * `antworten_erledigt` und bekommt wie jede andere Stufe ihre Kachel. Das ist
+ * eine Folge des Umbaus, keine eigene Absicht: Kevins Weg zu den Antworten
+ * führt weiter über die Arbeitsliste im Sales-Flow — die Kachel ist der
+ * Nachtrag für unterwegs, nicht der Hauptweg.
  */
 export interface ZaehlFeld {
   field: MetricField

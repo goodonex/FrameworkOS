@@ -31,6 +31,7 @@ import { INMAIL_CREDITS_STAND, type Posten, type Spur } from '../lib/prioritaet'
 import type { LinkedinThread } from '../../types/db'
 import { bereiteDatenVor, salesSerie, type SalesStreak } from '../lib/salesStreak'
 import {
+  ANTWORT_FRISCHE_STUNDEN,
   TAGES_FLOW,
   ersteOffeneStufe,
   flowFortschritt,
@@ -839,7 +840,14 @@ export function SalesDashboard() {
   )
 
   const antwortenAelteste = flowLive.antworten?.aeltesteStunden ?? null
-  const antwortenAbgestanden = antwortenAelteste !== null && antwortenAelteste >= 24
+  /**
+   * Die Schwelle kommt aus `tagesFlow.ts`, nicht aus dieser Datei. Sie stand
+   * hier bis zum 28.08.2026 als blanke 24 daneben — zwei Orte fuer dieselbe
+   * Zahl. Seit die Antworten-Stufe ein Zaehler ist (0081), ist das hier ihr
+   * einziger Nutzer: Die Frische entscheidet nicht mehr, OB die Stufe steht,
+   * nur noch, welche Farbe der Hinweis traegt.
+   */
+  const antwortenAbgestanden = antwortenAelteste !== null && antwortenAelteste >= ANTWORT_FRISCHE_STUNDEN
 
   /**
    * WER am längsten wartet, nicht nur wie lange (19.08.2026).
@@ -899,26 +907,30 @@ export function SalesDashboard() {
         return {
           ...basis,
           id: 'antworten',
+          /**
+           * Seit 0081 „n von m" wie jede andere Stufe (28.08.2026). Vorher
+           * stand hier „43 warten · am laengsten Michael Petersen (31 h)" —
+           * eine wahre und nuetzliche Zeile, die Kevins Frage trotzdem nicht
+           * beantwortete: er will sie ABARBEITEN und am Abend „11 von 11"
+           * sehen. Wer am laengsten wartet, steht jetzt in der Unterzeile;
+           * verloren geht nichts, es wechselt nur den Rang.
+           */
           kennzahl: linkedinThreads.tableMissing
             ? 'Migration 0058 ausstehend'
-            : zahl(
-                (antwortenStand?.wert ?? 0) === 0
-                  ? 'Niemand wartet'
-                  : `${antwortenStand?.wert} warten · am längsten ${
-                      antwortenAeltester ? antwortenAeltester.name : 'unbekannt'
-                    }${
-                      antwortenAelteste === null
-                        ? ''
-                        : antwortenAelteste < 48
-                          ? ` (${Math.max(1, Math.round(antwortenAelteste))} h)`
-                          : ` (${Math.round(antwortenAelteste / 24)} Tage)`
-                    }`,
-              ),
+            : zahl(`${antwortenStand?.wert ?? 0} von ${antwortenStand?.soll ?? 0}`),
           kennzahlFarbe: !flow.laedt && antwortenAbgestanden ? 'var(--ck-warn)' : undefined,
-          unterzeile:
-            ausgeblendetListe.length > 0
-              ? `${zuerst(antwortListe) ?? 'Reaktionszeit zählt'} · ${ausgeblendetListe.length} ausgeblendet`
-              : (zuerst(antwortListe) ?? 'Reaktionszeit zählt — nicht die Menge.'),
+          unterzeile: (() => {
+            const teile: string[] = []
+            if (antwortenAeltester && antwortenAelteste !== null) {
+              const alter =
+                antwortenAelteste < 48
+                  ? `${Math.max(1, Math.round(antwortenAelteste))} h`
+                  : `${Math.round(antwortenAelteste / 24)} Tage`
+              teile.push(`am längsten ${antwortenAeltester.name} (${alter})`)
+            }
+            if (ausgeblendetListe.length > 0) teile.push(`${ausgeblendetListe.length} ausgeblendet`)
+            return teile.length > 0 ? teile.join(' · ') : 'Wer geschrieben hat, wartet auf dich.'
+          })(),
           inhalt: () => (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {liste(antwortListe)()}
