@@ -34,6 +34,31 @@ export interface NetzwerkEintrag {
 }
 
 /** Eine Person in einer Funnel-Liste — das, was die Oberfläche zeigt. */
+/**
+ * Ab wann ist eine Annahme noch eine Nachricht wert? (31.08.2026)
+ *
+ * Kevins Entscheidung, nachdem die Aufteilung des Vorrats auf dem Tisch lag
+ * (502 Wartende, ältester Eintrag Januar 2023): **„ab Januar 26. und auch nur
+ * da wo es sinn macht."**
+ *
+ * Die 147 Annahmen aus der Zeit davor stammen aus Kevins Anstellung und aus
+ * Anfragen, die er vor der Selbstständigkeit gestellt hat — wer damals
+ * angenommen hat, kennt HERRMANN & CO. nicht und würde eine Nachricht als
+ * kalten Anwurf lesen. Sie werden nicht gelöscht: Sie stehen weiter im Canvas
+ * als Bestand, nur nicht mehr im Tagespensum und nicht in der Agenten-Vorlage.
+ *
+ * Der zweite Halbsatz („nur da wo es sinn macht") ist der ICP-Filter, den die
+ * Aufrufer ohnehin anlegen — plus der Agent, der `unklar` auflöst und
+ * Aussortierte auf `uebersprungen` setzt, damit sie nicht wiederkommen.
+ */
+export const ERSTNACHRICHT_STICHTAG = '2026-01-01'
+
+/** Wartet die Person seit dem Stichtag? Ohne Datum: ja (lieber prüfen als verlieren). */
+export function nachStichtag(seit: string | null | undefined, stichtag = ERSTNACHRICHT_STICHTAG): boolean {
+  if (!seit) return true
+  return String(seit).slice(0, 10) >= stichtag
+}
+
 export interface FunnelPerson {
   /** Stabiler Schlüssel für React und zum Entdoppeln. */
   key: string

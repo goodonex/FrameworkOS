@@ -130,19 +130,28 @@ Zufluss stimmt das — die 502 sind aufgelaufener Altbestand, keine Tagesmenge,
 und ein Deckel hätte ihn versteckt statt abgetragen. Ein eigenes Ziel aus
 `ui_settings` sticht weiterhin, falls doch einmal gedrosselt werden soll.
 
-**Der Altbestand ist die offene Entscheidung, nicht die Anzeige.** Der Vorrat
-reicht bis **Januar 2023** zurück:
+**Der Stichtag steht: ab dem 01.01.2026** (`ERSTNACHRICHT_STICHTAG` in
+`funnelStufen.ts`). Kevin, nachdem die Aufteilung auf dem Tisch lag: *„ab Januar
+26. und auch nur da wo es sinn macht."*
 
-| angenommen | Anzahl |
-|---|---|
-| ab 01.08.2026 | 62 |
-| ab 01.06.2026 | 202 |
-| ab 01.01.2026 | 355 |
-| davor | 147 |
+| angenommen | Anzahl | im Pensum |
+|---|---|---|
+| ab 01.08.2026 | 62 | ja |
+| ab 01.06.2026 | 202 | ja |
+| ab 01.01.2026 | **355** | **ja** |
+| davor (bis Januar 2023) | 147 | nein |
 
-Solange kein Stichtag gesetzt ist, steht die volle Zahl im Nenner. Das ist
-ehrlich, aber es macht die Zeile am Tag eins unerreichbar — zu klären, sobald
-Kevin sagt, ab wann eine Annahme noch eine Nachricht wert ist.
+Die 147 aus der Zeit davor stammen aus Kevins Anstellung — wer damals angenommen
+hat, kennt HERRMANN & CO. nicht und läse eine Nachricht als kalten Anwurf. Sie
+werden **nicht gelöscht**: Sie stehen weiter im Canvas als Bestand, nur nicht im
+Tagespensum und nicht in der Agenten-Vorlage.
+
+**Der zweite Halbsatz steckt in der Reihenfolge.** Der Wortlisten-Filter urteilt
+`unklar`, sobald kein Off-Wort fällt — über die Hälfte des Vorrats, und der
+erste Lauf sortierte davon 6 von 12 aus. Nähme der Agent stur die Jüngsten,
+ginge der halbe Lauf für Fitness-Coaches drauf. Er nimmt jetzt **Kern-ICP
+zuerst, dann Rand, dann `unklar`** — innerhalb einer Gruppe die Jüngsten.
+Vorher standen drei Coaches an der Spitze der Vorlage, jetzt fünf Makler.
 
 ### Der Topf füllt sich jetzt von selbst
 

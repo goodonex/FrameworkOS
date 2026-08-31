@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { antwortPosten, erstnachrichtPosten, followupPosten, loomPosten } from '../cockpit/lib/arbeitsmodusQuellen'
-import { angenommenOhneErstnachricht } from '../cockpit/lib/funnelStufen'
+import { angenommenOhneErstnachricht, nachStichtag } from '../cockpit/lib/funnelStufen'
 import { icpUrteil, istArbeitsVorrat } from '../cockpit/lib/icp'
 import {
   eigeneAufgabenPosten,
@@ -114,9 +114,11 @@ export function usePosten(slug: string | undefined): UsePostenResult {
    */
   const erstnachrichtWartend = useMemo(
     () =>
-      angenommenOhneErstnachricht(netzwerk.items, linkedinThreads.items, erstnachrichten.items, jetzt).filter((p) =>
-        istArbeitsVorrat(icpUrteil(p.info ?? '', p.name).urteil),
-      ),
+      angenommenOhneErstnachricht(netzwerk.items, linkedinThreads.items, erstnachrichten.items, jetzt)
+        // „ab Januar 26. und auch nur da wo es sinn macht" (Kevin, 31.08.):
+        // erst der Stichtag, dann der ICP-Filter.
+        .filter((p) => nachStichtag(p.seit))
+        .filter((p) => istArbeitsVorrat(icpUrteil(p.info ?? '', p.name).urteil)),
     [netzwerk.items, linkedinThreads.items, erstnachrichten.items, jetzt],
   )
 

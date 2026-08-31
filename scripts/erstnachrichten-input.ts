@@ -22,7 +22,7 @@
  * Start: npx tsx scripts/erstnachrichten-input.ts [--limit=12]
  */
 import { readFileSync } from 'node:fs'
-import { angenommenOhneErstnachricht } from '../app/src/cockpit/lib/funnelStufen'
+import { ERSTNACHRICHT_STICHTAG, angenommenOhneErstnachricht, nachStichtag } from '../app/src/cockpit/lib/funnelStufen'
 import { icpUrteil, istArbeitsVorrat } from '../app/src/cockpit/lib/icp'
 
 /**
@@ -30,8 +30,9 @@ import { icpUrteil, istArbeitsVorrat } from '../app/src/cockpit/lib/icp'
  *
  * Zwölf, nicht fünfzig: Der Agent sieht sich je Lead die Website an
  * (WebFetch/WebSearch), und ein Lauf soll in Minuten durch sein, nicht in einer
- * halben Stunde. Der Rückstau von 508 wird über Tage abgetragen — das
- * Tagespensum in `tagesFlow.ts` liegt ohnehin bei zehn.
+ * halben Stunde. Das ist die Grenze DIESES Laufs, kein Tagespensum — in der
+ * Kachel stehen alle Wartenden (Kevin am 31.08.: „Alle raus. Sind nicht so
+ * viele."). Der aufgelaufene Bestand wird über mehrere Läufe abgetragen.
  */
 const STANDARD_LIMIT = 12
 
@@ -89,23 +90,40 @@ async function main() {
    * behandelt: Ein fälschlich aussortierter Makler ist ein verlorener Kunde,
    * ein fälschlich behaltener Coach kostet einen Blick.
    */
-  const vorrat = wartend.filter((p) => istArbeitsVorrat(icpUrteil(p.info ?? '', p.name).urteil))
+  const vorrat = wartend
+    // Kevins Stichtag (31.08.): „ab Januar 26." — Begründung an der Konstante.
+    .filter((p) => nachStichtag(p.seit))
+    .filter((p) => istArbeitsVorrat(icpUrteil(p.info ?? '', p.name).urteil))
 
   /**
-   * Die JÜNGSTEN zuerst, nicht die ältesten.
+   * **Sichere Makler zuerst, dann die Unklaren** — und innerhalb davon die
+   * Jüngsten (31.08.2026, zweiter Halbsatz von „nur da wo es sinn macht").
    *
-   * Anders als bei Follow-ups, wo der Älteste am dringendsten ist: Wer gestern
-   * angenommen hat, erinnert sich an die Anfrage — bei jemandem aus dem April
-   * ist die Annahme eine Randnotiz. `angenommenOhneErstnachricht` sortiert
-   * bereits so; hier steht es nur explizit, damit ein Umbau dort nicht still
-   * die Reihenfolge dreht.
+   * Der Wortlisten-Filter urteilt `unklar`, sobald kein Off-Wort fällt; im
+   * Vorrat sind das über die Hälfte, und der erste echte Lauf hat davon 6 von
+   * 12 aussortiert. Nähme der Agent stur die Jüngsten, ginge der halbe Lauf für
+   * Fitness-Coaches drauf, und Kevin fände morgens sechs Texte statt zwölf.
+   * Mit dieser Reihenfolge liegt zuerst brauchbares Material da; die Unklaren
+   * kommen dran, wenn die Sicheren durch sind — aussortiert werden müssen sie
+   * ohnehin, aber sie halten dann niemanden auf.
+   *
+   * Innerhalb einer Gruppe die Jüngsten zuerst: Wer gestern angenommen hat,
+   * erinnert sich an die Anfrage; bei einer Annahme aus dem Februar ist sie
+   * eine Randnotiz.
    */
-  const sortiert = [...vorrat].sort((a, b) => String(b.seit ?? '').localeCompare(String(a.seit ?? '')))
+  const rang = { kern: 0, rand: 1, unklar: 2, off: 3 } as const
+  const sortiert = [...vorrat].sort((a, b) => {
+    const ra = rang[icpUrteil(a.info ?? '', a.name).urteil] ?? 9
+    const rb = rang[icpUrteil(b.info ?? '', b.name).urteil] ?? 9
+    if (ra !== rb) return ra - rb
+    return String(b.seit ?? '').localeCompare(String(a.seit ?? ''))
+  })
   const limit = argZahl('limit', STANDARD_LIMIT)
   const auswahl = sortiert.slice(0, limit)
 
   process.stdout.write(
     JSON.stringify({
+      stichtag: ERSTNACHRICHT_STICHTAG,
       gesamt: sortiert.length,
       weitereWarten: Math.max(0, sortiert.length - auswahl.length),
       leads: auswahl.map((p) => ({

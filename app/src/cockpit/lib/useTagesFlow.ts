@@ -1,4 +1,4 @@
-import { angenommenOhneErstnachricht } from './funnelStufen'
+import { angenommenOhneErstnachricht, nachStichtag } from './funnelStufen'
 import { icpUrteil, istArbeitsVorrat } from './icp'
 import { useEffect, useMemo } from 'react'
 import { useErstnachrichten } from '../../hooks/useErstnachrichten'
@@ -87,7 +87,9 @@ export function useFlowLiveQuellen(): { quellen: FlowLiveQuellen; laedt: boolean
             threads.items,
             erstnachrichten.items,
             jetzt,
-          ).filter((p) => istArbeitsVorrat(icpUrteil(p.info ?? '', p.name).urteil)),
+          )
+            .filter((p) => nachStichtag(p.seit))
+            .filter((p) => istArbeitsVorrat(icpUrteil(p.info ?? '', p.name).urteil)),
           loom: loomPosten(threads.items),
           antwort: antwortPosten(threads.items, jetzt, contacts.items),
         },
