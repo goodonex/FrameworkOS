@@ -72,15 +72,19 @@ export const REAKTIVIERUNG_ZIEL_TAG = 5
 export const FOLLOWUP_PORTION_TAG = 20
 
 /**
- * Wie viele Erstnachrichten an einem Tag höchstens fällig werden (31.08.2026).
+ * **Kein Deckel bei den Erstnachrichten** (31.08.2026, nach Kevins Widerspruch).
  *
- * Vorher gab es keinen Deckel — „alle raus, die da sind" stimmte, solange der
- * Topf täglich geleert wurde. Seit die Stufe die echten Wartenden zählt, wären
- * das 375 an einem Tag: eine Zahl, die niemand abarbeitet und die deshalb nach
- * zwei Tagen ignoriert wird. Zehn liegt über dem Wochenziel (40 ÷ 5 = 8) und
- * lässt damit Luft, den Rückstau abzutragen, ohne den Tag zu verstopfen.
+ * Ich hatte einen eingezogen, weil 508 Wartende kein Tagespensum sind. Kevins
+ * Antwort: *„Nein, kein Tagespensum von zehn bei den Erstnachrichten. Alle
+ * raus. Sind nicht so viele. Ich hab da am Tag vielleicht zehn, wenn's krass
+ * hochkommt."* — und für den Zufluss stimmt das: An einem starken Tag nimmt
+ * eine Handvoll an, nicht fünfhundert.
+ *
+ * Die 508 sind der aufgelaufene Altbestand, keine Tagesmenge. Ein Deckel hätte
+ * ihn versteckt statt abgetragen — und für den Normalbetrieb ein Limit dort
+ * eingezogen, wo Kevin gerade keines braucht. Wer angenommen hat, bekommt seine
+ * Nachricht; das ist der ganze Sinn der Stufe.
  */
-export const ERSTNACHRICHT_PORTION_TAG = 10
 
 /**
  * Ab wann eine wartende Antwort die Frische-Stufe rot macht. Bei Antworten
@@ -338,12 +342,14 @@ export function sollFuer(stufe: Stufe, eingabe: FlowEingabe): number {
   const wert = wertVon(stufe, eingabe)
 
   switch (stufe.id) {
-    case 'erstnachrichten': {
-      // Gedeckelt wie die Follow-ups: Der Nenner ist ein Tagespensum, kein
-      // Rückstand-Berg. `+ wert`, damit das Soll beim Abhaken stehen bleibt.
-      const drossel = gueltigesZiel(eigen) ? eigen : ERSTNACHRICHT_PORTION_TAG
-      return Math.min(drossel, anzahl(eingabe.erstnachrichtenOffen) + wert)
-    }
+    case 'erstnachrichten':
+      // Alle, die warten — kein Deckel (siehe oben). `+ wert`, damit das Soll
+      // beim Abhaken stehen bleibt und die Zeile nicht über den Tag lügt.
+      // Ein eigenes Ziel aus `ui_settings` sticht weiterhin, falls Kevin doch
+      // einmal drosseln will.
+      return gueltigesZiel(eigen)
+        ? Math.min(eigen, anzahl(eingabe.erstnachrichtenOffen) + wert)
+        : anzahl(eingabe.erstnachrichtenOffen) + wert
     case 'antworten':
       /**
        * Wer wartet, wird beantwortet — alle, nicht eine Portion. Anders als

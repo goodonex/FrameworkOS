@@ -110,7 +110,7 @@ sie bereit."* Notiert und vier Tage lang nicht geschlossen.
 
 | | vorher | jetzt |
 |---|---|---|
-| Nenner der Kachel | fertige Entwürfe | **wartende Menschen**, gedeckelt auf ein Tagespensum (10) |
+| Nenner der Kachel | fertige Entwürfe | **wartende Menschen**, ohne Deckel |
 | Zweite Zahl | — | `material`: wie viele Texte bereitliegen |
 | Grüner Haken bei leerem Topf | ja | **nie**, solange jemand wartet (`blockiert`) |
 
@@ -122,6 +122,27 @@ gelöscht, sonst hätte sie die neue Zahl bis morgen gedeckt.
 
 `uebersprungen` zählt in `angenommenOhneErstnachricht` ab jetzt wie `gesendet` —
 ohne das stünde derselbe aussortierte Fitness-Coach jeden Morgen wieder oben.
+
+**Ein Tagesdeckel von zehn war drin und ist wieder raus.** Kevins Widerspruch:
+*„Nein, kein Tagespensum von zehn bei den Erstnachrichten. Alle raus. Sind nicht
+so viele. Ich hab da am Tag vielleicht zehn, wenn's krass hochkommt."* Für den
+Zufluss stimmt das — die 502 sind aufgelaufener Altbestand, keine Tagesmenge,
+und ein Deckel hätte ihn versteckt statt abgetragen. Ein eigenes Ziel aus
+`ui_settings` sticht weiterhin, falls doch einmal gedrosselt werden soll.
+
+**Der Altbestand ist die offene Entscheidung, nicht die Anzeige.** Der Vorrat
+reicht bis **Januar 2023** zurück:
+
+| angenommen | Anzahl |
+|---|---|
+| ab 01.08.2026 | 62 |
+| ab 01.06.2026 | 202 |
+| ab 01.01.2026 | 355 |
+| davor | 147 |
+
+Solange kein Stichtag gesetzt ist, steht die volle Zahl im Nenner. Das ist
+ehrlich, aber es macht die Zeile am Tag eins unerreichbar — zu klären, sobald
+Kevin sagt, ab wann eine Annahme noch eine Nachricht wert ist.
 
 ### Der Topf füllt sich jetzt von selbst
 
