@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { antwortPosten, erstnachrichtPosten, followupPosten, loomPosten } from '../cockpit/lib/arbeitsmodusQuellen'
+import { angenommenOhneErstnachricht } from '../cockpit/lib/funnelStufen'
+import { icpUrteil, istArbeitsVorrat } from '../cockpit/lib/icp'
 import {
   eigeneAufgabenPosten,
   kundeLiegtPosten,
@@ -27,6 +29,14 @@ export interface UsePostenResult {
   /** Alle Posten in Rangfolge (Zug 1) — die Oberfläche kürzt selbst. */
   geordnet: Posten[]
   quellen: PostenQuellen
+  /**
+   * Angenommene ohne Erstnachricht, ICP-gefiltert (31.08.2026).
+   *
+   * Bewusst NICHT in `quellen`: Das sind Menschen ohne Text, also nichts, was
+   * sich abarbeiten liesse. Sie stehen im Nenner der Tageskachel, damit „0 von
+   * 0 ✓" nicht mehr vorkommt, während Hunderte warten.
+   */
+  erstnachrichtWartend: ReturnType<typeof angenommenOhneErstnachricht>
   /** Projekte, die > 14 Tage liegen — eigene Kennzahl der Kachel „Liegt zu lange". */
   liegend: ReturnType<typeof liegendeProjekte>
   /** Minutengenauer „jetzt"-Zeitpunkt, den alle abgeleiteten Werte teilen. */
@@ -90,6 +100,26 @@ export function usePosten(slug: string | undefined): UsePostenResult {
     [erstnachrichten.items, linkedinThreads.items, netzwerk.items],
   )
 
+  /**
+   * Die Angenommenen, die auf ihre Erstnachricht warten (31.08.2026).
+   *
+   * **Keine Posten-Spur, sondern eine Bestandszahl.** Man kann sie nicht
+   * abarbeiten — für sie ist ja noch nichts geschrieben. Genau das war der
+   * Fehler, den Kevin am 31.08. fand: Die Tageskachel zählte die fertigen
+   * Entwürfe und meldete „0 von 0 ✓", während 375 Menschen warteten.
+   *
+   * Dieselbe Funktion, die im Canvas die Karte „Erstnachricht" füllt — plus
+   * den ICP-Filter, den auch die Nacht-Agenten anlegen („37 Off-ICP
+   * übersprungen"). Ohne ihn stünden Coaches und Recruiter im Tagespensum.
+   */
+  const erstnachrichtWartend = useMemo(
+    () =>
+      angenommenOhneErstnachricht(netzwerk.items, linkedinThreads.items, erstnachrichten.items, jetzt).filter((p) =>
+        istArbeitsVorrat(icpUrteil(p.info ?? '', p.name).urteil),
+      ),
+    [netzwerk.items, linkedinThreads.items, erstnachrichten.items, jetzt],
+  )
+
   const quellen: PostenQuellen = useMemo(
     () => ({
       kundenaufgabe: kundenaufgabePosten,
@@ -121,6 +151,8 @@ export function usePosten(slug: string | undefined): UsePostenResult {
   return {
     geordnet,
     quellen,
+    /** Angenommene ohne Erstnachricht (ICP-gefiltert) — Bestand, keine Arbeitsspur. */
+    erstnachrichtWartend,
     liegend,
     jetzt,
     contacts,

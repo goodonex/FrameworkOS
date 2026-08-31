@@ -133,7 +133,10 @@ export function UrielHome() {
    * „Heute" und die Sales-Zeilen füttern. Die Seite lädt dafür nichts nach:
    * `usePosten` hat Threads und Erstnachrichten schon in der Hand.
    */
-  const flowLive = useMemo(() => flowQuellen(posten.quellen, jetzt), [posten.quellen, jetzt])
+  const flowLive = useMemo(
+    () => flowQuellen({ ...posten.quellen, erstnachrichtWartend: posten.erstnachrichtWartend }, jetzt),
+    [posten.quellen, posten.erstnachrichtWartend, jetzt],
+  )
   const flow = useTagesFlow(
     metrics.today,
     flowLive,

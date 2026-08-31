@@ -503,7 +503,12 @@ export function SalesDashboard() {
    * aus DENSELBEN Listen, die sich hinter den Zeilen öffnen („eine Abfrage,
    * eine Zahl"). `useTagesFlow` friert dabei die Tagesportionen ein (0074).
    */
-  const flowLive = useMemo(() => flowQuellen(quellen, jetzt), [quellen, jetzt])
+  // `erstnachrichtWartend` steht bewusst NEBEN den Quellen: Es sind Menschen
+  // ohne Text, also keine abarbeitbaren Posten (31.08.2026).
+  const flowLive = useMemo(
+    () => flowQuellen({ ...quellen, erstnachrichtWartend: posten.erstnachrichtWartend }, jetzt),
+    [quellen, posten.erstnachrichtWartend, jetzt],
+  )
   const flow = useTagesFlow(metrics.today, flowLive, postenLaedt || metrics.loading)
   const staende = flow.staende
   const standJeStufe = useMemo(() => {
@@ -948,17 +953,62 @@ export function SalesDashboard() {
             />
           ),
         }
-      case 'erstnachrichten':
+      case 'erstnachrichten': {
+        /**
+         * Zwei Zahlen, die vorher eine waren (31.08.2026).
+         *
+         * Kevins Screenshot: „0 von 0 ✓", während 508 Angenommene warteten und
+         * vier frisch angenommene Makler im Postfach lagen. Die Zeile zählte
+         * die fertigen Entwürfe — leerer Topf sah aus wie leerer Posteingang.
+         *
+         * Jetzt trägt die Kennzahl das Tagespensum aus den WARTENDEN, und die
+         * Unterzeile sagt, ob dafür überhaupt Text bereitliegt. `blockiert`
+         * kommt aus `stufenStaende` und hält die Zeile aus dem grünen Haken.
+         */
+        const wartend = posten.erstnachrichtWartend
+        const blockiert = erstnachrichtStand?.blockiert ?? false
         return {
           ...basis,
           id: 'erstnachrichten',
           kennzahl: erstnachrichten.tableMissing
             ? 'Migration 0060 ausstehend'
             : zahl(`${erstnachrichtStand?.wert ?? 0} von ${erstnachrichtStand?.soll ?? 0}`),
-          unterzeile: zuerst(erstnachrichtListe) ?? 'Wer angenommen hat, bekommt seine Nachricht.',
-          inhalt: liste(erstnachrichtListe),
+          kennzahlFarbe: !flow.laedt && blockiert ? 'var(--ck-warn)' : undefined,
+          /**
+           * Beide Zahlen, solange ein Rückstau da ist — nicht „zuerst: Anina".
+           *
+           * Der Name des Nächsten ist die freundlichere Zeile, aber er
+           * verschweigt genau das, was am 31.08. vier Tage lang unsichtbar war:
+           * wie viele hinter ihm stehen und für wie viele davon Text existiert.
+           */
+          unterzeile: blockiert
+            ? `${wartend.length} warten · kein Text bereit`
+            : wartend.length > 0
+              ? `${wartend.length} warten · ${erstnachrichtListe.length} ${erstnachrichtListe.length === 1 ? 'Text' : 'Texte'} bereit`
+              : (zuerst(erstnachrichtListe) ?? 'Wer angenommen hat, bekommt seine Nachricht.'),
+          inhalt: blockiert
+            ? () => (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <p style={{ margin: 0, color: 'var(--ck-text-2)', lineHeight: 1.55 }}>
+                    Für diese {wartend.length} ist noch kein Text geschrieben. Uriel legt sie beim nächsten Lauf an —
+                    oder du startest die Lead-Runde selbst.
+                  </p>
+                  {liste(
+                    wartend.slice(0, 40).map((w) => ({
+                      id: `wartend:${w.key}`,
+                      spur: 'erstnachricht' as const,
+                      name: w.name,
+                      firma: w.info || undefined,
+                      profil: w.profileUrl || undefined,
+                      timestamp: w.seit,
+                    })) as unknown as Posten[],
+                  )()}
+                </div>
+              )
+            : liste(erstnachrichtListe),
           fensterAktion: mobilArbeitsmodus('erstnachricht', erstnachrichtListe),
         }
+      }
       case 'antworten':
         return {
           ...basis,
@@ -1310,8 +1360,21 @@ export function SalesDashboard() {
    * Orte für dieselbe Zahl. `=== 'board'` statt Truthiness — der Wert kommt
    * aus einer Key-Value-Tabelle und war dort schon alles Mögliche.
    */
-  const { wert: ansichtRoh, setzen: setzeAnsicht } = useUiSetting<string>('salesAnsicht', 'liste')
-  const boardAnsicht = ansichtRoh === 'board' && !isMobile
+  /**
+   * **Kein Umschalter mehr** (31.08.2026). Kevin: *„die liste ist eh immer da,
+   * also brauchen wir keine auswahlmöglichkeit von liste und canvas, die
+   * buttons können wir uns sparen."*
+   *
+   * Er hat recht: Die Tagesliste rechts steht ohnehin permanent daneben, seit
+   * der Canvas zweispaltig ist. Damit war der Umschalter nicht mehr „Board
+   * ODER Liste", sondern nur noch die Frage, ob der Funnel als Baum oder als
+   * Kartenstapel gezeichnet wird — zwei Bilder derselben Zahlen. Der Baum
+   * gewinnt, weil nur er die Conversion an den Kanten trägt.
+   *
+   * Am Handy bleibt es bei den Karten: Ein Baum mit zwei Ästen wird auf 390 px
+   * zur Briefmarke.
+   */
+  const boardAnsicht = !isMobile
 
   /**
    * Das Fenster für die Wartezeiten. Es hängt an denselben Leads wie das
@@ -1473,13 +1536,21 @@ export function SalesDashboard() {
   const funnelSpalte = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 760 }}>
       {/* Kopf: Tagesansage + Daten-Frische — eine Zeile, keine Kachel. */}
-      {(ansage && ansage !== `${geordnet.length} offen`) || frische ? (
-        <div
-          className="ck-label"
-          style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}
-        >
-          <span>{!postenLaedt && ansage && ansage !== `${geordnet.length} offen` ? ansage : ''}</span>
-          {frische ? <span title="Letzter Postfach-Sync">Postfach-Stand: {frische}</span> : null}
+      {/**
+       * Die Ansage („222 offen · ≈ 1 h 36 · um 18:01 durch") steht seit dem
+       * 31.08. NICHT mehr hier, sondern über der Tagesliste rechts.
+       *
+       * Kevin: *„unter dashboard, was offen ist und wie lange es dauert, gehört
+       * über oder unter die liste."* Richtig — sie beschreibt das Tagespensum,
+       * und das Tagespensum steht rechts. Links über dem Funnel stand sie neben
+       * einer Bestandszahl, mit der sie nichts zu tun hat.
+       *
+       * Der Postfach-Stand bleibt oben: Er gilt für die ganze Seite, nicht für
+       * die Tagesliste.
+       */}
+      {frische ? (
+        <div className="ck-label" style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <span title="Letzter Postfach-Sync">Postfach-Stand: {frische}</span>
         </div>
       ) : null}
       {/* Die eine Zeile über dem Funnel: wie groß ist der Kosmos, und wie
@@ -1506,30 +1577,6 @@ export function SalesDashboard() {
             : `Tag ${tagesFortschritt.erledigt} von ${tagesFortschritt.gesamt}`}
         </span>
       </div>
-      {/* Board oder Liste, nie beides. Am Handy fehlt der Umschalter — dort
-          gibt es das Board nicht (ein Baum mit zwei Ästen wird auf 390 px zur
-          Briefmarke), und ein Knopf für eine Ansicht, die nicht kommt, wäre
-          eine Lüge. */}
-      {!isMobile && !leadsQuery.loading && !leadsQuery.tableMissing ? (
-        <div style={{ display: 'flex', gap: 6, paddingInline: 4 }}>
-          {(
-            [
-              ['liste', 'Liste'],
-              ['board', 'Board'],
-            ] as const
-          ).map(([wert, label]) => (
-            <button
-              key={wert}
-              type="button"
-              className={`ck-btn${(wert === 'board') === boardAnsicht ? ' ck-btn--primary' : ''}`}
-              onClick={() => setzeAnsicht(wert)}
-              aria-pressed={(wert === 'board') === boardAnsicht}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      ) : null}
       {/* Das Canvas: der Funnel als Karten (mobil und in der Listen-Ansicht),
           oder der Baum mit der Conversion an den Kanten. */}
       {leadsQuery.tableMissing ? null : leadsQuery.loading ? (
@@ -1592,12 +1639,21 @@ export function SalesDashboard() {
    * Migration fuer nichts zu schreiben.
    */
   const heuteSpalte = (
-    <TagesListe
-      zeilen={flowZeilen}
-      onOeffnen={(id) => oeffneKachel(id, `kachel-${id}`)}
-      fortschritt={tagesFortschritt}
-      laedt={flow.laedt}
-    />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* Was heute offen ist und wie lange es dauert — direkt über der Liste,
+          auf die sich beides bezieht (31.08.2026, Kevins Wort). */}
+      {!postenLaedt && ansage ? (
+        <div className="ck-label" style={{ paddingInline: 2 }}>
+          {ansage}
+        </div>
+      ) : null}
+      <TagesListe
+        zeilen={flowZeilen}
+        onOeffnen={(id) => oeffneKachel(id, `kachel-${id}`)}
+        fortschritt={tagesFortschritt}
+        laedt={flow.laedt}
+      />
+    </div>
   )
 
   return (

@@ -210,7 +210,16 @@ export function PipelineBoard({ karten, raten, onOeffnen, oeffenbar }: PipelineB
         width="100%"
         // Die Höhe folgt der Breite. Ohne feste Höhe skaliert der Baum mit der
         // Spalte, statt in einem Kasten fester Größe zu schrumpfen.
-        style={{ display: 'block', maxWidth: BREITE, height: 'auto' }}
+        /**
+         * `margin: '0 auto'` seit dem 31.08.2026.
+         *
+         * Kevin: *„der canvas hängt gefühlt zu weit links."* Er hatte recht und
+         * es war genau eine fehlende Zeile: Bei `maxWidth` klebt ein Block am
+         * linken Rand, sobald die Spalte breiter ist als der Baum — und
+         * zweispaltig ab 1180 px ist sie das fast immer. Der Freiraum stand
+         * dann komplett rechts, statt sich zu teilen.
+         */
+        style={{ display: 'block', maxWidth: BREITE, height: 'auto', margin: '0 auto' }}
         role="img"
         aria-label="Pipeline als Baum: Anfrage, dann getrennt nach angenommen und nicht angenommen"
       >

@@ -133,7 +133,15 @@ export function angenommenOhneErstnachricht(
 
   const gesendeteNamen = new Map<string, number>()
   for (const e of erstnachrichten) {
-    if (e.status !== 'gesendet') continue
+    /**
+     * `uebersprungen` zählt wie `gesendet` (31.08.2026).
+     *
+     * Wer bewusst aussortiert wurde — vom Agenten, weil die Person kein Makler
+     * ist, oder von Kevin —, wartet nicht mehr. Ohne diese Zeile stünde
+     * derselbe Fitness-Coach jeden Morgen wieder oben in der Liste, und der
+     * Agent schriebe ihm jede Nacht aufs Neue einen Text.
+     */
+    if (e.status === 'offen') continue
     const n = normName(e.name)
     if (n) gesendeteNamen.set(n, (gesendeteNamen.get(n) ?? 0) + 1)
   }

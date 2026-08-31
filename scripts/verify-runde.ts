@@ -54,8 +54,10 @@ const hole = (r: any, s: string) => r.etappen.find((e: any) => e.schluessel === 
 
 console.log('\n1) Die Etappen selbst')
 {
-  check('acht Etappen in fester Reihenfolge', ETAPPEN.length === 8)
+  check('neun Etappen in fester Reihenfolge', ETAPPEN.length === 9)
   check('die Quellen laufen vor den Agenten', ETAPPEN.findIndex((e) => e.schluessel === 'postfach') < ETAPPEN.findIndex((e) => e.schluessel === 'entwuerfe'))
+  // Eine wartende Antwort ist dringender als ein neuer Erstkontakt.
+  check('Antworten vor Erstnachrichten', ETAPPEN.findIndex((e) => e.schluessel === 'entwuerfe') < ETAPPEN.findIndex((e) => e.schluessel === 'erstnachrichten'))
   check('Leads werden vor dem Wächter verbucht', ETAPPEN.findIndex((e) => e.schluessel === 'leads') < ETAPPEN.findIndex((e) => e.schluessel === 'waechter'))
   check('die Gewichte ergeben 100', ETAPPEN.reduce((s, e) => s + e.gewicht, 0) === 100)
   // Der eigentliche Punkt: die längste Etappe muss den breitesten Abschnitt haben.
@@ -71,17 +73,18 @@ console.log('\n2) Der Balken')
   check('eine frische Runde steht bei 0 %', prozent(r) === 0)
 
   r = setzeEtappe(r, 'postfach', { status: 'fertig', anteil: 1 })
-  check('die erste Etappe bringt ihr Gewicht, nicht ein Achtel', prozent(r) === 12, String(prozent(r)))
+  check('die erste Etappe bringt ihr Gewicht, nicht ein Neuntel', prozent(r) === 11, String(prozent(r)))
 
   // Feinfortschritt: die Einladungsliste ist zur Hälfte durch.
   r = setzeEtappe(r, 'verlauf', { status: 'fertig' })
   r = setzeEtappe(r, 'einladungen', { status: 'laeuft', anteil: 0.5 })
-  check('eine halb gelaufene Etappe zählt halb', prozent(r) === 12 + 13 + 13, String(prozent(r)))
+  check('eine halb gelaufene Etappe zählt halb', prozent(r) === 11 + 12 + 11, String(prozent(r)))
 
   // Ohne Chrome: die vier Chrome-Etappen sind übersprungen, der Rest läuft.
   let ohne = neueRunde({ jetzt: T0 })
   for (const s of ['postfach', 'verlauf', 'einladungen', 'kontakte']) ohne = setzeEtappe(ohne, s, { status: 'uebersprungen' })
-  for (const s of ['leads', 'waechter', 'sortierer', 'entwuerfe']) ohne = setzeEtappe(ohne, s, { status: 'fertig' })
+  for (const s of ['leads', 'waechter', 'sortierer', 'entwuerfe', 'erstnachrichten'])
+    ohne = setzeEtappe(ohne, s, { status: 'fertig' })
   check('ein Lauf ohne Chrome erreicht trotzdem 100 %', prozent(ohne) === 100, String(prozent(ohne)))
 
   // Eine Teilmenge (Nachmittags-Knopf, nur die Quellen) rechnet auf sich selbst.
@@ -92,7 +95,7 @@ console.log('\n2) Der Balken')
   check('eine Teil-Runde erreicht 100 %, nicht 25 %', prozent(teil) === 100, String(prozent(teil)))
 
   check('der Prozentwert bleibt zwischen 0 und 100', [neueRunde({ jetzt: T0 }), r, ohne, teil].every((x) => prozent(x) >= 0 && prozent(x) <= 100))
-  check('ein kaputter Anteil kippt die Rechnung nicht', prozent(setzeEtappe(neueRunde({ jetzt: T0 }), 'postfach', { status: 'laeuft', anteil: 9 })) === 12)
+  check('ein kaputter Anteil kippt die Rechnung nicht', prozent(setzeEtappe(neueRunde({ jetzt: T0 }), 'postfach', { status: 'laeuft', anteil: 9 })) === 11)
 }
 
 console.log('\n3) Ein Fehler kippt nicht die Runde')
@@ -100,7 +103,8 @@ console.log('\n3) Ein Fehler kippt nicht die Runde')
   let r = neueRunde({ jetzt: T0 })
   r = setzeEtappe(r, 'postfach', { status: 'fertig' })
   r = setzeEtappe(r, 'einladungen', { status: 'fehler', text: 'Liste brach ab' })
-  for (const s of ['verlauf', 'kontakte', 'leads', 'waechter', 'sortierer', 'entwuerfe']) r = setzeEtappe(r, s, { status: 'fertig' })
+  for (const s of ['verlauf', 'kontakte', 'leads', 'waechter', 'sortierer', 'entwuerfe', 'erstnachrichten'])
+    r = setzeEtappe(r, s, { status: 'fertig' })
   const fertig = schliesseRunde(r, { jetzt: T0 + 600_000 })
   check('die Runde gilt als fertig, nicht als Fehler', fertig.status === 'fertig', fertig.status)
   check('der Fehler bleibt an seiner Etappe stehen', hole(fertig, 'einladungen').status === 'fehler')
@@ -149,7 +153,7 @@ console.log('\n5) Die Sätze, die Kevin liest')
   // offener Entwürfe-Etappe ist richtig (sie dauert real drei bis fünf), eine
   // erzwungene „gleich fertig"-Meldung wäre die Lüge.
   let fast = neueRunde({ jetzt: T0 })
-  for (const e of ETAPPEN.slice(0, 7)) fast = setzeEtappe(fast, e.schluessel, { status: 'fertig' })
+  for (const e of ETAPPEN.slice(0, 8)) fast = setzeEtappe(fast, e.schluessel, { status: 'fertig' })
   const minutenAus = (t: string) => Number(t.match(/\d+/)?.[0] ?? 0)
   check(
     'die Schätzung fällt, je weiter der Lauf ist',

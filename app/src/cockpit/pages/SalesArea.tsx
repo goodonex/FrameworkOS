@@ -73,18 +73,15 @@ function SalesSubNav() {
       aria-label="Sales-Unterbereiche"
       style={{ display: 'flex', gap: 6, marginBottom: 12, overflowX: 'auto', flexWrap: 'nowrap', alignItems: 'center' }}
     >
-      <button
-        type="button"
-        className="ck-nav-item"
-        style={{ padding: '6px 9px', flexShrink: 0, background: 'none', minHeight: 34 }}
-        aria-expanded={offen}
-        aria-controls="ck-sales-subnav"
-        title={offen ? 'Bereiche einklappen' : 'Alle Sales-Bereiche zeigen'}
-        onClick={() => setzeOffen(!offen)}
-      >
-        <span aria-hidden>{offen ? '▾' : '▸'}</span>
-        <span className="ck-nur-vorlesen">{offen ? 'Bereiche einklappen' : 'Alle Sales-Bereiche zeigen'}</span>
-      </button>
+      {/**
+       * Der Knopf steht RECHTS neben den Einträgen (31.08.2026).
+       *
+       * Kevin: *„die ausklappen butten ist links neben übersicht und nicht
+       * rechts, da wo sich alles ausklappt. dann wäre auch übersicht nach links
+       * bündig, was harmonischer aussieht."* Genau so: Der Pfeil sitzt an der
+       * Kante, an der die weiteren Einträge erscheinen, und „Dashboard" fängt
+       * bündig mit allem darunter an.
+       */}
       <span id="ck-sales-subnav" style={{ display: 'flex', gap: 6, minWidth: 0 }}>
         {sichtbar.map((i) => (
           <NavLink
@@ -98,6 +95,18 @@ function SalesSubNav() {
           </NavLink>
         ))}
       </span>
+      <button
+        type="button"
+        className="ck-nav-item"
+        style={{ padding: '6px 9px', flexShrink: 0, background: 'none', minHeight: 34 }}
+        aria-expanded={offen}
+        aria-controls="ck-sales-subnav"
+        title={offen ? 'Bereiche einklappen' : 'Alle Sales-Bereiche zeigen'}
+        onClick={() => setzeOffen(!offen)}
+      >
+        <span aria-hidden>{offen ? '◂' : '▸'}</span>
+        <span className="ck-nur-vorlesen">{offen ? 'Bereiche einklappen' : 'Alle Sales-Bereiche zeigen'}</span>
+      </button>
     </nav>
   )
 }

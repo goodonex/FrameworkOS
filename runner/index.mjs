@@ -20,6 +20,7 @@ import { ladeErstnachrichten } from './linkedin/erstnachrichten.mjs'
 import { baueAntwortInput, holeAntwortThreads } from './linkedin/antwortThreads.mjs'
 import { baueSortierInput, holeSortierThreads } from './linkedin/sortierThreads.mjs'
 import { parseDraftsRoh, parseUrteileRoh, schreibeEntwuerfe, schreibeUrteile } from './linkedin/entwuerfe.mjs'
+import { parseErstnachrichtenRoh, schreibeErstnachrichten } from './linkedin/erstnachrichtenEntwuerfe.mjs'
 import { neuerLauf, nimmBrocken, protokollText } from './agentStream.mjs'
 import { bewerteTagesLaeufe, darfRoutineStarten } from './routineGuard.mjs'
 import { laufGrund } from './laufGrund.mjs'
@@ -286,6 +287,19 @@ const AGENT_CATALOG = [
     // Aufruf: die Vault-settings.json allein griff headless nicht (siehe die
     // gleiche Lehre bei den write-Agenten), und ohne WebFetch/WebSearch kann der
     // Agent die Website des Leads nicht ansehen — genau das fehlte den Entwürfen.
+    modell: 'claude-opus-5',
+    effort: 'high',
+    tools: 'Read,Glob,Grep,WebFetch,WebSearch',
+  },
+  {
+    id: 'linkedin-erstnachrichten',
+    label: 'Erstnachrichten schreiben (LinkedIn)',
+    description:
+      'Schreibt Erstnachrichten für Angenommene, die noch keine bekommen haben. Sortiert dabei aus, wer kein Makler ist.',
+    kind: 'readonly',
+    // Gleiche Einstellung wie die Antwort-Entwürfe: Der Agent sieht sich je
+    // Lead die Website an, und ein schlechter Erstkontakt ist teurer als der
+    // Lauf. `tools` am Aufruf, weil die Vault-settings.json headless nicht greift.
     modell: 'claude-opus-5',
     effort: 'high',
     tools: 'Read,Glob,Grep,WebFetch,WebSearch',
@@ -683,6 +697,81 @@ async function antwortEntwuerfeInput(now = new Date()) {
 }
 
 /**
+ * Wer wartet auf seine Erstnachricht? (31.08.2026)
+ *
+ * Der Umweg über den Kindprozess ist derselbe wie bei `leads-sync`: Die Frage
+ * ist in TypeScript beantwortet (`angenommenOhneErstnachricht`, dieselbe
+ * Funktion, die im Canvas die Karte füllt), und eine zweite Fassung in .mjs
+ * wäre eine zweite Wahrheit. Begründung im Kopf von
+ * `scripts/erstnachrichten-input.ts`.
+ */
+async function erstnachrichtenInput(limit = 12) {
+  if (!SNAPSHOT_ENABLED) return null
+  const wurzel = fileURLToPath(new URL('..', import.meta.url))
+  const roh = await new Promise((fertig) => {
+    const proc = spawn(
+      process.execPath,
+      [join(wurzel, 'node_modules/tsx/dist/cli.mjs'), 'scripts/erstnachrichten-input.ts', `--limit=${limit}`],
+      { cwd: wurzel, env: process.env, stdio: ['ignore', 'pipe', 'pipe'] },
+    )
+    let aus = ''
+    proc.stdout.on('data', (d) => (aus += String(d)))
+    proc.stderr.on('data', (d) => console.error('[runner] erstnachrichten-input:', String(d).trim().slice(0, 200)))
+    proc.on('error', (e) => {
+      console.error('[runner] erstnachrichten-input nicht startbar:', e?.message ?? e)
+      fertig('')
+    })
+    proc.on('close', () => fertig(aus))
+  })
+  try {
+    const daten = JSON.parse(roh)
+    if (!daten?.leads?.length) return null
+    return daten
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Nach einem fertigen `linkedin-erstnachrichten`-Lauf: Texte in die
+ * Arbeitsliste legen.
+ *
+ * Wie bei den Antwort-Entwürfen darf ein Fehler hier den Lauf nicht
+ * nachträglich zum Fehlschlag machen — das Ergebnis steht in der Run-Datei.
+ */
+async function erstnachrichtenAnListe(runId, markdown) {
+  if (!SNAPSHOT_ENABLED) return
+  try {
+    const { nachrichten, uebersprungen } = parseErstnachrichtenRoh(markdown)
+    if (!nachrichten.length && !uebersprungen.length) {
+      console.warn(`[runner] ${runId}: kein verwertbarer json-Block — keine Erstnachrichten angelegt`)
+      return
+    }
+    const brandSlug = process.env.LINKEDIN_BRAND_SLUG ?? 'herrmann'
+    const br = await fetch(
+      `${SUPABASE_URL}/rest/v1/brands?slug=eq.${encodeURIComponent(brandSlug)}&select=id&limit=1`,
+      { headers: supabaseHeaders() },
+    )
+    const [brand] = br.ok ? await br.json() : []
+    if (!brand?.id) return
+    const r = await schreibeErstnachrichten({
+      supabaseUrl: SUPABASE_URL,
+      headers: supabaseHeaders(),
+      brandId: brand.id,
+      nachrichten,
+      uebersprungen,
+    })
+    console.log(
+      `[runner] Erstnachrichten: ${r.geschrieben} Texte angelegt` +
+        (r.uebersprungen ? ` · ${r.uebersprungen} aussortiert` : '') +
+        (r.schonDa ? ` · ${r.schonDa} hatten schon eine Zeile` : ''),
+    )
+  } catch (e) {
+    console.error('[runner] Erstnachrichten konnten nicht angelegt werden:', e?.message ?? e)
+  }
+}
+
+/**
  * Nach einem fertigen `linkedin-sortierer`-Lauf: nur die Urteile wegschreiben.
  *
  * Bewusst nicht über `entwuerfeAnThreads`: Der Sortierer liefert keine Entwürfe,
@@ -947,6 +1036,7 @@ async function startRun(agent, input) {
           await entwuerfeAnThreads(id, ergebnis)
         }
         if (agent === 'linkedin-sortierer') await urteileAnThreads(id, ergebnis)
+        if (agent === 'linkedin-erstnachrichten') await erstnachrichtenAnListe(id, ergebnis)
       } else {
         // O17: Statt „kein Output" steht hier jetzt, wie weit der Lauf kam.
         // 143 = 128+SIGTERM, 137 = 128+SIGKILL, null = per Signal beendet.
@@ -3841,6 +3931,20 @@ const ETAPPEN_ARBEIT = {
       text:
         `${gebaut.input.threads.length} beurteilt` +
         (gebaut.weitereWarten ? ` · ${gebaut.weitereWarten} bleiben für den nächsten Lauf` : ''),
+    }
+  },
+
+  erstnachrichten: async ({ melde }) => {
+    const gebaut = await erstnachrichtenInput()
+    if (!gebaut) return { text: 'niemand wartet auf eine Erstnachricht' }
+    melde(`${gebaut.leads.length} von ${gebaut.gesamt} werden vorbereitet`)
+    await startRun('linkedin-erstnachrichten', gebaut)
+    return {
+      text:
+        `${gebaut.leads.length} vorbereitet` +
+        (gebaut.weitereWarten ? ` · ${gebaut.weitereWarten} bleiben für den nächsten Lauf` : ''),
+      von: gebaut.leads.length,
+      bis: gebaut.gesamt,
     }
   },
 

@@ -463,7 +463,12 @@ check('die Instrumentierung der Fehlersuche ist wieder draussen', !/console\.log
 check('auch der Hero selbst rechnet keine Stände', !/stufenStaende\(|useTagesFlow\(/.test(hero))
 check(
   'der Homescreen leitet die Live-Zahlen aus der bestehenden Postenquelle ab',
-  /flowQuellen\(posten\.quellen/.test(home),
+  // Absicht statt Schreibweise (31.08.2026): Seit die Erstnachrichten-Stufe die
+  // WARTENDEN zählt, kommt neben `posten.quellen` noch `posten.erstnachrichtWartend`
+  // dazu — beides aus demselben Hook. Der Regex prüfte vorher die genaue
+  // Zeichenfolge und schlug deshalb an einer Erweiterung an, die genau das tut,
+  // was er sichern soll.
+  /flowQuellen\(\s*\{?\s*\.\.\.?posten\.quellen/.test(home) && !/useLinkedinThreads\(/.test(home),
   'Ein zweiter Ladelauf für dieselben Threads wäre der teuerste Weg zu derselben Zahl.',
 )
 check(

@@ -42,14 +42,21 @@
  * gesynct", 40 Mal am 31.08.).
  */
 export const ETAPPEN = [
-  { schluessel: 'postfach', titel: 'Postfach', wieLange: 'knapp eine Minute', gewicht: 12, brauchtChrome: true },
-  { schluessel: 'verlauf', titel: 'Gesprächsverläufe', wieLange: 'zwei bis drei Minuten', gewicht: 13, brauchtChrome: true },
-  { schluessel: 'einladungen', titel: 'Offene Einladungen', wieLange: 'bis zu sieben Minuten', gewicht: 25, brauchtChrome: true },
-  { schluessel: 'kontakte', titel: 'Angenommene Kontakte', wieLange: 'drei bis fünf Minuten', gewicht: 18, brauchtChrome: true },
-  { schluessel: 'leads', titel: 'Leads verbuchen', wieLange: 'unter einer Minute', gewicht: 5, brauchtChrome: false },
+  { schluessel: 'postfach', titel: 'Postfach', wieLange: 'knapp eine Minute', gewicht: 11, brauchtChrome: true },
+  { schluessel: 'verlauf', titel: 'Gesprächsverläufe', wieLange: 'zwei bis drei Minuten', gewicht: 12, brauchtChrome: true },
+  { schluessel: 'einladungen', titel: 'Offene Einladungen', wieLange: 'meist Sekunden', gewicht: 22, brauchtChrome: true },
+  { schluessel: 'kontakte', titel: 'Angenommene Kontakte', wieLange: 'meist Sekunden', gewicht: 16, brauchtChrome: true },
+  { schluessel: 'leads', titel: 'Leads verbuchen', wieLange: 'unter einer Minute', gewicht: 4, brauchtChrome: false },
   { schluessel: 'waechter', titel: 'Widersprüche prüfen', wieLange: 'Sekunden', gewicht: 2, brauchtChrome: false },
-  { schluessel: 'sortierer', titel: 'Neue Kontakte vorsortieren', wieLange: 'zwei bis vier Minuten', gewicht: 11, brauchtChrome: false },
-  { schluessel: 'entwuerfe', titel: 'Antwort-Entwürfe schreiben', wieLange: 'drei bis fünf Minuten', gewicht: 14, brauchtChrome: false },
+  { schluessel: 'sortierer', titel: 'Neue Kontakte vorsortieren', wieLange: 'zwei bis vier Minuten', gewicht: 10, brauchtChrome: false },
+  { schluessel: 'entwuerfe', titel: 'Antwort-Entwürfe schreiben', wieLange: 'drei bis fünf Minuten', gewicht: 12, brauchtChrome: false },
+  /**
+   * Die Etappe, die es am 31.08. noch nicht gab — und deretwegen die Kachel
+   * „0 von 0 ✓" zeigte, während 508 Angenommene warteten (siehe
+   * `scripts/erstnachrichten-input.ts`). Sie steht zuletzt, weil eine wartende
+   * Antwort dringender ist als ein neuer Erstkontakt.
+   */
+  { schluessel: 'erstnachrichten', titel: 'Erstnachrichten schreiben', wieLange: 'drei bis sechs Minuten', gewicht: 11, brauchtChrome: false },
 ]
 
 const GEWICHT_SUMME = ETAPPEN.reduce((s, e) => s + e.gewicht, 0)

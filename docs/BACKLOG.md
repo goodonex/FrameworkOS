@@ -84,6 +84,98 @@ September) etwas ändert, und kein Fehler dieses Baus.
 **Verifiziert:** `verify-runde.ts` jetzt 77 Prüfungen, App-Build grün, beide
 Wege echt gemessen (siehe Zahlen oben).
 
+## **GEFIXT 31.08.2026 — „0 von 0 ✓", während 508 Menschen warteten**
+
+Kevins Screenshot am Nachmittag: Die Tageskachel „ERSTNACHRICHTEN · LINKEDIN"
+stand auf **0 von 0 mit grünem Haken**, während im LinkedIn-Postfach vier frisch
+angenommene Makler lagen. Seine Frage danach ist die eigentliche:
+*„wie verlässlich sind da die Zahlen, mit denen ich arbeite?"*
+
+**Die Rechnung war richtig, die Quelle falsch.** Die Stufe zählte
+`linkedin_erstnachrichten` — den Topf mit den fertigen Texten, den bis dahin nur
+der `linkedin-leads`-Skill von Hand füllte. Vier Zeilen darin, zwei davon längst
+verschickt. Leerer Topf → Soll 0 → und in `stufenStaende` stand:
+
+```js
+const erledigt = soll <= 0 || wert >= soll || offenJetzt === 0
+```
+
+**„Kein Text bereit" und „niemand wartet" sahen damit identisch aus.** Im selben
+Bild zeigte das Canvas daneben „Erstnachricht 375" — dieselbe Sache, andere
+Quelle, andere Zahl. Und im Backlog stand es seit dem 27.08.: *„Erstnachricht
+fällig: 368 · heute 0 von 0 — 368 Angenommene warten, aber kein Text liegt für
+sie bereit."* Notiert und vier Tage lang nicht geschlossen.
+
+### Zwei Zahlen statt einer
+
+| | vorher | jetzt |
+|---|---|---|
+| Nenner der Kachel | fertige Entwürfe | **wartende Menschen**, gedeckelt auf ein Tagespensum (10) |
+| Zweite Zahl | — | `material`: wie viele Texte bereitliegen |
+| Grüner Haken bei leerem Topf | ja | **nie**, solange jemand wartet (`blockiert`) |
+
+Die Wartenden kommen aus `angenommenOhneErstnachricht` — **derselben Funktion,
+die im Canvas die Karte füllt**, plus dem ICP-Filter, den auch die Nacht-Agenten
+anlegen. Gemessen: 696 angenommen · 580 ohne Erstnachricht · **508 im
+Arbeitsvorrat**. Die falsch eingefrorene Tagesportion von heute (`soll: 0`) wurde
+gelöscht, sonst hätte sie die neue Zahl bis morgen gedeckt.
+
+`uebersprungen` zählt in `angenommenOhneErstnachricht` ab jetzt wie `gesendet` —
+ohne das stünde derselbe aussortierte Fitness-Coach jeden Morgen wieder oben.
+
+### Der Topf füllt sich jetzt von selbst
+
+Eine ehrlichere Anzeige über einem leeren Fach wäre nur die halbe Antwort.
+Deshalb neu: **neunte Etappe `erstnachrichten`** in der Runde, Agent
+`linkedin-erstnachrichten` (Opus, `effort: high`, WebFetch/WebSearch), Skill im
+Vault, Input über `scripts/erstnachrichten-input.ts` (TypeScript-Kindprozess wie
+`leads-sync` — die Wartenden-Logik existiert nur einmal).
+
+**Erster echter Lauf, 16:43 Uhr: 12 Leads vorgelegt, 6 Texte geschrieben, 6
+aussortiert.** Die Aussortierten mit Begründungspflicht, und genau die trägt:
+
+> Marco Pe: UNU Immobilien betreibt eigene Ferienimmobilien zur
+> Kurzzeitvermietung. Kein Maklergeschäft, keine Eigentümer-Mandate.
+
+Der Wortlisten-Filter hatte ihn als Makler durchgewinkt („UNU Immobilien GmbH ·
+Inhaber"). Ebenso aussortiert: ein Recruiter, ein Organisationsberater, ein
+Fitness-Coach, ein Investoren-Coach und ein Käuferberater — alle vom Filter als
+`unklar` durchgelassen, weil kein Off-Wort fiel.
+
+Die Texte tragen echte Website-Beobachtungen, und der Lead ohne Website bekam
+richtigerweise kein Video angeboten, sondern ein Telefonat.
+
+### Was dabei sonst noch auffiel
+
+**Vier der fünf aus dem Screenshot haben in der Lead-Historie überhaupt kein
+Ereignis** — nicht einmal `angenommen`, obwohl der Netzwerk-Spiegel sie so
+führt. `lead_ereignisse` zählt 693 Annahmen bei 696 im Spiegel; die Differenz
+verteilt sich anders als erwartet. **Offen**, unabhängig von der Kachel.
+
+### Oberfläche, gleiche Runde
+
+- **Der Umschalter „Liste │ Board" ist weg.** Kevin: *„die liste ist eh immer
+  da, die buttons können wir uns sparen."* Seit der Canvas zweispaltig ist,
+  stand die Tagesliste ohnehin permanent daneben — der Umschalter entschied nur
+  noch, ob derselbe Funnel als Baum oder als Kartenstapel gezeichnet wird. Der
+  Baum bleibt, weil nur er die Conversion an den Kanten trägt; am Handy bleiben
+  die Karten.
+- **Der Canvas hing zu weit links** — eine fehlende Zeile: `margin: '0 auto'`
+  am SVG. Bei `maxWidth` klebt ein Block links, sobald die Spalte breiter ist.
+- **Der Ausklapp-Pfeil der Sub-Nav sitzt rechts**, „Dashboard" beginnt links
+  bündig mit allem darunter.
+- **„222 offen · ≈ 1 h 36 · um 18:01 durch" steht über der Tagesliste**, nicht
+  mehr links über dem Funnel. Sie beschreibt das Tagespensum, und das steht
+  rechts.
+- **Die Vorschaubilder der gebauten Seiten waren nicht kaputt**, nur noch nicht
+  gespiegelt: Seit 16:39 tragen alle 12 Projekte einen `shotKey`, die Objekte
+  liegen abrufbar in `runner-files` (43 kB JPEG geprüft).
+
+**Verifiziert:** `verify-runde` 78, `verify-tages-flow` 107, `verify-funnel-stufen`
+38, `verify-icp` 50 — alle grün, App-Build grün. Eine Prüfung in
+`verify-tages-flow` prüfte die Schreibweise `flowQuellen(posten.quellen` statt
+ihrer Absicht und schlug an der Erweiterung an; sie prüft jetzt die Absicht.
+
 ## **GEBAUT 31.08.2026 — Die Runde: der Sync läuft auf Anstoß, nicht nach Uhr**
 
 > Logik: [`runner/runde.mjs`](../runner/runde.mjs) · Oberfläche:

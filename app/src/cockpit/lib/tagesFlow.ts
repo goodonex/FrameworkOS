@@ -72,6 +72,17 @@ export const REAKTIVIERUNG_ZIEL_TAG = 5
 export const FOLLOWUP_PORTION_TAG = 20
 
 /**
+ * Wie viele Erstnachrichten an einem Tag höchstens fällig werden (31.08.2026).
+ *
+ * Vorher gab es keinen Deckel — „alle raus, die da sind" stimmte, solange der
+ * Topf täglich geleert wurde. Seit die Stufe die echten Wartenden zählt, wären
+ * das 375 an einem Tag: eine Zahl, die niemand abarbeitet und die deshalb nach
+ * zwei Tagen ignoriert wird. Zehn liegt über dem Wochenziel (40 ÷ 5 = 8) und
+ * lässt damit Luft, den Rückstau abzutragen, ohne den Tag zu verstopfen.
+ */
+export const ERSTNACHRICHT_PORTION_TAG = 10
+
+/**
  * Ab wann eine wartende Antwort die Frische-Stufe rot macht. Bei Antworten
  * zählt Reaktionszeit, nicht Vollständigkeit — 43 können warten, solange
  * keine davon von vorgestern ist.
@@ -214,6 +225,27 @@ export interface StufenStand {
   offenJetzt: number | null
   /** Steht die Stufe? Eine leere Pflicht (nichts fällig, nichts offen) gilt als erledigt. */
   erledigt: boolean
+  /**
+   * Es wartet Arbeit, aber es liegt kein Material dafür bereit (31.08.2026).
+   *
+   * **Der Fehler, den das behebt.** Kevin am 31.08. mit einem Screenshot:
+   * „ERSTNACHRICHTEN · LINKEDIN — 0 von 0 ✓", während 375 Angenommene ohne
+   * Nachricht dastanden und vier frisch angenommene Makler im
+   * LinkedIn-Postfach lagen. Seine Frage danach war die richtige: *„wie
+   * verlässlich sind da die Zahlen, mit denen ich arbeite?"*
+   *
+   * Ursache war nicht die Rechnung, sondern die Quelle: Die Stufe zählte die
+   * fertigen Entwürfe in `linkedin_erstnachrichten`, nicht die Menschen, die
+   * warten. Leerer Topf → Soll 0 → `soll <= 0` → grüner Haken. „Kein Text
+   * bereit" und „niemand wartet" sahen identisch aus.
+   *
+   * Jetzt sind es zwei Zahlen: `offenJetzt` sind die Wartenden, `blockiert`
+   * sagt, dass für sie nichts geschrieben ist. Eine blockierte Stufe ist NIE
+   * erledigt — sie zeigt an, dass Material fehlt.
+   */
+  blockiert?: boolean
+  /** Wie viele versandfertige Texte bereitliegen (nur bei Erstnachrichten gesetzt). */
+  material?: number | null
 }
 
 /**
@@ -233,8 +265,23 @@ export interface FlowEingabe {
    * Fälligkeits-Logik, nicht aus einer nachgebauten Schwelle.
    */
   faelligHeute: number
-  /** Offene Erstnachrichten JETZT (`erstnachrichtPosten(...).length`). */
+  /**
+   * Wie viele Angenommene JETZT auf ihre Erstnachricht warten.
+   *
+   * **Menschen, nicht Entwürfe** (31.08.2026 — siehe `blockiert` im
+   * `StufenStand`). Kommt aus `angenommenOhneErstnachricht(...)`, derselben
+   * Funktion, die im Canvas die Karte „Erstnachricht 375" füllt. Vorher stand
+   * hier die Länge des Entwurfs-Topfs, und die Kachel meldete „0 von 0 ✓",
+   * während Hunderte warteten.
+   */
   erstnachrichtenOffen?: number
+  /**
+   * Wie viele versandfertige Texte bereitliegen (`erstnachrichtPosten(...)`).
+   *
+   * Die zweite Hälfte der Wahrheit: Ohne sie ließe sich „niemand wartet" nicht
+   * von „für die Wartenden ist nichts geschrieben" unterscheiden.
+   */
+  erstnachrichtenTexte?: number
   /** Offene Loom-Zusagen JETZT (`loomPosten(...).length`). */
   loomsOffen?: number
   /** Der Zustand der Antworten-Stufe (`antwortenStandVon(...)`). */
@@ -291,10 +338,12 @@ export function sollFuer(stufe: Stufe, eingabe: FlowEingabe): number {
   const wert = wertVon(stufe, eingabe)
 
   switch (stufe.id) {
-    case 'erstnachrichten':
-      // Alle raus, die da sind — heute Erledigte eingerechnet, damit das Soll
-      // beim Abhaken stehen bleibt.
-      return anzahl(eingabe.erstnachrichtenOffen) + wert
+    case 'erstnachrichten': {
+      // Gedeckelt wie die Follow-ups: Der Nenner ist ein Tagespensum, kein
+      // Rückstand-Berg. `+ wert`, damit das Soll beim Abhaken stehen bleibt.
+      const drossel = gueltigesZiel(eigen) ? eigen : ERSTNACHRICHT_PORTION_TAG
+      return Math.min(drossel, anzahl(eingabe.erstnachrichtenOffen) + wert)
+    }
     case 'antworten':
       /**
        * Wer wartet, wird beantwortet — alle, nicht eine Portion. Anders als
@@ -355,11 +404,23 @@ export function stufenStaende(eingabe: FlowEingabe): StufenStand[] {
     const soll = sollFuer(stufe, eingabe)
     const wert = wertVon(stufe, eingabe)
     const offenJetzt = offenJetztFuer(stufe, eingabe)
+
+    /**
+     * Wartet Arbeit ohne Material? Nur bei den Erstnachrichten kann das
+     * auseinanderfallen: Die Wartenden entstehen von selbst (jemand nimmt an),
+     * die Texte nicht (die schreibt ein Agent oder Kevin).
+     */
+    const material = stufe.id === 'erstnachrichten' ? (eingabe.erstnachrichtenTexte ?? null) : null
+    const blockiert = stufe.id === 'erstnachrichten' && (offenJetzt ?? 0) > 0 && material === 0
+
     // Erledigt auf zwei Wegen: das Soll steht — oder die Quelle ist leer
     // (eine Erstnachricht, die Kevin verwirft statt sendet, darf die Stufe
     // nicht für immer rot halten). Ein Soll von 0 gilt als erledigt.
-    const erledigt = soll <= 0 || wert >= soll || offenJetzt === 0
-    return { stufe, wert, soll, offenJetzt, erledigt }
+    //
+    // ABER NIE, solange Menschen warten und nichts für sie geschrieben ist:
+    // Genau dieser Fall stand am 31.08. vier Tage lang als grüner Haken da.
+    const erledigt = !blockiert && (soll <= 0 || wert >= soll || offenJetzt === 0)
+    return { stufe, wert, soll, offenJetzt, erledigt, blockiert, material }
   })
 }
 
@@ -433,16 +494,27 @@ export function flowQuellen(
     erstnachricht?: ReadonlyArray<unknown>
     loom?: ReadonlyArray<unknown>
     antwort?: ReadonlyArray<{ timestamp: string | null }>
+    /**
+     * Die Angenommenen ohne Erstnachricht — dieselbe Liste, die im Canvas
+     * hinter der Karte „Erstnachricht" liegt (31.08.2026). Fehlt sie, fällt die
+     * Stufe auf den Entwurfs-Topf zurück; dann gilt wieder das alte,
+     * beschönigende Verhalten, aber wenigstens kein Absturz.
+     */
+    erstnachrichtWartend?: ReadonlyArray<unknown>
   },
   jetzt: Date,
-): Pick<FlowEingabe, 'faelligHeute' | 'erstnachrichtenOffen' | 'loomsOffen' | 'antworten'> {
+): Pick<
+  FlowEingabe,
+  'faelligHeute' | 'erstnachrichtenOffen' | 'erstnachrichtenTexte' | 'loomsOffen' | 'antworten'
+> {
   const antworten = quellen.antwort ?? []
   const zeiten = antworten
     .map((p) => (p.timestamp ? new Date(p.timestamp).getTime() : Number.NaN))
     .filter((t) => Number.isFinite(t))
   return {
     faelligHeute: (quellen.followup ?? []).length,
-    erstnachrichtenOffen: (quellen.erstnachricht ?? []).length,
+    erstnachrichtenOffen: (quellen.erstnachrichtWartend ?? quellen.erstnachricht ?? []).length,
+    erstnachrichtenTexte: (quellen.erstnachricht ?? []).length,
     loomsOffen: (quellen.loom ?? []).length,
     antworten: {
       warten: antworten.length,
