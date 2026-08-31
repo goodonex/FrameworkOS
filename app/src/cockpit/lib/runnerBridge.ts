@@ -34,7 +34,24 @@ export async function leseSpiegel<T>(key: string): Promise<{ data: T; updatedAt:
   return { data: data.data as T, updatedAt: data.updated_at as string }
 }
 
-export type JobKind = 'linkedin_sync' | 'agent_run'
+export type JobKind = 'linkedin_sync' | 'agent_run' | 'runde' | 'runde_abbrechen'
+
+/**
+ * Auftrag ablegen und NICHT auf das Ergebnis warten (31.08.2026).
+ *
+ * Für die Runde: Sie läuft bis zu zwanzig Minuten, `beauftrageRunner` gibt nach
+ * fünf auf. Der Fortschritt kommt ohnehin über den Spiegel `runde_stand` — auf
+ * das Auftrags-Ergebnis wartet hier niemand.
+ */
+export async function beauftrageRunnerOhneWarten(
+  kind: JobKind,
+  payload: Record<string, unknown> = {},
+  brandId?: string | null,
+): Promise<void> {
+  if (!supabase) throw new Error('Keine Supabase-Verbindung')
+  const { error } = await supabase.from('runner_jobs').insert({ kind, payload, brand_id: brandId ?? null })
+  if (error) throw new Error(error.message)
+}
 
 export interface JobErgebnis<T = unknown> {
   status: 'done' | 'error'

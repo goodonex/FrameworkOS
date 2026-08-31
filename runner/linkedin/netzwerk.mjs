@@ -94,6 +94,12 @@ const MAX_RUNDEN = 160
 const RUNDEN_OHNE_ZUWACHS = 5
 
 /**
+ * Wie viele Runden in Folge nur Bekanntes bringen dürfen, bevor der kurze Lauf
+ * abbricht (31.08.2026). Siehe `bekannt` in `leseListe`.
+ */
+const RUNDEN_OHNE_NEUE = 2
+
+/**
  * Pause zwischen zwei Scroll-Runden. 1,1 s war messbar zu kurz — die Seite
  * legte dann nichts nach und der Lauf endete bei 130 von 882 (12.08.).
  * Mit 2,2 s kommen zuverlässig zehn Einträge je Runde.
@@ -343,7 +349,25 @@ async function sichtbarMachen(s, log = () => {}) {
  */
 export async function leseListe(
   seitenName,
-  { maxRunden = MAX_RUNDEN, jetzt = new Date(), log = () => {}, fortschritt = () => {} } = {},
+  {
+    maxRunden = MAX_RUNDEN,
+    jetzt = new Date(),
+    log = () => {},
+    fortschritt = () => {},
+    /**
+     * Schon bekannte Profil-Schlüssel (31.08.2026) — der Schlüssel zum kurzen Lauf.
+     *
+     * Kevin: *„Reicht es nicht, dass man sagt, okay, der Letzte war Thomas
+     * Müller und dann geht er halt durch und macht darunter noch mal fünf oder
+     * zehn Leute mit? […] darunter wird's ja keine Änderung geben."* Genau so.
+     * Beide Listen sind chronologisch, das Neue steht oben. Sobald zwei Runden
+     * hintereinander nur noch Bekannte bringen, ist der neue Teil abgegrast und
+     * die restlichen tausend Einträge sind dieselben wie gestern.
+     *
+     * Leeres Set = alter Zustand (bis zum Deckel blättern).
+     */
+    bekannt = null,
+  } = {},
 ) {
   const seite = SEITEN[seitenName]
   if (!seite) throw new Error(`unbekannte Liste: ${seitenName}`)
@@ -414,6 +438,9 @@ export async function leseListe(
   let gesamt = null
   let ohneZuwachs = 0
   let runden = 0
+  /** Runden in Folge, die keinen einzigen UNBEKANNTEN Eintrag brachten. */
+  let ohneNeue = 0
+  let abbruchGrund = 'deckel'
 
   for (; runden < maxRunden; runden++) {
     let roh
@@ -436,13 +463,21 @@ export async function leseListe(
     if (gesamt === null) gesamt = gesamtzahlAus(roh?.kopfText ?? '')
 
     const vorher = nachKey.size
+    let neueDieseRunde = 0
     for (const karte of roh?.karten ?? []) {
       const eintrag = karteZuEintrag(karte, jetzt)
-      if (eintrag) nachKey.set(eintrag.profilKey, eintrag)
+      if (!eintrag) continue
+      if (bekannt && !bekannt.has(eintrag.profilKey) && !nachKey.has(eintrag.profilKey)) neueDieseRunde++
+      nachKey.set(eintrag.profilKey, eintrag)
     }
 
     if (nachKey.size === vorher) ohneZuwachs++
     else ohneZuwachs = 0
+
+    if (bekannt) {
+      if (neueDieseRunde === 0) ohneNeue++
+      else ohneNeue = 0
+    }
 
     // Nach der Ernte, nicht davor: gemeldet wird, was wirklich in der Hand ist.
     try {
@@ -451,8 +486,26 @@ export async function leseListe(
       /* Eine Anzeige darf einen Lauf nie zu Fall bringen. */
     }
 
-    if (gesamt && nachKey.size >= gesamt) break
-    if (ohneZuwachs >= RUNDEN_OHNE_ZUWACHS) break
+    if (gesamt && nachKey.size >= gesamt) {
+      abbruchGrund = 'liste-zuende'
+      break
+    }
+    if (ohneZuwachs >= RUNDEN_OHNE_ZUWACHS) {
+      abbruchGrund = 'kein-nachladen'
+      break
+    }
+    /**
+     * Der kurze Lauf endet hier — aber frühestens nach zwei Runden.
+     *
+     * Zwei statt einer, weil LinkedIn beim Nachladen gelegentlich einen Takt
+     * aussetzt: Eine einzelne Runde ohne Neue kann bedeuten „nichts Neues da"
+     * oder „die Seite hat gerade nichts geliefert". Zwei hintereinander
+     * bedeuten zuverlässig das Erste, und es kostet nur gut vier Sekunden mehr.
+     */
+    if (bekannt && ohneNeue >= RUNDEN_OHNE_NEUE) {
+      abbruchGrund = 'nichts-neues'
+      break
+    }
   }
 
   s.schliessen()
@@ -464,7 +517,14 @@ export async function leseListe(
     eintraege,
     gesamt,
     runden,
+    /**
+     * `vollstaendig` bleibt die einzige Erlaubnis für Abwesenheits-Schlüsse
+     * (siehe netzwerkUpsert.mjs). Ein kurzer Lauf erreicht sie nie — er hat die
+     * Liste ja bewusst nicht zu Ende gelesen. Genau das ist gewollt: Er ergänzt
+     * und aktualisiert, er nimmt niemandem seinen Status.
+     */
     vollstaendig: istVollstaendig(eintraege.length, gesamt),
+    abbruchGrund,
   }
 }
 

@@ -1706,6 +1706,30 @@ async function fuehreJobAus(job) {
   // Der Weg vom Handy: dort gibt es keinen Draht auf 127.0.0.1, der Auftrag
   // kommt über `runner_jobs`. Hier darf gewartet werden — anders als am
   // HTTP-Pfad hängt niemand an der Antwort.
+  /**
+   * Der Weg vom Handy zur Runde. Bewusst NICHT abgewartet: Ein Lauf dauert bis
+   * zu zwanzig Minuten, `beauftrageRunner` gibt nach fünf auf — der Auftrag
+   * stünde dann auf „error", während der Lauf in Wahrheit sauber weiterläuft.
+   * Die Live-Seite verfolgt ihn über den Spiegel `runde_stand`, nicht über den
+   * Auftrags-Status.
+   */
+  if (job.kind === 'runde') {
+    if (laufendeRunde?.status === 'laeuft') return { schon: true, ...rundeStand() }
+    void starteRunde({
+      ausloeser: 'handy',
+      nur: Array.isArray(job.payload?.nur) && job.payload.nur.length ? job.payload.nur : null,
+      tief: typeof job.payload?.tief === 'boolean' ? job.payload.tief : null,
+    })
+    await new Promise((r) => setTimeout(r, 200))
+    return { gestartet: true, ...rundeStand() }
+  }
+
+  if (job.kind === 'runde_abbrechen') {
+    rundeAbbruch = true
+    await spiegleRunde({ sofort: true })
+    return rundeStand()
+  }
+
   if (job.kind === 'linkedin_netzwerk_sync') {
     if (netzwerkSync.laeuft) throw new Error('Netzwerk-Sync läuft bereits')
     await starteNetzwerkSync()
@@ -3620,6 +3644,31 @@ let laufendeRunde = null
 let rundeAbbruch = false
 /** Überlebt den Runner-Neustart, damit die Frage beim Öffnen nicht jedes Mal kommt. */
 const RUNDE_MARKE = 'letzte-runde'
+/** Wie oft die Netzwerk-Listen ganz durchgeblättert werden. Begründung in `starteRunde`. */
+const NETZWERK_VOLL_ABSTAND_MS = Number(process.env.NETZWERK_VOLL_ABSTAND_MS ?? 7 * 24 * 60 * 60 * 1000)
+
+/**
+ * Den Zustand der Runde nach Supabase spiegeln (31.08.2026).
+ *
+ * Kevin: *„mir bringt das ja nix, wenn das jetzt nur auf dem Localhost
+ * funktioniert."* Richtig — auf frameworkos.de verbietet der Browser den Draht
+ * nach 127.0.0.1 (Mixed Content). Gleiches Muster wie `os_map_snapshot` (0054)
+ * und der Heartbeat (0057): Der Rechner ruft raus, die Live-Seite liest mit.
+ *
+ * Gedrosselt auf zweieinhalb Sekunden. Der Balken ändert sich sekündlich; ohne
+ * Drosselung wären das bei einem Zwanzig-Minuten-Lauf einige hundert Schreib-
+ * vorgänge für eine Anzeige, die niemand so genau liest.
+ */
+const RUNDE_SPIEGEL_MS = 2500
+let letzterRundeSpiegel = 0
+
+async function spiegleRunde({ sofort = false } = {}) {
+  if (!SNAPSHOT_ENABLED) return
+  if (!sofort && Date.now() - letzterRundeSpiegel < RUNDE_SPIEGEL_MS) return
+  letzterRundeSpiegel = Date.now()
+  const stand = rundeStand()
+  await pushSnapshotKey('runde_stand', async () => ({ ...stand, chrome: await chromeErreichbar() }))
+}
 
 function rundeStand() {
   const letzterStand = markeLies(RUNDE_MARKE)
@@ -3648,12 +3697,24 @@ function rundeStand() {
  * genommen statt einmal lang — dazwischen kann abgebrochen werden.
  */
 async function tueNetzwerkListe(welche, { melde = () => {}, kurz = false } = {}) {
+  // Für den kurzen Lauf: die schon bekannten Schlüssel dieser Liste holen.
+  // Kevins Einwand, wörtlich: „darunter wird's ja keine Änderung geben. Das
+  // heißt, jedes Mal laufen dieselben tausend Leute da durch." Stimmt — beide
+  // Listen sind chronologisch, das Neue steht oben.
+  const bekannt = kurz ? await bekannteProfilKeys(welche === 'einladungen' ? 'offen' : 'angenommen') : null
+  if (bekannt) melde(`${bekannt.size} bereits bekannt — es wird nur das Neue geholt`)
   const ergebnis = await mitNetzwerkLock(async () => {
     const gelesen = await leseListe(welche, {
       log: (...a) => console.log(...a),
-      ...(kurz ? { maxRunden: 10 } : {}),
+      ...(bekannt ? { bekannt } : {}),
       fortschritt: ({ geerntet, gesamt }) => {
-        melde(gesamt ? `${geerntet} von ${gesamt}` : `${geerntet} gelesen`, gesamt ? geerntet / gesamt : null)
+        // Beim kurzen Lauf ist „von 1.049" die falsche Bezugsgröße — er WILL die
+        // Liste nicht zu Ende lesen. Dann zählt, was neu dazukam.
+        if (bekannt) {
+          melde(`${geerntet} durchgesehen`, null)
+        } else {
+          melde(gesamt ? `${geerntet} von ${gesamt}` : `${geerntet} gelesen`, gesamt ? geerntet / gesamt : null)
+        }
       },
     })
     if (gelesen.loginWall) {
@@ -3668,11 +3729,54 @@ async function tueNetzwerkListe(welche, { melde = () => {}, kurz = false } = {})
   })
   if (ergebnis?.blockiert) return { text: 'ein anderer Lauf hält gerade den Zugang' }
   const g = ergebnis?.gelesen
-  return {
-    text: g?.gesamt ? `${g.eintraege.length} von ${g.gesamt}${g.vollstaendig ? '' : ' (Liste brach ab)'}` : `${g?.eintraege.length ?? 0} gelesen`,
-    von: g?.eintraege.length ?? null,
-    bis: g?.gesamt ?? null,
+  if (!g) return { text: 'nichts gelesen' }
+
+  if (bekannt) {
+    const neue = g.eintraege.filter((e) => !bekannt.has(e.profilKey)).length
+    // „Liste brach ab" wäre hier eine Falschmeldung: Der kurze Lauf hört
+    // absichtlich auf, sobald oben nichts Neues mehr steht.
+    const wieWeit = g.abbruchGrund === 'nichts-neues' ? '' : ' · früher gestoppt als gedacht'
+    return {
+      text: neue === 0 ? `nichts Neues (${g.eintraege.length} durchgesehen)` : `${neue} neu${wieWeit}`,
+      von: neue,
+      bis: g.gesamt ?? null,
+    }
   }
+
+  return {
+    text: g.gesamt ? `${g.eintraege.length} von ${g.gesamt}${g.vollstaendig ? '' : ' (Liste brach ab)'}` : `${g.eintraege.length} gelesen`,
+    von: g.eintraege.length,
+    bis: g.gesamt ?? null,
+  }
+}
+
+/**
+ * Welche Profil-Schlüssel dieser Liste kennt die Datenbank schon? (31.08.2026)
+ *
+ * Blättert über den 1000-Zeilen-Deckel von PostgREST hinweg — bei 1.090 offenen
+ * Einladungen wäre eine einzelne Abfrage genau um die neunzig zu kurz, die dann
+ * jedes Mal als „neu" gälten und den kurzen Lauf bis zum Deckel treiben würden.
+ */
+async function bekannteProfilKeys(status) {
+  const keys = new Set()
+  if (!SNAPSHOT_ENABLED) return keys
+  try {
+    for (let off = 0; off < 20_000; off += 1000) {
+      const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/linkedin_netzwerk?status=eq.${status}&select=profil_key&limit=1000&offset=${off}`,
+        { headers: supabaseHeaders() },
+      )
+      if (!res.ok) break
+      const zeilen = await res.json()
+      for (const z of zeilen) keys.add(z.profil_key)
+      if (zeilen.length < 1000) break
+    }
+  } catch (e) {
+    console.error('[runner] bekannte Profile nicht ladbar:', e?.message ?? e)
+    // Leeres Set heisst: voll blättern. Lieber langsam als lückenhaft.
+    return new Set()
+  }
+  return keys
 }
 
 /**
@@ -3768,9 +3872,21 @@ async function starteRunde({ ausloeser = 'kevin', nur = null, tief = null } = {}
   laufendeRunde = neueRunde({ jetzt: Date.now(), ausloeser, nur })
 
   const chromeDa = await chromeErreichbar()
-  // Ein voller Durchlauf durch beide Listen dauert vierzehn Minuten und geht
-  // durch Kevins Konto — einmal am Tag, danach reicht die Spitze der Liste.
-  const vollNoetig = tief === null ? !(await netzwerkHeuteSchonDurch(nowStamp().slice(0, 10))) : tief
+  /**
+   * Wie oft muss die Liste WIRKLICH ganz durch? (31.08.2026)
+   *
+   * Bis heute: einmal täglich. Das waren vierzehn Minuten durch Kevins Konto
+   * für eine Erkenntnis, die sich fast nie ändert — sein Einwand war richtig.
+   * Der kurze Lauf holt alles Neue (beide Listen sind chronologisch), er kann
+   * nur eines nicht: bemerken, dass jemand aus der Liste VERSCHWUNDEN ist.
+   *
+   * Und selbst das ist meist ableitbar: Wer aus den Einladungen verschwindet,
+   * hat angenommen — und steht dann oben in den Kontakten, wo der kurze Lauf
+   * ihn ohnehin findet. Ganz durch muss es nur für den Rest (zurückgezogene
+   * Einladungen, entfernte Kontakte) und für die Gesamtzahl, an der der
+   * Wächter die Erntelücke misst. Einmal pro Woche genügt dafür.
+   */
+  const vollNoetig = tief === null ? Date.now() - markeLies('letzter-netzwerk-voll') > NETZWERK_VOLL_ABSTAND_MS : tief
 
   console.log(`[runner] Runde gestartet (${ausloeser}${chromeDa ? '' : ', ohne Chrome'}${vollNoetig ? ', volle Listen' : ''})`)
 
@@ -3785,6 +3901,7 @@ async function starteRunde({ ausloeser = 'kevin', nur = null, tief = null } = {}
       continue
     }
     laufendeRunde = setzeEtappe(laufendeRunde, etappe.schluessel, { status: 'laeuft', anteil: 0, text: '' })
+    await spiegleRunde({ sofort: true })
     try {
       const r = await ETAPPEN_ARBEIT[etappe.schluessel]({
         tief: vollNoetig,
@@ -3793,6 +3910,7 @@ async function starteRunde({ ausloeser = 'kevin', nur = null, tief = null } = {}
             text: String(text ?? '').slice(0, 120),
             ...(typeof anteil === 'number' ? { anteil } : {}),
           })
+          void spiegleRunde()
         },
       })
       laufendeRunde = setzeEtappe(laufendeRunde, etappe.schluessel, {
@@ -3816,8 +3934,17 @@ async function starteRunde({ ausloeser = 'kevin', nur = null, tief = null } = {}
   // darf den Stand nicht auf „frisch" setzen, sonst fragt Uriel morgen nicht mehr.
   if (laufendeRunde.status === 'fertig') {
     markeSchreib(RUNDE_MARKE, Date.now())
-    if (vollNoetig) await merkeNetzwerkLauf(new Date().toISOString())
+    if (vollNoetig) {
+      // Nur wenn beide Listen wirklich vollständig gelesen wurden — sonst
+      // wäre die Woche verstrichen, ohne dass je einer durchlief.
+      const listen = laufendeRunde.etappen.filter((e) => e.schluessel === 'einladungen' || e.schluessel === 'kontakte')
+      if (listen.length && listen.every((e) => e.status === 'fertig')) {
+        markeSchreib('letzter-netzwerk-voll', Date.now())
+        await merkeNetzwerkLauf(new Date().toISOString())
+      }
+    }
   }
+  await spiegleRunde({ sofort: true })
   console.log(`[runner] Runde ${laufendeRunde.status} — ${kopfText(laufendeRunde)}`)
   return rundeStand()
 }
@@ -3951,6 +4078,8 @@ server.listen(PORT, '127.0.0.1', () => {
     console.log(`[runner] Auftrags-Abfrage aktiv → alle ${Math.round(JOB_POLL_MS / 1000)}s`)
     const jp = setInterval(() => void pollJobs(), JOB_POLL_MS)
     jp.unref?.()
+    // Einmal beim Start: sonst zeigt die Live-Seite bis zum ersten Lauf nichts.
+    setTimeout(() => void spiegleRunde({ sofort: true }), 2500)
     setTimeout(() => void mirrorAll(), 4000)
     const mi = setInterval(() => void mirrorAll(), SNAPSHOT_MIRROR_MS)
     mi.unref?.()

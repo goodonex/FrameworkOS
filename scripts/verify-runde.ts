@@ -194,5 +194,49 @@ console.log('\n6) Der Zeitplan bleibt aus')
   check('eine kaputte Anzeige bringt den Lauf nicht zu Fall', /try \{\s*\n\s*fortschritt\(/.test(netz))
 }
 
+console.log('\n7) Der kurze Lauf — nur das Neue holen')
+{
+  const netz = readFileSync(join(wurzel, 'runner/linkedin/netzwerk.mjs'), 'utf8')
+  const kern = readFileSync(join(wurzel, 'runner/index.mjs'), 'utf8')
+
+  check('leseListe kennt schon bekannte Schlüssel', /bekannt = null,/.test(netz))
+  check('nur UNBEKANNTE zählen als „neu"', /if \(bekannt && !bekannt\.has\(eintrag\.profilKey\) && !nachKey\.has\(eintrag\.profilKey\)\) neueDieseRunde\+\+/.test(netz))
+  check('zwei Runden ohne Neues beenden den Lauf', /const RUNDEN_OHNE_NEUE = 2/.test(netz) && /ohneNeue >= RUNDEN_OHNE_NEUE/.test(netz))
+  // Die Regel, an der alles hängt: Ein kurzer Lauf darf niemandem den Status
+  // nehmen. `vollstaendig` bleibt die einzige Erlaubnis dafür (netzwerkUpsert).
+  check('der kurze Lauf beansprucht keine Vollständigkeit', /vollstaendig: istVollstaendig\(eintraege\.length, gesamt\)/.test(netz))
+  check('der Abbruchgrund wird zurückgegeben', /abbruchGrund,/.test(netz))
+  check('„nichts Neues" ist kein Abbruch-Fehler', /abbruchGrund === 'nichts-neues' \? '' :/.test(kern))
+
+  check('die Runde lädt die bekannten Schlüssel', /async function bekannteProfilKeys/.test(kern))
+  // Bei 1.090 offenen Einladungen wäre eine einzelne Abfrage neunzig zu kurz —
+  // die fehlenden gälten jedes Mal als neu und trieben den Lauf bis zum Deckel.
+  check('sie blättert über den 1000-Zeilen-Deckel', /offset=\$\{off\}/.test(kern) && /off \+= 1000/.test(kern))
+  check('ohne Datenbank wird voll geblättert, nicht lückenhaft', /return new Set\(\)/.test(kern))
+  check('der volle Durchlauf ist wöchentlich, nicht täglich', /NETZWERK_VOLL_ABSTAND_MS \?\? 7 \* 24 \* 60 \* 60 \* 1000/.test(kern))
+  check('die Wochen-Marke fällt nur bei wirklich vollen Listen', /listen\.every\(\(e\) => e\.status === 'fertig'\)/.test(kern))
+}
+
+console.log('\n8) Live über die Brücke')
+{
+  const kern = readFileSync(join(wurzel, 'runner/index.mjs'), 'utf8')
+  const api = readFileSync(join(wurzel, 'app/src/cockpit/lib/rundeApi.ts'), 'utf8')
+
+  check('der Runner spiegelt den Stand nach Supabase', /pushSnapshotKey\('runde_stand'/.test(kern))
+  check('der Spiegel ist gedrosselt', /const RUNDE_SPIEGEL_MS = 2500/.test(kern))
+  check('Etappenwechsel und Abschluss spiegeln sofort', (kern.match(/spiegleRunde\(\{ sofort: true \}\)/g) ?? []).length >= 3)
+  check('das Handy kann eine Runde beauftragen', /job\.kind === 'runde'/.test(kern))
+  check('der Auftrag wartet nicht auf den ganzen Lauf', /void starteRunde\(\{\s*\n\s*ausloeser: 'handy'/.test(kern))
+  check('das Abbrechen geht auch über die Brücke', /job\.kind === 'runde_abbrechen'/.test(kern))
+
+  check('die App wählt zwischen Draht und Brücke', /if \(runnerDirekt\(\)\) return hole\('\/runde'\)/.test(api))
+  check('live wird der Spiegel gelesen', /leseSpiegel<RundeStand>\('runde_stand'\)/.test(api))
+  check('live wird ein Auftrag abgelegt, nicht gewartet', /beauftrageRunnerOhneWarten\('runde'/.test(api))
+  // Der Fall, der sonst ewig „lädt": Kevin klappt den Laptop zu, während der
+  // Lauf läuft. Der Spiegel friert ein und behauptet weiter „läuft".
+  check('ein eingefrorener Spiegel behauptet nicht „läuft"', /laeuft: gespiegelt\.data\.laeuft && !eingefroren/.test(api))
+  check('die Grenze dafür sind zwei Minuten', /const SPIEGEL_GILT_MS = 2 \* 60 \* 1000/.test(api))
+}
+
 console.log(`\nverify-runde: ${pass} ok, ${fail} fehlgeschlagen`)
 process.exit(fail === 0 ? 0 : 1)

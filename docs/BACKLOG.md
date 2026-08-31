@@ -11,6 +11,79 @@
 > Baum. Wer hier etwas als „offen" liest, prüft es bitte zuerst gegen den
 > laufenden Stand — genau diese Drift hat zwei Sessions blockiert.
 
+## **NACHTRAG 31.08.2026 — Der kurze Lauf und der Weg aufs Handy**
+
+Zwei Einwände von Kevin direkt nach dem Umbau, beide berechtigt.
+
+### „Müssen die tausendneunundvierzig jedes Mal komplett neu geladen werden?"
+
+Wörtlich weiter: *„Reicht es nicht, dass man sagt, okay, der Letzte war Thomas
+Müller und dann geht er halt durch und macht darunter noch mal fünf oder zehn
+Leute mit? […] darunter wird's ja keine Änderung geben. Das heißt, jedes Mal
+laufen dieselben tausend Leute da durch."*
+
+Genau so ist es jetzt. `leseListe` nimmt ein Set der schon bekannten
+Profil-Schlüssel entgegen und **hört auf, sobald zwei Runden hintereinander
+keinen einzigen unbekannten Eintrag mehr bringen**. Beide Listen sind
+chronologisch, das Neue steht oben — darunter ist der Rest von gestern.
+
+**Gemessen am 31.08., 14:33 gegen die echte Kontaktliste: 19 Sekunden.**
+„693 bereits bekannt → 15 durchgesehen → 3 neu." Vorher wären es dieselben
+693 Einträge über mehrere Minuten gewesen.
+
+Drei Feinheiten, ohne die es kippt:
+
+1. **Zwei Runden Puffer, nicht eine.** LinkedIn setzt beim Nachladen
+   gelegentlich einen Takt aus; eine einzelne leere Runde kann „nichts Neues"
+   *oder* „gerade nichts geliefert" heißen. Zwei hintereinander heißen
+   zuverlässig das Erste und kosten vier Sekunden.
+2. **Der kurze Lauf beansprucht nie `vollstaendig`.** Das bleibt die einzige
+   Erlaubnis für Abwesenheits-Schlüsse (`netzwerkUpsert.mjs`): Nur wer die Liste
+   zu Ende gelesen hat, darf schließen, dass jemand daraus VERSCHWUNDEN ist. Der
+   kurze Lauf ergänzt und aktualisiert, er nimmt niemandem seinen Status.
+3. **Die bekannten Schlüssel werden geblättert geholt.** Bei 1.090 offenen
+   Einladungen wäre eine einzelne PostgREST-Abfrage (Deckel 1.000) genau um die
+   neunzig zu kurz — die fehlenden gälten jedes Mal als „neu" und trieben den
+   angeblich kurzen Lauf bis zum Deckel.
+
+**Der volle Durchlauf ist damit von täglich auf wöchentlich gerückt**
+(`NETZWERK_VOLL_ABSTAND_MS`). Er wird nur noch für das gebraucht, was der kurze
+Lauf nicht sehen kann: zurückgezogene Einladungen, entfernte Kontakte und die
+Gesamtzahl, an der der Wächter die Erntelücke misst. Der häufigste Fall des
+Verschwindens — jemand hat angenommen — steht ohnehin oben in der Kontaktliste,
+wo der kurze Lauf ihn findet. Die Wochen-Marke fällt nur, wenn beide Listen
+wirklich vollständig durchliefen; sonst wäre die Woche verstrichen, ohne dass je
+einer durchkam.
+
+### „Mir bringt das ja nix, wenn das nur auf dem Localhost funktioniert"
+
+Der Ladeschirm läuft jetzt auch auf frameworkos.de — über die Brücke aus 0059,
+dasselbe Muster wie OS-Graph (0054) und Heartbeat (0057). Keine neue Migration:
+`runner_jobs.kind` ist ein freies Textfeld.
+
+- **Lesen:** Der Runner spiegelt seinen Stand nach `runner_snapshots`
+  (`runde_stand`) — beim Start, bei jedem Etappenwechsel sofort, während der
+  Arbeit alle 2,5 s gedrosselt. Ohne Drosselung wären das bei einem
+  Zwanzig-Minuten-Lauf einige hundert Schreibvorgänge für eine Anzeige, die
+  niemand so genau liest.
+- **Handeln:** Die Seite legt `kind: 'runde'` in `runner_jobs` ab, der Runner
+  greift ihn binnen vier Sekunden. **Am 31.08. gemessen: Auftrag abgelegt →
+  nach 3 s „Runde gestartet".** Bewusst ohne Warten auf das Ergebnis:
+  `beauftrageRunner` gibt nach fünf Minuten auf, ein Lauf dauert zwanzig — der
+  Auftrag stünde auf „error", während der Lauf sauber weiterläuft.
+- **Der Fall, der sonst ewig lädt:** Laptop zugeklappt, während der Lauf läuft.
+  Der Spiegel friert ein und behauptet weiter „läuft". Deshalb gilt er nur zwei
+  Minuten; danach steht am Handy „Abgerissen — lief der Rechner weiter?" statt
+  eines Balkens, der sich nie wieder bewegt.
+
+**Die Grenze, die bleibt:** Das Handy ist die Fernbedienung, nicht der Motor.
+Der Sync spricht mit Chrome auf dem Mac — läuft der nicht, lässt sich von
+unterwegs nichts holen. Das ist derselbe Punkt, an dem der Mac Mini (Ende
+September) etwas ändert, und kein Fehler dieses Baus.
+
+**Verifiziert:** `verify-runde.ts` jetzt 77 Prüfungen, App-Build grün, beide
+Wege echt gemessen (siehe Zahlen oben).
+
 ## **GEBAUT 31.08.2026 — Die Runde: der Sync läuft auf Anstoß, nicht nach Uhr**
 
 > Logik: [`runner/runde.mjs`](../runner/runde.mjs) · Oberfläche:

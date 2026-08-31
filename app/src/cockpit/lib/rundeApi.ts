@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { beauftrageRunnerOhneWarten, leseSpiegel, runnerDirekt } from './runnerBridge'
 import { RUNNER_BASE_URL } from './useRunnerStatus'
 
 /**
@@ -67,20 +68,62 @@ async function hole(pfad: string, init?: RequestInit): Promise<RundeStand> {
   return (await res.json()) as RundeStand
 }
 
-export function fetchRunde(): Promise<RundeStand> {
-  return hole('/runde')
+/**
+ * Wie alt darf der Spiegel sein, bevor die Live-Seite ihn nicht mehr glaubt?
+ *
+ * Der Runner schreibt ihn beim Start, bei jedem Etappenwechsel und während der
+ * Arbeit alle zweieinhalb Sekunden. Steht er länger als zwei Minuten still,
+ * während er „läuft" behauptet, ist der Rechner zugeklappt worden — dann ist
+ * „läuft" eine Lüge, und der Knopf muss wieder anbietbar sein.
+ */
+const SPIEGEL_GILT_MS = 2 * 60 * 1000
+
+/**
+ * Auf `localhost` direkt zum Runner, auf der Live-Domain über Supabase.
+ *
+ * Kevin: *„mir bringt das ja nix, wenn das jetzt nur auf dem Localhost
+ * funktioniert."* — Deshalb dasselbe Brücken-Muster wie beim OS-Graph und beim
+ * Heartbeat: Der Rechner ruft raus und spiegelt, die Seite liest mit und legt
+ * Aufträge ab. Was live NICHT geht, ist der Lauf ohne laufenden Rechner: Der
+ * Sync spricht mit Chrome auf Kevins Mac. Das Handy ist die Fernbedienung,
+ * nicht der Motor.
+ */
+export async function fetchRunde(): Promise<RundeStand> {
+  if (runnerDirekt()) return hole('/runde')
+
+  const gespiegelt = await leseSpiegel<RundeStand>('runde_stand')
+  if (!gespiegelt) throw new Error('Noch kein Spiegel — der Rechner war seit dem Umbau nicht an')
+
+  const alter = Date.now() - new Date(gespiegelt.updatedAt).getTime()
+  const eingefroren = gespiegelt.data.laeuft && alter > SPIEGEL_GILT_MS
+  return {
+    ...gespiegelt.data,
+    // Ein eingefrorener Spiegel darf nicht „läuft" behaupten — sonst wartet
+    // Kevin am Handy auf einen Balken, der sich nie wieder bewegt.
+    laeuft: gespiegelt.data.laeuft && !eingefroren,
+    kopf: eingefroren ? 'Abgerissen — lief der Rechner weiter?' : gespiegelt.data.kopf,
+    rest: eingefroren ? '' : gespiegelt.data.rest,
+  }
 }
 
-export function startRunde(optionen: { nur?: string[]; tief?: boolean } = {}): Promise<RundeStand> {
-  return hole('/runde/start', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ausloeser: 'kevin', ...optionen }),
-  })
+export async function startRunde(optionen: { nur?: string[]; tief?: boolean } = {}): Promise<RundeStand> {
+  if (runnerDirekt()) {
+    return hole('/runde/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ausloeser: 'kevin', ...optionen }),
+    })
+  }
+  await beauftrageRunnerOhneWarten('runde', { ...optionen })
+  // Der Runner holt den Auftrag alle vier Sekunden; bis dahin bleibt der alte
+  // Stand stehen. Der Hook fasst gleich nach.
+  return fetchRunde()
 }
 
-export function brichRundeAb(): Promise<RundeStand> {
-  return hole('/runde/abbrechen', { method: 'POST' })
+export async function brichRundeAb(): Promise<RundeStand> {
+  if (runnerDirekt()) return hole('/runde/abbrechen', { method: 'POST' })
+  await beauftrageRunnerOhneWarten('runde_abbrechen', {})
+  return fetchRunde()
 }
 
 /**
@@ -136,7 +179,13 @@ export function useRunde() {
         setStand(s)
         laeuftRef.current = true
         // Sofort nachfassen, damit der Balken nicht zwei Sekunden auf 0 steht.
-        window.setTimeout(() => void laden(), 400)
+        // Über die Brücke dauert es länger: Der Runner holt Aufträge alle vier
+        // Sekunden ab, und erst danach steht etwas im Spiegel.
+        window.setTimeout(() => void laden(), runnerDirekt() ? 400 : 2000)
+        if (!runnerDirekt()) {
+          window.setTimeout(() => void laden(), 6000)
+          window.setTimeout(() => void laden(), 11_000)
+        }
       } catch {
         setRunnerWeg(true)
       }
