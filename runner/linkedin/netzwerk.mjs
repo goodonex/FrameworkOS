@@ -330,7 +330,21 @@ async function sichtbarMachen(s, log = () => {}) {
   }
 }
 
-export async function leseListe(seitenName, { maxRunden = MAX_RUNDEN, jetzt = new Date(), log = () => {} } = {}) {
+/**
+ * `fortschritt` meldet nach jeder Runde `{ geerntet, gesamt }` (31.08.2026).
+ *
+ * Gebraucht für den Ladeschirm, den Kevin sich gewünscht hat: *„der ist bei
+ * null Prozent […] und dann komm ich an 'n Schreibtisch und seh, ah, okay, der
+ * ist zu siebzig Prozent durch."* Ohne diesen Rückkanal wüsste die Oberfläche
+ * nur, DASS die Einladungsliste läuft — bei sieben Minuten Laufzeit ist das
+ * genau die Anzeige, der man nach zwei Tagen nicht mehr glaubt. `gesamt` ist
+ * null, solange die Kopfzeile der Liste nicht gelesen ist; der Aufrufer muss
+ * das aushalten.
+ */
+export async function leseListe(
+  seitenName,
+  { maxRunden = MAX_RUNDEN, jetzt = new Date(), log = () => {}, fortschritt = () => {} } = {},
+) {
   const seite = SEITEN[seitenName]
   if (!seite) throw new Error(`unbekannte Liste: ${seitenName}`)
 
@@ -429,6 +443,13 @@ export async function leseListe(seitenName, { maxRunden = MAX_RUNDEN, jetzt = ne
 
     if (nachKey.size === vorher) ohneZuwachs++
     else ohneZuwachs = 0
+
+    // Nach der Ernte, nicht davor: gemeldet wird, was wirklich in der Hand ist.
+    try {
+      fortschritt({ geerntet: nachKey.size, gesamt, runde: runden + 1, maxRunden })
+    } catch {
+      /* Eine Anzeige darf einen Lauf nie zu Fall bringen. */
+    }
 
     if (gesamt && nachKey.size >= gesamt) break
     if (ohneZuwachs >= RUNDEN_OHNE_ZUWACHS) break

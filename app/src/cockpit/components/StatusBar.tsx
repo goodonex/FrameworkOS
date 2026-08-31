@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { useUrielBus } from '../../store/urielBus'
 import { useRunnerStatus } from '../lib/useRunnerStatus'
+import { RundeKnopf } from './RundeTor'
 
 function Clock() {
   const [now, setNow] = useState(() => new Date())
@@ -96,6 +97,9 @@ export function StatusBar() {
       {/* Externe Tools + Uhr. Der Brand-Umschalter ist am 09.08.2026 entfallen —
           es gibt nur noch HERRMANN & CO. (siehe activeBrand.tsx). */}
       <div className="ck-status-right">
+        {/* Der Stand-Knopf steht VOR den externen Links: Er gehoert zu Uriel,
+            nicht zu den Sprungmarken nach draussen (31.08.2026). */}
+        <RundeKnopf />
         <span className="ck-status-links" aria-label="Externe Tools">
           {LAUNCH_LINKS.map((l) => (
             <a

@@ -29,6 +29,17 @@ import { upsertNetzwerk } from './linkedin/netzwerkUpsert.mjs'
 import { installiereLogHygiene, kuerzeLogDatei } from './logHygiene.mjs'
 import { WACH_KARENZ_MS, bewerteWachheit, chromeErreichbar, netzErreichbar, startBereitAus } from './startBereit.mjs'
 import { beurteileWache, meldungsText } from './chromeWache.mjs'
+import {
+  ETAPPEN,
+  frageBeimOeffnen,
+  kopfText,
+  neueRunde,
+  prozent,
+  restText,
+  schliesseRunde,
+  setzeEtappe,
+  standText,
+} from './runde.mjs'
 import { bewerteSchleuse, pruefeAnmeldung, pruefeDurchgang, pruefeSupabase, pruefeVault } from './schleuse.mjs'
 import { jophielProjekte, jophielShot, shotStand } from './jophiel.mjs'
 
@@ -2109,6 +2120,38 @@ const server = createServer(async (req, res) => {
       })
     }
 
+    /**
+     * Die Runde (31.08.2026) — der Ladeschirm fragt hier alle zwei Sekunden nach.
+     *
+     * Bewusst ein einziger GET für alles, was der Schirm braucht: Zustand,
+     * Prozent, Kopfzeile, Restschätzung und das Alter des letzten Standes. Ein
+     * Schirm, der drei Endpunkte zusammensetzen muss, zeigt bei jedem Ruckler
+     * einen Zwischenstand, den es nie gab.
+     */
+    if (req.method === 'GET' && url.pathname === '/runde') {
+      return json(res, 200, { ...rundeStand(), chrome: await chromeErreichbar() })
+    }
+
+    if (req.method === 'POST' && url.pathname === '/runde/start') {
+      if (laufendeRunde?.status === 'laeuft') return json(res, 409, { fehler: 'läuft bereits', ...rundeStand() })
+      const koerper = await readBody(req).catch(() => ({}))
+      // Nicht awaiten: Der Lauf dauert Minuten, die Antwort muss sofort zurück —
+      // der Schirm zeigt danach den Fortschritt über GET /runde.
+      void starteRunde({
+        ausloeser: koerper?.ausloeser ?? 'kevin',
+        nur: Array.isArray(koerper?.nur) && koerper.nur.length ? koerper.nur : null,
+        tief: typeof koerper?.tief === 'boolean' ? koerper.tief : null,
+      })
+      // Ein Tick, damit der erste GET nicht in die Lücke vor dem Aufsetzen fällt.
+      await new Promise((r) => setTimeout(r, 50))
+      return json(res, 202, rundeStand())
+    }
+
+    if (req.method === 'POST' && url.pathname === '/runde/abbrechen') {
+      rundeAbbruch = true
+      return json(res, 200, rundeStand())
+    }
+
     // Agenten-Katalog fürs Cockpit (/agenten): Liste + Run-Buttons.
     if (req.method === 'GET' && url.pathname === '/agents') {
       const runningIds = new Set([...running.values()].map((r) => r.agent))
@@ -2632,6 +2675,17 @@ const warteLog = new Map()
  * Wer das alte Verhalten zurueckwill, setzt CHROME_AUTOSTART=1.
  */
 const CHROME_AUTOSTART = process.env.CHROME_AUTOSTART === '1'
+
+/**
+ * Laufen die Zeitplan-Routinen? Seit dem 31.08.2026 standardmäßig NEIN.
+ *
+ * Begründung am Startblock unten und in `runner/runde.mjs`. Kurz: Acht Uhren,
+ * die alle fünf Minuten prüfen, haben Kevins Rechner ausgebremst und alle zwei
+ * Stunden sein Chrome angefasst — für einen Stand, den er ohnehin erst ansieht,
+ * wenn er sich hinsetzt. `ROUTINEN_AUTOMATIK=1` holt das alte Verhalten zurück
+ * (gedacht für den Mac Mini, der nicht schläft).
+ */
+const ROUTINEN_AUTOMATIK = process.env.ROUTINEN_AUTOMATIK === '1'
 const CHROME_START_ABSTAND_MS = 60 * 60 * 1000
 /**
  * Wie lange die Sperre gilt, wenn der Start NICHT geklappt hat (25.08.).
@@ -3159,28 +3213,49 @@ let verlaufLaeuft = false
  *  setzt zwar ein WorkingDirectory, aber ein Handstart aus einem anderen
  *  Ordner wuerde den Pfad sonst still zerlegen. */
 const REPO_WURZEL = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-function verlaufNachziehen() {
-  if (verlaufLaeuft) return
+/**
+ * Gibt seit dem 31.08. eine Promise zurück und meldet jede Ausgabezeile weiter.
+ *
+ * Der alte Aufruf (`void verlaufNachziehen()`) bleibt gültig — eine ignorierte
+ * Promise verhält sich wie vorher. Die Runde dagegen muss warten können, sonst
+ * stünde ihre Etappe auf „fertig", während der Kindprozess noch minutenlang
+ * durch die Threads geht.
+ */
+function verlaufNachziehen({ melde = () => {} } = {}) {
+  if (verlaufLaeuft) return Promise.resolve({ uebersprungen: 'läuft bereits' })
   verlaufLaeuft = true
-  try {
-    const p = spawn(process.execPath, [join(REPO_WURZEL, 'scripts', 'verlauf-nachziehen.mjs'), '--limit=60'], {
-      cwd: REPO_WURZEL,
-      env: process.env,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    })
-    let letzteZeile = ''
-    p.stdout.on('data', (d) => { const t = String(d).trim(); if (t) letzteZeile = t.split('\n').pop() })
-    p.stderr.on('data', (d) => console.error('[runner] verlauf-nachziehen:', String(d).trim().slice(0, 200)))
-    p.on('close', (code) => {
+  return new Promise((fertig) => {
+    try {
+      const p = spawn(process.execPath, [join(REPO_WURZEL, 'scripts', 'verlauf-nachziehen.mjs'), '--limit=60'], {
+        cwd: REPO_WURZEL,
+        env: process.env,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      })
+      let letzteZeile = ''
+      p.stdout.on('data', (d) => {
+        const t = String(d).trim()
+        if (!t) return
+        letzteZeile = t.split('\n').pop()
+        melde(letzteZeile.replace(/^\[[^\]]+\]\s*/, ''))
+      })
+      p.stderr.on('data', (d) => console.error('[runner] verlauf-nachziehen:', String(d).trim().slice(0, 200)))
+      p.on('close', (code) => {
+        verlaufLaeuft = false
+        if (code === 0 && letzteZeile) console.log('[runner] ' + letzteZeile.replace(/^\[[^\]]+\]\s*/, 'verlauf-nachziehen: '))
+        else if (code !== 0) console.error('[runner] verlauf-nachziehen endete mit Code ' + code)
+        fertig(code === 0 ? { text: letzteZeile.replace(/^\[[^\]]+\]\s*/, '') } : { fehler: `Code ${code}` })
+      })
+      p.on('error', (e) => {
+        verlaufLaeuft = false
+        console.error('[runner] verlauf-nachziehen:', e?.message ?? e)
+        fertig({ fehler: e?.message ?? String(e) })
+      })
+    } catch (e) {
       verlaufLaeuft = false
-      if (code === 0 && letzteZeile) console.log('[runner] ' + letzteZeile.replace(/^\[[^\]]+\]\s*/, 'verlauf-nachziehen: '))
-      else if (code !== 0) console.error('[runner] verlauf-nachziehen endete mit Code ' + code)
-    })
-    p.on('error', (e) => { verlaufLaeuft = false; console.error('[runner] verlauf-nachziehen:', e?.message ?? e) })
-  } catch (e) {
-    verlaufLaeuft = false
-    console.error('[runner] verlauf-nachziehen konnte nicht starten:', e?.message ?? e)
-  }
+      console.error('[runner] verlauf-nachziehen konnte nicht starten:', e?.message ?? e)
+      fertig({ fehler: e?.message ?? String(e) })
+    }
+  })
 }
 
 /**
@@ -3420,12 +3495,28 @@ async function maybeLeadsSync() {
     if (!SNAPSHOT_ENABLED) return // ohne service_role kein Schreibweg
     if (Date.now() - letzterLeadsLauf < LEADS_ABSTAND_MS) return
     letzterLeadsLauf = Date.now()
+    await tueLeadsSync()
+  } catch (e) {
+    console.error('[runner] leads-sync übersprungen:', e?.message ?? e)
+  }
+}
+
+/**
+ * Der Arbeitskern ohne Bremse (31.08.2026) — dieselbe Arbeit, ohne Zeitschranke.
+ *
+ * Getrennt, weil die Runde keine Uhr befragt: Kevin hat gedrückt, also läuft
+ * es. Die Bremse (`LEADS_ABSTAND_MS`) gehört zur Automatik, nicht zur Arbeit —
+ * und ein zweiter Codepfad für dieselbe Fachlogik wäre genau die Doppelung,
+ * die dieses Repo bei den Erstnachrichten schon einmal teuer bezahlt hat (0071).
+ */
+async function tueLeadsSync({ melde = () => {} } = {}) {
+  {
     // `fileURLToPath`, nicht `.pathname`: Der Repo-Pfad enthält ein Leerzeichen
     // („Kevin OS"), und `.pathname` liefert es prozentkodiert zurück. spawn
     // sucht dann wörtlich nach „Kevin%20OS" und scheitert mit ENOENT —
     // genau so im Runner-Log vom 20.08., 14:42 zu sehen.
     const wurzel = fileURLToPath(new URL('..', import.meta.url))
-    await new Promise((fertig) => {
+    return await new Promise((fertig) => {
       // Nicht das tsx-Binary direkt: dessen Shebang ist `#!/usr/bin/env node`,
       // und der LaunchAgent hat kein node im PATH (nvm) — im Log vom 20.08.,
       // 14:54 als „env: node: No such file or directory". `process.execPath`
@@ -3438,21 +3529,21 @@ async function maybeLeadsSync() {
       let letzte = ''
       proc.stdout.on('data', (d) => {
         const text = String(d).trim()
-        if (text) letzte = text.split('\n').pop() ?? letzte
+        if (!text) return
+        letzte = text.split('\n').pop() ?? letzte
+        melde(letzte)
       })
       proc.stderr.on('data', (d) => console.error('[runner] leads-sync:', String(d).trim().slice(0, 300)))
       proc.on('error', (e) => {
         console.error('[runner] leads-sync nicht startbar:', e?.message ?? e)
-        fertig()
+        fertig({ fehler: e?.message ?? String(e) })
       })
       proc.on('close', (code) => {
         if (code === 0) console.log(`[runner] leads-sync durch (${letzte})`)
         else console.error(`[runner] leads-sync endete mit Code ${code}`)
-        fertig()
+        fertig(code === 0 ? { text: letzte } : { fehler: `Code ${code}` })
       })
     })
-  } catch (e) {
-    console.error('[runner] leads-sync übersprungen:', e?.message ?? e)
   }
 }
 
@@ -3473,6 +3564,15 @@ async function maybeWaechter() {
     if (!SNAPSHOT_ENABLED) return // ohne service_role kein Schreibweg
     if (Date.now() - letzterWaechterLauf < WAECHTER_ABSTAND_MS) return
     letzterWaechterLauf = Date.now()
+    await tueWaechter()
+  } catch (e) {
+    console.error('[runner] wächter übersprungen:', e?.message ?? e)
+  }
+}
+
+/** Der Arbeitskern ohne Bremse (31.08.2026) — siehe `tueLeadsSync`. */
+async function tueWaechter() {
+  {
     const { ladeUndPruefe, schreibeBefund } = await import('./widersprueche.mjs')
     const ergebnis = await ladeUndPruefe()
     // 18.08.: Eine geschlossene Schleuse gehört ganz nach vorn. Sie ist der
@@ -3496,9 +3596,230 @@ async function maybeWaechter() {
     if (ergebnis.anzahl > 0) {
       console.log(`[runner] wächter: ${ergebnis.anzahl} Widersprüche (${ergebnis.hoch} dringend)`)
     }
-  } catch (e) {
-    console.error('[runner] wächter übersprungen:', e?.message ?? e)
+    return {
+      text: ergebnis.anzahl
+        ? `${ergebnis.anzahl} Widerspruch${ergebnis.anzahl > 1 ? 'sfälle' : ''} (${ergebnis.hoch} dringend)`
+        : 'keine Widersprüche',
+    }
   }
+}
+
+/* ==========================================================================
+ * DIE RUNDE (31.08.2026) — ein Lauf, den Kevin auslöst und dem er zusieht.
+ *
+ * Begründung und Etappen-Gewichte stehen in `runner/runde.mjs`. Hier steht nur,
+ * WIE die Etappen ihre Arbeit tun: Jede ruft dieselben Bausteine, die die
+ * Automatik gerufen hat — `syncThreads`, `leseListe`, `upsertNetzwerk`,
+ * `startRun` —, nur ohne Uhrzeit-Schranke und Tagesstempel. Kevin hat
+ * gedrückt; das IST der Grund zu laufen.
+ * ========================================================================== */
+
+/** Der laufende bzw. zuletzt gelaufene Zustand. Nur EINE Runde zur Zeit. */
+let laufendeRunde = null
+/** Wird auf true gesetzt, wenn Kevin abbricht — die Etappen sehen zwischen den Schritten nach. */
+let rundeAbbruch = false
+/** Überlebt den Runner-Neustart, damit die Frage beim Öffnen nicht jedes Mal kommt. */
+const RUNDE_MARKE = 'letzte-runde'
+
+function rundeStand() {
+  const letzterStand = markeLies(RUNDE_MARKE)
+  const standIso = letzterStand ? new Date(letzterStand).toISOString() : null
+  const laeuft = laufendeRunde?.status === 'laeuft'
+  return {
+    runde: laufendeRunde,
+    prozent: prozent(laufendeRunde),
+    kopf: kopfText(laufendeRunde),
+    rest: restText(laufendeRunde),
+    laeuft,
+    letzterStand: standIso,
+    letzterStandText: standText(standIso, Date.now()),
+    // Die Entscheidung „fragen oder nicht" fällt hier, nicht im Browser: Sonst
+    // stünde die Vier-Stunden-Grenze an zwei Stellen und liefe auseinander.
+    fragen: frageBeimOeffnen({ letzterStand: standIso, jetzt: Date.now(), laeuft }),
+  }
+}
+
+/**
+ * Eine Liste des Netzwerks holen — einzeln, nicht beide auf einmal.
+ *
+ * `starteNetzwerkSync` macht beide unter einem Lock. Für die Runde ist das zu
+ * grob: Kevin soll „Offene Einladungen: 340 von 1.049" sehen und nicht sieben
+ * Minuten lang „Netzwerk". Der Lock bleibt derselbe, er wird nur zweimal kurz
+ * genommen statt einmal lang — dazwischen kann abgebrochen werden.
+ */
+async function tueNetzwerkListe(welche, { melde = () => {}, kurz = false } = {}) {
+  const ergebnis = await mitNetzwerkLock(async () => {
+    const gelesen = await leseListe(welche, {
+      log: (...a) => console.log(...a),
+      ...(kurz ? { maxRunden: 10 } : {}),
+      fortschritt: ({ geerntet, gesamt }) => {
+        melde(gesamt ? `${geerntet} von ${gesamt}` : `${geerntet} gelesen`, gesamt ? geerntet / gesamt : null)
+      },
+    })
+    if (gelesen.loginWall) {
+      throw new Error('LinkedIn zeigt die Anmeldung — im Sync-Chrome einmal anmelden')
+    }
+    const geschrieben = await upsertNetzwerk(gelesen)
+    console.log(
+      `[runner] runde ${welche}: ${gelesen.eintraege.length}/${gelesen.gesamt}` +
+        ` · vollständig: ${gelesen.vollstaendig ? 'ja' : 'nein'}`,
+    )
+    return { gelesen, geschrieben }
+  })
+  if (ergebnis?.blockiert) return { text: 'ein anderer Lauf hält gerade den Zugang' }
+  const g = ergebnis?.gelesen
+  return {
+    text: g?.gesamt ? `${g.eintraege.length} von ${g.gesamt}${g.vollstaendig ? '' : ' (Liste brach ab)'}` : `${g?.eintraege.length ?? 0} gelesen`,
+    von: g?.eintraege.length ?? null,
+    bis: g?.gesamt ?? null,
+  }
+}
+
+/**
+ * Was jede Etappe tut. Der Schlüssel muss zu `ETAPPEN` in runde.mjs passen.
+ *
+ * Jede Funktion bekommt `melde(text, anteil)` und gibt `{ text }` zurück — was
+ * dort steht, liest Kevin hinterher in der Etappen-Zeile. Wirft sie, steht die
+ * Etappe auf „fehler" und die Runde läuft weiter: Eine abgebrochene
+ * Einladungsliste darf die Antwort-Entwürfe nicht verhindern.
+ */
+const ETAPPEN_ARBEIT = {
+  postfach: async ({ melde }) => {
+    melde('LinkedIn-Postfach wird gelesen')
+    const synced = await syncThreads({})
+    const result = await upsertThreads(synced.threads, {})
+    letzterPostfachSync = Date.now()
+    markeSchreib('letzter-postfach-sync', letzterPostfachSync)
+    return {
+      text:
+        `${result.geschrieben ?? synced.threads.length} Gespräche` +
+        (result.inserted ? ` · ${result.inserted} neu` : '') +
+        (synced.partial ? ' · Lauf brach ab' : ''),
+    }
+  },
+
+  verlauf: async ({ melde }) => {
+    const r = await verlaufNachziehen({ melde: (t) => melde(t) })
+    if (r?.fehler) throw new Error(r.fehler)
+    return { text: r?.text ?? r?.uebersprungen ?? 'nachgezogen' }
+  },
+
+  einladungen: async ({ melde, tief }) => tueNetzwerkListe('einladungen', { melde, kurz: !tief }),
+
+  kontakte: async ({ melde, tief }) => tueNetzwerkListe('kontakte', { melde, kurz: !tief }),
+
+  leads: async ({ melde }) => {
+    const r = await tueLeadsSync({ melde: (t) => melde(t) })
+    if (r?.fehler) throw new Error(r.fehler)
+    letzterLeadsLauf = Date.now()
+    return { text: r?.text ?? 'verbucht' }
+  },
+
+  waechter: async ({ melde }) => {
+    melde('Datenbank wird gegengelesen')
+    const r = await tueWaechter()
+    letzterWaechterLauf = Date.now()
+    return { text: r?.text ?? 'geprüft' }
+  },
+
+  sortierer: async ({ melde }) => {
+    const { threads } = await holeSortierThreads({
+      supabaseUrl: SUPABASE_URL,
+      headers: supabaseHeaders(),
+      brandSlug: process.env.LINKEDIN_BRAND_SLUG ?? 'herrmann',
+    })
+    if (!threads.length) return { text: 'nichts zu sortieren' }
+    const gebaut = baueSortierInput(threads)
+    if (!gebaut.input.threads.length) return { text: 'nichts zu sortieren' }
+    melde(`${gebaut.input.threads.length} Kontakte werden beurteilt`)
+    await startRun('linkedin-sortierer', gebaut.input)
+    return {
+      text:
+        `${gebaut.input.threads.length} beurteilt` +
+        (gebaut.weitereWarten ? ` · ${gebaut.weitereWarten} bleiben für den nächsten Lauf` : ''),
+    }
+  },
+
+  entwuerfe: async ({ melde }) => {
+    const gebaut = await antwortEntwuerfeInput(new Date())
+    if (!gebaut) return { text: 'niemand wartet auf eine Antwort' }
+    melde(`${gebaut.input.threads.length} Entwürfe werden geschrieben`)
+    await startRun('linkedin-antwort-entwuerfe', gebaut.input)
+    return {
+      text:
+        `${gebaut.input.threads.length} Entwürfe` +
+        (gebaut.weitereWarten ? ` · ${gebaut.weitereWarten} über dem Limit` : ''),
+    }
+  },
+}
+
+/**
+ * Die Runde ausführen.
+ *
+ * **Chrome wird geprüft, nicht geöffnet.** Fehlt es, werden die vier
+ * Chrome-Etappen als „übersprungen" markiert und der Rest läuft trotzdem —
+ * Leads verbuchen und Wächter brauchen nur die Datenbank. Kevin sieht dann im
+ * Schirm genau, was fehlt und warum, statt einer roten Zeile im Log, die er nie
+ * liest.
+ */
+async function starteRunde({ ausloeser = 'kevin', nur = null, tief = null } = {}) {
+  if (laufendeRunde?.status === 'laeuft') return rundeStand()
+  rundeAbbruch = false
+  laufendeRunde = neueRunde({ jetzt: Date.now(), ausloeser, nur })
+
+  const chromeDa = await chromeErreichbar()
+  // Ein voller Durchlauf durch beide Listen dauert vierzehn Minuten und geht
+  // durch Kevins Konto — einmal am Tag, danach reicht die Spitze der Liste.
+  const vollNoetig = tief === null ? !(await netzwerkHeuteSchonDurch(nowStamp().slice(0, 10))) : tief
+
+  console.log(`[runner] Runde gestartet (${ausloeser}${chromeDa ? '' : ', ohne Chrome'}${vollNoetig ? ', volle Listen' : ''})`)
+
+  for (const etappe of laufendeRunde.etappen) {
+    if (rundeAbbruch) break
+    const def = ETAPPEN.find((e) => e.schluessel === etappe.schluessel)
+    if (def?.brauchtChrome && !chromeDa) {
+      laufendeRunde = setzeEtappe(laufendeRunde, etappe.schluessel, {
+        status: 'uebersprungen',
+        text: 'Sync-Chrome läuft nicht',
+      })
+      continue
+    }
+    laufendeRunde = setzeEtappe(laufendeRunde, etappe.schluessel, { status: 'laeuft', anteil: 0, text: '' })
+    try {
+      const r = await ETAPPEN_ARBEIT[etappe.schluessel]({
+        tief: vollNoetig,
+        melde: (text, anteil = null) => {
+          laufendeRunde = setzeEtappe(laufendeRunde, etappe.schluessel, {
+            text: String(text ?? '').slice(0, 120),
+            ...(typeof anteil === 'number' ? { anteil } : {}),
+          })
+        },
+      })
+      laufendeRunde = setzeEtappe(laufendeRunde, etappe.schluessel, {
+        status: 'fertig',
+        anteil: 1,
+        text: r?.text ?? 'fertig',
+        von: r?.von ?? null,
+        bis: r?.bis ?? null,
+      })
+    } catch (e) {
+      console.error(`[runner] Runde — Etappe ${etappe.schluessel}:`, e?.message ?? e)
+      laufendeRunde = setzeEtappe(laufendeRunde, etappe.schluessel, {
+        status: 'fehler',
+        text: String(e?.message ?? e).slice(0, 160),
+      })
+    }
+  }
+
+  laufendeRunde = schliesseRunde(laufendeRunde, { jetzt: Date.now(), abgebrochen: rundeAbbruch })
+  // Der Stempel steht erst NACH dem Lauf auf der Platte: Ein abgebrochener Lauf
+  // darf den Stand nicht auf „frisch" setzen, sonst fragt Uriel morgen nicht mehr.
+  if (laufendeRunde.status === 'fertig') {
+    markeSchreib(RUNDE_MARKE, Date.now())
+    if (vollNoetig) await merkeNetzwerkLauf(new Date().toISOString())
+  }
+  console.log(`[runner] Runde ${laufendeRunde.status} — ${kopfText(laufendeRunde)}`)
+  return rundeStand()
 }
 
 async function maybeDream() {
@@ -3526,8 +3847,9 @@ async function maybeDream() {
 
 server.listen(PORT, '127.0.0.1', () => {
   console.log(`[runner] alive auf http://127.0.0.1:${PORT} · Vault: ${VAULT}`)
-  // leicht verzögert, damit der Start nicht blockiert
-  setTimeout(() => void maybeDream(), 5000)
+  // Der Dream-Agent gehört zum Zeitplan, nicht zum Start: Er fährt ein Modell
+  // hoch, und auf 8 GB ist das bei jedem Aufwachen spürbar (31.08.).
+  if (ROUTINEN_AUTOMATIK) setTimeout(() => void maybeDream(), 5000)
 
   // Die Uhr, an der die Routinen ablesen, ob der Mac wach ist (18.08.). Muss
   // vor ihnen laufen und feiner ticken als sie: Ein DarkWake von einer Minute
@@ -3536,53 +3858,80 @@ server.listen(PORT, '127.0.0.1', () => {
   const wt = setInterval(wachTick, WACH_TICK_MS)
   wt.unref?.()
 
-  // Die Chrome-Wache im selben Minutentakt, direkt nach der Wachheit: Sie
-  // braucht deren Urteil, und sie soll den Moment nicht verpassen, in dem
-  // Kevin morgens `chrome-sync` startet.
-  const cw = setInterval(() => void chromeWacheTick(), WACH_TICK_MS)
-  cw.unref?.()
+  /**
+   * ---- Die Zeitplan-Routinen: seit dem 31.08.2026 standardmäßig AUS ----
+   *
+   * Kevin, nachdem das eine Woche lief: *„das ist so still im Hintergrund
+   * läuft, das geht mir ultra auf die Nerven […] das macht mein ganzes System
+   * langsamer. Ich muss bei jedem Klick länger warten."*
+   *
+   * Am Log vom 31.08. nachgezählt: acht Routinen, alle fünf Minuten geprüft,
+   * vierzig identische Zeilen an einem Vormittag — und alle zwei Stunden ein
+   * `Page.navigate` in Kevins offenes Chrome-Fenster. Der Gegenwert war gering,
+   * weil er den Stand ohnehin erst ansieht, wenn er sich hinsetzt.
+   *
+   * Was an ihre Stelle tritt, steht in `runner/runde.mjs`: EIN Lauf, den Kevin
+   * auslöst und dem er beim Fortschritt zusehen kann. Wer den Zeitplan
+   * zurückwill (Mac Mini als Dauerläufer, geplant für Ende September), setzt
+   * `ROUTINEN_AUTOMATIK=1` in `runner/.env` — der Code darunter ist unverändert
+   * geblieben, nur nicht mehr angeschaltet.
+   *
+   * Die Wachheits-Uhr oben läuft weiter: Sie kostet nichts, fasst nichts an und
+   * beantwortet die Frage „schlief der Mac gerade?", die auch die Runde stellt.
+   */
+  if (ROUTINEN_AUTOMATIK) {
+    console.log('[runner] Zeitplan-Routinen AKTIV (ROUTINEN_AUTOMATIK=1)')
 
-  // Morgenbrief: kurz nach dem Start prüfen (Mac gerade aufgeklappt) und dann
-  // alle 5 Minuten — so kommt er auch, wenn der Rechner erst um 9 angeht.
-  setTimeout(() => void maybeMorgenbrief(), 10_000)
-  const mb = setInterval(() => void maybeMorgenbrief(), MORGENBRIEF_CHECK_MS)
-  mb.unref?.()
+    // Die Chrome-Wache im selben Minutentakt, direkt nach der Wachheit: Sie
+    // braucht deren Urteil, und sie soll den Moment nicht verpassen, in dem
+    // Kevin morgens `chrome-sync` startet.
+    const cw = setInterval(() => void chromeWacheTick(), WACH_TICK_MS)
+    cw.unref?.()
 
-  // Das Postfach zuerst: Es ist die Quelle, aus der die Entwürfe gebaut werden.
-  setTimeout(() => void maybePostfachSync(), 15_000)
-  const pf = setInterval(() => void maybePostfachSync(), MORGENBRIEF_CHECK_MS)
-  pf.unref?.()
+    // Morgenbrief: kurz nach dem Start prüfen (Mac gerade aufgeklappt) und dann
+    // alle 5 Minuten — so kommt er auch, wenn der Rechner erst um 9 angeht.
+    setTimeout(() => void maybeMorgenbrief(), 10_000)
+    const mb = setInterval(() => void maybeMorgenbrief(), MORGENBRIEF_CHECK_MS)
+    mb.unref?.()
 
-  // Antwort-Entwürfe im selben Takt, aber eine Stunde früher als der Morgenbrief:
-  // beim Aufklappen des Macs prüfen und dann alle 5 Minuten.
-  setTimeout(() => void maybeAntwortEntwuerfe(), 20_000)
-  const ae = setInterval(() => void maybeAntwortEntwuerfe(), MORGENBRIEF_CHECK_MS)
-  ae.unref?.()
+    // Das Postfach zuerst: Es ist die Quelle, aus der die Entwürfe gebaut werden.
+    setTimeout(() => void maybePostfachSync(), 15_000)
+    const pf = setInterval(() => void maybePostfachSync(), MORGENBRIEF_CHECK_MS)
+    pf.unref?.()
 
-  // Der Sortierer im selben Takt, zwei Stunden später. Versetzter Start (50 statt
-  // 20 Sekunden), damit auf 8 GB nie zwei CLI-Läufe gleichzeitig hochfahren.
-  setTimeout(() => void maybeSortierer(), 50_000)
-  const so = setInterval(() => void maybeSortierer(), MORGENBRIEF_CHECK_MS)
-  so.unref?.()
+    // Antwort-Entwürfe im selben Takt, aber eine Stunde früher als der Morgenbrief:
+    // beim Aufklappen des Macs prüfen und dann alle 5 Minuten.
+    setTimeout(() => void maybeAntwortEntwuerfe(), 20_000)
+    const ae = setInterval(() => void maybeAntwortEntwuerfe(), MORGENBRIEF_CHECK_MS)
+    ae.unref?.()
 
-  // Netzwerk-Sync einmal täglich — NUR über den regulären Tick. Ein Lauf kurz
-  // nach dem Start wäre bei jedem Runner-Neustart ein neuer Fünf-Minuten-Lauf
-  // über Kevins LinkedIn; der erste Tick in fünf Minuten reicht vollkommen.
-  const nw = setInterval(() => void maybeNetzwerkSync(), MORGENBRIEF_CHECK_MS)
-  nw.unref?.()
+    // Der Sortierer im selben Takt, zwei Stunden später. Versetzter Start (50 statt
+    // 20 Sekunden), damit auf 8 GB nie zwei CLI-Läufe gleichzeitig hochfahren.
+    setTimeout(() => void maybeSortierer(), 50_000)
+    const so = setInterval(() => void maybeSortierer(), MORGENBRIEF_CHECK_MS)
+    so.unref?.()
 
-  // Lead-Pflege vor dem Wächter: sie verbucht, was ein Thread beweist, damit
-  // der Wächter nicht den Stand von vorgestern meldet.
-  setTimeout(() => void maybeLeadsSync(), 25_000)
-  const ls = setInterval(() => void maybeLeadsSync(), MORGENBRIEF_CHECK_MS)
-  ls.unref?.()
+    // Netzwerk-Sync einmal täglich — NUR über den regulären Tick. Ein Lauf kurz
+    // nach dem Start wäre bei jedem Runner-Neustart ein neuer Fünf-Minuten-Lauf
+    // über Kevins LinkedIn; der erste Tick in fünf Minuten reicht vollkommen.
+    const nw = setInterval(() => void maybeNetzwerkSync(), MORGENBRIEF_CHECK_MS)
+    nw.unref?.()
 
-  // Der Widerspruchs-Wächter: kurz nach dem Start einmal, danach im 15-Minuten-
-  // Takt (er selbst bremst über `WAECHTER_ABSTAND_MS`). Reines Lesen der
-  // Datenbank — kein Chrome, kein Vault, kein Modell.
-  setTimeout(() => void maybeWaechter(), 30_000)
-  const wa = setInterval(() => void maybeWaechter(), MORGENBRIEF_CHECK_MS)
-  wa.unref?.()
+    // Lead-Pflege vor dem Wächter: sie verbucht, was ein Thread beweist, damit
+    // der Wächter nicht den Stand von vorgestern meldet.
+    setTimeout(() => void maybeLeadsSync(), 25_000)
+    const ls = setInterval(() => void maybeLeadsSync(), MORGENBRIEF_CHECK_MS)
+    ls.unref?.()
+
+    // Der Widerspruchs-Wächter: kurz nach dem Start einmal, danach im 15-Minuten-
+    // Takt (er selbst bremst über `WAECHTER_ABSTAND_MS`). Reines Lesen der
+    // Datenbank — kein Chrome, kein Vault, kein Modell.
+    setTimeout(() => void maybeWaechter(), 30_000)
+    const wa = setInterval(() => void maybeWaechter(), MORGENBRIEF_CHECK_MS)
+    wa.unref?.()
+  } else {
+    console.log('[runner] Zeitplan-Routinen AUS — der Sync läuft auf Anstoß (Uriel öffnen oder „Jetzt aktualisieren")')
+  }
 
   // OS-Map-Snapshot für die Live-Domain: einmal beim Start + periodisch spiegeln.
   if (SNAPSHOT_ENABLED) {

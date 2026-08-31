@@ -1,6 +1,6 @@
 # Uriel — Backlog (die eine Quelle der Wahrheit)
 
-**Stand:** 2026-08-27 · Branch `main` · Repo `~/Kevin OS/02 Projekte/uriel`
+**Stand:** 2026-08-31 · Branch `main` · Repo `~/Kevin OS/02 Projekte/uriel`
 
 > **Am 27.08. eingesammelt, was auseinandergelaufen war.** Drei Behauptungen in
 > diesem Dokument waren überholt und sind unten korrigiert: Die Migrationen
@@ -11,10 +11,101 @@
 > Baum. Wer hier etwas als „offen" liest, prüft es bitte zuerst gegen den
 > laufenden Stand — genau diese Drift hat zwei Sessions blockiert.
 
+## **GEBAUT 31.08.2026 — Die Runde: der Sync läuft auf Anstoß, nicht nach Uhr**
+
+> Logik: [`runner/runde.mjs`](../runner/runde.mjs) · Oberfläche:
+> `cockpit/components/Ladeschirm.tsx` + `RundeTor.tsx` · Prüfung:
+> `scripts/verify-runde.ts` (55 Prüfungen). Vorschau ohne Login:
+> `/dev/runde-vorschau?z=0..4`.
+
+Kevins Beschwerde, wörtlich: *„dass jede Stunde hier mein Chrome aufgeht, auch
+wenn ich abends im Film gucke. Geht dann der Vollbildmodus weg und dann auf
+einmal seh ich dann wieder Chrome, LinkedIn, wie das immer wieder neu lädt. […]
+das macht mein ganzes System langsamer. Ich muss bei jedem Klick länger warten."*
+
+**Erst nachgemessen, dann gebaut — und die Vermutung stimmte nicht.** Der
+Chrome-Autostart war seit dem 27.08. aus; die Marke auf der Platte
+(`.letzter-chrome-start`) zeigt als letzten Selbststart den **27.08. um 11:59**.
+Es ging kein Fenster mehr von selbst auf. Was blieb, war schwerer zu fassen und
+in der Summe schlimmer:
+
+- **Acht Routinen mit eigenen Bremsen, alle fünf Minuten geprüft.** Am Vormittag
+  des 31.08. stand vierzig Mal dieselbe Zeile im Log („antwort-entwuerfe: 37
+  Off-ICP übersprungen"), ohne dass sich etwas geändert hätte.
+- **Alle zwei Stunden fasste der Postfach-Sync das offene Fenster an** —
+  `Page.navigate` plus Fokus-Emulation. Das ist das „lädt immer wieder neu",
+  und es erklärt auch den verlorenen Vollbild-Space.
+- **Jeder Schlaf-Wach-Zyklus startete den Runner neu** („Mac war 8 Min. weg —
+  Routinen warten auf stabile Wachheit"), und danach lief alles von vorn an.
+
+Auf einem M1 mit 8 GB und vollem Swap ist dieser Dauerlauf genau die Trägheit,
+die Kevin bei jedem Klick spürt. Der Gegenwert war gering: Er sieht den Stand
+ohnehin erst an, wenn er sich hinsetzt.
+
+**Der Tausch: Zeitplan raus, Anstoß rein.** `ROUTINEN_AUTOMATIK` ist
+standardmäßig **aus** — die acht Schleifen und der Dream-Agent laufen nicht
+mehr von selbst; der Code darunter ist unverändert und kommt mit
+`ROUTINEN_AUTOMATIK=1` zurück (gedacht für den Mac Mini Ende September). Stehen
+bleibt die Wachheits-Uhr: Sie kostet nichts und fasst nichts an.
+
+An ihre Stelle tritt **eine Runde aus acht Etappen**, die Kevin auslöst:
+Postfach → Verläufe → Einladungen → Kontakte → Leads → Wächter → Sortierer →
+Entwürfe. Beim Öffnen fragt Uriel („Letzter Stand: gestern 19:40. Jetzt
+laden?"), am Nachmittag genügt der Knopf in der Statusleiste. Drei Endpunkte:
+`GET /runde`, `POST /runde/start`, `POST /runde/abbrechen`.
+
+**Die fünf Entscheidungen, die dem naiven Bau widersprechen:**
+
+1. **Die Gewichte des Balkens sind gemessen, nicht gleich verteilt.** Die
+   Einladungsliste (1.049 Einträge, bis zu sieben Minuten) trägt 25 Punkte, der
+   Wächter (Sekunden) zwei. Mit acht gleich breiten Abschnitten stünde der
+   Balken die halbe Zeit bei 62 % — eine Anzeige, der man nach zwei Tagen nicht
+   mehr glaubt.
+2. **Feinfortschritt innerhalb der Etappe.** `leseListe` meldet nach jeder Runde
+   `{ geerntet, gesamt }` zurück; im Schirm steht „340 von 1.049", nicht ein
+   sich drehender Kreis. Ohne diesen Rückkanal wäre die längste Etappe sieben
+   Minuten lang eine schwarze Box.
+3. **Ein Fehler in einer Etappe beendet die Runde nicht.** Bricht die
+   Einladungsliste ab, sind Postfach und Verläufe trotzdem frisch — und das ist
+   der Stand, mit dem gearbeitet wird. Rot wird der Abschluss nur, wenn
+   **nichts** durchlief.
+4. **Chrome wird geprüft, nicht geöffnet.** Fehlt das Sync-Fenster, gelten die
+   vier Chrome-Etappen als übersprungen und der Rest läuft; der Schirm sagt
+   vorher, was dann fehlt. Ein übersprungener Schritt zählt im Balken **voll** —
+   sonst bliebe ein Lauf ohne Chrome für immer unter 50 % stehen.
+5. **Der Schirm sperrt nicht.** „Im Hintergrund weiterlaufen" legt ihn weg, der
+   Knopf in der Statusleiste trägt die Prozentzahl weiter und holt ihn zurück.
+   Ein Cockpit, das zwanzig Minuten unbedienbar ist, wäre der nächste Ärger.
+
+**Zwei Funde beim Bauen, beide durch echtes Ausprobieren:**
+
+- Eine Teil-Runde mit nur dem Wächter darin meldete **„noch etwa 22 Minuten"**.
+  `restText` rechnete relativ — 100 % der Runde waren ja offen. Die Minuten
+  hängen aber an der Arbeit, nicht am Anteil: jetzt gegen die volle
+  Gewichtssumme gerechnet. Als Prüfung festgenagelt.
+- Nach einem fertigen Lauf zeigte der Schirm wieder **die Frage** statt des
+  Ergebnisses — genau in dem Moment, für den er gebaut ist (Kevin kommt vom
+  Kaffee zurück und klickt auf den Knopf). Zehn Minuten lang steht jetzt das
+  Ergebnis, danach wieder die Frage.
+
+**Verifiziert:** `verify-runde.ts` 55 Prüfungen grün, `verify-chrome-wache`
+15 grün, `verify-start-bereit` 25 grün, App-Build grün. Eine echte Teil-Runde
+(Leads + Wächter) lief am 31.08. um 14:09 gegen die Produktivdatenbank durch:
+0 % → „Leads verbuchen" → „4 Widerspruchsfälle (3 dringend)" → 100 % „Alles auf
+dem neuesten Stand". Der launchd-Runner läuft mit dem neuen Code und meldet
+beim Start „Zeitplan-Routinen AUS".
+
+**Offen:** Der Morgenbrief hängt mit an der Automatik und kommt damit vorerst
+nicht mehr von selbst — falls er gebraucht wird, gehört er als neunte Etappe in
+die Runde statt zurück in den Zeitplan. Beim Mac Mini (Ende September) ist neu
+zu entscheiden, was dort wieder nach Uhr laufen darf; die Runde bleibt in jedem
+Fall der Weg für alles, was Kevins Chrome anfasst.
+
 ## **GEBAUT 28.08.2026 — Sales-Canvas v2: Gesamt und Heute stehen nicht mehr übereinander**
 
 > Blaupause: [`docs/wargames/sales-canvas-v2.md`](wargames/sales-canvas-v2.md).
-> **Nicht gepusht** — Livegang ist Kevins Wort.
+> **Live seit 31.08.2026** (`8ef72de`, Netlify-Deploy `ready`). Migration 0081
+> steht auf Prod.
 
 Kevins Durchsicht des Canvas, wörtlich: *„Von der Ästhetik her sehr, sehr
 schön, alles lesbar und mit den Karten hab ich mir genauso vorgestellt"* — und

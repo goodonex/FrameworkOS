@@ -1,6 +1,7 @@
 import { Outlet, useLocation } from 'react-router-dom'
 import { ChatBubble } from './components/ChatBubble'
 import { NavRail } from './components/NavRail'
+import { RundeTor } from './components/RundeTor'
 import { RunWatcher } from './components/RunWatcher'
 import { StatusBar } from './components/StatusBar'
 import { UrielAura } from './components/UrielAura'
@@ -31,6 +32,10 @@ export function CockpitShell() {
 
   return (
     <ActiveBrandProvider>
+      {/* Das Tor zur Runde umschliesst die ganze Shell: Der Ladeschirm liegt
+          ueber allem, und der Knopf in der Statusleiste liest denselben Zustand
+          (31.08.2026, siehe components/RundeTor.tsx). */}
+      <RundeTor>
       <div
         className="ck-root"
         data-home={istHome ? 'true' : undefined}
@@ -59,6 +64,7 @@ export function CockpitShell() {
         <ChatBubble />
         <UrielDock />
       </div>
+      </RundeTor>
     </ActiveBrandProvider>
   )
 }

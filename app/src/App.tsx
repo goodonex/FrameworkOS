@@ -40,6 +40,7 @@ import { SalesVorschau } from './dev/SalesVorschau'
 import { ZielVorschau } from './dev/ZielVorschau'
 import { NavVorschau } from './dev/NavVorschau'
 import { ShellVorschau } from './dev/ShellVorschau'
+import { RundeVorschau } from './dev/RundeVorschau'
 import { IdentitaetVorschau } from './dev/IdentitaetVorschau'
 import { PosteingangVorschau } from './dev/PosteingangVorschau'
 
@@ -224,6 +225,7 @@ function App() {
             {import.meta.env.DEV ? <Route path="/dev/ziel-vorschau" element={<ZielVorschau />} /> : null}
             {import.meta.env.DEV ? <Route path="/dev/nav-vorschau" element={<NavVorschau />} /> : null}
             {import.meta.env.DEV ? <Route path="/dev/shell-vorschau" element={<ShellVorschau />} /> : null}
+            {import.meta.env.DEV ? <Route path="/dev/runde-vorschau" element={<RundeVorschau />} /> : null}
             {import.meta.env.DEV ? <Route path="/dev/identitaet-vorschau" element={<IdentitaetVorschau />} /> : null}
             {import.meta.env.DEV ? <Route path="/dev/posteingang-vorschau" element={<PosteingangVorschau />} /> : null}
             <Route element={<OwnerWorkspaceShell />}>
