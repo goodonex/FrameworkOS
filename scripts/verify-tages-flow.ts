@@ -511,5 +511,28 @@ check(
   /--ck-ring-glas:/.test(lies('app/src/styles/cockpit.css')) && /var\(--ck-ring-glas\)/.test(kette),
 )
 
+// --- Looms ohne Tagesdeckel (01.09.2026, Kevins Diktat) ------------------
+{
+  const staende = stufenStaende({
+    today: {},
+    faelligHeute: 0,
+    erstnachrichtenOffen: 0,
+    erstnachrichtenTexte: 0,
+    loomsOffen: 12,
+  })
+  const looms = staende.find((s) => s.stufe.id === 'looms')!
+  check('Looms-Soll sind ALLE offenen Zusagen, kein Deckel', looms.soll === 12, `Ist: ${looms.soll}`)
+  check('Looms nicht erledigt, solange Zusagen offen sind', !looms.erledigt)
+  const gedrosselt = stufenStaende({
+    today: {},
+    faelligHeute: 0,
+    erstnachrichtenOffen: 0,
+    erstnachrichtenTexte: 0,
+    loomsOffen: 12,
+    ziele: { looms: 3 },
+  }).find((s) => s.stufe.id === 'looms')!
+  check('ein eigenes Looms-Ziel wirkt weiter als bewusste Drossel', gedrosselt.soll === 3, `Ist: ${gedrosselt.soll}`)
+}
+
 console.log(`\nverify-tages-flow: ${pass} ok, ${fail} fehlgeschlagen`)
 process.exit(fail === 0 ? 0 : 1)

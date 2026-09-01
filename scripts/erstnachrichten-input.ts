@@ -83,7 +83,21 @@ async function main() {
     alle<any>(`linkedin_erstnachrichten?brand_id=eq.${bid}&select=name,status&order=id`),
   ])
 
-  const wartend = angenommenOhneErstnachricht(netzwerk, threads, erst, new Date())
+  /**
+   * Wer schon IRGENDEINE Topf-Zeile hat, fliegt aus der VORLAGE (01.09.2026).
+   *
+   * Die Kachel zählt Offene bewusst als „wartend" (der Text liegt bereit,
+   * verschickt ist er nicht). Für den Agenten ist dieselbe Person aber
+   * erledigt: Der Text existiert schon. Ohne diesen Filter hat der heutige
+   * Lauf 6 von 12 Leads doppelt recherchiert und getextet — die Rückschreibung
+   * warf die Duplikate zwar weg (`schonDa`), aber die Website-Recherche und
+   * das Schreiben waren bezahlt und für die Tonne. Bei Kevins Tagesziel von 50
+   * wäre das die halbe Arbeit.
+   */
+  const schonImTopf = new Set(erst.map((e: { name: string }) => String(e.name).trim().toLowerCase()))
+  const wartend = angenommenOhneErstnachricht(netzwerk, threads, erst, new Date()).filter(
+    (p) => !schonImTopf.has(p.name.trim().toLowerCase()),
+  )
   /**
    * Der ICP-Filter wie überall sonst — der Nacht-Agent meldet dieselbe Zahl
    * („37 Off-ICP übersprungen"). `unklar` bleibt drin und wird wie ICP

@@ -389,11 +389,22 @@ export function sollFuer(stufe: Stufe, eingabe: FlowEingabe): number {
       return Math.min(drossel, anzahl(eingabe.faelligHeute) + wert)
     }
     case 'looms': {
-      const ziel = gueltigesZiel(eigen) ? eigen : (stufe.standardZiel ?? 0)
-      // Ohne Kenntnis der offenen Zusagen bleibt das feste Ziel stehen —
-      // lieber ein zu hohes Soll als ein erfundenes „nichts fällig".
-      if (eingabe.loomsOffen == null) return ziel
-      return Math.min(ziel, anzahl(eingabe.loomsOffen) + wert)
+      /**
+       * **Kein Tagesdeckel mehr (01.09.2026, Kevins Diktat):** *„Nehmen wir
+       * bitte die Begrenzung von zwei Looms pro Tag raus — da kann direkt
+       * zwölf stehen. Die müssen ja nun rausgesendet werden."*
+       *
+       * Ein offenes Loom ist ein gegebenes Versprechen an jemanden, der JA
+       * gesagt hat — die dringendste Arbeit im ganzen Funnel. Ein Deckel von
+       * zwei ließ die Kachel grün werden, während zehn Zusagen liegen blieben.
+       * Wie bei Erstnachrichten und Antworten gilt: Das Soll sind alle
+       * offenen; ein eigenes Ziel aus den Einstellungen wirkt weiter als
+       * bewusste Drossel. Ohne Kenntnis der offenen bleibt das alte feste
+       * Ziel — lieber ein zu hohes Soll als ein erfundenes „nichts fällig".
+       */
+      if (eingabe.loomsOffen == null) return gueltigesZiel(eigen) ? eigen : (stufe.standardZiel ?? 0)
+      const offenPlus = anzahl(eingabe.loomsOffen) + wert
+      return gueltigesZiel(eigen) ? Math.min(eigen, offenPlus) : offenPlus
     }
     default:
       return gueltigesZiel(eigen) ? eigen : (stufe.standardZiel ?? 0)

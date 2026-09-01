@@ -3950,16 +3950,37 @@ const ETAPPEN_ARBEIT = {
   },
 
   erstnachrichten: async ({ melde }) => {
-    const gebaut = await erstnachrichtenInput()
-    if (!gebaut) return { text: 'niemand wartet auf eine Erstnachricht' }
-    melde(`${gebaut.leads.length} von ${gebaut.gesamt} werden vorbereitet`)
-    await startRun('linkedin-erstnachrichten', gebaut)
+    /**
+     * Kevins Tagesziel (01.09.2026): *„Bei den Erstnachrichten will ich
+     * fünfzig pro Tag machen."*
+     *
+     * Fünfzig in EINEM Agentenlauf wären ein Zeitlimit-Risiko (je Lead eine
+     * Website-Recherche; das 10-Minuten-Limit hat Läufe schon abgeschnitten).
+     * Deshalb Batches: bis zu vier Läufe à ~13, jeder mit eigenem Zeitfenster,
+     * nacheinander. Der Input rechnet vor jedem Batch neu und schließt aus,
+     * was schon eine Topf-Zeile hat — Batch 2 sieht die Ergebnisse von
+     * Batch 1 also nie doppelt.
+     */
+    const TAGESZIEL = Number(process.env.ERSTNACHRICHTEN_TAGESZIEL ?? 50)
+    const BATCH = 13
+    let vorbereitet = 0
+    let zuletztGesamt = 0
+    for (let runde = 0; vorbereitet < TAGESZIEL; runde++) {
+      if (rundeAbbruch) break
+      const gebaut = await erstnachrichtenInput(Math.min(BATCH, TAGESZIEL - vorbereitet))
+      if (!gebaut) break
+      zuletztGesamt = gebaut.gesamt
+      melde(`${vorbereitet + gebaut.leads.length} von ${Math.min(TAGESZIEL, gebaut.gesamt + vorbereitet)} werden vorbereitet (Batch ${runde + 1})`, Math.min(1, vorbereitet / TAGESZIEL))
+      await startRun('linkedin-erstnachrichten', gebaut)
+      vorbereitet += gebaut.leads.length
+    }
+    if (vorbereitet === 0) return { text: 'niemand wartet auf eine Erstnachricht' }
     return {
       text:
-        `${gebaut.leads.length} vorbereitet` +
-        (gebaut.weitereWarten ? ` · ${gebaut.weitereWarten} bleiben für den nächsten Lauf` : ''),
-      von: gebaut.leads.length,
-      bis: gebaut.gesamt,
+        `${vorbereitet} vorbereitet` +
+        (zuletztGesamt > vorbereitet ? ` · ~${zuletztGesamt - vorbereitet} bleiben für den nächsten Lauf` : ''),
+      von: vorbereitet,
+      bis: Math.max(zuletztGesamt, vorbereitet),
     }
   },
 
