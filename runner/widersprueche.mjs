@@ -264,12 +264,21 @@ export function pruefeWidersprueche(daten, jetzt = new Date()) {
    * Zeilen in der Tabelle, ist gedoppelt worden.
    */
   const versandfertig = Number(daten.erstnachrichtenMeta?.versandfertig ?? 0)
-  if (versandfertig > 0 && erstnachrichten.length > versandfertig) {
+  /**
+   * Seit dem 31.08. legt auch der Agent `linkedin-erstnachrichten` Zeilen an
+   * (`quelle_datei: 'agent:…'`) — die stehen bewusst NICHT in der Vault-Datei.
+   * Ohne diesen Filter schlug die Regel am 01.09. Alarm („152 in der Tabelle,
+   * nur 140 in der Datei"), obwohl nichts gedoppelt war: Die Differenz waren
+   * exakt die Agenten-Texte. Verglichen wird nur, was der Spiegel aus der
+   * Datei erzeugt hat.
+   */
+  const ausDatei = erstnachrichten.filter((e) => !String(e.quelle_datei ?? '').startsWith('agent:'))
+  if (versandfertig > 0 && ausDatei.length > versandfertig) {
     melde(
       'erstnachrichten_gedoppelt',
       'hoch',
-      `${erstnachrichten.length} Erstnachrichten in der Tabelle, aber nur ${versandfertig} in der Quelldatei — der Spiegel hat gedoppelt`,
-      erstnachrichten.length - versandfertig,
+      `${ausDatei.length} Erstnachrichten aus der Datei in der Tabelle, aber nur ${versandfertig} in der Quelldatei — der Spiegel hat gedoppelt`,
+      ausDatei.length - versandfertig,
       'Migration 0071 anwenden; bis dahin Gruppen-Überschriften im Vault nicht umformulieren',
     )
   }
@@ -366,7 +375,7 @@ export async function ladeUndPruefe(jetzt = new Date()) {
   const [netzwerk, threads, erstnachrichten, netzMeta, runsSnap, erstMeta] = await Promise.all([
     alleZeilen('linkedin_netzwerk?select=name,status,zuletzt_gesehen_at&order=id'),
     alleZeilen('linkedin_threads?select=name,last_from,last_synced_at&order=id'),
-    alleZeilen('linkedin_erstnachrichten?select=name,status&order=id'),
+    alleZeilen('linkedin_erstnachrichten?select=name,status,quelle_datei&order=id'),
     einSnapshot('linkedin_netzwerk_meta'),
     einSnapshot('runs'),
     einSnapshot('erstnachrichten_meta'),

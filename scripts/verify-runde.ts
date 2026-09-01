@@ -218,7 +218,9 @@ console.log('\n7) Der kurze Lauf — nur das Neue holen')
   check('sie blättert über den 1000-Zeilen-Deckel', /offset=\$\{off\}/.test(kern) && /off \+= 1000/.test(kern))
   check('ohne Datenbank wird voll geblättert, nicht lückenhaft', /return new Set\(\)/.test(kern))
   check('der volle Durchlauf ist wöchentlich, nicht täglich', /NETZWERK_VOLL_ABSTAND_MS \?\? 7 \* 24 \* 60 \* 60 \* 1000/.test(kern))
-  check('die Wochen-Marke fällt nur bei wirklich vollen Listen', /listen\.every\(\(e\) => e\.status === 'fertig'\)/.test(kern))
+  // 01.09.: Kontakte brachen bei 291/709 ab, Etappe war trotzdem „fertig" —
+  // die Marke fiel, und sieben Tage wäre kein Volllauf mehr gekommen.
+  check('die Wochen-Marke verlangt Vollständigkeit, nicht Fertigkeit', /e\.status === 'fertig' && e\.vollstaendig === true/.test(kern))
 }
 
 console.log('\n8) Live über die Brücke')

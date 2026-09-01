@@ -3850,6 +3850,8 @@ async function tueNetzwerkListe(welche, { melde = () => {}, kurz = false } = {})
     text: g.gesamt ? `${g.eintraege.length} von ${g.gesamt}${g.vollstaendig ? '' : ' (Liste brach ab)'}` : `${g.eintraege.length} gelesen`,
     von: g.eintraege.length,
     bis: g.gesamt ?? null,
+    /** Nur ein wirklich vollständiger Lauf darf die Wochen-Marke setzen. */
+    vollstaendig: g.vollstaendig === true,
   }
 }
 
@@ -4036,6 +4038,7 @@ async function starteRunde({ ausloeser = 'kevin', nur = null, tief = null } = {}
         text: r?.text ?? 'fertig',
         von: r?.von ?? null,
         bis: r?.bis ?? null,
+        ...(typeof r?.vollstaendig === 'boolean' ? { vollstaendig: r.vollstaendig } : {}),
       })
     } catch (e) {
       console.error(`[runner] Runde — Etappe ${etappe.schluessel}:`, e?.message ?? e)
@@ -4055,7 +4058,15 @@ async function starteRunde({ ausloeser = 'kevin', nur = null, tief = null } = {}
       // Nur wenn beide Listen wirklich vollständig gelesen wurden — sonst
       // wäre die Woche verstrichen, ohne dass je einer durchlief.
       const listen = laufendeRunde.etappen.filter((e) => e.schluessel === 'einladungen' || e.schluessel === 'kontakte')
-      if (listen.length && listen.every((e) => e.status === 'fertig')) {
+      /**
+       * `status === 'fertig'` reicht NICHT (01.09.): Der Kontakte-Volllauf
+       * brach bei 291 von 709 ab, die Etappe war trotzdem „fertig" (sie hat ja
+       * geliefert, nur unvollständig) — und die Wochen-Marke fiel. Damit wäre
+       * sieben Tage kein voller Lauf mehr gekommen, und genau der eine
+       * „Einladung offen trotz Thread"-Fall wartet auf ihn. Vollständigkeit
+       * ist die Bedingung, nicht Fertigkeit.
+       */
+      if (listen.length && listen.every((e) => e.status === 'fertig' && e.vollstaendig === true)) {
         markeSchreib('letzter-netzwerk-voll', Date.now())
         await merkeNetzwerkLauf(new Date().toISOString())
       }
