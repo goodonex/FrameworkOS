@@ -410,7 +410,20 @@ export function SalesDashboard() {
     posten.tasks.loading ||
     posten.projekte.loading ||
     posten.linkedinThreads.loading ||
-    posten.erstnachrichten.loading
+    posten.erstnachrichten.loading ||
+    /**
+     * **`netzwerk` gehört seit dem 01.09.2026 in diese Liste.**
+     *
+     * Es fehlte, solange die Erstnachrichten-Stufe den Entwurfs-Topf zählte —
+     * dafür brauchte sie das Netzwerk nicht. Seit sie die WARTENDEN zählt,
+     * hängt sie an `netzwerk.items`, und die Lücke wäre teuer geworden: Der
+     * Tages-Flow friert sein Soll beim ersten Öffnen ein (0074) und tut das,
+     * sobald „alles geladen" ist. Wäre das Netzwerk dann noch unterwegs, stünde
+     * dort eine 0 — und die Kachel zeigte den ganzen Tag „0 von 0 ✓", also
+     * exakt den Fehler wieder, der gerade behoben wurde. Diesmal aber
+     * eingefroren in der Datenbank und nicht mehr wegzuladen.
+     */
+    posten.netzwerk.loading
   const dauern = useArbeitsDauern(slug)
   const { runner, runs, refresh: refreshRuns } = useRunnerData()
 

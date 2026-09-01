@@ -140,7 +140,12 @@ export function UrielHome() {
   const flow = useTagesFlow(
     metrics.today,
     flowLive,
-    metrics.loading || posten.linkedinThreads.loading || posten.erstnachrichten.loading,
+    // `netzwerk` mit dabei: Die Erstnachrichten-Stufe zählt seit dem 31.08. die
+    // Wartenden, und die kommen von dort (Begründung im SalesDashboard).
+    metrics.loading ||
+      posten.linkedinThreads.loading ||
+      posten.erstnachrichten.loading ||
+      posten.netzwerk.loading,
   )
 
   const ansage = useMemo(() => tagesansage(geordnet, dauern, jetzt), [geordnet, dauern, jetzt])

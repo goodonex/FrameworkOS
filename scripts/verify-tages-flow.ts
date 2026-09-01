@@ -461,6 +461,25 @@ check(
 )
 check('die Instrumentierung der Fehlersuche ist wieder draussen', !/console\.log|__flow/.test(kette))
 check('auch der Hero selbst rechnet keine Stände', !/stufenStaende\(|useTagesFlow\(/.test(hero))
+/**
+ * Am 01.09.2026 gefunden, bevor es zuschlagen konnte: Der Tages-Flow friert
+ * sein Soll beim ersten Öffnen ein (0074), sobald „alles geladen" ist. Seit die
+ * Erstnachrichten-Stufe die WARTENDEN zählt, hängt sie an `linkedin_netzwerk` —
+ * und genau das stand in keiner der beiden Ladeprüfungen. Wäre das Netzwerk
+ * beim Einfrieren noch unterwegs gewesen, stünde eine 0 in der Tabelle und die
+ * Kachel zeigte den ganzen Tag „0 von 0 ✓". Also derselbe Fehler wie zuvor, nur
+ * eingefroren und nicht mehr wegzuladen.
+ */
+check(
+  'der Sales-Ladezustand wartet auch auf das Netzwerk',
+  /posten\.netzwerk\.loading/.test(readFileSync(join(wurzel, 'app/src/cockpit/pages/SalesDashboard.tsx'), 'utf8')),
+  'Sonst friert eine 0 als Tages-Soll ein.',
+)
+check(
+  'der Homescreen wartet ebenfalls auf das Netzwerk',
+  /posten\.netzwerk\.loading/.test(home),
+  'Sonst friert eine 0 als Tages-Soll ein.',
+)
 check(
   'der Homescreen leitet die Live-Zahlen aus der bestehenden Postenquelle ab',
   // Absicht statt Schreibweise (31.08.2026): Seit die Erstnachrichten-Stufe die
