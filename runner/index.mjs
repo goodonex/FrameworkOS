@@ -1692,6 +1692,19 @@ async function mirrorAll() {
       await pushSnapshotKey('jophiel_projekte', async () => stand)
     }
   }
+  /**
+   * Den Runde-Stand mitspiegeln (01.09.2026) — sonst altert er nie.
+   *
+   * **Der Fehler, den das behebt.** `spiegleRunde` lief nur beim Start, bei
+   * Etappenwechseln und während der Arbeit. Nach dem letzten Lauf gestern
+   * 16:39 wurde also nie wieder geschrieben: Heute Morgen stand auf
+   * frameworkos.de weiterhin „heute 16:39" (statt „gestern"), und schlimmer —
+   * `fragen` blieb auf `false` eingefroren. Damit hätte die Frage „Neuesten
+   * Stand laden?" auf der Live-Domain NIE wieder aufgetaucht, also genau die
+   * Funktion, für die der ganze Umbau da ist. Lokal war alles richtig, weil
+   * dort direkt gerechnet wird.
+   */
+  await spiegleRunde({ sofort: true })
   await pushSnapshotKey('sales_library', async () => await salesLibrary())
   await spiegleErstnachrichten()
   await pushSnapshotKey('agents', async () => {

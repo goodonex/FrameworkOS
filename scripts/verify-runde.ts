@@ -227,6 +227,14 @@ console.log('\n8) Live über die Brücke')
   const api = readFileSync(join(wurzel, 'app/src/cockpit/lib/rundeApi.ts'), 'utf8')
 
   check('der Runner spiegelt den Stand nach Supabase', /pushSnapshotKey\('runde_stand'/.test(kern))
+  /**
+   * Am 01.09. an Kevins Bildschirm gefunden: Der Spiegel lief nur bei
+   * Etappenwechseln, also nach dem letzten Lauf nie wieder. Auf der Live-Domain
+   * stand deshalb morgens weiterhin „heute 16:39" — und `fragen` blieb auf
+   * `false` eingefroren, womit die Frage „Neuesten Stand laden?" dort NIE
+   * wieder erschienen wäre. Lokal war alles richtig, weil dort gerechnet wird.
+   */
+  check('der Spiegel altert mit — er hängt im Mirror-Takt', /await spiegleRunde\(\{ sofort: true \}\)\s*\n\s*await pushSnapshotKey\('sales_library'/.test(kern))
   check('der Spiegel ist gedrosselt', /const RUNDE_SPIEGEL_MS = 2500/.test(kern))
   check('Etappenwechsel und Abschluss spiegeln sofort', (kern.match(/spiegleRunde\(\{ sofort: true \}\)/g) ?? []).length >= 3)
   check('das Handy kann eine Runde beauftragen', /job\.kind === 'runde'/.test(kern))
