@@ -84,6 +84,72 @@ September) etwas ändert, und kein Fehler dieses Baus.
 **Verifiziert:** `verify-runde.ts` jetzt 77 Prüfungen, App-Build grün, beide
 Wege echt gemessen (siehe Zahlen oben).
 
+## **AUDIT 01.09.2026 — Kevin hatte recht: 133 der 355 „Wartenden" waren längst angeschrieben**
+
+Kevins Auftrag, wörtlich: *„Bitte geh diese Systematik durch, nicht raten,
+nicht annehmen […] Tu alles zweimal gegenchecken. Ich bin mir zu 99 % sicher,
+dass ich keine 355 Leute habe, denen ich eine Erstnachricht rausschicken kann."*
+
+Dafür gibt es jetzt **`scripts/audit-vertrieb.ts`** — das Gegenstück zu den
+verify-Skripten: Die prüfen Logik gegen Fixtures, das Audit prüft die **Daten**
+gegen Invarianten, jede kritische Zahl auf zwei unabhängigen Wegen. Acht
+Kettenglieder (K1 Chrome/Runner · K2 Threads · K3 Netzwerk · K4 Leads/Historie
+· K5 Erstnachrichten-Topf · K6 Wartende · K7 Kachel-Kette · K8 Stichprobe),
+Exit 1 bei jedem FAIL. Erster Lauf: **4 FAILS. Kevins 99 % waren berechtigt.**
+
+### Fund 1 — die 133 (der große)
+
+`angenommenOhneErstnachricht` summierte Namenstreffer über beide Quellen und
+hielt „2" für mehrdeutig. Der NORMALFALL des Angeschrieben-Seins hinterlässt
+aber genau zwei Spuren: Arbeitslisten-Zeile auf `gesendet` **und** den daraus
+entstandenen Thread — dieselbe Person, derselbe Vorgang. **133 Angeschriebene
+standen so wieder in Kachel und Agenten-Vorlage.** Beide Gegenproben (Lead mit
+`li_urn` · `erstnachricht`-Ereignis in der Historie) nannten dieselben Namen,
+z. B. Nalle Adenauer: Zeile gesendet 24.08., Thread vorhanden — „wartend".
+
+Regel jetzt: **ein Treffer je Quelle schließt aus; mehrdeutig ist nur, was
+innerhalb EINER Quelle doppelt vorkommt** (zwei Threads gleichen Namens = zwei
+Menschen). Als Fixture in `verify-funnel-stufen` festgenagelt (40 Prüfungen).
+
+### Fund 2 — „Noah Weber Aktueller Entitätsverlauf"
+
+Fünf Netzwerk-Namen trugen LinkedIns unsichtbaren Barrierefreiheits-Suffix im
+Namen — der Abgleich fand ihre Threads nicht, fünf Angeschriebene galten als
+wartend. Parser strippt den Suffix jetzt an der Quelle
+(`netzwerkParse.karteZuEintrag`), die fünf Bestandszeilen sind repariert, das
+Audit wacht über neue Varianten.
+
+### Fund 3 — der Stale-Guard (die „0 von 0"-Wurzel, endgültig)
+
+Kevins Tab hielt die am 31.08. eingefrorene 0-Portion im React-State — das
+DB-Delete erreichte ihn nicht, und jeder Tab mit altem Bundle kann die 0 neu
+einfrieren („vorhandene Zeilen gewinnen"). Deshalb jetzt in `sollFuer`: **eine
+Portion von 0 zählt nur, wenn auch live nichts offen ist.** Ist Arbeit da, war
+die 0 Ladezustand oder alter Code → Live-Rechnung. Eine ehrliche 0 bleibt
+gültig.
+
+### Fund 4 — der Runde-Spiegel altert nur inhaltlich
+
+`pushSnapshotKey` schreibt signaturgesteuert — unveränderte Daten behalten ihr
+`updated_at`. Die Audit-Invariante ist deshalb nicht der Zeitstempel, sondern:
+**Spiegel und Runner geben dieselbe Antwort auf die Morgenfrage** (`fragen`).
+
+### Die Zahlen danach (Audit: 26 ok · 4 Warnungen · 0 FAILS)
+
+| | vorher | **jetzt** |
+|---|---|---|
+| „Wartende" in der Kachel | 355 | **222** |
+| davon sichere Kern-Makler | — | **101** |
+| unklar (sortiert der Agent nachts weg) | — | 115 |
+| Texte bereit | 6 | 6 |
+
+Die 4 Warnungen, alle benannt: Sync-Chrome war beim Lauf aus (normal) · nur
+33 % der Threads haben nachgezogene Verläufe (Conversion-Messung wächst je
+Runde um 60) · 14 Namen mit mehreren Leads (echte Namensvettern, der Abgleich
+meldet sie „mehrdeutig") · 3 frisch geerntete Netzwerk-Zeilen noch
+unverheiratet (die nächste Leads-Etappe holt das nach — es sind genau die drei
+vom Agenten Aussortierten).
+
 ## **GEFIXT 31.08.2026 — „0 von 0 ✓", während 508 Menschen warteten**
 
 Kevins Screenshot am Nachmittag: Die Tageskachel „ERSTNACHRICHTEN · LINKEDIN"
