@@ -118,7 +118,17 @@ export function karteZuEintrag({ zeilen, href, nameAusBild }, jetzt = new Date()
   // gesendet" — am 12.08. genau so gemessen.
   const inhalt = echte.filter((z) => !IST_ZEIT.test(z) && !/^--$/.test(z))
 
-  const name = inhalt[0] || nameAusProfilbild(nameAusBild, profilKey)
+  /**
+   * LinkedIn hängt an manche Namenszeilen einen unsichtbaren
+   * Barrierefreiheits-Text — im DOM steht dann wörtlich
+   * „Noah Weber Aktueller Entitätsverlauf" in EINEM Element. Fünf solcher
+   * Namen lagen am 01.09. im Bestand, und weil der Namensabgleich sie nicht
+   * mit ihren Threads verheiraten konnte, galten fünf längst Angeschriebene
+   * als „wartet auf Erstnachricht" (Audit K6). Der Suffix wird deshalb an der
+   * Quelle entfernt, nicht in jedem Abnehmer einzeln.
+   */
+  const roherName = inhalt[0] || nameAusProfilbild(nameAusBild, profilKey)
+  const name = roherName ? roherName.replace(/\s*Aktueller Entitätsverlauf\s*$/i, '').trim() : roherName
   if (!name) return null
 
   const headline = inhalt[1] ?? ''

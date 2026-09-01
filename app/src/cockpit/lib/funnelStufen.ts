@@ -178,14 +178,29 @@ export function angenommenOhneErstnachricht(
     if (threadKeys.has(e.profil_key)) continue
 
     const n = normName(e.name)
-    const perName = (threadNamen.get(n) ?? 0) + (gesendeteNamen.get(n) ?? 0)
-    // Genau ein Namenstreffer ohne URL-Beleg: wahrscheinlich dieselbe Person,
-    // aber nicht beweisbar → raus aus der Liste, denn „schon geschrieben" ist
-    // die vorsichtigere Annahme. Mehrere Treffer: mehrdeutig → mit Markierung
-    // anzeigen, statt jemanden auf Verdacht zu verlieren.
-    if (perName === 1) continue
+    const inThreads = threadNamen.get(n) ?? 0
+    const inGesendet = gesendeteNamen.get(n) ?? 0
+    /**
+     * **JE QUELLE zählen, nicht über beide summieren (01.09.2026 — der
+     * 133er-Fund).**
+     *
+     * Die alte Regel addierte Thread-Treffer und Gesendet-Treffer und hielt
+     * alles über 1 für „mehrdeutig, lieber anzeigen". Damit stand genau der
+     * NORMALFALL wieder in der Liste: Wer über die Arbeitsliste angeschrieben
+     * wurde (Zeile auf `gesendet`) UND daraufhin einen Thread hat, kam auf
+     * zwei Treffer — einmal je Quelle, dieselbe Person, derselbe Vorgang. Das
+     * Audit vom 01.09. fand so **133 längst Angeschriebene** unter 355
+     * „Wartenden"; Kevins Einwand („die Zahl kommt mir utopisch vor") war
+     * exakt richtig. Beide Gegenproben — Lead mit `li_urn` und
+     * `erstnachricht`-Ereignis in der Historie — nannten dieselben Namen.
+     *
+     * Mehrdeutig ist nur, was INNERHALB einer Quelle doppelt vorkommt: zwei
+     * Threads mit demselben Namen sind zwei Menschen, und dann ist nicht
+     * entscheidbar, wer gemeint war — diese bleiben markiert in der Liste.
+     */
+    if (inThreads + inGesendet > 0 && inThreads <= 1 && inGesendet <= 1) continue
 
-    raus.push(personAus(e, e.angenommen_at, jetzt, perName > 1))
+    raus.push(personAus(e, e.angenommen_at, jetzt, inThreads > 1 || inGesendet > 1))
   }
 
   // Die jüngste Annahme zuerst — dort ist die Erinnerung an das Profil frisch.

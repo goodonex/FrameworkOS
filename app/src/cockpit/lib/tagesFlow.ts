@@ -336,7 +336,28 @@ export function sollFuer(stufe: Stufe, eingabe: FlowEingabe): number {
   if (stufe.art === 'frische') return 0
 
   const portion = eingabe.portionen?.[stufe.id]
-  if (gueltigesZiel(portion)) return portion
+  /**
+   * **Der Stale-Guard (01.09.2026): eine eingefrorene 0 bei vorhandener Arbeit
+   * ist Gift, kein Soll.**
+   *
+   * Der Fall, der ihn erzwang: Am 31.08. um 10:41 fror ein Tab die
+   * Erstnachrichten-Portion mit 0 ein (die Stufe zählte damals den leeren
+   * Entwurfs-Topf). Der Datenbank-Eintrag wurde um 15:50 gelöscht — aber
+   * Kevins offener Tab hielt die 0 im React-State und zeigte bis zum nächsten
+   * Morgen „0 von 0 ✓", während 355 Menschen warteten. Ein zweiter Weg in
+   * dieselbe Falle bleibt dauerhaft offen: Ein Tab mit älterem Bundle friert
+   * die 0 erneut ein, und „vorhandene Zeilen gewinnen" hält sie dann fest.
+   *
+   * Die Regel: Eine Portion von 0 zählt nur, wenn JETZT auch nichts offen ist.
+   * Ist live etwas da, war die 0 ein Ladezustand oder alter Code — dann rechnet
+   * die Stufe frisch. Eine ehrliche 0 (nichts war offen, nichts ist offen)
+   * bleibt gültig; der Einfrier-Zweck (stabiles Soll über den Tag) gilt weiter
+   * für jede Portion > 0.
+   */
+  const offenLive = offenJetztFuer(stufe, eingabe)
+  if (portion === 0 && (offenLive ?? 0) > 0) {
+    // durchfallen zur Live-Rechnung
+  } else if (gueltigesZiel(portion)) return portion
 
   const eigen = eingabe.ziele?.[stufe.id]
   const wert = wertVon(stufe, eingabe)

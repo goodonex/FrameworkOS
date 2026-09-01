@@ -144,6 +144,42 @@ for (const url of [
   )
 }
 
+// --- 2b. Der 133er-Fall (01.09.2026): Vault-Zeile UND Thread ------------
+{
+  /**
+   * Der Normalfall des Angeschrieben-Seins hinterlässt ZWEI Spuren: die
+   * Arbeitslisten-Zeile auf `gesendet` und den daraus entstandenen Thread.
+   * Die alte Regel summierte beide Quellen und hielt „2 Treffer" für
+   * mehrdeutig — 133 längst Angeschriebene standen so am 01.09. wieder als
+   * „wartend" in Kachel und Agenten-Vorlage (Audit K6, per li_urn- UND
+   * Historie-Gegenprobe bestätigt; Kevins „die Zahl kommt mir utopisch vor"
+   * war der Auslöser). Ein Treffer JE QUELLE ist dieselbe Person.
+   */
+  const netzwerk = [netz({ profil_key: 'nalle-adenauer', name: 'Nalle Adenauer', angenommen_at: vorTagen(3) })]
+  const beide = angenommenOhneErstnachricht(
+    netzwerk,
+    [thread({ id: 't-na', name: 'Nalle Adenauer', profile_url: 'https://www.linkedin.com/in/ACoAAOpak123/' })],
+    [ersteN({ name: 'Nalle Adenauer', status: 'gesendet' })],
+    JETZT,
+  )
+  check(
+    'Vault-Zeile UND Thread zusammen schliessen aus (der 133er-Fall)',
+    !beide.some((p) => p.key === 'nalle-adenauer'),
+    'Ein Treffer je Quelle ist dieselbe Person auf zwei Wegen, keine Mehrdeutigkeit.',
+  )
+
+  const uebersprungenUndThread = angenommenOhneErstnachricht(
+    netzwerk,
+    [thread({ id: 't-na', name: 'Nalle Adenauer', profile_url: 'https://www.linkedin.com/in/ACoAAOpak123/' })],
+    [ersteN({ name: 'Nalle Adenauer', status: 'uebersprungen' })],
+    JETZT,
+  )
+  check(
+    'auch übersprungen + Thread bleibt draussen',
+    !uebersprungenUndThread.some((p) => p.key === 'nalle-adenauer'),
+  )
+}
+
 // --- 3. Namens-Mehrdeutigkeit (D5) --------------------------------------
 {
   const netzwerk = [netz({ profil_key: 'michael-mueller-1', name: 'Michael Müller', angenommen_at: vorTagen(2) })]
