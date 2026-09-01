@@ -156,6 +156,17 @@ export function Ladeschirm({
         padding: '1.5rem',
         background: 'rgba(8, 13, 9, 0.88)',
         backdropFilter: 'blur(6px)',
+        /**
+         * `#app-ui-overlay` in App.tsx legt über die GANZE App
+         * `pointer-events: none` — jedes Vollbild-UI außerhalb des
+         * `.ck-root`-Divs muss sich einzeln zurückmelden (dokumentierte
+         * Uriel-Falle, zuletzt beim Nebula-Vollbild). Ohne diese Zeile war der
+         * Schirm am 01.09. sichtbar, aber KEIN Knopf klickbar — „Ja, laden"
+         * und „Später" taten schlicht nichts. In der Dev-Vorschau fiel das
+         * nicht auf, weil der Schirm dort INNERHALB eines ck-root mit
+         * `pointerEvents: 'auto'` steht.
+         */
+        pointerEvents: 'auto',
       }}
     >
       <div

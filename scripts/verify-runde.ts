@@ -248,6 +248,13 @@ console.log('\n8) Live über die Brücke')
   // Lauf läuft. Der Spiegel friert ein und behauptet weiter „läuft".
   check('ein eingefrorener Spiegel behauptet nicht „läuft"', /laeuft: gespiegelt\.data\.laeuft && !eingefroren/.test(api))
   check('die Grenze dafür sind zwei Minuten', /const SPIEGEL_GILT_MS = 2 \* 60 \* 1000/.test(api))
+
+  // #app-ui-overlay setzt app-weit pointer-events:none; der Schirm liegt
+  // ausserhalb des ck-root und MUSS sich zurueckmelden. Am 01.09. war er ohne
+  // diese Zeile sichtbar, aber kein Knopf klickbar (Dev-Vorschau zeigte es
+  // nicht — dort steht er in einem ck-root mit pointerEvents auto).
+  const schirm = readFileSync(join(wurzel, 'app/src/cockpit/components/Ladeschirm.tsx'), 'utf8')
+  check('der Ladeschirm meldet sich vom pointer-events-Overlay zurück', /pointerEvents: 'auto'/.test(schirm))
 }
 
 console.log(`\nverify-runde: ${pass} ok, ${fail} fehlgeschlagen`)
