@@ -40,6 +40,8 @@ interface SmartView {
   follow: FollowFilter
   /** Nur überfällige — die Bibliothek kennt „today" als „heute ODER früher". */
   nurUeberfaellig?: boolean
+  /** Nur Kontakte mit diesem Tag — die Bibliothek filtert, hier steht nur der Parameter. */
+  tag?: string
 }
 
 const SMART_VIEWS: SmartView[] = [
@@ -49,6 +51,10 @@ const SMART_VIEWS: SmartView[] = [
   { id: 'woche', label: 'Diese Woche', stage: 'all', follow: 'week' },
   { id: 'ohne', label: 'Ohne Follow-up', stage: 'all', follow: 'none' },
   { id: 'deal', label: 'Im Deal', stage: 'deal', follow: 'all' },
+  // Die Whale-Bank (01.09.2026): ~28 handverlesene Groß-Häuser aus der
+  // DACH-Recherche, geseedet über scripts/whales-seed.ts. Ruht ohne
+  // Follow-up-Datum — Kevin greift zu, wenn der Tagesvertrieb leer ist.
+  { id: 'whales', label: 'Whales', stage: 'all', follow: 'all', tag: 'whale' },
 ]
 
 /**
@@ -113,6 +119,7 @@ export function LeadListe() {
       stage: stage !== 'all' ? stage : view.stage,
       follow: view.follow,
       potenzial: 'all',
+      tag: view.tag,
     })
     const eng = view.nurUeberfaellig
       ? basis.filter((c) => (c.next_follow_up_at?.slice(0, 10) ?? '') < heute)

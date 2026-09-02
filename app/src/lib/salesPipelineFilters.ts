@@ -116,6 +116,8 @@ export function filterPipelineContacts(
     stage: StageFilter
     follow: FollowFilter
     potenzial: PotenzialFilter
+    /** Nur Kontakte mit diesem Tag (contacts.tags, 0026) — z. B. 'whale'. */
+    tag?: string
   },
 ): Contact[] {
   const q = opts.q.trim().toLowerCase()
@@ -124,6 +126,8 @@ export function filterPipelineContacts(
 
   return items.filter((c) => {
     if (opts.stage !== 'all' && c.pipeline_stage !== opts.stage) return false
+
+    if (opts.tag && !(c.tags ?? []).includes(opts.tag)) return false
 
     if (opts.follow === 'today') {
       const nx = c.next_follow_up_at?.slice(0, 10)
