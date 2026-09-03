@@ -361,6 +361,16 @@ export interface Contact {
   potenzial_betrag: number
   potenzial_typ: PotenzialTyp
   potenzial_notiz: string
+  /**
+   * Rechnungsanschrift (0082). Getrennt von `address`/`company`, weil der
+   * Rechnungsempfänger oft anders heisst als der Ansprechpartner und die
+   * Rechnungsmail meist an die Buchhaltung geht.
+   */
+  rechnung_firma: string
+  rechnung_strasse: string
+  rechnung_plz: string
+  rechnung_ort: string
+  rechnung_email: string
   /** Konfigurierbare Felder, key = Feld-id */
   custom_fields: Record<string, string | number | boolean>
   /** Sales-Pro */

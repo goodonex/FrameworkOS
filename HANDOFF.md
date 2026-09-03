@@ -60,6 +60,7 @@ nie im SQL-Editor — genau das hatte die Historie zerlegt.
 | `/sales/pipeline` | Glass-Pipeline, **bleibt bis zum Paritäts-Entscheid** (`docs/phase2/sales-paritaet.md`) — kann neun Dinge, die der Neubau nicht kann | `pages/sales/SalesMode.tsx` |
 | `/sales/lists` `call-mode` `new` | Altes CRM, in der Shell | `pages/sales/*` (Glass-Ära) |
 | `/sales/bibliothek` | **Ressourcen** — Skripte, Vorlagen, PDFs | `SalesBibliothek.tsx` |
+| `/sales/:contactId` | **Lead-Detail** mit Ressourcen- und **Rechnungs-Panel** (02.09.): Anschrift, Paketwahl, PDF mit GiroCode über den Runner | `LeadDetail.tsx`, `components/sales/RechnungPanel.tsx` |
 | `/projekte` | Deliver / Kundenprojekte + Posteingang | `ProjekteArea.tsx`, `ProjectPage.tsx` |
 | `/ads` | Ads-Review über alle Kunden | `AdsArea.tsx` |
 | `/content` | Kanal-Tabs **LinkedIn** (text-first) und **Instagram** (slide-first, Wochen + Posts) | `SocialArea.tsx`, `components/content/LinkedinPosts.tsx` |
@@ -111,6 +112,13 @@ launchctl kickstart -k gui/$(id -u)/de.uriel.runner
 
 Skill-Änderungen brauchen das nicht (`claude -p` liest `SKILL.md` frisch).
 
+- **Rechnungen (02.09.):** `runner/rechnung.mjs` ruft den Generator unter `~/rechnungen/`
+  auf — dieselbe Maschine wie der `rechnung`-Skill, nichts nachgebaut. Python liegt
+  im venv (`~/rechnungen/.venv/bin/python`, PEP 668). **Jeder Lauf verbraucht eine
+  fortlaufende Rechnungsnummer**, deshalb eine Dublettensperre (gleicher Kunde,
+  gleicher Betrag, gleicher Tag) und bewusst kein automatischer zweiter Versuch.
+  Auftragsart `rechnung_erstellen`, Endpunkte `/rechnung/{pakete,liste,erstellen}`
+  und `/files/rechnungen/<datei>.pdf`.
 - **Endpoints:** `/status` `/run` `/runs` `/runs/:id` `/agents` `/vault/recent`
   `/vault/graph` `/os/map` `/os/file` `/calendar` `/ads/{overview,manifest,customers}`
   `/content/manifest` `/social/weeks` `/sales/library` `/linkedin/sync`

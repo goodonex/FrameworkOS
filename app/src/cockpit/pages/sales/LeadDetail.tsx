@@ -5,6 +5,7 @@ import { readContactsLocal, useContacts } from '../../../hooks/useContacts'
 import { useCurrentBrandSlug } from '../../../hooks/useCurrentBrandSlug'
 import { STAGE_LABEL } from '../../../lib/salesPipelineFilters'
 import { RessourcenPanel } from '../../components/sales/RessourcenPanel'
+import { RechnungPanel } from '../../components/sales/RechnungPanel'
 
 /**
  * Das Lead-Detail im Cockpit-Look (Phase 2, Zug B2 · D5).
@@ -53,7 +54,12 @@ export function LeadDetail() {
         {contact ? <span className="ck-chip">{STAGE_LABEL[contact.pipeline_stage]}</span> : null}
       </div>
 
-      {contact ? <RessourcenPanel contact={contact} /> : null}
+      {contact ? (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
+          <RessourcenPanel contact={contact} />
+          <RechnungPanel contact={contact} onSpeichern={(patch) => void contacts.update(contact.id, patch)} />
+        </div>
+      ) : null}
 
       <ContactPage variant="page" scrollInParent ohneKopf seitenspalte="rechts" />
     </div>

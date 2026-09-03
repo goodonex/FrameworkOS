@@ -34,7 +34,7 @@ export async function leseSpiegel<T>(key: string): Promise<{ data: T; updatedAt:
   return { data: data.data as T, updatedAt: data.updated_at as string }
 }
 
-export type JobKind = 'linkedin_sync' | 'agent_run' | 'runde' | 'runde_abbrechen'
+export type JobKind = 'linkedin_sync' | 'agent_run' | 'runde' | 'runde_abbrechen' | 'rechnung_erstellen'
 
 /**
  * Auftrag ablegen und NICHT auf das Ergebnis warten (31.08.2026).

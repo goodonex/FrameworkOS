@@ -28,6 +28,7 @@ import { leseListe, mitNetzwerkLock } from './linkedin/netzwerk.mjs'
 import { baueMorgenbriefInput } from './morgenbriefInput.mjs'
 import { upsertNetzwerk } from './linkedin/netzwerkUpsert.mjs'
 import { installiereLogHygiene, kuerzeLogDatei } from './logHygiene.mjs'
+import { OUTPUT_DIR as RECHNUNG_OUT, erstelleRechnung, ladePakete, listeRechnungen, rechnungBereit } from './rechnung.mjs'
 import { WACH_KARENZ_MS, bewerteWachheit, chromeErreichbar, netzErreichbar, startBereitAus } from './startBereit.mjs'
 import { beurteileWache, meldungsText } from './chromeWache.mjs'
 import {
@@ -1863,6 +1864,12 @@ async function fuehreJobAus(job) {
       linkedinSyncRunning = false
     }
   }
+  if (job.kind === 'rechnung_erstellen') {
+    // Verbraucht eine fortlaufende Rechnungsnummer. Die Dublettensperre steckt
+    // in rechnung.mjs — hier wird sie bewusst NICHT uebergangen.
+    return await erstelleRechnung(job.payload ?? {})
+  }
+
   if (job.kind === 'agent_run') {
     const agent = String(job.payload?.agent ?? '')
     if (!AGENT_BY_ID.has(agent)) throw new Error(`Unbekannter Agent: ${agent}`)
@@ -2392,6 +2399,54 @@ const server = createServer(async (req, res) => {
     }
 
     // ---------- Kunden-Ads: statische Dateien (HTML/PNG-Previews für /ads) ----------
+    // ---------- Rechnungen ----------
+    if (req.method === 'GET' && url.pathname === '/rechnung/pakete') {
+      return json(res, 200, { bereit: rechnungBereit(), pakete: await ladePakete() })
+    }
+
+    if (req.method === 'GET' && url.pathname === '/rechnung/liste') {
+      const limit = Math.min(Number(url.searchParams.get('limit') ?? 50), 200)
+      return json(res, 200, { rechnungen: await listeRechnungen(limit) })
+    }
+
+    if (req.method === 'POST' && url.pathname === '/rechnung/erstellen') {
+      const body = await readBody(req)
+      try {
+        return json(res, 200, await erstelleRechnung(body))
+      } catch (e) {
+        // Die Dublettensperre ist kein Serverfehler, sondern eine Nachfrage:
+        // 409 traegt die vorhandene Rechnung mit, damit die Oberflaeche sie
+        // anzeigen kann statt nur "ging nicht".
+        if (e?.code === 'dublette') {
+          return json(res, 409, { error: e.message, code: 'dublette', vorhandene: e.vorhandene })
+        }
+        return json(res, 400, { error: e?.message ?? 'Rechnung fehlgeschlagen' })
+      }
+    }
+
+    // Die fertige PDF. Nur aus dem Ausgabeordner, nur PDF — realpath schlaegt
+    // ../-Tricks tot, wie beim Kunden-Pfad.
+    if (req.method === 'GET' && url.pathname.startsWith('/files/rechnungen/')) {
+      const rel = decodeURIComponent(url.pathname.slice('/files/rechnungen/'.length))
+      if (!rel.toLowerCase().endsWith('.pdf')) return json(res, 403, { error: 'Nur PDF' })
+      let wurzel
+      try {
+        wurzel = await realpath(RECHNUNG_OUT)
+      } catch {
+        return json(res, 404, { error: 'Kein Rechnungsordner' })
+      }
+      const real = await realpath(resolve(join(RECHNUNG_OUT, rel)))
+      if (!real.startsWith(wurzel + sep)) return json(res, 403, { error: 'Pfad außerhalb des Rechnungsordners' })
+      const buf = await readFile(real)
+      res.writeHead(200, {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename="${encodeURIComponent(rel)}"`,
+        'Cache-Control': 'no-cache',
+        'Access-Control-Allow-Origin': '*',
+      })
+      return res.end(buf)
+    }
+
     if (req.method === 'GET' && url.pathname.startsWith('/files/kunden/')) {
       const rel = decodeURIComponent(url.pathname.slice('/files/kunden/'.length))
       const dot = rel.lastIndexOf('.')
